@@ -475,6 +475,15 @@ function helpPanel() {
 	return d;
 }
 
+// Explicit move reference for a note, e.g. "7.Nbd2" / "7...Nbd7" (number + SAN).
+function moveRef(ply) {
+	for (const l of current.lines) {
+		const m = l.moves.find((x) => x.ply === ply);
+		if (m) return fullmoveLabel(m.ply) + m.san;
+	}
+	return fullmoveLabel(ply);
+}
+
 // Notes are numbered (PGN {comments}); tagged-Footnote lines are lettered.
 function notesFootnotesPanel() {
 	const box = el("div", { className: "notes" });
@@ -486,7 +495,7 @@ function notesFootnotesPanel() {
 			row.appendChild(el("sup", { textContent: "[" + (i + 1) + "]" }));
 			row.appendChild(
 				el("span", {
-					textContent: fullmoveLabel(c.ply) + " — " + c.text,
+					textContent: moveRef(c.ply) + " — " + c.text,
 				}),
 			);
 			const edit = el("button", {
@@ -601,7 +610,7 @@ function buildMarkdown() {
 	if (comments.length) {
 		L.push("", "## Notes", "");
 		comments.forEach((c, i) =>
-			L.push(`${i + 1}. ${fullmoveLabel(c.ply)} — ${c.text}`),
+			L.push(`${i + 1}. ${moveRef(c.ply)} — ${c.text}`),
 		);
 	}
 	return L.join("\n") + "\n";

@@ -136,7 +136,9 @@ function moveCell(c, ply, noteByPly) {
 export function renderTable(container, grid, orientation, opts = {}) {
 	const { vars, maxPly, mainMoves } = grid;
 	const labels = {};
-	mainMoves.forEach((m) => (labels[m.ply] = m.ply % 2 === 0 ? fullmoveLabel(m.ply) : ""));
+	mainMoves.forEach(
+		(m) => (labels[m.ply] = m.ply % 2 === 0 ? fullmoveLabel(m.ply) : ""),
+	);
 
 	const table = document.createElement("table");
 	table.className = "tbl";
