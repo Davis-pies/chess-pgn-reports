@@ -42,7 +42,7 @@ function flipToMove(fen) {
 }
 
 function attachPending(pending) {
-	return pending ? [{ text: pending }] : [];
+	return pending ? [pending] : [];
 }
 
 // Parses a run of moves starting at `state` ({fen, ply}: position BEFORE the
@@ -64,9 +64,9 @@ function parseSeq(tokens, ctx, state) {
 				.trim()
 				.replace(/\[%.*?\]/g, "")
 				.trim(); // drop [%...] NAG markers
-			if (!text || text.length < 5) {
-				// drop empty or trivially short fragments (e.g. a lone "If"/"then")
-				// that are PGN sentence-splitter noise rather than real notes
+			if (!text) {
+				// only drop truly empty comments; keep fragments like "If"/"then"
+				// so if/then annotations don't lose their connective words
 				ctx.i++;
 				continue;
 			}
