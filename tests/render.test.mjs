@@ -4,7 +4,12 @@ import { JSDOM } from "jsdom";
 import { parsePgn } from "../src/pgn.js";
 import { collectLines } from "../src/tree.js";
 import { grid } from "../src/table.js";
-import { renderTable, fenToSvg } from "../src/render.js";
+import {
+	renderTable,
+	renderCards,
+	boardSvg,
+	fullMovesText,
+} from "../src/render.js";
 
 function dom() {
 	return new JSDOM('<!DOCTYPE html><div id="view"></div>', {
@@ -12,11 +17,13 @@ function dom() {
 	});
 }
 
-test("fenToSvg draws all 64 squares, including empty ones", () => {
-	const svg = fenToSvg("4k3/8/8/8/8/8/8/4K3 w - - 0 1");
-	assert.strictEqual((svg.match(/<rect/g) || []).length, 64);
+test("boardSvg draws all 64 squares, including empty ones", () => {
+	global.document = dom().window.document;
+	const svg = boardSvg("4k3/8/8/8/8/8/8/4K3 w - - 0 1");
+	assert.strictEqual(svg.querySelectorAll("rect").length, 64);
 	// the two kings still render as pieces
-	assert.strictEqual((svg.match(/<text/g) || []).length, 2);
+	assert.strictEqual(svg.querySelectorAll("text").length, 2);
+	delete global.document;
 });
 
 test("renders a vertical table with tagged variations into the DOM", () => {
@@ -27,8 +34,7 @@ test("renders a vertical table with tagged variations into the DOM", () => {
 	const lines = collectLines(
 		parsePgn("1. e4 e5 (1... c5 2. Nf3 Nc6) 2. Nf3 Nc6").nodes,
 	);
-	lines[0].tag = "main";
-	lines[1].tag = "minor";
+	lines[1].tag = "sideline";
 
 	const container = document.createElement("div");
 	renderTable(container, grid(lines), "vertical", { showBoards: true });
@@ -42,12 +48,36 @@ test("renders a vertical table with tagged variations into the DOM", () => {
 	// header labels include move numbers
 	assert.ok(header.textContent.includes("1."));
 	assert.ok(header.textContent.includes("2."));
-	// main row has a board diagram esp. via showBoards
-	const boards = container.querySelectorAll("figure.board svg");
+	// each variation gets a board diagram
+	const boards = container.querySelectorAll("figure.board svg.board-svg");
 	assert.strictEqual(boards.length, 2);
 
 	delete global.document;
 	delete global.DOMParser;
+});
+
+test("renderCards produces one labeled card per line with moves", () => {
+	global.document = dom().window.document;
+	const lines = collectLines(
+		parsePgn("1. e4 e5 (1... c5 2. Nf3) 2. Nf3").nodes,
+	);
+	const container = document.createElement("div");
+	renderCards(container, grid(lines), { boardSize: 120 });
+	const cards = container.querySelectorAll(".card");
+	assert.strictEqual(cards.length, 2);
+	assert.ok(cards[0].textContent.includes("e4"));
+	assert.ok(cards[0].querySelector(".board-svg"));
+	delete global.document;
+});
+
+test("fullMovesText renders move numbers with the moves", () => {
+	const lines = collectLines(
+		parsePgn("1. e4 e5 (1... c5) 2. Nf3").nodes,
+	);
+	const main = lines[0];
+	const txt = fullMovesText(main.moves);
+	assert.ok(txt.includes("1. e4"));
+	assert.ok(txt.includes("2. Nf3"));
 });
 
 test("horizontal layout transposes to one row per ply", () => {

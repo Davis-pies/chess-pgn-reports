@@ -31,18 +31,18 @@ test("full app flow: import PGN, tag a line, render table preview", async () => 
 	// main + 1 variation -> 2 line editors
 	const editors = view.querySelectorAll(".ledge");
 	assert.strictEqual(editors.length, 2);
-	// tag the second line as minor
+	// tag the second line as sideline
 	const secondRow = editors[1];
-	const minorBtn = [...secondRow.querySelectorAll("button")].find(
-		(b) => b.textContent === "Minor",
+	const sidelineBtn = [...secondRow.querySelectorAll("button")].find(
+		(b) => b.textContent === "Sideline",
 	);
-	minorBtn.click();
-	// preview should now carry a "minor" tag label
+	sidelineBtn.click();
+	// preview should now carry a sideline tag label
 	const view2 = doc("view");
 	const preview = view2.querySelector("table.tbl");
 	assert.ok(
-		preview.textContent.includes("minor"),
-		"minor tag appears in table",
+		preview.textContent.toLowerCase().includes("sideline"),
+		"sideline tag appears in table",
 	);
 
 	delete global.window;

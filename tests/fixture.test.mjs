@@ -29,25 +29,25 @@ test("headers are stripped and variations become separate lines", () => {
 });
 
 test("null moves are preserved and do not break turn alternation", () => {
-const pgn = fs.readFileSync(fixture, "utf8");
-const lines = collectLines(parsePgn(pgn).nodes);
-const nullVar = lines.find((l) => l.moves.some((m) => m.san === "--"));
-assert.ok(nullVar, "a variation containing a null move exists");
-// the null-move line: ... Be6 (-- Bc4)
-const idx = nullVar.moves.findIndex((m) => m.san === "--");
-assert.strictEqual(nullVar.moves[idx - 1].san, "Be6");
-assert.strictEqual(nullVar.moves[idx + 1].san, "Bc4");
+	const pgn = fs.readFileSync(fixture, "utf8");
+	const lines = collectLines(parsePgn(pgn).nodes);
+	const nullVar = lines.find((l) => l.moves.some((m) => m.san === "--"));
+	assert.ok(nullVar, "a variation containing a null move exists");
+	// the null-move line: ... Be6 (-- Bc4)
+	const idx = nullVar.moves.findIndex((m) => m.san === "--");
+	assert.strictEqual(nullVar.moves[idx - 1].san, "Be6");
+	assert.strictEqual(nullVar.moves[idx + 1].san, "Bc4");
 });
 
 test("comments are captured and exposed on the parse result", () => {
-const pgn = fs.readFileSync(fixture, "utf8");
-const { comments } = parsePgn(pgn);
-assert.ok(comments.length > 0, "game has prose comments");
-assert.ok(
-comments.every((c) => typeof c.ply === "number" && c.text.length > 0),
-);
-// a known comment from the game
-const solid = comments.find((c) => c.text.includes("very solid development"));
-assert.ok(solid, "the 5.d3 comment is present");
-assert.strictEqual(solid.ply, 8); // 5.d3 -> ply 8 (0-based)
+	const pgn = fs.readFileSync(fixture, "utf8");
+	const { comments } = parsePgn(pgn);
+	assert.ok(comments.length > 0, "game has prose comments");
+	assert.ok(
+		comments.every((c) => typeof c.ply === "number" && c.text.length > 0),
+	);
+	// a known comment from the game
+	const solid = comments.find((c) => c.text.includes("very solid development"));
+	assert.ok(solid, "the 5.d3 comment is present");
+	assert.strictEqual(solid.ply, 8); // 5.d3 -> ply 8 (0-based)
 });

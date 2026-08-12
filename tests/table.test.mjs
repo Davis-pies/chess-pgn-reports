@@ -20,7 +20,7 @@ test("divergence finds where a variation splits from mainline", () => {
 
 test("grid marks shared prefix as ellipsis and diverging moves with tag class", () => {
 	const lines = linesFrom("1. e4 c5 (1... e5 2. Nf3 Nc6) 2. Nf3");
-	lines[1].tag = "minor";
+	lines[1].tag = "sideline";
 	const { vars, maxPly, mainMoves } = grid(lines);
 	assert.strictEqual(vars.length, 2);
 	assert.strictEqual(mainMoves.length, 3);
@@ -32,7 +32,7 @@ test("grid marks shared prefix as ellipsis and diverging moves with tag class", 
 	assert.strictEqual(varRow.cells[0].cls, "ellip");
 	// diverging moves render with the tag class
 	assert.strictEqual(varRow.cells[1].text, "e5");
-	assert.strictEqual(varRow.cells[1].cls, "minor");
+	assert.strictEqual(varRow.cells[1].cls, "sideline");
 	assert.strictEqual(varRow.cells[2].text, "Nf3");
 	// main row shows real (non-ellipsis) moves
 	assert.strictEqual(vars[0].cells[2].text, "Nf3");

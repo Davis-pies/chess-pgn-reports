@@ -12,13 +12,15 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
 2. **Tag** — for each line (mainline first, then each variation) mark it
    **Main** / **Minor** / **Footnote**, and optionally add a name, an
    evaluation symbol (`=`, `±`, `∞`, ...), and a note.
-3. **Render** — a table in either **vertical** (variations as rows, with `…`
-   for shared prefix) or **horizontal** (variations as columns) layout. Toggle
-   inline SVG board diagrams. Below the table: **Notes** (PGN comments,
-   numbered) and **Footnotes** (lines tagged Footnote, lettered a, b, c…).
-4. **Export** — **Print → Save as PDF**; the print stylesheet keeps only the
-   table, notes, and footnotes so the PDF is clean. Saved notebooks (in
-   `localStorage`) are reopened from the **Open** list on the import screen.
+3. **Render** — a table in **vertical** or **horizontal** layout, or a linear
+   **card** view (each line as its own readout with a board diagram of the end
+   position) for printing. Boards are self-contained SVG, fixed colors so they
+   stay visible in both light and dark themes. Below the table: **Notes**
+   (PGN comments, numbered) and **Footnotes** (tagged lines, lettered a, b, c…).
+   A dark-theme toggle is in the toolbar.
+4. **Export** — **Print → Save as PDF** always uses the linear card view (one
+   line + position, then the next). Saved workbooks (in `localStorage`) are
+   listed under **My saved workbooks** on the import screen to reopen/delete.
 
 ## Run locally
 

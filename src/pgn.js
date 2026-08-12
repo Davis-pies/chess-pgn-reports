@@ -60,14 +60,18 @@ function parseSeq(tokens, ctx, state) {
 		const t = tokens[ctx.i];
 		if (t.startsWith("{") || t.startsWith(";")) {
 			let text = t.startsWith("{") ? t.slice(1, -1) : t.slice(1);
-			text = text.trim().replace(/\[%.*?\]/g, "").trim(); // drop [%...] NAG markers
+			text = text
+				.trim()
+				.replace(/\[%.*?\]/g, "")
+				.trim(); // drop [%...] NAG markers
 			if (!text) {
 				ctx.i++;
 				continue;
 			}
 			ctx.comments.push({ ply: last ? last.ply : 0, text });
 			if (last) last.comments.push(text);
-			else pendingComment = pendingComment ? pendingComment + "\n" + text : text;
+			else
+				pendingComment = pendingComment ? pendingComment + "\n" + text : text;
 			ctx.i++;
 			continue;
 		}

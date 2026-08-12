@@ -2,7 +2,7 @@
 import { parsePgn } from "./pgn.js";
 import { collectLines } from "./tree.js";
 import { grid } from "./table.js";
-import { renderTable, fullmoveLabel } from "./render.js";
+import { renderTable, renderCards, fullmoveLabel } from "./render.js";
 import {
 	saveNotebook,
 	listNotebooks,
@@ -19,6 +19,7 @@ let current = {
 	comments: [],
 	orientation: "vertical",
 	showBoards: false,
+	preview: "table",
 };
 
 const $ = (id) => document.getElementById(id);
@@ -32,6 +33,31 @@ function el(tag, props, children = []) {
 			: e.appendChild(c),
 	);
 	return e;
+}
+
+const THEME_KEY = "ott-theme";
+function currentTheme() {
+	return (document.documentElement.dataset.theme || "light") === "dark"
+		? "dark"
+		: "light";
+}
+function applyTheme(t) {
+	document.documentElement.dataset.theme = t;
+	try {
+		localStorage.setItem(THEME_KEY, t);
+	} catch {}
+}
+function themeBtn() {
+	const target = currentTheme() === "light" ? "dark" : "light";
+	const b = el("button", {
+		className: "chip",
+		textContent: target === "dark" ? "Dark theme" : "Light theme",
+	});
+	b.onclick = () => {
+		applyTheme(target);
+		renderApp();
+	};
+	return b;
 }
 
 function movesText(line, head = 6) {
@@ -94,6 +120,7 @@ function viewRoot() {
 		setTimeout(() => (save.textContent = "Save"), 1200);
 	};
 	top.appendChild(save);
+	top.appendChild(themeBtn());
 	wrap.appendChild(top);
 
 	wrap.appendChild(notebookList());
@@ -101,62 +128,84 @@ function viewRoot() {
 	wrap.appendChild(helpPanel());
 	wrap.appendChild(orientationToggle());
 	wrap.appendChild(markupPanel());
-	wrap.appendChild(tablePreview());
+	wrap.appendChild(previewGroup());
 	wrap.appendChild(notesFootnotesPanel());
 	wrap.appendChild(exportBar());
 	return wrap;
 }
 
-// Live table preview; this is what print/PDF renders (controls hidden by CSS).
-function tablePreview() {
+// Both the packed table and the linear print/card view. On screen, `preview`
+// picks which is visible; at print time the cards are always used (media query).
+function previewGroup() {
 	const box = el("div", { className: "preview" });
-	box.appendChild(el("h3", { textContent: "Table" }));
-	renderTable(box, grid(current.lines), current.orientation, {
+	const g = grid(current.lines, current.comments);
+	const t = el("div", { className: "pv-table" });
+	t.appendChild(el("h3", { textContent: "Table" }));
+	renderTable(t, g, current.orientation, {
 		showBoards: current.showBoards,
 	});
+	const c = el("div", { className: "pv-cards" });
+	c.appendChild(el("h3", { textContent: "Print view — one line, one position" }));
+	renderCards(c, g);
+	box.append(t, c);
+	const useCards = current.preview === "cards";
+	t.classList.toggle("hidden", useCards);
+	c.classList.toggle("hidden", !useCards);
 	return box;
 }
 
 function notebookList() {
 	const items = listNotebooks();
 	const box = el("div", { className: "notebooks" });
-	if (!items.length) return box;
-	items
-		.filter((n) => n.id !== current.id)
-		.forEach((n) => {
-			const b = el("button", {
-				className: "chip",
-				textContent: `Open: ${n.name || n.id}`,
-			});
-			b.onclick = () => openNotebook(n.id);
-			const del = el("button", { className: "chip danger", textContent: "✕" });
-			del.onclick = () => {
-				if (confirm(`Delete "${n.name}"?`)) {
-					deleteNotebook(n.id);
-					box.remove();
-				}
-			};
-			const cell = el("span", {}, [b, del]);
-			box.appendChild(cell);
+	const shown = items.filter((n) => n.id !== current.id);
+	if (!shown.length) return box;
+	box.appendChild(
+		el("div", {
+			className: "nb-head",
+			textContent: "My saved workbooks — click to open, ✕ to delete",
+		}),
+	);
+	shown.forEach((n) => {
+		const b = el("button", {
+			className: "chip",
+			textContent: `Open: ${n.name || n.id}`,
 		});
+		b.onclick = () => openNotebook(n.id);
+		const del = el("button", { className: "chip danger", textContent: "✕" });
+		del.onclick = () => {
+			if (confirm(`Delete "${n.name}"?`)) {
+				deleteNotebook(n.id);
+				box.remove();
+			}
+		};
+		const cell = el("span", {}, [b, del]);
+		box.appendChild(cell);
+	});
 	return box;
 }
 
 function openNotebook(id) {
 	const nb = loadNotebook(id);
-	if (!nb) return;
+	if (!nb) {
+		alert("That workbook could not be read.");
+		return;
+	}
 	try {
 		const { nodes } = parsePgn(nb.pgn);
-		if (!nodes.length) return;
+		if (!nodes.length) {
+			alert("That workbook has no moves.");
+			return;
+		}
 		const lines = collectLines(nodes);
 		// re-apply tags
 		lines.forEach((l) => {
 			const k = keyFor(l.moves);
 			const t = (nb.tags || []).find((x) => x.key === k);
 			if (t) {
-				l.tag = t.tag;
 				l.name = t.name;
 				l.meta = t.meta || {};
+				// legacy notebooks used 'main'/'minor'; mainline is now structural
+				l.tag = l.isMain ? undefined : t.tag === "foot" ? "foot" : "sideline";
 			}
 		});
 		current = {
@@ -168,7 +217,7 @@ function openNotebook(id) {
 			orientation: current.orientation,
 			showBoards: current.showBoards,
 		};
-	} catch {
+	} catch (e) {
 		current = {
 			id: null,
 			name: "",
@@ -177,6 +226,7 @@ function openNotebook(id) {
 			orientation: "vertical",
 			showBoards: false,
 		};
+		alert("Could not open workbook: " + e.message);
 	}
 	renderApp();
 }
@@ -201,6 +251,24 @@ function orientationToggle() {
 		renderApp();
 	};
 	bar.append(h, v);
+	bar.appendChild(el("span", { textContent: "\u00a0 View: " }));
+	const tb = el("button", {
+		className: "chip" + (current.preview === "table" ? " on" : ""),
+		textContent: "Table",
+	});
+	tb.onclick = () => {
+		current.preview = "table";
+		renderApp();
+	};
+	const cb = el("button", {
+		className: "chip" + (current.preview === "cards" ? " on" : ""),
+		textContent: "Lines (print)",
+	});
+	cb.onclick = () => {
+		current.preview = "cards";
+		renderApp();
+	};
+	bar.append(tb, cb);
 	const b = el("label", {}, [
 		"Board diagrams ",
 		el("input", { type: "checkbox", checked: current.showBoards }),
@@ -216,7 +284,10 @@ function orientationToggle() {
 function markupPanel() {
 	const box = el("div", { className: "markup" });
 	box.appendChild(
-		el("h3", { textContent: "Tag variations — main / minor / footnote" }),
+		el("h3", {
+			textContent:
+				"The mainline is fixed. Tag each sideline or footnote line below.",
+		}),
 	);
 	current.lines.forEach((l, idx) => {
 		box.appendChild(lineEditor(l, idx));
@@ -224,12 +295,10 @@ function markupPanel() {
 	box.appendChild(
 		el("button", {
 			className: "chip",
-			textContent: "Tag remaining as minor",
+			textContent: "Tag remaining as sideline",
 			onclick: () => {
 				current.lines.forEach((l) => {
-					if (!l.tag) {
-						l.tag = "minor";
-					}
+					if (!l.tag && !l.isMain) l.tag = "sideline";
 				});
 				renderApp();
 			},
@@ -259,11 +328,16 @@ function lineEditor(l, idx) {
 		}),
 	);
 	const tags = el("div", { className: "tags" });
-	tags.append(
-		btn("main", "Main"),
-		btn("minor", "Minor"),
-		btn("foot", "Footnote"),
-	);
+	if (idx === 0) {
+		tags.appendChild(
+			el("span", { className: "maintag", textContent: "Mainline — fixed" }),
+		);
+	} else {
+		tags.append(
+			btn("sideline", "Sideline"),
+			btn("foot", "Footnote"),
+		);
+	}
 	row.appendChild(tags);
 	const name = el("input", {
 		className: "ln",
@@ -300,7 +374,7 @@ function helpPanel() {
 	const ol = el("ol", {});
 	[
 		"Paste a PGN or upload a .pgn file, then click Load & Tag. Every variation in parentheses becomes its own line.",
-		"For each line choose Main, Minor, or Footnote, and optionally add a name, an evaluation symbol (=, ±, ∞), and a note.",
+		"For each sideline or footnote line choose Sideline or Footnote, and optionally add a name, an evaluation symbol (=, ±, ∞), and a note. The mainline is fixed automatically.",
 		"Switch layout between Horizontal (variations as columns) and Vertical (variations as rows), and toggle board diagrams.",
 		"Click Save to keep this notebook in your browser (localStorage). Reopen it anytime from the Open list.",
 		"Print or Save as PDF — the printed page keeps only the table, notes, and footnotes.",
@@ -329,9 +403,7 @@ function notesFootnotesPanel() {
 		box.appendChild(el("h3", { textContent: "Footnotes" }));
 		footLines.forEach((l, i) => {
 			const row = el("div", { className: "nt" });
-			row.appendChild(
-				el("sup", { textContent: String.fromCharCode(97 + i) }),
-			);
+			row.appendChild(el("sup", { textContent: String.fromCharCode(97 + i) }));
 			const note = (l.meta && l.meta.note) || "";
 			row.appendChild(
 				el("span", {
@@ -363,6 +435,7 @@ function importPanel() {
 	box.appendChild(
 		el("h2", { textContent: "Chess Opening Theory Table Builder" }),
 	);
+	box.appendChild(themeBtn());
 	box.append(helpPanel(), notebookList());
 	const ta = el("textarea", {
 		className: "pgnin",
@@ -393,6 +466,7 @@ function importPanel() {
 				comments,
 				orientation: "vertical",
 				showBoards: false,
+				preview: "table",
 			};
 			renderApp();
 		} catch (e) {
@@ -405,5 +479,10 @@ function importPanel() {
 
 document.addEventListener("DOMContentLoaded", () => {
 	if (!document.getElementById("view")) return;
+	let saved = null;
+	try {
+		saved = localStorage.getItem(THEME_KEY);
+	} catch {}
+	if (saved) document.documentElement.dataset.theme = saved;
 	renderApp();
 });
