@@ -135,43 +135,46 @@ function viewRoot() {
 	top.appendChild(save);
 	top.appendChild(themeBtn());
 	wrap.appendChild(top);
-
-	wrap.appendChild(notebookList());
-
-	wrap.appendChild(helpPanel());
-	wrap.appendChild(orientationToggle());
-	wrap.appendChild(markupPanel());
-	wrap.appendChild(previewGroup());
-	wrap.appendChild(notesFootnotesPanel());
-	wrap.appendChild(exportBar());
-	return wrap;
-}
-
-// Both the packed table and the linear print/card view. On screen, `preview`
-// picks which is visible; at print time the cards are always used (media query).
-function previewGroup() {
-	const box = el("div", { className: "preview" });
+	const layout = el("div", { className: "app-layout" });
+	const side = el("aside", { className: "side-panel" });
+	const main = el("div", { className: "main-panel" });
 	const g = grid(current.lines);
+
+	// side: controls + the table, fixed to the left with its own scroll
+	side.appendChild(orientationToggle());
 	const t = el("div", { className: "pv-table" });
 	t.appendChild(el("h3", { textContent: "Table" }));
 	renderTable(t, g, current.orientation, {
 		showBoards: current.showBoards,
 		boardSize: current.boardSize,
 	});
+	side.appendChild(t);
+	appendPrintTables(side, g); // print-only horizontal slices (hidden on screen)
+	layout.appendChild(side);
+
+	// main: management, cards (print preview), reference sections
+	main.appendChild(notebookList());
+	main.appendChild(helpPanel());
+	const markupBox = markupPanel();
+	const notesBox = notesFootnotesPanel();
+	main.appendChild(markupBox);
 	const c = el("div", { className: "pv-cards" });
 	c.appendChild(
 		el("h3", { textContent: "Print view — one line, one position" }),
 	);
-	renderCards(c, g, {
-		notes: allNotes(),
-		boardSize: current.boardSize,
-	});
-	box.append(t, c);
-	appendPrintTables(box, g);
+	renderCards(c, g, { notes: allNotes(), boardSize: current.boardSize });
+	main.appendChild(c);
+	main.appendChild(notesBox);
+	main.appendChild(exportBar());
+	layout.appendChild(main);
+	wrap.appendChild(layout);
+
+	// `preview` flips the main pane between the editors and the print cards
 	const useCards = current.preview === "cards";
-	t.classList.toggle("hidden", useCards);
+	markupBox.classList.toggle("hidden", useCards);
+	notesBox.classList.toggle("hidden", useCards);
 	c.classList.toggle("hidden", !useCards);
-	return box;
+	return wrap;
 }
 
 // Print/PDF horizontal table. The mainline is always shown as the reference

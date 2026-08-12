@@ -53,6 +53,38 @@ main {
 	padding: 16px;
 }
 
+/* two-pane layout: table pinned left with its own scroll, editing on the right */
+.app-layout {
+	display: flex;
+	gap: 16px;
+	align-items: flex-start;
+}
+.side-panel {
+	flex: 1 1 48%;
+	min-width: 360px;
+	max-width: 62%;
+	position: sticky;
+	top: 0;
+	max-height: 100vh;
+	overflow: auto;
+	padding-right: 4px;
+}
+.main-panel {
+	flex: 1 1 52%;
+	min-width: 0;
+}
+@media (max-width: 900px) {
+	.app-layout {
+		flex-direction: column;
+	}
+	.side-panel {
+		position: static;
+		max-height: none;
+		flex: none;
+		width: 100%;
+	}
+}
+
 h2 {
 	margin: 10px 0 6px;
 }
@@ -525,6 +557,13 @@ figure.board figcaption {
 	}
 	.preview {
 		overflow: visible;
+	}
+	.side-panel {
+		position: static;
+		max-height: none;
+		overflow: visible;
+		flex: none;
+		width: 100%;
 	}
 	.pv-cards {
 		display: block !important;
