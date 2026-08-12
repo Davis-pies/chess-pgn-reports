@@ -430,17 +430,12 @@ function moveStrip(l) {
 			mv[d].san === mainL.moves[d].san
 		)
 			d++;
-	// indicate the shared prefix (where this line diverges from the mainline)
+	// indicate the directly preceding move (where this line diverges)
 	if (!l.isMain && d > 0) {
 		const lab = (m) =>
 			(m.ply % 2 === 0 ? Math.floor(m.ply / 2) + 1 + ". " : "") + m.san;
-		const shared = mv.slice(0, d);
-		const ctx =
-			shared.length <= 3
-				? shared.map(lab).join(" ")
-				: lab(shared[0]) + " \u2026 " + lab(shared[d - 1]);
 		wrap.appendChild(
-			el("span", { className: "ctxchip", textContent: "\u22ef " + ctx }),
+			el("span", { className: "ctxchip", textContent: "\u2192 " + lab(mv[d - 1]) }),
 		);
 	}
 	const owned = l.isMain ? mv : mv.slice(d);
