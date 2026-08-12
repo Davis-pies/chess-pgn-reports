@@ -234,6 +234,11 @@ select:focus {
 	color: #fff;
 	border-color: var(--main);
 }
+.move-chip.has-note::after {
+	content: " \u00b6";
+	color: var(--foot);
+	font-weight: 700;
+}
 .endchip {
 	opacity: 0.75;
 }

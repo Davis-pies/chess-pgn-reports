@@ -431,21 +431,21 @@ function moveStrip(l) {
 		)
 			d++;
 	// indicate the directly preceding move (where this line diverges)
-	if (!l.isMain && d > 0) {
-		const lab = (m) =>
-			(m.ply % 2 === 0 ? Math.floor(m.ply / 2) + 1 + ". " : "") + m.san;
-		wrap.appendChild(
-			el("span", { className: "ctxchip", textContent: "\u2192 " + lab(mv[d - 1]) }),
-		);
+	if (!l.isMain) {
+		const ctx = branchContext(l);
+		if (ctx)
+			wrap.appendChild(el("span", { className: "ctxchip", textContent: ctx }));
 	}
 	const owned = l.isMain ? mv : mv.slice(d);
 	owned.forEach((m) => {
 		const num = m.ply % 2 === 0 ? Math.floor(m.ply / 2) + 1 + ". " : "";
 		const mark = (l.marks || {})[m.ply];
+		const hasNote = (current.comments || []).some((c) => c.ply === m.ply);
 		const sel = current.sel && current.sel.l === l && current.sel.ply === m.ply;
 		const b = el("button", {
 			type: "button",
-			className: "move-chip" + (sel ? " on" : ""),
+			className:
+				"move-chip" + (sel ? " on" : "") + (hasNote ? " has-note" : ""),
 			textContent: num + m.san + (mark ? " \u00b7 " + mark : ""),
 		});
 		b.onclick = () => {
@@ -611,6 +611,27 @@ function moveRef(ply) {
 	return fullmoveLabel(ply);
 }
 
+// "→ <directly preceding move>" so a branched line's divergence point is clear.
+function branchContext(l) {
+	if (l.isMain) return "";
+	const mainL = current.lines.find((x) => x.isMain) || current.lines[0];
+	let d = 0;
+	const mv = l.moves;
+	while (
+		d < mv.length &&
+		d < mainL.moves.length &&
+		mv[d].san === mainL.moves[d].san
+	)
+		d++;
+	if (!d) return "";
+	const m = mv[d - 1];
+	return (
+		"\u2192 " +
+		(m.ply % 2 === 0 ? Math.floor(m.ply / 2) + 1 + ". " : "") +
+		m.san
+	);
+}
+
 // Notes are numbered (PGN {comments}); tagged-Footnote lines are lettered.
 function notesFootnotesPanel() {
 	const box = el("div", { className: "notes" });
@@ -639,10 +660,12 @@ function notesFootnotesPanel() {
 			row.appendChild(el("sup", { textContent: String.fromCharCode(97 + i) }));
 			const note = (l.meta && l.meta.note) || "";
 			const d = divergence(l, mainL);
+			const ctx = branchContext(l);
 			row.appendChild(
 				el("span", {
 					textContent:
 						(l.name ? l.name + ": " : "") +
+						(ctx ? ctx + " " : "") +
 						fullMovesText(l.moves.slice(d), l.marks) +
 						(note ? " — " + note : ""),
 				}),
@@ -708,11 +731,20 @@ function buildMarkdown() {
 	}
 	if (g.footNotes.length) {
 		L.push("", "## Footnotes", "");
-		g.footNotes.forEach((f) =>
+		g.footNotes.forEach((f) => {
+			const prec =
+				f.d > 0
+					? "\u2192 " +
+						(f.moves[f.d - 1].ply % 2 === 0
+							? Math.floor(f.moves[f.d - 1].ply / 2) + 1 + ". "
+							: "") +
+						f.moves[f.d - 1].san +
+						" "
+					: "";
 			L.push(
-				`- ${f.letter}${f.name ? " " + f.name : ""}${f.eval ? " " + f.eval : ""}: ${fullMovesText(f.moves.slice(f.d), f.marks)}${f.note ? " — " + f.note : ""}`,
-			),
-		);
+				`- ${f.letter}${f.name ? " " + f.name : ""}${f.eval ? " " + f.eval : ""}: ${prec}${fullMovesText(f.moves.slice(f.d), f.marks)}${f.note ? " — " + f.note : ""}`,
+			);
+		});
 	}
 	const comments = current.comments || [];
 	if (comments.length) {
