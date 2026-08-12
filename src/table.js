@@ -25,6 +25,7 @@ export function grid(lines) {
 	// number the notes in line order (matches allNotes()); each line carries its
 	// own comments, so ownership is structural rather than inferred from ply
 	let noteNum = 0;
+	const seen = new Set(); // identical (ply,text) notes collapse to one number
 	const vars = []; // mainline + sidelines (table rows)
 	const footNotes = []; // footnote lines (prose section)
 	lines.forEach((l) => {
@@ -47,10 +48,15 @@ export function grid(lines) {
 			}
 			cells[m.ply] = { text, cls, mark: marks[m.ply] || "" };
 		});
-		// note markers keyed by ply, from the line's own comments
+		// note markers keyed by ply; identical (ply,text) notes shared across
+		// lines get one number, matching allNotes()
 		const noteByPly = {};
 		(l.comments || []).forEach((c) => {
-			noteNum++;
+			const k = c.ply + "|" + c.text;
+			if (!seen.has(k)) {
+				seen.add(k);
+				noteNum++;
+			}
 			(noteByPly[c.ply] = noteByPly[c.ply] || []).push(noteNum);
 		});
 		const base = {

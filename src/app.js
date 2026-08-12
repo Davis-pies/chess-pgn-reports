@@ -32,13 +32,55 @@ let current = {
 };
 let sideDragging = false; // dragging the table-panel resize handle
 
+// trie groups the user expanded — details open state survives re-renders
+const openPaths = new Set();
+
+// identical-move tracking: a shared move (same position reached + same SAN)
+// is annotated once and applied to every line carrying it
+const fenCache = new WeakMap(); // line -> Map(ply -> fen)
+let sharedInfo = {}; // { byLine: line -> Map(ply -> id), idLines: id -> [lines] }
+function fenAtLine(l, ply) {
+	let m = fenCache.get(l);
+	if (!m) fenCache.set(l, (m = new Map()));
+	if (!m.has(ply)) m.set(ply, fenAt(l.moves, ply));
+	return m.get(ply);
+}
+function computeShared() {
+	const byLine = new Map();
+	const idLines = new Map();
+	const byFenSan = new Map();
+	let next = 0;
+	current.lines.forEach((l) => {
+		const per = new Map();
+		l.moves.forEach((m) => {
+			const k = fenAtLine(l, m.ply) + "\u0000" + m.san;
+			let id = byFenSan.get(k);
+			if (!id) {
+				id = "s" + ++next;
+				byFenSan.set(k, id);
+				idLines.set(id, []);
+			}
+			per.set(m.ply, id);
+			const arr = idLines.get(id);
+			if (!arr.includes(l)) arr.push(l);
+		});
+		byLine.set(l, per);
+	});
+	sharedInfo = { byLine, idLines };
+}
+
 // Flatten every line's own comments into the numbered Notes list (mainline
 // first, then each variation). Each entry remembers its owning line, so notes
 // are attached to a specific line rather than to a (colliding) ply.
 function allNotes() {
 	const out = [];
+	const seen = new Set();
 	current.lines.forEach((l) => {
 		(l.comments || []).forEach((c) => {
+			// identical (ply,text) notes carried by several shared lines are one note
+			const k = c.ply + "|" + c.text;
+			if (seen.has(k)) return;
+			seen.add(k);
 			out.push({ ply: c.ply, text: c.text, owner: l, n: out.length + 1 });
 		});
 	});
@@ -85,6 +127,7 @@ function themeBtn() {
 
 function renderApp() {
 	const v = $("view");
+	computeShared(); // which lines carry each move (identical position + SAN)
 	v.replaceChildren();
 	v.appendChild(viewRoot());
 }
@@ -107,6 +150,7 @@ function viewRoot() {
 					orientation: "horizontal",
 					showBoards: false,
 					boardSize: current.boardSize,
+					sideWidth: current.sideWidth,
 					sel: null,
 				};
 				renderApp();
@@ -376,14 +420,20 @@ function buildTrie(lines, main) {
 		const d = divergence(l, main);
 		let node = root;
 		for (const m of l.moves.slice(d)) {
-			const key = m.ply + ":" + m.san;
-			if (!node.children.has(key))
-				node.children.set(key, {
+			const k = m.ply + ":" + m.san;
+			let child = node.children.get(k);
+			if (!child) {
+				child = {
 					children: new Map(),
 					leaf: null,
 					move: m,
-				});
-			node = node.children.get(key);
+					// root-relative path key: stable across renders, used to
+					// remember which <details> groups are open
+					key: (node.key ? node.key + "/" : "") + k,
+				};
+				node.children.set(k, child);
+			}
+			node = child;
 		}
 		node.leaf = l;
 	}
@@ -431,6 +481,11 @@ function renderTrieNode(container, node, nameCounter, path) {
 	// a fork: a collapsible group, all closed by default; header shows the full
 	// shared path up to the fork
 	const det = el("details", { className: "lgroup" });
+	det.open = openPaths.has(node.key);
+	det.addEventListener("toggle", () => {
+		if (det.open) openPaths.add(node.key);
+		else openPaths.delete(node.key);
+	});
 	const count = countLeaves(node);
 	det.appendChild(
 		el("summary", {
@@ -543,8 +598,9 @@ function lineEditor(l, idx) {
 	}
 	row.appendChild(tags);
 	row.appendChild(moveStrip(l));
-	// the symbol/comment panel only appears when a move (or line-end) is selected
-	if (current.sel && current.sel.l === l) row.appendChild(movePanel(l));
+	// the symbol/comment panel appears once, on the first line of the group
+	if (current.sel && current.sel.lines && current.sel.lines[0] === l)
+		row.appendChild(movePanel(l));
 	const note = el("input", {
 		className: "lno",
 		placeholder: "note",
@@ -632,12 +688,28 @@ function moveStrip(l) {
 	owned.forEach((m) => {
 		const num = m.ply % 2 === 0 ? Math.floor(m.ply / 2) + 1 + ". " : "";
 		const mark = (l.marks || {})[m.ply];
-		const hasNote = (l.comments || []).some((c) => c.ply === m.ply);
+		// this move's shared group: every line reaching the identical position
+		const gid = sharedInfo.byLine.get(l)?.get(m.ply);
+		const group = gid ? sharedInfo.idLines.get(gid) : [l];
+		// a note lives on whichever lines carry it; shared notes sit on all of them
+		const hasNote = group.some((x) =>
+			(x.comments || []).some((c) => c.ply === m.ply),
+		);
 		// numbered note references for this move's chip (superscript numbers, no brackets)
 		const noteNums = allNotes()
-			.filter((n) => n.owner === l && n.ply === m.ply)
+			.filter(
+				(n) =>
+					n.ply === m.ply &&
+					(l.comments || []).some(
+						(c) => c.ply === n.ply && c.text === n.text,
+					),
+			)
 			.map((n) => n.n);
-		const sel = current.sel && current.sel.l === l && current.sel.ply === m.ply;
+		const sel =
+			current.sel &&
+			current.sel.ply === m.ply &&
+			current.sel.lines &&
+			current.sel.lines.includes(l);
 		const b = el("button", {
 			type: "button",
 			className:
@@ -650,10 +722,14 @@ function moveStrip(l) {
 			b.appendChild(sup);
 		});
 		b.onclick = () => {
+			// annotating a shared move targets the whole identical group
 			current.sel =
-				current.sel && current.sel.l === l && current.sel.ply === m.ply
+				current.sel &&
+				current.sel.ply === m.ply &&
+				current.sel.lines &&
+				current.sel.lines.includes(l)
 					? null
-					: { l, ply: m.ply };
+					: { lines: group, ply: m.ply };
 			renderApp();
 		};
 		wrap.appendChild(b);
@@ -669,13 +745,21 @@ function movePanel(l) {
 	const box = el("div", { className: "movepanel" });
 	const selPly = current.sel.ply;
 	const atEnd = selPly == null;
+	const lines = current.sel.lines || [l];
 	const cur = atEnd
 		? (l.meta && l.meta.eval) || ""
 		: (l.marks || {})[selPly] || "";
 	const mm = atEnd ? null : l.moves.find((x) => x.ply === selPly);
 	const label = atEnd ? "line-end" : fullmoveLabel(selPly) + (mm ? mm.san : "");
 	box.appendChild(
-		el("div", { className: "symlabel", textContent: "@ " + label + ":" }),
+		el("div", {
+			className: "symlabel",
+			textContent:
+				"@ " +
+				label +
+				(lines.length > 1 ? " \u00b7 " + lines.length + " shared" : "") +
+				":",
+		}),
 	);
 	// a static board of the selected move's position
 	if (!atEnd) {
@@ -685,12 +769,16 @@ function movePanel(l) {
 	}
 	const apply = (sym) => {
 		if (atEnd) {
-			l.meta = { ...(l.meta || {}), eval: cur === sym ? "" : sym };
+			lines.forEach((x) => {
+				x.meta = { ...(x.meta || {}), eval: cur === sym ? "" : sym };
+			});
 		} else {
-			l.marks = l.marks || {};
-			if (cur === sym) delete l.marks[selPly];
-			else l.marks[selPly] = sym;
-			if (!Object.keys(l.marks).length) l.marks = undefined;
+			lines.forEach((x) => {
+				x.marks = x.marks || {};
+				if (cur === sym) delete x.marks[selPly];
+				else x.marks[selPly] = sym;
+				if (!Object.keys(x.marks).length) x.marks = undefined;
+			});
 		}
 	};
 	const srow = el("span", { className: "sympick" });
@@ -719,7 +807,7 @@ function movePanel(l) {
 	};
 	srow.appendChild(clear);
 	box.appendChild(srow);
-	if (!atEnd) box.appendChild(commentEditor(selPly, l));
+	if (!atEnd) box.appendChild(commentEditor(selPly, lines));
 	const done = el("button", {
 		type: "button",
 		className: "chip mini",
@@ -733,15 +821,43 @@ function movePanel(l) {
 	return box;
 }
 
-// Edit/add notes attached to a specific move (plies are shared app-wide).
-function commentEditor(ply, l) {
+// Edit/add notes attached to an (identical) move; `lines` is the shared
+// group, so every line carrying the position gets the same note.
+function commentEditor(ply, lines) {
 	const wrap = el("div", { className: "cedit" });
-	const mine = (l.comments || []).filter((c) => c.ply === ply);
-	mine.forEach((c) => {
+	// the distinct notes at this ply across the group (deduped by text)
+	const snapshot = () => {
+		const out = [];
+		const seen = new Set();
+		lines.forEach((l) =>
+			(l.comments || []).forEach((c) => {
+				if (c.ply !== ply || seen.has(c.text)) return;
+				seen.add(c.text);
+				out.push(c.text);
+			}),
+		);
+		return out;
+	};
+	// write the same set of notes onto every line in the group
+	const writeAll = (texts) => {
+		lines.forEach((l) => {
+			l.comments = (l.comments || []).filter((c) => c.ply !== ply);
+		});
+		texts.forEach((t) => {
+			if (!t.trim()) return;
+			lines.forEach((l) => {
+				l.comments = l.comments || [];
+				l.comments.push({ ply, text: t.trim() });
+			});
+		});
+	};
+	const texts = snapshot(); // live row order; edits update this array
+	texts.forEach((_, i) => {
 		const row = el("div", { className: "nt" });
-		const inp = el("input", { className: "lno", value: c.text });
+		const inp = el("input", { className: "lno", value: texts[i] });
 		inp.oninput = () => {
-			c.text = inp.value;
+			texts[i] = inp.value;
+			writeAll(texts);
 		};
 		const del = el("button", {
 			type: "button",
@@ -749,7 +865,8 @@ function commentEditor(ply, l) {
 			textContent: "\u2715",
 		});
 		del.onclick = () => {
-			l.comments.splice(l.comments.indexOf(c), 1);
+			texts.splice(i, 1);
+			writeAll(texts);
 			renderApp();
 		};
 		row.append(inp, del);
@@ -757,7 +874,7 @@ function commentEditor(ply, l) {
 	});
 	const addInp = el("input", {
 		className: "lno",
-		placeholder: mine.length ? "add another note…" : "note at this move…",
+		placeholder: texts.length ? "add another note…" : "note at this move…",
 	});
 	const add = el("button", {
 		type: "button",
@@ -766,8 +883,8 @@ function commentEditor(ply, l) {
 	});
 	add.onclick = () => {
 		if (addInp.value.trim()) {
-			l.comments = l.comments || [];
-			l.comments.push({ ply, text: addInp.value.trim() });
+			texts.push(addInp.value.trim());
+			writeAll(texts);
 			addInp.value = "";
 			renderApp();
 		}
@@ -1030,6 +1147,7 @@ function importPanel() {
 				alert("No moves found in PGN");
 				return;
 			}
+			openPaths.clear(); // fresh trie: all groups start collapsed
 			current = {
 				id: current.id,
 				name: "",
@@ -1039,6 +1157,7 @@ function importPanel() {
 				showBoards: false,
 				preview: "table",
 				boardSize: current.boardSize,
+				sideWidth: current.sideWidth,
 				sel: null,
 			};
 			renderApp();

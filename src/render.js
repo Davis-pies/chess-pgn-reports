@@ -273,6 +273,33 @@ export function cardMovesText(v) {
 	return parts.join("  ");
 }
 
+// Same layout as cardMovesText but built as DOM so note numbers render as
+// true superscripts in the Lines (print) view and the printed PDF.
+function buildCardMoves(container, v) {
+	let first = true;
+	const seg = (text) => {
+		if (!first) container.appendChild(document.createTextNode("  "));
+		first = false;
+		container.appendChild(document.createTextNode(text));
+	};
+	if (v.tag !== "mainline" && v.d > 0) {
+		const pm = v.moves[v.d - 1];
+		const num = pm.ply % 2 === 0 ? Math.floor(pm.ply / 2) + 1 + ". " : "";
+		seg("\u22ef " + num + pm.san);
+	}
+	const range = v.tag === "mainline" ? v.moves : v.moves.slice(v.d);
+	range.forEach((m) => {
+		const num = m.ply % 2 === 0 ? Math.floor(m.ply / 2) + 1 + ". " : "";
+		const mark = v.marks && v.marks[m.ply] ? " " + v.marks[m.ply] : "";
+		seg(num + m.san + mark);
+		((v.noteByPly && v.noteByPly[m.ply]) || []).forEach((n) => {
+			const sup = document.createElement("sup");
+			sup.textContent = String(n);
+			container.appendChild(sup);
+		});
+	});
+}
+
 export function renderCards(container, grid, opts = {}) {
 	const notes = opts.notes || [];
 	const strip = (s) =>
@@ -307,7 +334,7 @@ export function renderCards(container, grid, opts = {}) {
 
 		const moves = document.createElement("div");
 		moves.className = "card-moves";
-		moves.textContent = cardMovesText(v);
+		buildCardMoves(moves, v);
 		card.appendChild(moves);
 
 		const board = document.createElement("div");
