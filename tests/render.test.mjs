@@ -17,13 +17,15 @@ function dom() {
 	});
 }
 
-test("boardSvg draws all 64 squares, including empty ones", () => {
-	global.document = dom().window.document;
-	const svg = boardSvg("4k3/8/8/8/8/8/8/4K3 w - - 0 1");
-	assert.strictEqual(svg.querySelectorAll("rect").length, 64);
-	// the two kings still render as pieces
-	assert.strictEqual(svg.querySelectorAll("text").length, 2);
-	delete global.document;
+test("boardSvg draws all 64 squares with pieces and coordinates", () => {
+global.document = dom().window.document;
+const svg = boardSvg("4k3/8/8/8/8/8/8/4K3 w - - 0 1");
+assert.strictEqual(svg.querySelectorAll("rect").length, 64);
+// the two kings are <use> sprite references
+assert.strictEqual(svg.querySelectorAll("use").length, 2);
+// a-file ranks + 1st-rank files are drawn as coordinate text
+assert.strictEqual(svg.querySelectorAll("text").length, 15);
+delete global.document;
 });
 
 test("renders a vertical table with tagged variations into the DOM", () => {

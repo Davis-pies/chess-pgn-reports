@@ -22,11 +22,6 @@ const TAG_META = {
 
 export function grid(lines, comments = []) {
 	const main = lines.find((l) => l.isMain) || lines[0];
-	// global comment -> note number (matches the numbered Notes section)
-	const commentNum = {};
-	comments.forEach((c, i) => {
-		commentNum[c.ply + "\u0000" + c.text] = i + 1;
-	});
 
 	const vars = []; // mainline + sidelines (table rows)
 	const footNotes = []; // footnote lines (prose section)
@@ -49,10 +44,13 @@ export function grid(lines, comments = []) {
 			}
 			cells[m.ply] = { text, cls };
 		});
+		// note markers keyed by ply, only for plies this line owns (its tail; the
+		// mainline owns every move). So a comment appears once, on the right line.
+		const tail = isMain ? l.moves : l.moves.slice(d);
+		const owned = new Set(tail.map((m) => m.ply));
 		const noteByPly = {};
-		(l.comments || []).forEach((cm) => {
-			const num = commentNum[cm.ply + "\u0000" + cm.text];
-			if (num != null) (noteByPly[cm.ply] = noteByPly[cm.ply] || []).push(num);
+		comments.forEach((c, i) => {
+			if (owned.has(c.ply)) (noteByPly[c.ply] = noteByPly[c.ply] || []).push(i + 1);
 		});
 		const base = {
 			tag,
@@ -61,8 +59,10 @@ export function grid(lines, comments = []) {
 			eval: (l.meta && l.meta.eval) || "",
 			fen: l.fen,
 			moves: l.moves,
+			d,
 		};
-		if (tag === "foot") footNotes.push({ ...base, note: (l.meta && l.meta.note) || "" });
+		if (tag === "foot")
+			footNotes.push({ ...base, note: (l.meta && l.meta.note) || "" });
 		else vars.push({ ...base, cells, noteByPly });
 	});
 	// mainline is the top reference row

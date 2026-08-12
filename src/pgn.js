@@ -64,7 +64,9 @@ function parseSeq(tokens, ctx, state) {
 				.trim()
 				.replace(/\[%.*?\]/g, "")
 				.trim(); // drop [%...] NAG markers
-			if (!text) {
+			if (!text || text.length < 5) {
+				// drop empty or trivially short fragments (e.g. a lone "If"/"then")
+				// that are PGN sentence-splitter noise rather than real notes
 				ctx.i++;
 				continue;
 			}

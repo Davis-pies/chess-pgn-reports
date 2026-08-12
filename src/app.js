@@ -1,7 +1,7 @@
 // Browser glue: import PGN, tag each line, render the table, persist notebook.
 import { parsePgn } from "./pgn.js";
 import { collectLines } from "./tree.js";
-import { grid } from "./table.js";
+import { grid, divergence } from "./table.js";
 import {
 	renderTable,
 	renderCards,
@@ -370,14 +370,7 @@ function lineEditor(l, idx) {
 	name.oninput = () => {
 		l.name = name.value;
 	};
-	const ev = el("input", {
-		className: "le",
-		placeholder: "eval (=, ±, ∞)",
-		value: (l.meta && l.meta.eval) || "",
-	});
-	ev.oninput = () => {
-		l.meta = { ...(l.meta || {}), eval: ev.value };
-	};
+	const ev = evalSelect(l);
 	const note = el("input", {
 		className: "lno",
 		placeholder: "note",
@@ -404,6 +397,52 @@ function promoteMainline(l) {
 	renderApp();
 }
 
+// Advantage/quality symbols offered in the line editor's evaluation picker.
+const EVAL_SYMBOLS = [
+	"", "=", "\u00b1", "\u2213", "+=", "=+", "\u221e", "+\u2212", "\u2212+",
+	"!", "?", "!?", "?!", "!!", "??",
+];
+
+function evalSelect(l) {
+	const s = document.createElement("select");
+	s.className = "le";
+	EVAL_SYMBOLS.forEach((sym) => {
+		const o = document.createElement("option");
+		o.value = sym;
+		o.textContent = sym || "eval…";
+		s.appendChild(o);
+	});
+	s.value = (l.meta && l.meta.eval) || "";
+	s.onchange = () => {
+		l.meta = { ...(l.meta || {}), eval: s.value };
+	};
+	return s;
+}
+
+// A form to append a note to a specific mainline move.
+function addNoteRow() {
+	const bar = el("div", { className: "addbar" });
+	const main = current.lines.find((l) => l.isMain) || current.lines[0];
+	const sel = document.createElement("select");
+	main.moves.forEach((m) => {
+		const o = document.createElement("option");
+		o.value = m.ply;
+		o.textContent = fullmoveLabel(m.ply) + " " + m.san;
+		sel.appendChild(o);
+	});
+	const inp = el("input", { className: "lno", placeholder: "note at this move…" });
+	const add = el("button", { className: "chip", textContent: "Add note" });
+	add.onclick = () => {
+		if (inp.value.trim()) {
+			current.comments.push({ ply: Number(sel.value), text: inp.value.trim() });
+			inp.value = "";
+			renderApp();
+		}
+	};
+	bar.append("+ ", sel, inp, add);
+	return bar;
+}
+
 function helpPanel() {
 	const d = document.createElement("details");
 	d.className = "help";
@@ -424,29 +463,48 @@ function helpPanel() {
 function notesFootnotesPanel() {
 	const box = el("div", { className: "notes" });
 	const comments = current.comments || [];
+	box.appendChild(el("h3", { textContent: "Notes" }));
 	if (comments.length) {
-		box.appendChild(el("h3", { textContent: "Notes" }));
 		comments.forEach((c, i) => {
 			const row = el("div", { className: "nt" });
 			row.appendChild(el("sup", { textContent: "[" + (i + 1) + "]" }));
 			row.appendChild(
-				el("span", { textContent: fullmoveLabel(c.ply) + " — " + c.text }),
+				el("span", {
+					textContent: fullmoveLabel(c.ply) + " — " + c.text,
+				}),
 			);
+			const edit = el("button", { className: "chip mini", textContent: "\u270e" });
+			edit.onclick = () => {
+				const nt = prompt("Edit note:", c.text);
+				if (nt !== null && nt.trim()) {
+					c.text = nt.trim();
+					renderApp();
+				}
+			};
+			const del = el("button", { className: "chip mini danger", textContent: "\u2715" });
+			del.onclick = () => {
+				current.comments.splice(i, 1);
+				renderApp();
+			};
+			row.append(edit, del);
 			box.appendChild(row);
 		});
 	}
+	box.appendChild(addNoteRow());
 	const footLines = current.lines.filter((l) => l.tag === "foot");
+	const mainL = current.lines.find((l) => l.isMain) || current.lines[0];
 	if (footLines.length) {
 		box.appendChild(el("h3", { textContent: "Footnotes" }));
 		footLines.forEach((l, i) => {
 			const row = el("div", { className: "nt" });
 			row.appendChild(el("sup", { textContent: String.fromCharCode(97 + i) }));
 			const note = (l.meta && l.meta.note) || "";
+			const d = divergence(l, mainL);
 			row.appendChild(
 				el("span", {
 					textContent:
 						(l.name ? l.name + ": " : "") +
-						fullMovesText(l.moves) +
+						fullMovesText(l.moves.slice(d)) +
 						(note ? " — " + note : ""),
 				}),
 			);
@@ -466,7 +524,10 @@ function exportBar() {
 	const pgn = el("button", { className: "chip", textContent: "Export PGN" });
 	pgn.onclick = () =>
 		download(slug() + ".pgn", current.pgn, "application/x-chess-pgn");
-	const md = el("button", { className: "chip", textContent: "Export Markdown" });
+	const md = el("button", {
+		className: "chip",
+		textContent: "Export Markdown",
+	});
 	md.onclick = () => download(slug() + ".md", buildMarkdown(), "text/markdown");
 	bar.append(printBtn, pgn, md);
 	return bar;
@@ -498,15 +559,19 @@ function buildMarkdown() {
 	for (const v of g.vars) {
 		const lead =
 			v.tag === "mainline" ? "**Mainline**" : "- " + v.label.toUpperCase();
+		const moves =
+			v.tag === "mainline"
+				? fullMovesText(v.moves)
+				: fullMovesText(v.moves.slice(v.d));
 		L.push(
-			`${lead}${v.name ? " (" + v.name + ")" : ""}${v.eval ? " " + v.eval : ""}: ${fullMovesText(v.moves)}`,
+			`${lead}${v.name ? " (" + v.name + ")" : ""}${v.eval ? " " + v.eval : ""}: ${moves}`,
 		);
 	}
 	if (g.footNotes.length) {
 		L.push("", "## Footnotes", "");
 		g.footNotes.forEach((f) =>
 			L.push(
-				`- ${f.letter}${f.name ? " " + f.name : ""}${f.eval ? " " + f.eval : ""}: ${fullMovesText(f.moves)}${f.note ? " — " + f.note : ""}`,
+				`- ${f.letter}${f.name ? " " + f.name : ""}${f.eval ? " " + f.eval : ""}: ${fullMovesText(f.moves.slice(f.d))}${f.note ? " — " + f.note : ""}`,
 			),
 		);
 	}
@@ -575,4 +640,17 @@ document.addEventListener("DOMContentLoaded", () => {
 	} catch {}
 	if (saved) document.documentElement.dataset.theme = saved;
 	renderApp();
+	// inject the cburnett piece sprite so board <use href="#wK"> works & prints,
+	// then re-render once it's in the DOM
+	fetch("assets/pieces.svg")
+		.then(async (r) => {
+			if (!r.ok) return;
+			const doc = new DOMParser().parseFromString(
+				await r.text(),
+				"image/svg+xml",
+			);
+			document.body.appendChild(doc.documentElement);
+			renderApp();
+		})
+		.catch(() => {});
 });

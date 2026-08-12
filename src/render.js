@@ -6,25 +6,17 @@
 
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-// Solid (filled) Unicode glyphs for both colors; white/black differ by fill and
-// stroke so each piece is solid and readable on any square.
-const PIECES = {
-	P: "\u265F",
-	N: "\u265E",
-	B: "\u265D",
-	R: "\u265C",
-	Q: "\u265B",
-	K: "\u265A",
-	p: "\u265F",
-	n: "\u265E",
-	b: "\u265D",
-	r: "\u265C",
-	q: "\u265B",
-	k: "\u265A",
+// Pieces come from the inline cburnett sprite (assets/pieces.svg, injected by
+// the app): white = light fill with dark outline, black = dark. Board colors
+// stay fixed so diagrams read on both the light and dark page themes.
+const PIECE_IDS = {
+	P: "wP", N: "wN", B: "wB", R: "wR", Q: "wQ", K: "wK",
+	p: "bP", n: "bN", b: "bB", r: "bR", q: "bQ", k: "bK",
 };
 const NS = "http://www.w3.org/2000/svg";
 const LIGHT_SQ = "#f0d9b5";
 const DARK_SQ = "#b58863";
+const FILES = "abcdefgh";
 
 function fenGrid(fen) {
 	const ranks = (fen || START_FEN).split(" ")[0].split("/");
@@ -38,14 +30,18 @@ function fenGrid(fen) {
 	});
 }
 
-// Build an SVG <svg> element for a FEN position, square `size`px.
-export function boardSvg(fen, size = 200) {
+// Build an SVG <svg> board for a FEN position. Pieces are <use> references into
+// the injected cburnett sprite, each padded for spacing; coordinates are drawn
+// on the a-file and 1st rank.
+export function boardSvg(fen, size = 220) {
 	const grid = fenGrid(fen);
 	const sq = size / 8;
+	const pad = Math.max(2, sq * 0.1);
 	const svg = document.createElementNS(NS, "svg");
 	svg.setAttribute("viewBox", `0 0 ${size} ${size}`);
 	svg.setAttribute("width", size);
 	svg.setAttribute("height", size);
+	svg.setAttribute("shape-rendering", "geometricPrecision");
 	svg.classList.add("board-svg");
 	for (let r = 0; r < 8; r++) {
 		for (let f = 0; f < 8; f++) {
@@ -61,27 +57,42 @@ export function boardSvg(fen, size = 200) {
 			svg.appendChild(rect);
 
 			const p = grid[r][f];
-			if (p && PIECES[p]) {
-				const text = document.createElementNS(NS, "text");
-				text.setAttribute("x", x + sq / 2);
-				text.setAttribute("y", y + sq * 0.82);
-				text.setAttribute("font-size", sq * 0.78);
-				text.setAttribute("text-anchor", "middle");
-				const white = p === p.toUpperCase();
-				text.setAttribute("fill", white ? "#fafafa" : "#14151a");
-				text.setAttribute("stroke", white ? "#1a1a1e" : "#e8e8ee");
-				text.setAttribute("stroke-width", Math.max(1, sq * 0.03));
-				text.setAttribute("stroke-linejoin", "round");
-				text.textContent = PIECES[p];
-				svg.appendChild(text);
+			if (p && PIECE_IDS[p]) {
+				const u = document.createElementNS(NS, "use");
+				u.setAttribute("href", "#" + PIECE_IDS[p]);
+				u.setAttribute("x", x + pad);
+				u.setAttribute("y", y + pad);
+				const ps = sq - pad * 2;
+				u.setAttribute("width", ps);
+				u.setAttribute("height", ps);
+				svg.appendChild(u);
+			}
+
+			if (f === 0 || r === 7) {
+				const coord = document.createElementNS(NS, "text");
+				const font = Math.max(7, sq * 0.16);
+				coord.setAttribute("font-size", font);
+				coord.setAttribute("font-weight", "600");
+				coord.setAttribute("fill", light ? "#a5825c" : "#f0d9b5");
+				if (f === 0 && r !== 7) {
+					coord.setAttribute("x", x + 1.5);
+					coord.setAttribute("y", y + font - 1);
+					coord.textContent = String(8 - r);
+				} else if (r === 7) {
+					coord.setAttribute("x", x + sq - 1.5);
+					coord.setAttribute("y", y + sq - 1);
+					coord.setAttribute("text-anchor", "end");
+					coord.textContent = FILES[f];
+				}
+				svg.appendChild(coord);
 			}
 		}
 	}
 	return svg;
 }
 
-// Append a board for `fen` to `container`.
-export function appendBoard(container, fen, size = 200) {
+// Append a board for `fen` to `container` (internal helper).
+export function appendBoard(container, fen, size = 220) {
 	container.appendChild(boardSvg(fen, size));
 	return container.lastElementChild;
 }
@@ -229,7 +240,12 @@ export function renderCards(container, grid, opts = {}) {
 
 		const moves = document.createElement("div");
 		moves.className = "card-moves";
-		moves.textContent = fullMovesText(v.moves);
+		// split at the divergence: non-main lines show only their tail, not the
+		// repeated shared prefix
+		moves.textContent =
+			v.tag === "mainline"
+				? fullMovesText(v.moves)
+				: fullMovesText(v.moves.slice(v.d));
 		card.appendChild(moves);
 
 		const board = document.createElement("div");
