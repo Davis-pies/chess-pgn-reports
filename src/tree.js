@@ -1,6 +1,8 @@
 // Turns a parsed variation-tree (from pgn.js) into the flat list of "lines"
-// the editor works on. A line is one root-to-leaf path: mainline is index 0,
-// every (variation) contributes its own leaf line.
+// the editor works on. A line is one root-to-leaf path: mainline first,
+// every (variation) contributes its own leaf line. Each line carries the
+// comments owned by it (mainline owns trunk comments; a variation owns only
+// its own nodes' comments), so note markers render without row duplication.
 
 function chainToMoves(chain) {
 	return chain
@@ -8,12 +10,22 @@ function chainToMoves(chain) {
 		.map((x) => ({ san: x.san, ply: x.ply }));
 }
 
+function nodeComments(seq) {
+	const out = [];
+	seq.forEach((n) =>
+		(n.comments || []).forEach((c) => out.push({ text: c, ply: n.ply })),
+	);
+	return out;
+}
+
 export function collectLines(nodes) {
 	const lines = [];
 	function walk(seq, prefix, isTop) {
 		const path = prefix.slice();
+		const own = []; // nodes in THIS line's tail (not the shared prefix)
 		seq.forEach((n) => {
 			path.push(n);
+			own.push(n);
 			n.variations.forEach((v) => walk(v, path, false));
 		});
 		if (!isTop) {
@@ -22,6 +34,7 @@ export function collectLines(nodes) {
 				moves: chainToMoves(path),
 				fen: last.fen,
 				ply: last.ply,
+				comments: nodeComments(own),
 			});
 		}
 	}
@@ -37,6 +50,7 @@ export function collectLines(nodes) {
 		fen: last.fen,
 		ply: last.ply,
 		isMain: true,
+		comments: nodeComments(chain),
 	};
 	return [main, ...lines];
 }

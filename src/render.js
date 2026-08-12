@@ -9,8 +9,18 @@ const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 // Solid (filled) Unicode glyphs for both colors; white/black differ by fill and
 // stroke so each piece is solid and readable on any square.
 const PIECES = {
-	P: "\u265F", N: "\u265E", B: "\u265D", R: "\u265C", Q: "\u265B", K: "\u265A",
-	p: "\u265F", n: "\u265E", b: "\u265D", r: "\u265C", q: "\u265B", k: "\u265A",
+	P: "\u265F",
+	N: "\u265E",
+	B: "\u265D",
+	R: "\u265C",
+	Q: "\u265B",
+	K: "\u265A",
+	p: "\u265F",
+	n: "\u265E",
+	b: "\u265D",
+	r: "\u265C",
+	q: "\u265B",
+	k: "\u265A",
 };
 const NS = "http://www.w3.org/2000/svg";
 const LIGHT_SQ = "#f0d9b5";
@@ -89,9 +99,9 @@ function td(text, cls) {
 }
 
 // A move cell, plus any numbered comment reference marker for that ply.
-function moveCell(c, ply, plyNotes) {
+function moveCell(c, ply, noteByPly) {
 	const e = td(c ? c.text : "", c ? c.cls : "");
-	const notes = plyNotes && plyNotes[ply];
+	const notes = noteByPly && noteByPly[ply];
 	if (notes)
 		notes.forEach((n) => {
 			const s = document.createElement("sup");
@@ -103,7 +113,7 @@ function moveCell(c, ply, plyNotes) {
 
 // Populates `container` with the table (+ optional board diagrams).
 export function renderTable(container, grid, orientation, opts = {}) {
-	const { vars, maxPly, mainMoves, plyNotes } = grid;
+	const { vars, maxPly, mainMoves } = grid;
 	const labels = {};
 	mainMoves.forEach((m) => (labels[m.ply] = fullmoveLabel(m.ply)));
 
@@ -143,7 +153,7 @@ export function renderTable(container, grid, orientation, opts = {}) {
 			tr.appendChild(num);
 			for (const v of vars) {
 				const c = v.cells[ply];
-				tr.appendChild(moveCell(c, ply, plyNotes));
+				tr.appendChild(moveCell(c, ply, v.noteByPly));
 			}
 			table.appendChild(tr);
 		}
@@ -163,7 +173,7 @@ export function renderTable(container, grid, orientation, opts = {}) {
 			tr.appendChild(varHead(v));
 			for (let ply = 0; ply <= maxPly; ply++) {
 				const c = v.cells[ply];
-				tr.appendChild(moveCell(c, ply, plyNotes));
+				tr.appendChild(moveCell(c, ply, v.noteByPly));
 			}
 			tr.appendChild(td(v.eval, "eval"));
 			table.appendChild(tr);

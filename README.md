@@ -9,17 +9,18 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
 1. **Import** — paste PGN or drop a `.pgn` file. Parenthesized variations
    `(...)` are parsed into separate taggable lines; PGN `{...}` comments are
    captured as numbered **Notes**.
-2. **Tag** — for each line (mainline first, then each variation) mark it
-   **Main** / **Minor** / **Footnote**, and optionally add a name, an
-   evaluation symbol (`=`, `±`, `∞`, ...), and a note.
+2. **Tag** — the mainline is the reference row. For each other line choose
+   **Sideline** or **Footnote** (optionally add a name, evaluation symbol, and a
+   note), or use **★ Make mainline** to promote a sideline to the mainline.
+   Footnotes are pulled out of the table into the prose **Footnotes** section.
 3. **Render** — a table in **vertical** or **horizontal** layout, or a linear
-   **card** view (each line as its own readout with a board diagram of the end
-   position) for printing. Boards are self-contained SVG, fixed colors so they
-   stay visible in both light and dark themes. Below the table: **Notes**
-   (PGN comments, numbered) and **Footnotes** (tagged lines, lettered a, b, c…).
-   A dark-theme toggle is in the toolbar.
-4. **Export** — **Print → Save as PDF** always uses the linear card view (one
-   line + position, then the next). Saved workbooks (in `localStorage`) are
+   **card** view (each line with a board diagram of its end position) for print.
+   Boards are self-contained SVG, fixed colors so they stay visible on both
+   light and dark themes; a theme toggle is in the toolbar. Comment moves carry
+   numbered `[n]` markers (appearing only on the line that owns them).
+4. **Export** — **Export PGN** (editable chess notation for any chess app),
+   **Export Markdown** (paste into Google Docs/Word), or **Print → Save as
+   PDF** (always the linear card view). Saved workbooks (`localStorage`) are
    listed under **My saved workbooks** on the import screen to reopen/delete.
 
 ## Run locally

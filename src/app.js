@@ -2,7 +2,12 @@
 import { parsePgn } from "./pgn.js";
 import { collectLines } from "./tree.js";
 import { grid } from "./table.js";
-import { renderTable, renderCards, fullmoveLabel } from "./render.js";
+import {
+	renderTable,
+	renderCards,
+	fullmoveLabel,
+	fullMovesText,
+} from "./render.js";
 import {
 	saveNotebook,
 	listNotebooks,
@@ -145,7 +150,9 @@ function previewGroup() {
 		showBoards: current.showBoards,
 	});
 	const c = el("div", { className: "pv-cards" });
-	c.appendChild(el("h3", { textContent: "Print view — one line, one position" }));
+	c.appendChild(
+		el("h3", { textContent: "Print view — one line, one position" }),
+	);
 	renderCards(c, g);
 	box.append(t, c);
 	const useCards = current.preview === "cards";
@@ -208,6 +215,16 @@ function openNotebook(id) {
 				l.tag = l.isMain ? undefined : t.tag === "foot" ? "foot" : "sideline";
 			}
 		});
+		// restore a user-promoted mainline, if any
+		if (nb.main) {
+			const target = lines.find((l) => keyFor(l.moves) === nb.main);
+			if (target) {
+				lines.forEach((x) => {
+					x.isMain = x === target;
+					if (x === target) x.tag = undefined;
+				});
+			}
+		}
 		current = {
 			id,
 			name: nb.name,
@@ -286,7 +303,7 @@ function markupPanel() {
 	box.appendChild(
 		el("h3", {
 			textContent:
-				"The mainline is fixed. Tag each sideline or footnote line below.",
+				"The mainline is the reference row. Promote a sideline to make it the mainline; tag the rest Sideline or Footnote.",
 		}),
 	);
 	current.lines.forEach((l, idx) => {
@@ -321,22 +338,28 @@ function lineEditor(l, idx) {
 		};
 		return b;
 	};
+	const isMain = !!l.isMain;
 	row.appendChild(
 		el("div", {
 			className: "lmoves",
-			textContent: `${idx === 0 ? "MAINLINE" : "Line " + idx}: ${movesText(l)}`,
+			textContent: `${isMain ? "MAINLINE" : "Line " + idx}: ${movesText(l)}`,
 		}),
 	);
 	const tags = el("div", { className: "tags" });
-	if (idx === 0) {
+	if (isMain) {
 		tags.appendChild(
-			el("span", { className: "maintag", textContent: "Mainline — fixed" }),
+			el("span", { className: "maintag", textContent: "Mainline" }),
 		);
 	} else {
-		tags.append(
-			btn("sideline", "Sideline"),
-			btn("foot", "Footnote"),
-		);
+		tags.append(btn("sideline", "Sideline"), btn("foot", "Footnote"));
+		const promote = el("button", {
+			className: "chip",
+			textContent: "\u2605 Make mainline",
+		});
+		promote.onclick = () => {
+			promoteMainline(l);
+		};
+		tags.appendChild(promote);
 	}
 	row.appendChild(tags);
 	const name = el("input", {
@@ -367,6 +390,20 @@ function lineEditor(l, idx) {
 	return row;
 }
 
+// Promote a sideline/footnote line to be the mainline; demote the old one.
+function promoteMainline(l) {
+	current.lines.forEach((x) => {
+		if (x === l) {
+			x.isMain = true;
+			x.tag = undefined;
+		} else if (x.isMain) {
+			x.isMain = false;
+			if (!x.tag) x.tag = "sideline";
+		}
+	});
+	renderApp();
+}
+
 function helpPanel() {
 	const d = document.createElement("details");
 	d.className = "help";
@@ -374,10 +411,10 @@ function helpPanel() {
 	const ol = el("ol", {});
 	[
 		"Paste a PGN or upload a .pgn file, then click Load & Tag. Every variation in parentheses becomes its own line.",
-		"For each sideline or footnote line choose Sideline or Footnote, and optionally add a name, an evaluation symbol (=, ±, ∞), and a note. The mainline is fixed automatically.",
-		"Switch layout between Horizontal (variations as columns) and Vertical (variations as rows), and toggle board diagrams.",
-		"Click Save to keep this notebook in your browser (localStorage). Reopen it anytime from the Open list.",
-		"Print or Save as PDF — the printed page keeps only the table, notes, and footnotes.",
+		"The mainline is the reference row. For each other line choose Sideline or Footnote, add a name/eval/note, or use ★ Make mainline to promote it.",
+		"Switch layout between Horizontal and Vertical, or the Lines (print) view; toggle board diagrams; use the toolbar to flip the dark theme.",
+		"Click Save to keep this workbook in your browser (localStorage). Reopen it anytime from My saved workbooks.",
+		"Export PGN (editable chess notation for any chess software), Export Markdown (paste into Google Docs/Word), or Print → Save as PDF.",
 	].forEach((s) => ol.appendChild(el("li", { textContent: s })));
 	d.appendChild(ol);
 	return d;
@@ -409,7 +446,7 @@ function notesFootnotesPanel() {
 				el("span", {
 					textContent:
 						(l.name ? l.name + ": " : "") +
-						movesText(l) +
+						fullMovesText(l.moves) +
 						(note ? " — " + note : ""),
 				}),
 			);
@@ -426,8 +463,61 @@ function exportBar() {
 		textContent: "Print / Save as PDF",
 	});
 	printBtn.onclick = () => window.print();
-	bar.appendChild(printBtn);
+	const pgn = el("button", { className: "chip", textContent: "Export PGN" });
+	pgn.onclick = () =>
+		download(slug() + ".pgn", current.pgn, "application/x-chess-pgn");
+	const md = el("button", { className: "chip", textContent: "Export Markdown" });
+	md.onclick = () => download(slug() + ".md", buildMarkdown(), "text/markdown");
+	bar.append(printBtn, pgn, md);
 	return bar;
+}
+
+function slug() {
+	return (current.name || "opening-table")
+		.replace(/[^a-z0-9_-]+/gi, "-")
+		.replace(/^-+|-+$/g, "");
+}
+
+function download(filename, text, mime) {
+	const blob = new Blob([text], { type: mime });
+	const a = document.createElement("a");
+	a.href = URL.createObjectURL(blob);
+	a.download = filename;
+	document.body.appendChild(a);
+	a.click();
+	a.remove();
+	URL.revokeObjectURL(a.href);
+}
+
+// Editable, portable Markdown of the finished table — paste into Docs/Word.
+function buildMarkdown() {
+	const g = grid(current.lines, current.comments);
+	const L = [];
+	if (current.name) L.push("# " + current.name, "");
+	L.push("## Lines", "");
+	for (const v of g.vars) {
+		const lead =
+			v.tag === "mainline" ? "**Mainline**" : "- " + v.label.toUpperCase();
+		L.push(
+			`${lead}${v.name ? " (" + v.name + ")" : ""}${v.eval ? " " + v.eval : ""}: ${fullMovesText(v.moves)}`,
+		);
+	}
+	if (g.footNotes.length) {
+		L.push("", "## Footnotes", "");
+		g.footNotes.forEach((f) =>
+			L.push(
+				`- ${f.letter}${f.name ? " " + f.name : ""}${f.eval ? " " + f.eval : ""}: ${fullMovesText(f.moves)}${f.note ? " — " + f.note : ""}`,
+			),
+		);
+	}
+	const comments = current.comments || [];
+	if (comments.length) {
+		L.push("", "## Notes", "");
+		comments.forEach((c, i) =>
+			L.push(`${i + 1}. ${fullmoveLabel(c.ply)} — ${c.text}`),
+		);
+	}
+	return L.join("\n") + "\n";
 }
 
 function importPanel() {

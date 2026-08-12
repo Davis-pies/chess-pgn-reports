@@ -1,9 +1,10 @@
 // Converts tagged lines into a cell grid shared by both (horizontal/vertical)
 // table layouts. cell[variation][ply] is undefined where a variation has no
-// move at that ply (blank cell), or a display object {text, cls}.
-// The mainline is structural (lines[0] with isMain) — never a user choice.
-// Other lines are tagged 'sideline' or 'foot'. Shared-prefix plies render as
-// ellipsis. Comments and footnote lines become cross-reference markers.
+// move at that ply, or a display object {text, cls}. The mainline is the
+// reference row (— usually structural, but a sideline can be promoted to it).
+// Sidelines render as table rows; Footnote lines are pulled OUT of the table
+// and returned as `footNotes` for the prose footnotes section. Comments render
+// as per-line note markers (no row duplication).
 
 export function divergence(line, main) {
 	let i = 0;
@@ -21,7 +22,15 @@ const TAG_META = {
 
 export function grid(lines, comments = []) {
 	const main = lines.find((l) => l.isMain) || lines[0];
-	const vars = lines.map((l) => {
+	// global comment -> note number (matches the numbered Notes section)
+	const commentNum = {};
+	comments.forEach((c, i) => {
+		commentNum[c.ply + "\u0000" + c.text] = i + 1;
+	});
+
+	const vars = []; // mainline + sidelines (table rows)
+	const footNotes = []; // footnote lines (prose section)
+	lines.forEach((l) => {
 		const isMain = !!l.isMain;
 		const tag = isMain ? "mainline" : l.tag === "foot" ? "foot" : "sideline";
 		const d = isMain ? 0 : divergence(l, main);
@@ -40,32 +49,33 @@ export function grid(lines, comments = []) {
 			}
 			cells[m.ply] = { text, cls };
 		});
-		return {
+		const noteByPly = {};
+		(l.comments || []).forEach((cm) => {
+			const num = commentNum[cm.ply + "\u0000" + cm.text];
+			if (num != null) (noteByPly[cm.ply] = noteByPly[cm.ply] || []).push(num);
+		});
+		const base = {
 			tag,
 			label: TAG_META[tag].label,
 			name: l.name || "",
 			eval: (l.meta && l.meta.eval) || "",
 			fen: l.fen,
 			moves: l.moves,
-			cells,
 		};
+		if (tag === "foot") footNotes.push({ ...base, note: (l.meta && l.meta.note) || "" });
+		else vars.push({ ...base, cells, noteByPly });
 	});
+	// mainline is the top reference row
+	vars.sort(
+		(a, b) => (a.tag === "mainline" ? -1 : 1) - (b.tag === "mainline" ? -1 : 1),
+	);
 
-	// number the PGN comments per ply
-	const plyNotes = {};
-	comments.forEach((c, i) => {
-		(plyNotes[c.ply] = plyNotes[c.ply] || []).push(i + 1);
-	});
-
-	// letter the footnote lines in table order
-	let li = 0;
-	vars.forEach((v) => {
-		if (v.tag === "foot") v.letter = String.fromCharCode(97 + li++);
-	});
+	// letter the footnote lines
+	footNotes.forEach((f, i) => (f.letter = String.fromCharCode(97 + i)));
 
 	const maxPly = vars.reduce(
 		(m, v) => Math.max(m, ...Object.keys(v.cells).map(Number)),
 		0,
 	);
-	return { vars, maxPly, mainMoves: main.moves, plyNotes };
+	return { vars, maxPly, mainMoves: main.moves, footNotes };
 }

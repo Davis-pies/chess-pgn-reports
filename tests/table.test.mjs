@@ -40,8 +40,35 @@ test("grid marks shared prefix as ellipsis and diverging moves with tag class", 
 });
 
 test("evaluation symbol rides on the variation row", () => {
-	const lines = linesFrom("1. e4 e5 (1... c5) 2. Nf3");
-	lines[1].meta = { eval: "=+" };
-	const { vars } = grid(lines);
-	assert.strictEqual(vars[1].eval, "=+");
+const lines = linesFrom("1. e4 e5 (1... c5) 2. Nf3");
+lines[1].meta = { eval: "=+" };
+const { vars } = grid(lines);
+assert.strictEqual(vars[1].eval, "=+");
+});
+
+test("footnote lines are pulled out of the table rows into footNotes", () => {
+const lines = linesFrom("1. e4 e5 (1... c5) (1... c6 2. Nf3) 2. Nf3");
+lines[1].tag = "foot"; // the c5 line is a footnote
+const { vars, footNotes } = grid(lines);
+// only mainline + c6 sideline remain as rows
+assert.strictEqual(vars.length, 2);
+assert.strictEqual(footNotes.length, 1);
+assert.strictEqual(footNotes[0].letter, "a");
+assert.ok(footNotes[0].moves.some((m) => m.san === "c5"));
+// the footnote move must not appear as a table row
+assert.strictEqual(vars.some((v) => v.cells[1] && v.cells[1].text === "c5"), false);
+});
+
+test("a comment's note marker appears only on the line that owns it", () => {
+const pgn = "1. e4 {Central} e5 (1... c5 2. Nf3) 2. Nf3";
+const comments = parsePgn(pgn).comments;
+const lines = collectLines(parsePgn(pgn).nodes);
+const { vars } = grid(lines, comments);
+const mainVar = vars.find((v) => v.tag === "mainline");
+const sidVar = vars.find((v) => v.tag === "sideline");
+assert.deepStrictEqual(mainVar.noteByPly[0], [1]); // mainline owns the marker
+assert.ok(
+!sidVar.noteByPly[0] || sidVar.noteByPly[0].length === 0,
+"sideline carries no duplicate marker",
+);
 });

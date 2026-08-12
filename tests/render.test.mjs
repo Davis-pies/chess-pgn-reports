@@ -71,9 +71,7 @@ test("renderCards produces one labeled card per line with moves", () => {
 });
 
 test("fullMovesText renders move numbers with the moves", () => {
-	const lines = collectLines(
-		parsePgn("1. e4 e5 (1... c5) 2. Nf3").nodes,
-	);
+	const lines = collectLines(parsePgn("1. e4 e5 (1... c5) 2. Nf3").nodes);
 	const main = lines[0];
 	const txt = fullMovesText(main.moves);
 	assert.ok(txt.includes("1. e4"));
