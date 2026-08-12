@@ -20,28 +20,30 @@ const PIECES = {
 };
 
 export function fenToSvg(fen, size = 180) {
-	const board = (fen || START_FEN).split(" ")[0];
+	const ranks = (fen || START_FEN).split(" ")[0].split("/");
+	// expand a rank like "4p3" into 8 cells (piece char or null)
+	const grid = ranks.map((rank) => {
+		const row = [];
+		for (const ch of rank) {
+			if (/[1-8]/.test(ch)) for (let k = 0; k < +ch; k++) row.push(null);
+			else row.push(ch);
+		}
+		return row;
+	});
 	const sq = size / 8;
 	let s = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">`;
-	let r = 0;
-	let f = 0;
-	for (const row of board.split("/")) {
-		for (const ch of row) {
-			if (/[1-8]/.test(ch)) {
-				f += +ch;
-				continue;
-			}
+	for (let r = 0; r < 8; r++) {
+		for (let f = 0; f < 8; f++) {
 			const x = f * sq;
 			const y = r * sq;
 			const light = (r + f) % 2 === 0;
+			// always draw the square so empty squares are visible
 			s += `<rect x="${x}" y="${y}" width="${sq}" height="${sq}" fill="${light ? "#f0d9b5" : "#b58863"}"/>`;
-			if (PIECES[ch]) {
-				s += `<text x="${x + sq / 2}" y="${y + sq * 0.82}" font-size="${sq * 0.78}" text-anchor="middle" fill="#111">${PIECES[ch]}</text>`;
+			const p = grid[r][f];
+			if (p && PIECES[p]) {
+				s += `<text x="${x + sq / 2}" y="${y + sq * 0.82}" font-size="${sq * 0.78}" text-anchor="middle" fill="#111">${PIECES[p]}</text>`;
 			}
-			f++;
 		}
-		r++;
-		f = 0;
 	}
 	return s + "</svg>";
 }

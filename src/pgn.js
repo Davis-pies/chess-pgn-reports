@@ -5,17 +5,15 @@ const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 export function tokenize(mt) {
 	const re =
 		/(\(|\)|\{[^}]*\}|;[^\r\n]*|\d+\.\.\.|\d+\.|1-0|0-1|1\/2-1\/2|\*|[^\s(){};]+)/g;
-	return (mt.match(re) || []).filter(
-		(t) => !t.startsWith("{") && !t.startsWith(";"),
-	);
+	return mt.match(re) || [];
 }
 
 export function parsePgn(mt) {
 	const cleaned = mt.replace(/\[[^\]\n]*\]\s*/g, " "); // strip PGN tag/header lines
 	const tokens = tokenize(cleaned);
-	const ctx = { i: 0, result: "*" };
+	const ctx = { i: 0, result: "*", comments: [] };
 	const nodes = parseSeq(tokens, ctx, { fen: START_FEN, ply: 0 });
-	return { nodes, result: ctx.result };
+	return { nodes, result: ctx.result, comments: ctx.comments };
 }
 
 function stepFrom(state, san) {
@@ -27,7 +25,13 @@ function stepFrom(state, san) {
 	} catch {
 		throw new Error("Illegal or ambiguous move in PGN: " + san);
 	}
-	return { san: m.san, fen: chess.fen(), ply: state.ply, variations: [] };
+	return {
+		san: m.san,
+		fen: chess.fen(),
+		ply: state.ply,
+		variations: [],
+		comments: [],
+	};
 }
 
 // PGN null move: swap the side to move in a FEN string (no board change).
@@ -35,6 +39,10 @@ function flipToMove(fen) {
 	const p = fen.split(" ");
 	p[1] = p[1] === "w" ? "b" : "w";
 	return p.join(" ");
+}
+
+function attachPending(pending) {
+	return pending ? [{ text: pending }] : [];
 }
 
 // Parses a run of moves starting at `state` ({fen, ply}: position BEFORE the
@@ -47,8 +55,22 @@ function parseSeq(tokens, ctx, state) {
 	let last = null;
 	let stateBeforeLast = state; // position before the most recent move
 	let cur = state;
+	let pendingComment = null; // comment seen before any move yet
 	while (ctx.i < tokens.length) {
 		const t = tokens[ctx.i];
+		if (t.startsWith("{") || t.startsWith(";")) {
+			let text = t.startsWith("{") ? t.slice(1, -1) : t.slice(1);
+			text = text.trim().replace(/\[%.*?\]/g, "").trim(); // drop [%...] NAG markers
+			if (!text) {
+				ctx.i++;
+				continue;
+			}
+			ctx.comments.push({ ply: last ? last.ply : 0, text });
+			if (last) last.comments.push(text);
+			else pendingComment = pendingComment ? pendingComment + "\n" + text : text;
+			ctx.i++;
+			continue;
+		}
 		if (t === "(") {
 			ctx.i++;
 			const sub = parseSeq(tokens, ctx, stateBeforeLast);
@@ -85,7 +107,9 @@ function parseSeq(tokens, ctx, state) {
 				fen: flipToMove(cur.fen),
 				ply: cur.ply,
 				variations: [],
+				comments: attachPending(pendingComment),
 			};
+			pendingComment = null;
 			nodes.push(node);
 			stateBeforeLast = cur;
 			cur = { fen: node.fen, ply: node.ply + 1 };
@@ -94,6 +118,8 @@ function parseSeq(tokens, ctx, state) {
 			continue;
 		}
 		const node = stepFrom(cur, t);
+		node.comments = attachPending(pendingComment);
+		pendingComment = null;
 		nodes.push(node);
 		stateBeforeLast = cur;
 		cur = { fen: node.fen, ply: node.ply + 1 };

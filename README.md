@@ -7,16 +7,18 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
 ## What it does
 
 1. **Import** — paste PGN or drop a `.pgn` file. Parenthesized variations
-   `(...)` are parsed into separate taggable lines.
+   `(...)` are parsed into separate taggable lines; PGN `{...}` comments are
+   captured as numbered **Notes**.
 2. **Tag** — for each line (mainline first, then each variation) mark it
    **Main** / **Minor** / **Footnote**, and optionally add a name, an
    evaluation symbol (`=`, `±`, `∞`, ...), and a note.
 3. **Render** — a table in either **vertical** (variations as rows, with `…`
    for shared prefix) or **horizontal** (variations as columns) layout. Toggle
-   inline SVG board diagrams.
+   inline SVG board diagrams. Below the table: **Notes** (PGN comments,
+   numbered) and **Footnotes** (lines tagged Footnote, lettered a, b, c…).
 4. **Export** — **Print → Save as PDF**; the print stylesheet keeps only the
-   table (and diagrams) so the PDF is clean. Lists named notebooks to reopen,
-   edit, and delete.
+   table, notes, and footnotes so the PDF is clean. Saved notebooks (in
+   `localStorage`) are reopened from the **Open** list on the import screen.
 
 ## Run locally
 

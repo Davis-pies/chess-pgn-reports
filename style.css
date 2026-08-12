@@ -137,6 +137,29 @@ h3 {
 	overflow-x: auto;
 }
 
+.help {
+	margin: 8px 0;
+	max-width: 720px;
+}
+.help summary {
+	cursor: pointer;
+	font-weight: 600;
+}
+.notes {
+	margin-top: 16px;
+}
+.nt {
+	margin: 4px 0;
+	line-height: 1.4;
+}
+.nt sup {
+	color: var(--foot);
+	font-weight: 600;
+}
+sup {
+	font-size: 0.7em;
+}
+
 /* table */
 .tbl {
 	border-collapse: collapse;
@@ -222,6 +245,7 @@ figure.board {
 	.notebooks,
 	.orow,
 	.markup,
+	.help,
 	.export {
 		display: none !important;
 	}

@@ -4,13 +4,20 @@ import { JSDOM } from "jsdom";
 import { parsePgn } from "../src/pgn.js";
 import { collectLines } from "../src/tree.js";
 import { grid } from "../src/table.js";
-import { renderTable } from "../src/render.js";
+import { renderTable, fenToSvg } from "../src/render.js";
 
 function dom() {
 	return new JSDOM('<!DOCTYPE html><div id="view"></div>', {
 		url: "http://localhost/",
 	});
 }
+
+test("fenToSvg draws all 64 squares, including empty ones", () => {
+	const svg = fenToSvg("4k3/8/8/8/8/8/8/4K3 w - - 0 1");
+	assert.strictEqual((svg.match(/<rect/g) || []).length, 64);
+	// the two kings still render as pieces
+	assert.strictEqual((svg.match(/<text/g) || []).length, 2);
+});
 
 test("renders a vertical table with tagged variations into the DOM", () => {
 	const { window } = dom();

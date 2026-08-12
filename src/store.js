@@ -8,12 +8,13 @@ export function keyFor(moves) {
 	return moves.map((m) => m.san).join(" ");
 }
 
-export function saveNotebook(id, { name, pgn, lines }) {
+export function saveNotebook(id, { name, pgn, lines, comments = [] }) {
 	localStorage.setItem(
 		PREFIX + id,
 		JSON.stringify({
 			name,
 			pgn,
+			comments,
 			tags: lines.map((l) => ({
 				key: keyFor(l.moves),
 				tag: l.tag || "minor",

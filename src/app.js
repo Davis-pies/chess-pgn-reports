@@ -2,7 +2,7 @@
 import { parsePgn } from "./pgn.js";
 import { collectLines } from "./tree.js";
 import { grid } from "./table.js";
-import { renderTable } from "./render.js";
+import { renderTable, fullmoveLabel } from "./render.js";
 import {
 	saveNotebook,
 	listNotebooks,
@@ -16,6 +16,7 @@ let current = {
 	name: "",
 	pgn: "",
 	lines: [],
+	comments: [],
 	orientation: "vertical",
 	showBoards: false,
 };
@@ -87,6 +88,7 @@ function viewRoot() {
 			name: current.name,
 			pgn: current.pgn,
 			lines: current.lines,
+			comments: current.comments,
 		});
 		save.textContent = "Saved ✓";
 		setTimeout(() => (save.textContent = "Save"), 1200);
@@ -96,9 +98,11 @@ function viewRoot() {
 
 	wrap.appendChild(notebookList());
 
+	wrap.appendChild(helpPanel());
 	wrap.appendChild(orientationToggle());
 	wrap.appendChild(markupPanel());
 	wrap.appendChild(tablePreview());
+	wrap.appendChild(notesFootnotesPanel());
 	wrap.appendChild(exportBar());
 	return wrap;
 }
@@ -160,6 +164,7 @@ function openNotebook(id) {
 			name: nb.name,
 			pgn: nb.pgn,
 			lines,
+			comments: nb.comments || [],
 			orientation: current.orientation,
 			showBoards: current.showBoards,
 		};
@@ -288,6 +293,60 @@ function lineEditor(l, idx) {
 	return row;
 }
 
+function helpPanel() {
+	const d = document.createElement("details");
+	d.className = "help";
+	d.appendChild(el("summary", { textContent: "How to use" }));
+	const ol = el("ol", {});
+	[
+		"Paste a PGN or upload a .pgn file, then click Load & Tag. Every variation in parentheses becomes its own line.",
+		"For each line choose Main, Minor, or Footnote, and optionally add a name, an evaluation symbol (=, ±, ∞), and a note.",
+		"Switch layout between Horizontal (variations as columns) and Vertical (variations as rows), and toggle board diagrams.",
+		"Click Save to keep this notebook in your browser (localStorage). Reopen it anytime from the Open list.",
+		"Print or Save as PDF — the printed page keeps only the table, notes, and footnotes.",
+	].forEach((s) => ol.appendChild(el("li", { textContent: s })));
+	d.appendChild(ol);
+	return d;
+}
+
+// Notes are numbered (PGN {comments}); tagged-Footnote lines are lettered.
+function notesFootnotesPanel() {
+	const box = el("div", { className: "notes" });
+	const comments = current.comments || [];
+	if (comments.length) {
+		box.appendChild(el("h3", { textContent: "Notes" }));
+		comments.forEach((c, i) => {
+			const row = el("div", { className: "nt" });
+			row.appendChild(el("sup", { textContent: "[" + (i + 1) + "]" }));
+			row.appendChild(
+				el("span", { textContent: fullmoveLabel(c.ply) + " — " + c.text }),
+			);
+			box.appendChild(row);
+		});
+	}
+	const footLines = current.lines.filter((l) => l.tag === "foot");
+	if (footLines.length) {
+		box.appendChild(el("h3", { textContent: "Footnotes" }));
+		footLines.forEach((l, i) => {
+			const row = el("div", { className: "nt" });
+			row.appendChild(
+				el("sup", { textContent: String.fromCharCode(97 + i) }),
+			);
+			const note = (l.meta && l.meta.note) || "";
+			row.appendChild(
+				el("span", {
+					textContent:
+						(l.name ? l.name + ": " : "") +
+						movesText(l) +
+						(note ? " — " + note : ""),
+				}),
+			);
+			box.appendChild(row);
+		});
+	}
+	return box;
+}
+
 function exportBar() {
 	const bar = el("div", { className: "export" });
 	const printBtn = el("button", {
@@ -304,12 +363,7 @@ function importPanel() {
 	box.appendChild(
 		el("h2", { textContent: "Chess Opening Theory Table Builder" }),
 	);
-	box.appendChild(
-		el("p", {
-			textContent:
-				"Import a PGN. Variations in parentheses become separate taggable lines.",
-		}),
-	);
+	box.append(helpPanel(), notebookList());
 	const ta = el("textarea", {
 		className: "pgnin",
 		rows: 10,
@@ -326,7 +380,7 @@ function importPanel() {
 	const go = el("button", { textContent: "Load & Tag" });
 	go.onclick = () => {
 		try {
-			const { nodes } = parsePgn(ta.value);
+			const { nodes, comments } = parsePgn(ta.value);
 			if (!nodes.length) {
 				alert("No moves found in PGN");
 				return;
@@ -336,6 +390,7 @@ function importPanel() {
 				name: "",
 				pgn: ta.value,
 				lines: collectLines(nodes),
+				comments,
 				orientation: "vertical",
 				showBoards: false,
 			};
