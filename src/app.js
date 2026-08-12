@@ -131,6 +131,7 @@ function viewRoot() {
 	wrap.appendChild(notebookList());
 
 	wrap.appendChild(helpPanel());
+	wrap.appendChild(symbolsBar());
 	wrap.appendChild(orientationToggle());
 	wrap.appendChild(markupPanel());
 	wrap.appendChild(previewGroup());
@@ -428,6 +429,7 @@ function evalSelect(l) {
 	s.value = (l.meta && l.meta.eval) || "";
 	s.onchange = () => {
 		l.meta = { ...(l.meta || {}), eval: s.value };
+		renderApp();
 	};
 	return s;
 }
@@ -473,6 +475,32 @@ function helpPanel() {
 	].forEach((s) => ol.appendChild(el("li", { textContent: s })));
 	d.appendChild(ol);
 	return d;
+}
+
+// A palette of advantage/quality symbols that inserts into whichever text
+// field currently has focus, so symbols can go anywhere (notes, names, etc.).
+function insertSymbol(sym) {
+	const a = document.activeElement;
+	if (a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA")) {
+		const s = a.selectionStart ?? a.value.length;
+		const e = a.selectionEnd ?? s;
+		a.value = a.value.slice(0, s) + sym + a.value.slice(e);
+		a.selectionStart = a.selectionEnd = s + sym.length;
+		a.dispatchEvent(new (a.ownerDocument.defaultView.Event)("input"));
+		a.focus();
+	}
+}
+
+function symbolsBar() {
+	const bar = el("div", { className: "symbols" });
+	bar.appendChild(el("span", { className: "symlabel", textContent: "Insert symbol: " }));
+	EVAL_SYMBOLS.forEach((sym) => {
+		if (!sym) return;
+		const b = el("button", { type: "button", className: "chip mini", textContent: sym });
+		b.onclick = () => insertSymbol(sym);
+		bar.appendChild(b);
+	});
+	return bar;
 }
 
 // Explicit move reference for a note, e.g. "7.Nbd2" / "7...Nbd7" (number + SAN).
@@ -623,6 +651,7 @@ function importPanel() {
 	);
 	box.appendChild(themeBtn());
 	box.append(helpPanel(), notebookList());
+	box.appendChild(symbolsBar());
 	const ta = el("textarea", {
 		className: "pgnin",
 		rows: 10,

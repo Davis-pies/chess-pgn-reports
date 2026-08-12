@@ -165,7 +165,7 @@ export function renderTable(container, grid, orientation, opts = {}) {
 		head.appendChild(document.createElement("th")).textContent = "ply";
 		vars.forEach((v) => {
 			const th = document.createElement("th");
-			th.textContent = v.name || v.label;
+			th.textContent = (v.name || v.label) + (v.eval ? " " + v.eval : "");
 			head.appendChild(th);
 		});
 		table.appendChild(head);

@@ -111,6 +111,17 @@ h3 {
 	flex-wrap: wrap;
 	margin: 6px 0;
 }
+.symbols {
+	display: flex;
+	gap: 4px;
+	flex-wrap: wrap;
+	align-items: center;
+	margin: 8px 0;
+}
+.symlabel {
+	font-size: 0.8rem;
+	color: var(--muted);
+}
 .chip.tag.sideline.on {
 	background: var(--sideline);
 	border-color: var(--sideline);
