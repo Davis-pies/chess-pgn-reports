@@ -10,8 +10,18 @@ const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 // the app): white = light fill with dark outline, black = dark. Board colors
 // stay fixed so diagrams read on both the light and dark page themes.
 const PIECE_IDS = {
-	P: "wP", N: "wN", B: "wB", R: "wR", Q: "wQ", K: "wK",
-	p: "bP", n: "bN", b: "bB", r: "bR", q: "bQ", k: "bK",
+	P: "wP",
+	N: "wN",
+	B: "wB",
+	R: "wR",
+	Q: "wQ",
+	K: "wK",
+	p: "bP",
+	n: "bN",
+	b: "bB",
+	r: "bR",
+	q: "bQ",
+	k: "bK",
 };
 const NS = "http://www.w3.org/2000/svg";
 const LIGHT_SQ = "#f0d9b5";
@@ -92,7 +102,7 @@ export function boardSvg(fen, size = 220) {
 }
 
 // Append a board for `fen` to `container` (internal helper).
-export function appendBoard(container, fen, size = 220) {
+function appendBoard(container, fen, size = 220) {
 	container.appendChild(boardSvg(fen, size));
 	return container.lastElementChild;
 }

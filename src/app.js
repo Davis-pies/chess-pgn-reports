@@ -399,8 +399,21 @@ function promoteMainline(l) {
 
 // Advantage/quality symbols offered in the line editor's evaluation picker.
 const EVAL_SYMBOLS = [
-	"", "=", "\u00b1", "\u2213", "+=", "=+", "\u221e", "+\u2212", "\u2212+",
-	"!", "?", "!?", "?!", "!!", "??",
+	"",
+	"=",
+	"\u00b1",
+	"\u2213",
+	"+=",
+	"=+",
+	"\u221e",
+	"+\u2212",
+	"\u2212+",
+	"!",
+	"?",
+	"!?",
+	"?!",
+	"!!",
+	"??",
 ];
 
 function evalSelect(l) {
@@ -430,7 +443,10 @@ function addNoteRow() {
 		o.textContent = fullmoveLabel(m.ply) + " " + m.san;
 		sel.appendChild(o);
 	});
-	const inp = el("input", { className: "lno", placeholder: "note at this move…" });
+	const inp = el("input", {
+		className: "lno",
+		placeholder: "note at this move…",
+	});
 	const add = el("button", { className: "chip", textContent: "Add note" });
 	add.onclick = () => {
 		if (inp.value.trim()) {
@@ -473,7 +489,10 @@ function notesFootnotesPanel() {
 					textContent: fullmoveLabel(c.ply) + " — " + c.text,
 				}),
 			);
-			const edit = el("button", { className: "chip mini", textContent: "\u270e" });
+			const edit = el("button", {
+				className: "chip mini",
+				textContent: "\u270e",
+			});
 			edit.onclick = () => {
 				const nt = prompt("Edit note:", c.text);
 				if (nt !== null && nt.trim()) {
@@ -481,7 +500,10 @@ function notesFootnotesPanel() {
 					renderApp();
 				}
 			};
-			const del = el("button", { className: "chip mini danger", textContent: "\u2715" });
+			const del = el("button", {
+				className: "chip mini danger",
+				textContent: "\u2715",
+			});
 			del.onclick = () => {
 				current.comments.splice(i, 1);
 				renderApp();

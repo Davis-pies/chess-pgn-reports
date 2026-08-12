@@ -50,7 +50,8 @@ export function grid(lines, comments = []) {
 		const owned = new Set(tail.map((m) => m.ply));
 		const noteByPly = {};
 		comments.forEach((c, i) => {
-			if (owned.has(c.ply)) (noteByPly[c.ply] = noteByPly[c.ply] || []).push(i + 1);
+			if (owned.has(c.ply))
+				(noteByPly[c.ply] = noteByPly[c.ply] || []).push(i + 1);
 		});
 		const base = {
 			tag,
