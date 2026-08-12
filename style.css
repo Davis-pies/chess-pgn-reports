@@ -111,12 +111,16 @@ h3 {
 	flex-wrap: wrap;
 	margin: 6px 0;
 }
-.symbols {
-	display: flex;
+.symbols,
+.sympick {
+	display: inline-flex;
 	gap: 4px;
 	flex-wrap: wrap;
 	align-items: center;
-	margin: 8px 0;
+	margin: 4px 0;
+}
+.sympick {
+	margin: 0;
 }
 .symlabel {
 	font-size: 0.8rem;

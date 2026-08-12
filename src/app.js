@@ -131,7 +131,6 @@ function viewRoot() {
 	wrap.appendChild(notebookList());
 
 	wrap.appendChild(helpPanel());
-	wrap.appendChild(symbolsBar());
 	wrap.appendChild(orientationToggle());
 	wrap.appendChild(markupPanel());
 	wrap.appendChild(previewGroup());
@@ -371,7 +370,7 @@ function lineEditor(l, idx) {
 	name.oninput = () => {
 		l.name = name.value;
 	};
-	const ev = evalSelect(l);
+	const ev = symbolPicker(l);
 	const note = el("input", {
 		className: "lno",
 		placeholder: "note",
@@ -417,21 +416,36 @@ const EVAL_SYMBOLS = [
 	"??",
 ];
 
-function evalSelect(l) {
-	const s = document.createElement("select");
-	s.className = "le";
+// A per-line row of tappable symbol buttons; clicking one sets (or clears)
+// that line's evaluation, which then shows in the table and lines/card views.
+function symbolPicker(l) {
+	const wrap = el("span", { className: "sympick" });
+	const cur = (l.meta && l.meta.eval) || "";
 	EVAL_SYMBOLS.forEach((sym) => {
-		const o = document.createElement("option");
-		o.value = sym;
-		o.textContent = sym || "eval…";
-		s.appendChild(o);
+		if (!sym) return;
+		const b = el("button", {
+			type: "button",
+			className: "chip mini" + (cur === sym ? " on" : ""),
+			textContent: sym,
+		});
+		b.onclick = () => {
+			l.meta = { ...(l.meta || {}), eval: cur === sym ? "" : sym };
+			renderApp();
+		};
+		wrap.appendChild(b);
 	});
-	s.value = (l.meta && l.meta.eval) || "";
-	s.onchange = () => {
-		l.meta = { ...(l.meta || {}), eval: s.value };
+	const clear = el("button", {
+		type: "button",
+		className: "chip mini danger",
+		textContent: "\u2715",
+		title: "clear evaluation",
+	});
+	clear.onclick = () => {
+		l.meta = { ...(l.meta || {}), eval: "" };
 		renderApp();
 	};
-	return s;
+	wrap.appendChild(clear);
+	return wrap;
 }
 
 // A form to append a note to a specific mainline move.
@@ -475,32 +489,6 @@ function helpPanel() {
 	].forEach((s) => ol.appendChild(el("li", { textContent: s })));
 	d.appendChild(ol);
 	return d;
-}
-
-// A palette of advantage/quality symbols that inserts into whichever text
-// field currently has focus, so symbols can go anywhere (notes, names, etc.).
-function insertSymbol(sym) {
-	const a = document.activeElement;
-	if (a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA")) {
-		const s = a.selectionStart ?? a.value.length;
-		const e = a.selectionEnd ?? s;
-		a.value = a.value.slice(0, s) + sym + a.value.slice(e);
-		a.selectionStart = a.selectionEnd = s + sym.length;
-		a.dispatchEvent(new (a.ownerDocument.defaultView.Event)("input"));
-		a.focus();
-	}
-}
-
-function symbolsBar() {
-	const bar = el("div", { className: "symbols" });
-	bar.appendChild(el("span", { className: "symlabel", textContent: "Insert symbol: " }));
-	EVAL_SYMBOLS.forEach((sym) => {
-		if (!sym) return;
-		const b = el("button", { type: "button", className: "chip mini", textContent: sym });
-		b.onclick = () => insertSymbol(sym);
-		bar.appendChild(b);
-	});
-	return bar;
 }
 
 // Explicit move reference for a note, e.g. "7.Nbd2" / "7...Nbd7" (number + SAN).
@@ -651,7 +639,6 @@ function importPanel() {
 	);
 	box.appendChild(themeBtn());
 	box.append(helpPanel(), notebookList());
-	box.appendChild(symbolsBar());
 	const ta = el("textarea", {
 		className: "pgnin",
 		rows: 10,
