@@ -113,7 +113,9 @@ function appendBoard(container, fen, size = 220) {
 export function selfContainedBoardSvg(fen, size = 220) {
 	const svg = boardSvg(fen, size);
 	svg.querySelectorAll("use").forEach((u) => {
-		const sym = document.getElementById((u.getAttribute("href") || "").slice(1));
+		const sym = document.getElementById(
+			(u.getAttribute("href") || "").slice(1),
+		);
 		if (!sym) {
 			u.remove();
 			return;
@@ -123,7 +125,10 @@ export function selfContainedBoardSvg(fen, size = 220) {
 		const w = Number(u.getAttribute("width") || 45);
 		const h = Number(u.getAttribute("height") || 45);
 		const g = document.createElementNS(NS, "g");
-		g.setAttribute("transform", `translate(${x} ${y}) scale(${w / 45} ${h / 45})`);
+		g.setAttribute(
+			"transform",
+			`translate(${x} ${y}) scale(${w / 45} ${h / 45})`,
+		);
 		sym.childNodes.forEach((n) => g.appendChild(n.cloneNode(true)));
 		u.replaceWith(g);
 	});

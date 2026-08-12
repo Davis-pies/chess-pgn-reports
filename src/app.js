@@ -7,7 +7,6 @@ import {
 	renderCards,
 	fullmoveLabel,
 	fullMovesText,
-	selfContainedBoardSvg,
 } from "./render.js";
 import {
 	saveNotebook,
@@ -724,7 +723,23 @@ function exportBar() {
 		textContent: "Export Markdown",
 	});
 	md.onclick = () => download(slug() + ".md", buildMarkdown(), "text/markdown");
-	bar.append(printBtn, pgn, md);
+	const copy = el("button", { className: "chip", textContent: "Copy report" });
+	copy.onclick = async () => {
+		const text = buildMarkdown();
+		try {
+			await navigator.clipboard.writeText(text);
+		} catch {
+			const ta = document.createElement("textarea");
+			ta.value = text;
+			document.body.appendChild(ta);
+			ta.select();
+			document.execCommand("copy");
+			ta.remove();
+		}
+		copy.textContent = "Copied \u2713";
+		setTimeout(() => (copy.textContent = "Copy report"), 1500);
+	};
+	bar.append(printBtn, pgn, md, copy);
 	return bar;
 }
 
@@ -746,52 +761,6 @@ function download(filename, text, mime) {
 }
 
 // Editable, portable Markdown of the finished table — paste into Docs/Word.
-// A GitHub-flavoured pipe table of the current (vertical) table.
-function markdownTable(g) {
-	const labels = {};
-	g.mainMoves.forEach((m) => {
-		labels[m.ply] = m.ply % 2 === 0 ? Math.floor(m.ply / 2) + 1 + "." : "";
-	});
-	const head = ["Variation"];
-	for (let ply = 0; ply <= g.maxPly; ply++) head.push(labels[ply] || "");
-	head.push("eval");
-	const rows = [
-		"| " + head.join(" | ") + " |",
-		"|" + head.map(() => "---").join("|") + "|",
-	];
-	for (const v of g.vars) {
-		const cells = [];
-		for (let ply = 0; ply <= g.maxPly; ply++) {
-			const c = v.cells[ply];
-			cells.push(c ? c.text + (c.mark ? " " + c.mark : "") : "");
-		}
-		rows.push(
-			"| " +
-				[[v.label, v.name].filter(Boolean).join(" "), ...cells, v.eval].join(
-					" | ",
-				) +
-				" |",
-		);
-	}
-	return rows.join("\n");
-}
-
-// Self-contained board diagrams as markdown images (data-URI SVGs).
-function markdownBoards(g) {
-	return g.vars
-		.map((v) => {
-			const svg = new XMLSerializer().serializeToString(
-				selfContainedBoardSvg(v.fen),
-			);
-			const bytes = new TextEncoder().encode(svg);
-			let bin = "";
-			for (const b of bytes) bin += String.fromCharCode(b);
-			const b64 = btoa(bin);
-			return `![${[v.label, v.name].filter(Boolean).join(" ")}](data:image/svg+xml;base64,${b64})`;
-		})
-		.join("\n\n");
-}
-
 function buildMarkdown() {
 	const g = grid(current.lines, current.comments);
 	const L = [];
@@ -808,10 +777,6 @@ function buildMarkdown() {
 			`${lead}${v.name ? " (" + v.name + ")" : ""}${v.eval ? " " + v.eval : ""}: ${moves}`,
 		);
 	}
-	L.push("", "## Table", "");
-	L.push(markdownTable(g));
-	L.push("", "## Positions", "");
-	L.push(markdownBoards(g));
 	if (g.footNotes.length) {
 		L.push("", "## Footnotes", "");
 		g.footNotes.forEach((f) => {
