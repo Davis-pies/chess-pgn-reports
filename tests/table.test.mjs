@@ -84,3 +84,20 @@ test("a comment's note marker appears only on the line that owns it", () => {
 		"sideline carries no duplicate marker",
 	);
 });
+
+test("a variation's note shows only on the variation, not the mainline branch move", () => {
+	const pgn = "1. e4 e5 ( {var note} 1... c5 2. Nf3) 2. Nf3";
+	const comments = parsePgn(pgn).comments;
+	const lines = collectLines(parsePgn(pgn).nodes);
+	const { vars } = grid(lines, comments);
+	const note = comments.find((c) => c.text.includes("var note"));
+	assert.strictEqual(note.inVar, true, "in-variation comment is flagged inVar");
+	const mainVar = vars.find((v) => v.tag === "mainline");
+	const sidVar = vars.find((v) => v.tag === "sideline");
+	// both sit at the branch ply (1), but the note must not show on the mainline
+	assert.ok(!mainVar.noteByPly[note.ply], "mainline shows no variation-note marker");
+	assert.ok(
+		sidVar.noteByPly[note.ply] && sidVar.noteByPly[note.ply].length,
+		"the variation shows its own note",
+	);
+});

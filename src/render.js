@@ -303,7 +303,7 @@ export function renderCards(container, grid, opts = {}) {
 		for (const ply in v.noteByPly || {}) {
 			v.noteByPly[ply].forEach((n) => {
 				const c = comments[n - 1];
-				if (c) owned.push({ n, text: strip(c.text) });
+				if (c) owned.push({ n, ply: Number(ply), text: strip(c.text) });
 			});
 		}
 		if (owned.length) {
@@ -312,9 +312,11 @@ export function renderCards(container, grid, opts = {}) {
 			h.textContent = "Notes";
 			notesBox.appendChild(h);
 			owned.forEach((o) => {
+				const mv = (v.moves || []).find((m) => m.ply === o.ply);
+				const ref = mv ? fullmoveLabel(mv.ply) + mv.san : fullmoveLabel(o.ply);
 				const row = document.createElement("div");
 				row.className = "nt";
-				row.textContent = `[${o.n}] ${o.text}`;
+				row.textContent = `[${o.n}] ${ref} \u2014 ${o.text}`;
 				notesBox.appendChild(row);
 			});
 		}

@@ -25,6 +25,7 @@ let current = {
 	orientation: "vertical",
 	showBoards: false,
 	preview: "table",
+	boardSize: 300,
 	sel: null, // { l: line, ply } — the move the symbol row targets (null = line-end)
 };
 
@@ -145,7 +146,10 @@ function previewGroup() {
 	c.appendChild(
 		el("h3", { textContent: "Print view — one line, one position" }),
 	);
-	renderCards(c, g, { comments: current.comments });
+	renderCards(c, g, {
+		comments: current.comments,
+		boardSize: current.boardSize,
+	});
 	box.append(t, c);
 	const useCards = current.preview === "cards";
 	t.classList.toggle("hidden", useCards);
@@ -279,6 +283,18 @@ function orientationToggle() {
 		renderApp();
 	};
 	bar.append(tb, cb);
+	bar.appendChild(el("span", { textContent: " Board: " }));
+	[220, 300, 400].forEach((s) => {
+		const sb = el("button", {
+			className: "chip" + (current.boardSize === s ? " on" : ""),
+			textContent: String(s),
+		});
+		sb.onclick = () => {
+			current.boardSize = s;
+			renderApp();
+		};
+		bar.appendChild(sb);
+	});
 	const b = el("label", {}, [
 		"Board diagrams ",
 		el("input", { type: "checkbox", checked: current.showBoards }),
@@ -528,7 +544,7 @@ function movePanel(l) {
 	};
 	srow.appendChild(clear);
 	box.appendChild(srow);
-	if (!atEnd) box.appendChild(commentEditor(selPly));
+	if (!atEnd) box.appendChild(commentEditor(selPly, l));
 	const done = el("button", {
 		type: "button",
 		className: "chip mini",
@@ -543,7 +559,7 @@ function movePanel(l) {
 }
 
 // Edit/add notes attached to a specific move (plies are shared app-wide).
-function commentEditor(ply) {
+function commentEditor(ply, l) {
 	const wrap = el("div", { className: "cedit" });
 	const mine = current.comments.filter((c) => c.ply === ply);
 	mine.forEach((c) => {
@@ -575,7 +591,11 @@ function commentEditor(ply) {
 	});
 	add.onclick = () => {
 		if (addInp.value.trim()) {
-			current.comments.push({ ply, text: addInp.value.trim() });
+			current.comments.push({
+				ply,
+				text: addInp.value.trim(),
+				inVar: !!(l && !l.isMain), // attach to this line's side
+			});
 			addInp.value = "";
 			renderApp();
 		}

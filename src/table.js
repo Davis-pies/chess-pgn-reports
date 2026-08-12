@@ -46,12 +46,14 @@ export function grid(lines, comments = []) {
 			cells[m.ply] = { text, cls, mark: marks[m.ply] || "" };
 		});
 		// note markers keyed by ply, only for plies this line owns (its tail; the
-		// mainline owns every move). So a comment appears once, on the right line.
+		// mainline owns every move). Comments are tagged inVar (inside a
+		// variation), so mainline cells show only mainline comments and a
+		// variation shows only its own — no branch-ply double display.
 		const tail = isMain ? l.moves : l.moves.slice(d);
 		const owned = new Set(tail.map((m) => m.ply));
 		const noteByPly = {};
 		comments.forEach((c, i) => {
-			if (owned.has(c.ply))
+			if (owned.has(c.ply) && (isMain ? !c.inVar : c.inVar))
 				(noteByPly[c.ply] = noteByPly[c.ply] || []).push(i + 1);
 		});
 		const base = {

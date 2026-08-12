@@ -65,6 +65,7 @@ function parseSeq(tokens, ctx, state, inVariation = false) {
 			ctx.comments.push({
 				ply: narrative.ply,
 				text: narrative.parts.join(" "),
+				inVar: inVariation,
 			});
 			narrative = null;
 		}
@@ -89,7 +90,11 @@ function parseSeq(tokens, ctx, state, inVariation = false) {
 				if (narrative) narrative.parts.push(text);
 				else narrative = { ply: last ? last.ply : state.ply, parts: [text] };
 			} else {
-				ctx.comments.push({ ply: last ? last.ply : state.ply, text });
+				ctx.comments.push({
+					ply: last ? last.ply : state.ply,
+					text,
+					inVar: inVariation,
+				});
 			}
 			if (last) last.comments.push(text);
 			else
