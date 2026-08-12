@@ -11,7 +11,8 @@ export function tokenize(mt) {
 }
 
 export function parsePgn(mt) {
-	const tokens = tokenize(mt);
+	const cleaned = mt.replace(/\[[^\]\n]*\]\s*/g, " "); // strip PGN tag/header lines
+	const tokens = tokenize(cleaned);
 	const ctx = { i: 0, result: "*" };
 	const nodes = parseSeq(tokens, ctx, { fen: START_FEN, ply: 0 });
 	return { nodes, result: ctx.result };
@@ -27,6 +28,13 @@ function stepFrom(state, san) {
 		throw new Error("Illegal or ambiguous move in PGN: " + san);
 	}
 	return { san: m.san, fen: chess.fen(), ply: state.ply, variations: [] };
+}
+
+// PGN null move: swap the side to move in a FEN string (no board change).
+function flipToMove(fen) {
+	const p = fen.split(" ");
+	p[1] = p[1] === "w" ? "b" : "w";
+	return p.join(" ");
 }
 
 // Parses a run of moves starting at `state` ({fen, ply}: position BEFORE the
@@ -65,6 +73,23 @@ function parseSeq(tokens, ctx, state) {
 		}
 		if (/^\d+\.\.?/.test(t)) {
 			// move-number token, redundant with ply; skip
+			ctx.i++;
+			continue;
+		}
+		if (t === "--") {
+			// null move: opponent passes, swapping the side to move. Flip the FEN's
+			// active color so the following move validates for the right side, and
+			// keep '--' as a visible node.
+			const node = {
+				san: "--",
+				fen: flipToMove(cur.fen),
+				ply: cur.ply,
+				variations: [],
+			};
+			nodes.push(node);
+			stateBeforeLast = cur;
+			cur = { fen: node.fen, ply: node.ply + 1 };
+			last = node;
 			ctx.i++;
 			continue;
 		}
