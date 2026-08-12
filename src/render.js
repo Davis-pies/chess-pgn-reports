@@ -239,7 +239,7 @@ export function renderTable(container, grid, orientation, opts = {}) {
 		for (const v of vars) {
 			const fig = document.createElement("figure");
 			fig.className = "board";
-			appendBoard(fig, v.fen);
+			appendBoard(fig, v.fen, opts.boardSize);
 			const cap = document.createElement("figcaption");
 			cap.textContent = v.name || v.label;
 			fig.appendChild(cap);
@@ -254,7 +254,7 @@ export function renderTable(container, grid, orientation, opts = {}) {
 // Moves text for a card: sidelines get a leading ellipsis + the preceding
 // (shared) move for divergence context, and every move that has notes gets its
 // [n] references appended inline so the moves point at the notes below.
-function cardMovesText(v) {
+export function cardMovesText(v) {
 	const parts = [];
 	if (v.tag !== "mainline" && v.d > 0) {
 		const pm = v.moves[v.d - 1];

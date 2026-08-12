@@ -414,6 +414,7 @@ figure.board figcaption {
 	margin-top: 4px;
 }
 .board-svg {
+	display: block;
 	border-radius: 4px;
 	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
 }

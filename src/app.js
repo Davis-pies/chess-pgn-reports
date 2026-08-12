@@ -8,6 +8,7 @@ import {
 	appendBoard,
 	fullmoveLabel,
 	fullMovesText,
+	cardMovesText,
 } from "./render.js";
 import {
 	saveNotebook,
@@ -43,9 +44,6 @@ function allNotes() {
 }
 
 const $ = (id) => document.getElementById(id);
-// Approx. printable content width on a portrait page (px), used to decide
-// whether the horizontal table fits cleanly on the printed page.
-const PRINT_MAX_WIDTH = 740;
 
 function el(tag, props, children = []) {
 	const e = document.createElement(tag);
@@ -106,6 +104,8 @@ function viewRoot() {
 					lines: [],
 					orientation: "horizontal",
 					showBoards: false,
+					boardSize: current.boardSize,
+					sel: null,
 				};
 				renderApp();
 			},
@@ -156,6 +156,7 @@ function previewGroup() {
 	t.appendChild(el("h3", { textContent: "Table" }));
 	renderTable(t, g, current.orientation, {
 		showBoards: current.showBoards,
+		boardSize: current.boardSize,
 	});
 	const c = el("div", { className: "pv-cards" });
 	c.appendChild(
@@ -166,22 +167,31 @@ function previewGroup() {
 		boardSize: current.boardSize,
 	});
 	box.append(t, c);
-	// horizontal table for print/PDF — included only if it fits the page
-	const ht = el("div", { className: "pv-htable" });
-	ht.appendChild(el("h3", { textContent: "Table" }));
-	renderTable(ht, g, "horizontal", { showBoards: false });
-	// measure the natural width while rendered off-screen (it's display:none on
-	// screen, so scrollWidth would read 0), then mark too-wide tables to skip
-	ht.style.cssText =
-		"position:absolute;left:-9999px;display:block;width:max-content;";
-	const w = ht.querySelector(".tbl")?.scrollWidth || 0;
-	ht.style.cssText = "";
-	if (w > PRINT_MAX_WIDTH) ht.classList.add("no-print");
-	box.appendChild(ht);
+	appendPrintTables(box, g);
 	const useCards = current.preview === "cards";
 	t.classList.toggle("hidden", useCards);
 	c.classList.toggle("hidden", !useCards);
 	return box;
+}
+
+// Print/PDF horizontal table. The mainline is always shown as the reference
+// column; the side lines are split into vertical slices of ~16 columns so the
+// table wraps across pages instead of being cut off or scaled.
+function appendPrintTables(box, g) {
+	const wrap = el("div", { className: "pv-htable" });
+	wrap.appendChild(el("h3", { textContent: "Table" }));
+	const mainV = g.vars[0]; // mainline sorts first
+	const others = g.vars.slice(1);
+	const size = 15; // mainline + 15 = 16 columns per slice
+	if (mainV && others.length > size) {
+		for (let i = 0; i < others.length; i += size) {
+			const vars = [mainV, ...others.slice(i, i + size)];
+			renderTable(wrap, { ...g, vars }, "horizontal", { showBoards: false });
+		}
+	} else {
+		renderTable(wrap, g, "horizontal", { showBoards: false });
+	}
+	box.appendChild(wrap);
 }
 
 function notebookList() {
@@ -257,6 +267,8 @@ function openNotebook(id) {
 			lines,
 			orientation: current.orientation,
 			showBoards: current.showBoards,
+			boardSize: current.boardSize,
+			sel: null,
 		};
 	} catch (e) {
 		current = {
@@ -266,6 +278,8 @@ function openNotebook(id) {
 			lines: [],
 			orientation: "horizontal",
 			showBoards: false,
+			boardSize: current.boardSize || 300,
+			sel: null,
 		};
 		alert("Could not open workbook: " + e.message);
 	}
@@ -496,12 +510,17 @@ function moveStrip(l) {
 		const num = m.ply % 2 === 0 ? Math.floor(m.ply / 2) + 1 + ". " : "";
 		const mark = (l.marks || {})[m.ply];
 		const hasNote = (l.comments || []).some((c) => c.ply === m.ply);
+		// numbered note references for this move's chip ("[2]" / "[2][5]")
+		const noteRefs = allNotes()
+			.filter((n) => n.owner === l && n.ply === m.ply)
+			.map((n) => "[" + n.n + "]")
+			.join("");
 		const sel = current.sel && current.sel.l === l && current.sel.ply === m.ply;
 		const b = el("button", {
 			type: "button",
 			className:
 				"move-chip" + (sel ? " on" : "") + (hasNote ? " has-note" : ""),
-			textContent: num + m.san + (mark ? " \u00b7 " + mark : ""),
+			textContent: num + m.san + (mark ? " \u00b7 " + mark : "") + noteRefs,
 		});
 		b.onclick = () => {
 			current.sel =
@@ -824,10 +843,7 @@ function buildMarkdown() {
 	for (const v of g.vars) {
 		const lead =
 			v.tag === "mainline" ? "**Mainline**" : "- " + v.label.toUpperCase();
-		const moves =
-			v.tag === "mainline"
-				? fullMovesText(v.moves, v.marks)
-				: fullMovesText(v.moves.slice(v.d), v.marks);
+		const moves = cardMovesText(v);
 		L.push(
 			`${lead}${v.name ? " (" + v.name + ")" : ""}${v.eval ? " " + v.eval : ""}: ${moves}`,
 		);
@@ -895,6 +911,8 @@ function importPanel() {
 				orientation: "horizontal",
 				showBoards: false,
 				preview: "table",
+				boardSize: current.boardSize,
+				sel: null,
 			};
 			renderApp();
 		} catch (e) {
