@@ -25,6 +25,7 @@ let current = {
 	orientation: "vertical",
 	showBoards: false,
 	preview: "table",
+	sel: null, // { l: line, ply } — the move the symbol row targets (null = line-end)
 };
 
 const $ = (id) => document.getElementById(id);
@@ -211,6 +212,7 @@ function openNotebook(id) {
 			if (t) {
 				l.name = t.name;
 				l.meta = t.meta || {};
+				l.marks = t.marks || {};
 				// legacy notebooks used 'main'/'minor'; mainline is now structural
 				l.tag = l.isMain ? undefined : t.tag === "foot" ? "foot" : "sideline";
 			}
@@ -362,6 +364,7 @@ function lineEditor(l, idx) {
 		tags.appendChild(promote);
 	}
 	row.appendChild(tags);
+	row.appendChild(moveStrip(l));
 	const name = el("input", {
 		className: "ln",
 		placeholder: "name (e.g. Marshall)",
@@ -370,7 +373,6 @@ function lineEditor(l, idx) {
 	name.oninput = () => {
 		l.name = name.value;
 	};
-	const ev = symbolPicker(l);
 	const note = el("input", {
 		className: "lno",
 		placeholder: "note",
@@ -379,7 +381,7 @@ function lineEditor(l, idx) {
 	note.oninput = () => {
 		l.meta = { ...(l.meta || {}), note: note.value };
 	};
-	row.append(name, ev, note);
+	row.append(name, note, symbolPicker(l));
 	return row;
 }
 
@@ -418,9 +420,74 @@ const EVAL_SYMBOLS = [
 
 // A per-line row of tappable symbol buttons; clicking one sets (or clears)
 // that line's evaluation, which then shows in the table and lines/card views.
+// A tappable strip of a line's moves. Clicking a move selects it as the target
+// for the symbol row; the current mark, if any, is shown on the chip.
+function moveStrip(l) {
+	const mainL = current.lines.find((x) => x.isMain) || current.lines[0];
+	const wrap = el("span", { className: "moves" });
+	wrap.appendChild(
+		el("span", { className: "symlabel", textContent: "Tap a move\u00a0\u2192" }),
+	);
+	let d = 0;
+	const mv = l.moves;
+	if (!l.isMain)
+		while (
+			d < mv.length &&
+			d < mainL.moves.length &&
+			mv[d].san === mainL.moves[d].san
+		)
+			d++;
+	const owned = l.isMain ? mv : mv.slice(d);
+	owned.forEach((m) => {
+		const num = m.ply % 2 === 0 ? Math.floor(m.ply / 2) + 1 + ". " : "";
+		const mark = (l.marks || {})[m.ply];
+		const sel = current.sel && current.sel.l === l && current.sel.ply === m.ply;
+		const b = el("button", {
+			type: "button",
+			className: "move-chip" + (sel ? " on" : ""),
+			textContent: num + m.san + (mark ? " \u00b7 " + mark : ""),
+		});
+		b.onclick = () => {
+			current.sel =
+				current.sel && current.sel.l === l && current.sel.ply === m.ply
+					? null
+					: { l, ply: m.ply };
+			renderApp();
+		};
+		wrap.appendChild(b);
+	});
+	return wrap;
+}
+
+// Symbol row. Applies to the selected move (a per-move mark) or, when no move
+// is selected, to the line-end evaluation.
 function symbolPicker(l) {
 	const wrap = el("span", { className: "sympick" });
-	const cur = (l.meta && l.meta.eval) || "";
+	const selPly = current.sel && current.sel.l === l ? current.sel.ply : null;
+	const atMove = selPly != null;
+	const cur = atMove
+		? (l.marks || {})[selPly] || ""
+		: (l.meta && l.meta.eval) || "";
+	const mm = atMove ? l.moves.find((x) => x.ply === selPly) : null;
+	wrap.appendChild(
+		el("span", {
+			className: "symlabel",
+			textContent: atMove
+				? "@ " + fullmoveLabel(selPly) + (mm ? mm.san : "") + ": "
+				: "line-end: ",
+		}),
+	);
+	const apply = (sym) => {
+		if (atMove) {
+			l.marks = l.marks || {};
+			if (cur === sym) delete l.marks[selPly];
+			else l.marks[selPly] = sym;
+			if (!Object.keys(l.marks).length) l.marks = undefined;
+		} else {
+			l.meta = { ...(l.meta || {}), eval: cur === sym ? "" : sym };
+		}
+		renderApp();
+	};
 	EVAL_SYMBOLS.forEach((sym) => {
 		if (!sym) return;
 		const b = el("button", {
@@ -428,22 +495,16 @@ function symbolPicker(l) {
 			className: "chip mini" + (cur === sym ? " on" : ""),
 			textContent: sym,
 		});
-		b.onclick = () => {
-			l.meta = { ...(l.meta || {}), eval: cur === sym ? "" : sym };
-			renderApp();
-		};
+		b.onclick = () => apply(sym);
 		wrap.appendChild(b);
 	});
 	const clear = el("button", {
 		type: "button",
 		className: "chip mini danger",
 		textContent: "\u2715",
-		title: "clear evaluation",
+		title: "clear",
 	});
-	clear.onclick = () => {
-		l.meta = { ...(l.meta || {}), eval: "" };
-		renderApp();
-	};
+	clear.onclick = () => apply("");
 	wrap.appendChild(clear);
 	return wrap;
 }
@@ -551,7 +612,7 @@ function notesFootnotesPanel() {
 				el("span", {
 					textContent:
 						(l.name ? l.name + ": " : "") +
-						fullMovesText(l.moves.slice(d)) +
+						fullMovesText(l.moves.slice(d), l.marks) +
 						(note ? " — " + note : ""),
 				}),
 			);
@@ -608,8 +669,8 @@ function buildMarkdown() {
 			v.tag === "mainline" ? "**Mainline**" : "- " + v.label.toUpperCase();
 		const moves =
 			v.tag === "mainline"
-				? fullMovesText(v.moves)
-				: fullMovesText(v.moves.slice(v.d));
+				? fullMovesText(v.moves, v.marks)
+				: fullMovesText(v.moves.slice(v.d), v.marks);
 		L.push(
 			`${lead}${v.name ? " (" + v.name + ")" : ""}${v.eval ? " " + v.eval : ""}: ${moves}`,
 		);
@@ -618,7 +679,7 @@ function buildMarkdown() {
 		L.push("", "## Footnotes", "");
 		g.footNotes.forEach((f) =>
 			L.push(
-				`- ${f.letter}${f.name ? " " + f.name : ""}${f.eval ? " " + f.eval : ""}: ${fullMovesText(f.moves.slice(f.d))}${f.note ? " — " + f.note : ""}`,
+				`- ${f.letter}${f.name ? " " + f.name : ""}${f.eval ? " " + f.eval : ""}: ${fullMovesText(f.moves.slice(f.d), f.marks)}${f.note ? " — " + f.note : ""}`,
 			),
 		);
 	}

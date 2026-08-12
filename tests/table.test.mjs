@@ -46,6 +46,15 @@ test("evaluation symbol rides on the variation row", () => {
 	assert.strictEqual(vars[1].eval, "=+");
 });
 
+test("per-move marks ride on the correct cell", () => {
+	const lines = linesFrom("1. e4 e5 (1... c5) 2. Nf3");
+	lines[0].marks = { 2: "\u00b1" }; // Nf3 at ply2
+	const { vars } = grid(lines);
+	const mainVar = vars.find((v) => v.tag === "mainline");
+	assert.strictEqual(mainVar.cells[2].mark, "\u00b1");
+	assert.strictEqual(mainVar.cells[0].mark, "");
+});
+
 test("footnote lines are pulled out of the table rows into footNotes", () => {
 	const lines = linesFrom("1. e4 e5 (1... c5) (1... c6 2. Nf3) 2. Nf3");
 	lines[1].tag = "foot"; // the c5 line is a footnote

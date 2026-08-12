@@ -199,6 +199,31 @@ select:focus {
 	flex: 1;
 	color: var(--text);
 }
+.moves {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 3px;
+	align-items: center;
+	flex: 1 1 100%;
+}
+.move-chip {
+	border: 1px solid var(--line);
+	background: var(--lift);
+	color: var(--text);
+	border-radius: 6px;
+	padding: 2px 7px;
+	font-size: 0.78rem;
+	cursor: pointer;
+	font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+.move-chip:hover {
+	border-color: var(--main);
+}
+.move-chip.on {
+	background: var(--main);
+	color: #fff;
+	border-color: var(--main);
+}
 .tags {
 	display: inline-flex;
 	gap: 4px;

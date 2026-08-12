@@ -22,6 +22,7 @@ export function saveNotebook(id, { name, pgn, lines, comments = [] }) {
 				tag: l.tag || "sideline",
 				name: l.name || "",
 				meta: l.meta || {},
+				marks: l.marks || {},
 			})),
 		}),
 	);

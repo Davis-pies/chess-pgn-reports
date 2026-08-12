@@ -119,9 +119,10 @@ function td(text, cls) {
 	return e;
 }
 
-// A move cell, plus any numbered comment reference marker for that ply.
+// A move cell, plus any per-move symbol mark and referenced note markers.
 function moveCell(c, ply, noteByPly) {
 	const e = td(c ? c.text : "", c ? c.cls : "");
+	if (c && c.mark) e.appendChild(document.createTextNode(" " + c.mark));
 	const notes = noteByPly && noteByPly[ply];
 	if (notes)
 		notes.forEach((n) => {
@@ -256,8 +257,8 @@ export function renderCards(container, grid, opts = {}) {
 		// repeated shared prefix
 		moves.textContent =
 			v.tag === "mainline"
-				? fullMovesText(v.moves)
-				: fullMovesText(v.moves.slice(v.d));
+				? fullMovesText(v.moves, v.marks)
+				: fullMovesText(v.moves.slice(v.d), v.marks);
 		card.appendChild(moves);
 
 		const board = document.createElement("div");
@@ -269,12 +270,16 @@ export function renderCards(container, grid, opts = {}) {
 	container.appendChild(wrap);
 }
 
-// Standard algebraic pairing: the full-move number appears once on White's
-// half-move ("1. e4 e5 2. Nf3"), Black's half-move carries no number.
-export function fullMovesText(moves) {
+// Standard algebraic pairing: number on White's half-move once ("1. e4 e5 2.
+// Nf3"), Black's half-move carries none. Marks (per-move symbols) are
+// appended to the move they annotate.
+export function fullMovesText(moves, marks) {
 	return moves
 		.map(
-			(m) => (m.ply % 2 === 0 ? Math.floor(m.ply / 2) + 1 + ". " : "") + m.san,
+			(m) =>
+				(m.ply % 2 === 0 ? Math.floor(m.ply / 2) + 1 + ". " : "") +
+				m.san +
+				(marks && marks[m.ply] ? " " + marks[m.ply] : ""),
 		)
 		.join(" ");
 }

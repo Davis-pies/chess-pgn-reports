@@ -30,6 +30,7 @@ export function grid(lines, comments = []) {
 		const tag = isMain ? "mainline" : l.tag === "foot" ? "foot" : "sideline";
 		const d = isMain ? 0 : divergence(l, main);
 		const cells = {};
+		const marks = l.marks || {};
 		l.moves.forEach((m, i) => {
 			let text, cls;
 			if (i < d) {
@@ -42,7 +43,7 @@ export function grid(lines, comments = []) {
 				text = m.san;
 				cls = tag;
 			}
-			cells[m.ply] = { text, cls };
+			cells[m.ply] = { text, cls, mark: marks[m.ply] || "" };
 		});
 		// note markers keyed by ply, only for plies this line owns (its tail; the
 		// mainline owns every move). So a comment appears once, on the right line.
@@ -60,6 +61,7 @@ export function grid(lines, comments = []) {
 			eval: (l.meta && l.meta.eval) || "",
 			fen: l.fen,
 			moves: l.moves,
+			marks,
 			d,
 		};
 		if (tag === "foot")
