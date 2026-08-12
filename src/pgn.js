@@ -50,12 +50,29 @@ function attachPending(pending) {
 // move, so it branches at the state before that move (same ply). ')' closes it.
 // Returns the node list. `state` is never mutated across sub-variations because
 // every step draws its position from the previous node's fen.
-function parseSeq(tokens, ctx, state) {
+function parseSeq(tokens, ctx, state, inVariation = false) {
 	const nodes = [];
 	let last = null;
 	let stateBeforeLast = state; // position before the most recent move
 	let cur = state;
 	let pendingComment = null; // comment seen before any move yet
+	// Within a variation, fragment comments like "If ... then ..." separated only
+	// by moves are merged into ONE note with the moves inline (e.g.
+	// "If 38...Rxa4 then 39.Nxd6 would of course win a piece.").
+	let narrative = null; // { ply, parts: [] }
+	const flushNarrative = () => {
+		if (narrative) {
+			ctx.comments.push({
+				ply: narrative.ply,
+				text: narrative.parts.join(" "),
+			});
+			narrative = null;
+		}
+	};
+	const mvText = (m) => {
+		const n = Math.floor(m.ply / 2) + 1;
+		return (m.ply % 2 === 0 ? n + ". " : n + "... ") + m.san;
+	};
 	while (ctx.i < tokens.length) {
 		const t = tokens[ctx.i];
 		if (t.startsWith("{") || t.startsWith(";")) {
@@ -65,12 +82,15 @@ function parseSeq(tokens, ctx, state) {
 				.replace(/\[%.*?\]/g, "")
 				.trim(); // drop [%...] NAG markers
 			if (!text) {
-				// only drop truly empty comments; keep fragments like "If"/"then"
-				// so if/then annotations don't lose their connective words
 				ctx.i++;
 				continue;
 			}
-			ctx.comments.push({ ply: last ? last.ply : state.ply, text });
+			if (inVariation) {
+				if (narrative) narrative.parts.push(text);
+				else narrative = { ply: last ? last.ply : state.ply, parts: [text] };
+			} else {
+				ctx.comments.push({ ply: last ? last.ply : state.ply, text });
+			}
 			if (last) last.comments.push(text);
 			else
 				pendingComment = pendingComment ? pendingComment + "\n" + text : text;
@@ -78,8 +98,9 @@ function parseSeq(tokens, ctx, state) {
 			continue;
 		}
 		if (t === "(") {
+			flushNarrative();
 			ctx.i++;
-			const sub = parseSeq(tokens, ctx, stateBeforeLast);
+			const sub = parseSeq(tokens, ctx, stateBeforeLast, true);
 			if (last) last.variations.push(sub);
 			else
 				nodes.push({
@@ -92,11 +113,13 @@ function parseSeq(tokens, ctx, state) {
 		}
 		if (t === ")") {
 			ctx.i++;
+			flushNarrative();
 			return nodes;
 		}
 		if (/^(1-0|0-1|1\/2-1\/2|\*)$/.test(t)) {
 			ctx.result = t;
 			ctx.i++;
+			flushNarrative();
 			return nodes;
 		}
 		if (/^\d+\.\.?/.test(t)) {
@@ -116,6 +139,7 @@ function parseSeq(tokens, ctx, state) {
 				comments: attachPending(pendingComment),
 			};
 			pendingComment = null;
+			if (narrative) narrative.parts.push(mvText(node));
 			nodes.push(node);
 			stateBeforeLast = cur;
 			cur = { fen: node.fen, ply: node.ply + 1 };
@@ -126,11 +150,13 @@ function parseSeq(tokens, ctx, state) {
 		const node = stepFrom(cur, t);
 		node.comments = attachPending(pendingComment);
 		pendingComment = null;
+		if (narrative) narrative.parts.push(mvText(node));
 		nodes.push(node);
 		stateBeforeLast = cur;
 		cur = { fen: node.fen, ply: node.ply + 1 };
 		last = node;
 		ctx.i++;
 	}
+	flushNarrative();
 	return nodes;
 }

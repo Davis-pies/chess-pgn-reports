@@ -50,9 +50,14 @@ test("comments are captured and exposed on the parse result", () => {
 	const solid = comments.find((c) => c.text.includes("very solid development"));
 	assert.ok(solid, "the 5.d3 comment is present");
 	assert.strictEqual(solid.ply, 8); // 5.d3 -> ply 8 (0-based)
-	// if/then fragments must survive (not be dropped as "too short")
-	const noIfThen = comments.find((c) => c.text.trim() === "then");
-	assert.ok(noIfThen, "the 'then' fragment of an if/then block is kept");
-	const noObjectLeak = comments.every((c) => !String(c.text).includes("[object"));
+	// if/then fragments merge into ONE note with the moves inline
+	const ifThen = comments.find(
+		(c) => c.text.includes("Rxa4") && c.text.includes("then"),
+	);
+	assert.ok(ifThen, "the if/then block is merged into one note");
+	assert.ok(ifThen.text.includes("would of course win a piece"));
+	const noObjectLeak = comments.every(
+		(c) => !String(c.text).includes("[object"),
+	);
 	assert.ok(noObjectLeak, "no [object Object] leaked into comments");
 });
