@@ -66,10 +66,25 @@ main {
 	top: 0;
 	bottom: 0;
 	width: 420px;
+	min-width: 280px;
+	max-width: 70vw;
 	overflow: auto; /* vertical + horizontal scroll for the table */
 	background: var(--bg);
 	padding: 14px;
 	z-index: 5;
+}
+.side-resize {
+	position: fixed;
+	top: 0;
+	bottom: 0;
+	width: 8px;
+	cursor: ew-resize;
+	z-index: 6;
+}
+.side-resize:hover,
+.side-resize:active {
+	background: var(--main);
+	opacity: 0.35;
 }
 .side-panel .pv-table {
 	margin-top: 8px;

@@ -233,7 +233,7 @@ export function renderTable(container, grid, orientation, opts = {}) {
 	}
 	container.appendChild(table);
 
-	if (opts.showBoards && vars.length <= 40) {
+	if (opts.showBoards) {
 		const boards = document.createElement("div");
 		boards.className = "boards";
 		for (const v of vars) {

@@ -27,8 +27,10 @@ let current = {
 	showBoards: false,
 	preview: "table",
 	boardSize: 300,
+	sideWidth: 420, // px; the drag-resized table panel width
 	sel: null, // { l: line, ply } — the move the symbol row targets (null = line-end)
 };
+let sideDragging = false; // dragging the table-panel resize handle
 
 // Flatten every line's own comments into the numbered Notes list (mainline
 // first, then each variation). Each entry remembers its owning line, so notes
@@ -140,8 +142,7 @@ function viewRoot() {
 	const main = el("div", { className: "main-panel" });
 	const g = grid(current.lines);
 
-	// side: controls + the table, fixed to the left with its own scroll
-	side.appendChild(orientationToggle());
+	// side: the preview (table, or print lines) with its own scroll, resizable
 	const t = el("div", { className: "pv-table" });
 	t.appendChild(el("h3", { textContent: "Table" }));
 	renderTable(t, g, current.orientation, {
@@ -149,31 +150,42 @@ function viewRoot() {
 		boardSize: current.boardSize,
 	});
 	side.appendChild(t);
-	appendPrintTables(side, g); // print-only horizontal slices (hidden on screen)
-	layout.appendChild(side);
-
-	// main: management, cards (print preview), reference sections
-	main.appendChild(notebookList());
-	main.appendChild(helpPanel());
-	const markupBox = markupPanel();
-	const notesBox = notesFootnotesPanel();
-	main.appendChild(markupBox);
 	const c = el("div", { className: "pv-cards" });
 	c.appendChild(
 		el("h3", { textContent: "Print view — one line, one position" }),
 	);
 	renderCards(c, g, { notes: allNotes(), boardSize: current.boardSize });
-	main.appendChild(c);
+	side.appendChild(c);
+	appendPrintTables(side, g); // print-only horizontal slices (hidden on screen)
+	const handle = el("div", { className: "side-resize", title: "Drag to resize" });
+	handle.onmousedown = (e) => {
+		e.preventDefault();
+		sideDragging = true;
+	};
+	side.appendChild(handle);
+	layout.appendChild(side);
+
+	// main (right): controls + management + reference sections
+	main.appendChild(orientationToggle());
+	main.appendChild(notebookList());
+	main.appendChild(helpPanel());
+	const markupBox = markupPanel();
+	const notesBox = notesFootnotesPanel();
+	main.appendChild(markupBox);
 	main.appendChild(notesBox);
 	main.appendChild(exportBar());
 	layout.appendChild(main);
 	wrap.appendChild(layout);
 
-	// `preview` flips the main pane between the editors and the print cards
+	// `preview` flips the LEFT panel between the table and the print lines
 	const useCards = current.preview === "cards";
-	markupBox.classList.toggle("hidden", useCards);
-	notesBox.classList.toggle("hidden", useCards);
+	t.classList.toggle("hidden", useCards);
 	c.classList.toggle("hidden", !useCards);
+	// apply the (drag-resized) table panel width
+	const sw = current.sideWidth || 420;
+	side.style.width = sw + "px";
+	main.style.marginLeft = sw + 8 + "px";
+	handle.style.left = sw - 4 + "px";
 	return wrap;
 }
 
@@ -384,15 +396,18 @@ function branchLabel(move) {
 	return fullmoveLabel(move.ply) + move.san;
 }
 
-function renderTrieNode(container, node, nameCounter, depth, entryLabel) {
-	// a lone line (leaf, no fork): a non-collapsible block styled like a group,
-	// so single lines don't look out of place among the collapsible tries
+function renderTrieNode(container, node, nameCounter, path) {
+	const nextPath = path
+		? path + "  " + branchLabel(node.move)
+		: branchLabel(node.move);
+	// a lone line (leaf, no fork): a non-collapsible block; header shows the
+	// full shared path up to this move
 	if (!node.children.size && node.leaf) {
 		const box = el("div", { className: "lgroup open" });
 		box.appendChild(
 			el("div", {
 				className: "lg-head",
-				textContent: (entryLabel || branchLabel(node.move)) + " \u00b7 1 line",
+				textContent: `${nextPath} \u00b7 1 line`,
 			}),
 		);
 		const body = el("div", { className: "lgroup-body" });
@@ -401,28 +416,27 @@ function renderTrieNode(container, node, nameCounter, depth, entryLabel) {
 		container.appendChild(box);
 		return;
 	}
-	// a single-child chain with no leaf: inline it so lone lines don't get
-	// buried under nested groups — only fork points become collapsible groups
+	// single-child chain: inline it, accumulating the path so a long shared
+	// continuation shows as one compressed header, not nested single groups
 	if (!node.leaf && node.children.size === 1) {
 		node.children.forEach((c) =>
-			renderTrieNode(container, c, nameCounter, depth, entryLabel),
+			renderTrieNode(container, c, nameCounter, nextPath),
 		);
 		return;
 	}
+	// a fork: a collapsible group, all closed by default; header shows the full
+	// shared path up to the fork
 	const det = el("details", { className: "lgroup" });
-	det.open = depth <= 1;
 	const count = countLeaves(node);
 	det.appendChild(
 		el("summary", {
 			className: "lg-head",
-			textContent: `${entryLabel || branchLabel(node.move)} \u00b7 ${count} lines`,
+			textContent: `${nextPath} \u00b7 ${count} lines`,
 		}),
 	);
 	const body = el("div", { className: "lgroup-body" });
 	if (node.leaf) body.appendChild(lineEditor(node.leaf, nameCounter.n++));
-	node.children.forEach((c) =>
-		renderTrieNode(body, c, nameCounter, depth + 1, null),
-	);
+	node.children.forEach((c) => renderTrieNode(body, c, nameCounter, ""));
 	det.appendChild(body);
 	container.appendChild(det);
 }
@@ -467,7 +481,7 @@ function markupPanel() {
 		});
 	} else {
 		trie.children.forEach((c) =>
-			renderTrieNode(box, c, counter, 1, branchLabel(c.move)),
+			renderTrieNode(box, c, counter, ""),
 		);
 	}
 	box.appendChild(
@@ -1038,6 +1052,21 @@ document.addEventListener("DOMContentLoaded", () => {
 	} catch {}
 	if (saved) document.documentElement.dataset.theme = saved;
 	renderApp();
+	// drag-resize for the table panel (updates main margin to match)
+	document.addEventListener("mousemove", (e) => {
+		if (!sideDragging) return;
+		const w = Math.max(280, Math.min(window.innerWidth * 0.7, e.clientX));
+		current.sideWidth = w;
+		const sp = document.querySelector(".side-panel");
+		const mp = document.querySelector(".main-panel");
+		const h = document.querySelector(".side-resize");
+		if (sp) sp.style.width = w + "px";
+		if (mp) mp.style.marginLeft = w + 8 + "px";
+		if (h) h.style.left = w - 4 + "px";
+	});
+	document.addEventListener("mouseup", () => {
+		sideDragging = false;
+	});
 	// inject the cburnett piece sprite so board <use href="#wK"> works & prints,
 	// then re-render once it's in the DOM
 	fetch("assets/pieces.svg")
