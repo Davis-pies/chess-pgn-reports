@@ -161,7 +161,8 @@ function previewGroup() {
 	renderTable(ht, g, "horizontal", { showBoards: false });
 	// measure the natural width while rendered off-screen (it's display:none on
 	// screen, so scrollWidth would read 0), then mark too-wide tables to skip
-	ht.style.cssText = "position:absolute;left:-9999px;display:block;width:max-content;";
+	ht.style.cssText =
+		"position:absolute;left:-9999px;display:block;width:max-content;";
 	const w = ht.querySelector(".tbl")?.scrollWidth || 0;
 	ht.style.cssText = "";
 	if (w > PRINT_MAX_WIDTH) ht.classList.add("no-print");
@@ -656,8 +657,15 @@ function helpPanel() {
 }
 
 // Explicit move reference for a note, e.g. "7.Nbd2" / "7...Nbd7" (number + SAN).
-function moveRef(ply) {
-	for (const l of current.lines) {
+// Explicit move reference for a note, e.g. "7.Nbd2" / "7...Nbd7" (number + SAN).
+// A variation-owned note (inVar) is looked up among non-main lines, since a
+// variation's first move shares a ply with the mainline move it replaces (e.g.
+// the variation's cxd6 and the mainline Kf6 both at ply 71).
+function moveRef(ply, inVar) {
+	const pool = inVar
+		? current.lines.filter((l) => !l.isMain)
+		: current.lines.filter((l) => l.isMain);
+	for (const l of pool) {
 		const m = l.moves.find((x) => x.ply === ply);
 		if (m) return fullmoveLabel(m.ply) + m.san;
 	}
@@ -724,7 +732,7 @@ function notesFootnotesPanel() {
 			const row = el("div", { className: "nt" });
 			row.appendChild(el("sup", { textContent: "[" + (i + 1) + "]" }));
 			const span = document.createElement("span");
-			span.appendChild(document.createTextNode(moveRef(c.ply) + " \u2014 "));
+			span.appendChild(document.createTextNode(moveRef(c.ply, c.inVar) + " \u2014 "));
 			renderInline(span, c.text);
 			row.appendChild(span);
 			box.appendChild(row);
@@ -851,7 +859,7 @@ function buildMarkdown() {
 	if (comments.length) {
 		L.push("", "## Notes", "");
 		comments.forEach((c, i) =>
-			L.push(`${i + 1}. ${moveRef(c.ply)} — ${c.text}`),
+			L.push(`${i + 1}. ${moveRef(c.ply, c.inVar)} — ${c.text}`),
 		);
 	}
 	return L.join("\n") + "\n";
