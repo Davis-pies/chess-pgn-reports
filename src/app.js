@@ -7,6 +7,7 @@ import {
 	renderCards,
 	fullmoveLabel,
 	fullMovesText,
+	selfContainedBoardSvg,
 } from "./render.js";
 import {
 	saveNotebook,
@@ -649,7 +650,9 @@ function renderInline(container, text) {
 			const tok = m[0];
 			const bold = tok.startsWith("**");
 			const code = tok.startsWith("`");
-			const node = document.createElement(bold ? "strong" : code ? "code" : "em");
+			const node = document.createElement(
+				bold ? "strong" : code ? "code" : "em",
+			);
 			node.textContent = tok.slice(bold ? 2 : 1, tok.length - (bold ? 2 : 1));
 			container.appendChild(node);
 			last = m.index + tok.length;
@@ -743,6 +746,52 @@ function download(filename, text, mime) {
 }
 
 // Editable, portable Markdown of the finished table — paste into Docs/Word.
+// A GitHub-flavoured pipe table of the current (vertical) table.
+function markdownTable(g) {
+	const labels = {};
+	g.mainMoves.forEach((m) => {
+		labels[m.ply] = m.ply % 2 === 0 ? Math.floor(m.ply / 2) + 1 + "." : "";
+	});
+	const head = ["Variation"];
+	for (let ply = 0; ply <= g.maxPly; ply++) head.push(labels[ply] || "");
+	head.push("eval");
+	const rows = [
+		"| " + head.join(" | ") + " |",
+		"|" + head.map(() => "---").join("|") + "|",
+	];
+	for (const v of g.vars) {
+		const cells = [];
+		for (let ply = 0; ply <= g.maxPly; ply++) {
+			const c = v.cells[ply];
+			cells.push(c ? c.text + (c.mark ? " " + c.mark : "") : "");
+		}
+		rows.push(
+			"| " +
+				[[v.label, v.name].filter(Boolean).join(" "), ...cells, v.eval].join(
+					" | ",
+				) +
+				" |",
+		);
+	}
+	return rows.join("\n");
+}
+
+// Self-contained board diagrams as markdown images (data-URI SVGs).
+function markdownBoards(g) {
+	return g.vars
+		.map((v) => {
+			const svg = new XMLSerializer().serializeToString(
+				selfContainedBoardSvg(v.fen),
+			);
+			const bytes = new TextEncoder().encode(svg);
+			let bin = "";
+			for (const b of bytes) bin += String.fromCharCode(b);
+			const b64 = btoa(bin);
+			return `![${[v.label, v.name].filter(Boolean).join(" ")}](data:image/svg+xml;base64,${b64})`;
+		})
+		.join("\n\n");
+}
+
 function buildMarkdown() {
 	const g = grid(current.lines, current.comments);
 	const L = [];
@@ -759,6 +808,10 @@ function buildMarkdown() {
 			`${lead}${v.name ? " (" + v.name + ")" : ""}${v.eval ? " " + v.eval : ""}: ${moves}`,
 		);
 	}
+	L.push("", "## Table", "");
+	L.push(markdownTable(g));
+	L.push("", "## Positions", "");
+	L.push(markdownBoards(g));
 	if (g.footNotes.length) {
 		L.push("", "## Footnotes", "");
 		g.footNotes.forEach((f) => {
