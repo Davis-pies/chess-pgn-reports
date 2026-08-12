@@ -157,7 +157,10 @@ function viewRoot() {
 	renderCards(c, g, { notes: allNotes(), boardSize: current.boardSize });
 	side.appendChild(c);
 	appendPrintTables(side, g); // print-only horizontal slices (hidden on screen)
-	const handle = el("div", { className: "side-resize", title: "Drag to resize" });
+	const handle = el("div", {
+		className: "side-resize",
+		title: "Drag to resize",
+	});
 	handle.onmousedown = (e) => {
 		e.preventDefault();
 		sideDragging = true;
@@ -181,11 +184,12 @@ function viewRoot() {
 	const useCards = current.preview === "cards";
 	t.classList.toggle("hidden", useCards);
 	c.classList.toggle("hidden", !useCards);
-	// apply the (drag-resized) table panel width
-	const sw = current.sideWidth || 420;
-	side.style.width = sw + "px";
-	main.style.marginLeft = sw + 8 + "px";
-	handle.style.left = sw - 4 + "px";
+	// apply the (drag-resized) table panel width — one CSS var drives the side
+	// width and the main/toolbar left margins so everything stays aligned
+	document.documentElement.style.setProperty(
+		"--side-w",
+		(current.sideWidth || 420) + "px",
+	);
 	return wrap;
 }
 
@@ -480,9 +484,7 @@ function markupPanel() {
 			if (!l.isMain) box.appendChild(lineEditor(l, counter.n++));
 		});
 	} else {
-		trie.children.forEach((c) =>
-			renderTrieNode(box, c, counter, ""),
-		);
+		trie.children.forEach((c) => renderTrieNode(box, c, counter, ""));
 	}
 	box.appendChild(
 		el("button", {
@@ -631,17 +633,21 @@ function moveStrip(l) {
 		const num = m.ply % 2 === 0 ? Math.floor(m.ply / 2) + 1 + ". " : "";
 		const mark = (l.marks || {})[m.ply];
 		const hasNote = (l.comments || []).some((c) => c.ply === m.ply);
-		// numbered note references for this move's chip ("[2]" / "[2][5]")
-		const noteRefs = allNotes()
+		// numbered note references for this move's chip (superscript numbers, no brackets)
+		const noteNums = allNotes()
 			.filter((n) => n.owner === l && n.ply === m.ply)
-			.map((n) => "[" + n.n + "]")
-			.join("");
+			.map((n) => n.n);
 		const sel = current.sel && current.sel.l === l && current.sel.ply === m.ply;
 		const b = el("button", {
 			type: "button",
 			className:
 				"move-chip" + (sel ? " on" : "") + (hasNote ? " has-note" : ""),
-			textContent: num + m.san + (mark ? " \u00b7 " + mark : "") + noteRefs,
+			textContent: num + m.san + (mark ? " \u00b7 " + mark : ""),
+		});
+		noteNums.forEach((n) => {
+			const sup = document.createElement("sup");
+			sup.textContent = String(n);
+			b.appendChild(sup);
 		});
 		b.onclick = () => {
 			current.sel =
@@ -1057,12 +1063,7 @@ document.addEventListener("DOMContentLoaded", () => {
 		if (!sideDragging) return;
 		const w = Math.max(280, Math.min(window.innerWidth * 0.7, e.clientX));
 		current.sideWidth = w;
-		const sp = document.querySelector(".side-panel");
-		const mp = document.querySelector(".main-panel");
-		const h = document.querySelector(".side-resize");
-		if (sp) sp.style.width = w + "px";
-		if (mp) mp.style.marginLeft = w + 8 + "px";
-		if (h) h.style.left = w - 4 + "px";
+		document.documentElement.style.setProperty("--side-w", w + "px");
 	});
 	document.addEventListener("mouseup", () => {
 		sideDragging = false;

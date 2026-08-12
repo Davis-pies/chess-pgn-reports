@@ -65,8 +65,7 @@ main {
 	left: 0;
 	top: 0;
 	bottom: 0;
-	width: 420px;
-	min-width: 280px;
+	width: var(--side-w, 420px);
 	max-width: 70vw;
 	overflow: auto; /* vertical + horizontal scroll for the table */
 	background: var(--bg);
@@ -78,6 +77,7 @@ main {
 	top: 0;
 	bottom: 0;
 	width: 8px;
+	left: calc(var(--side-w, 420px) - 4px);
 	cursor: ew-resize;
 	z-index: 6;
 }
@@ -90,10 +90,32 @@ main {
 	margin-top: 8px;
 }
 .main-panel {
-	margin-left: 428px;
+	margin-left: calc(var(--side-w, 420px) + 8px);
 	max-width: 1000px;
 	margin-right: auto;
 	padding: 16px;
+}
+.toolbar {
+	margin-left: calc(var(--side-w, 420px) + 8px);
+}
+@media (max-width: 1000px) {
+	.app-layout {
+		width: auto;
+		margin-left: 0;
+	}
+	.side-panel {
+		position: static;
+		width: auto;
+		max-height: none;
+		overflow: visible;
+	}
+	.main-panel,
+	.toolbar {
+		margin-left: 0;
+	}
+	.main-panel {
+		max-width: 100%;
+	}
 }
 @media (max-width: 1000px) {
 	.app-layout {

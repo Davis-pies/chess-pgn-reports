@@ -155,7 +155,7 @@ function moveCell(c, ply, noteByPly) {
 	if (notes)
 		notes.forEach((n) => {
 			const s = document.createElement("sup");
-			s.textContent = "[" + n + "]";
+			s.textContent = String(n);
 			e.appendChild(s);
 		});
 	return e;
