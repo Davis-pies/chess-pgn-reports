@@ -224,6 +224,34 @@ select:focus {
 	color: #fff;
 	border-color: var(--main);
 }
+.endchip {
+	opacity: 0.75;
+}
+.movepanel {
+	flex: 1 1 100%;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	align-items: flex-start;
+	border: 1px dashed var(--line);
+	border-radius: 8px;
+	padding: 8px;
+	background: var(--panel);
+}
+.cedit {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	flex: 1 1 300px;
+}
+.cedit .nt {
+	display: flex;
+	gap: 4px;
+	align-items: center;
+}
+.cedit .nt input {
+	flex: 1;
+}
 .tags {
 	display: inline-flex;
 	gap: 4px;

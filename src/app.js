@@ -66,15 +66,6 @@ function themeBtn() {
 	return b;
 }
 
-function movesText(line, head = 6) {
-	return (
-		line.moves
-			.slice(0, head)
-			.map((m) => m.san)
-			.join(" ") + (line.moves.length > head ? " …" : "")
-	);
-}
-
 function renderApp() {
 	const v = $("view");
 	v.replaceChildren();
@@ -308,7 +299,11 @@ function markupPanel() {
 				"The mainline is the reference row. Promote a sideline to make it the mainline; tag the rest Sideline or Footnote.",
 		}),
 	);
-	current.lines.forEach((l, idx) => {
+	// mainline always first in the management UI
+	const ordered = [...current.lines].sort(
+		(a, b) => (b.isMain ? 1 : 0) - (a.isMain ? 1 : 0),
+	);
+	ordered.forEach((l, idx) => {
 		box.appendChild(lineEditor(l, idx));
 	});
 	box.appendChild(
@@ -341,12 +336,13 @@ function lineEditor(l, idx) {
 		return b;
 	};
 	const isMain = !!l.isMain;
-	row.appendChild(
-		el("div", {
-			className: "lmoves",
-			textContent: `${isMain ? "MAINLINE" : "Line " + idx}: ${movesText(l)}`,
-		}),
-	);
+	// name comes first, pre-populated
+	if (!l.name) l.name = isMain ? "Mainline" : "Line " + idx;
+	const name = el("input", { className: "ln", value: l.name });
+	name.oninput = () => {
+		l.name = name.value;
+	};
+	row.appendChild(name);
 	const tags = el("div", { className: "tags" });
 	if (isMain) {
 		tags.appendChild(
@@ -365,14 +361,8 @@ function lineEditor(l, idx) {
 	}
 	row.appendChild(tags);
 	row.appendChild(moveStrip(l));
-	const name = el("input", {
-		className: "ln",
-		placeholder: "name (e.g. Marshall)",
-		value: l.name || "",
-	});
-	name.oninput = () => {
-		l.name = name.value;
-	};
+	// the symbol/comment panel only appears when a move (or line-end) is selected
+	if (current.sel && current.sel.l === l) row.appendChild(movePanel(l));
 	const note = el("input", {
 		className: "lno",
 		placeholder: "note",
@@ -381,7 +371,7 @@ function lineEditor(l, idx) {
 	note.oninput = () => {
 		l.meta = { ...(l.meta || {}), note: note.value };
 	};
-	row.append(name, note, symbolPicker(l));
+	row.appendChild(note);
 	return row;
 }
 
@@ -426,7 +416,10 @@ function moveStrip(l) {
 	const mainL = current.lines.find((x) => x.isMain) || current.lines[0];
 	const wrap = el("span", { className: "moves" });
 	wrap.appendChild(
-		el("span", { className: "symlabel", textContent: "Tap a move\u00a0\u2192" }),
+		el("span", {
+			className: "symlabel",
+			textContent: "Tap a move\u00a0\u2192",
+		}),
 	);
 	let d = 0;
 	const mv = l.moves;
@@ -456,38 +449,51 @@ function moveStrip(l) {
 		};
 		wrap.appendChild(b);
 	});
+	// a trailing "end" chip selects the line-end evaluation
+	const endSel = current.sel && current.sel.l === l && current.sel.ply == null;
+	const endChip = el("button", {
+		type: "button",
+		className: "move-chip" + (endSel ? " on" : "") + " endchip",
+		textContent: "end\u00a0\u00b7\u00a0" + ((l.meta && l.meta.eval) || "\u2013"),
+	});
+	endChip.onclick = () => {
+		current.sel =
+			current.sel && current.sel.l === l && current.sel.ply == null
+				? null
+				: { l, ply: null };
+		renderApp();
+	};
+	wrap.appendChild(endChip);
 	return wrap;
 }
 
 // Symbol row. Applies to the selected move (a per-move mark) or, when no move
 // is selected, to the line-end evaluation.
-function symbolPicker(l) {
-	const wrap = el("span", { className: "sympick" });
-	const selPly = current.sel && current.sel.l === l ? current.sel.ply : null;
-	const atMove = selPly != null;
-	const cur = atMove
-		? (l.marks || {})[selPly] || ""
-		: (l.meta && l.meta.eval) || "";
-	const mm = atMove ? l.moves.find((x) => x.ply === selPly) : null;
-	wrap.appendChild(
-		el("span", {
-			className: "symlabel",
-			textContent: atMove
-				? "@ " + fullmoveLabel(selPly) + (mm ? mm.san : "") + ": "
-				: "line-end: ",
-		}),
+// Revealed when a move (or line-end) is selected on a line: symbol buttons and
+// a per-move comment editor. Collapses via the done button.
+function movePanel(l) {
+	const box = el("div", { className: "movepanel" });
+	const selPly = current.sel.ply;
+	const atEnd = selPly == null;
+	const cur = atEnd
+		? (l.meta && l.meta.eval) || ""
+		: (l.marks || {})[selPly] || "";
+	const mm = atEnd ? null : l.moves.find((x) => x.ply === selPly);
+	const label = atEnd ? "line-end" : fullmoveLabel(selPly) + (mm ? mm.san : "");
+	box.appendChild(
+		el("div", { className: "symlabel", textContent: "@ " + label + ":" }),
 	);
 	const apply = (sym) => {
-		if (atMove) {
+		if (atEnd) {
+			l.meta = { ...(l.meta || {}), eval: cur === sym ? "" : sym };
+		} else {
 			l.marks = l.marks || {};
 			if (cur === sym) delete l.marks[selPly];
 			else l.marks[selPly] = sym;
 			if (!Object.keys(l.marks).length) l.marks = undefined;
-		} else {
-			l.meta = { ...(l.meta || {}), eval: cur === sym ? "" : sym };
 		}
-		renderApp();
 	};
+	const srow = el("span", { className: "sympick" });
 	EVAL_SYMBOLS.forEach((sym) => {
 		if (!sym) return;
 		const b = el("button", {
@@ -495,8 +501,11 @@ function symbolPicker(l) {
 			className: "chip mini" + (cur === sym ? " on" : ""),
 			textContent: sym,
 		});
-		b.onclick = () => apply(sym);
-		wrap.appendChild(b);
+		b.onclick = () => {
+			apply(sym);
+			renderApp();
+		};
+		srow.appendChild(b);
 	});
 	const clear = el("button", {
 		type: "button",
@@ -504,38 +513,69 @@ function symbolPicker(l) {
 		textContent: "\u2715",
 		title: "clear",
 	});
-	clear.onclick = () => apply("");
-	wrap.appendChild(clear);
+	clear.onclick = () => {
+		apply("");
+		renderApp();
+	};
+	srow.appendChild(clear);
+	box.appendChild(srow);
+	if (!atEnd) box.appendChild(commentEditor(selPly));
+	const done = el("button", {
+		type: "button",
+		className: "chip mini",
+		textContent: "done",
+	});
+	done.onclick = () => {
+		current.sel = null;
+		renderApp();
+	};
+	box.appendChild(done);
+	return box;
+}
+
+// Edit/add notes attached to a specific move (plies are shared app-wide).
+function commentEditor(ply) {
+	const wrap = el("div", { className: "cedit" });
+	const mine = current.comments.filter((c) => c.ply === ply);
+	mine.forEach((c) => {
+		const row = el("div", { className: "nt" });
+		const inp = el("input", { className: "lno", value: c.text });
+		inp.oninput = () => {
+			c.text = inp.value;
+		};
+		const del = el("button", {
+			type: "button",
+			className: "chip mini danger",
+			textContent: "\u2715",
+		});
+		del.onclick = () => {
+			current.comments.splice(current.comments.indexOf(c), 1);
+			renderApp();
+		};
+		row.append(inp, del);
+		wrap.appendChild(row);
+	});
+	const addInp = el("input", {
+		className: "lno",
+		placeholder: mine.length ? "add another note…" : "note at this move…",
+	});
+	const add = el("button", {
+		type: "button",
+		className: "chip",
+		textContent: "Add note",
+	});
+	add.onclick = () => {
+		if (addInp.value.trim()) {
+			current.comments.push({ ply, text: addInp.value.trim() });
+			addInp.value = "";
+			renderApp();
+		}
+	};
+	wrap.append(addInp, add);
 	return wrap;
 }
 
 // A form to append a note to a specific mainline move.
-function addNoteRow() {
-	const bar = el("div", { className: "addbar" });
-	const main = current.lines.find((l) => l.isMain) || current.lines[0];
-	const sel = document.createElement("select");
-	main.moves.forEach((m) => {
-		const o = document.createElement("option");
-		o.value = m.ply;
-		o.textContent = fullmoveLabel(m.ply) + " " + m.san;
-		sel.appendChild(o);
-	});
-	const inp = el("input", {
-		className: "lno",
-		placeholder: "note at this move…",
-	});
-	const add = el("button", { className: "chip", textContent: "Add note" });
-	add.onclick = () => {
-		if (inp.value.trim()) {
-			current.comments.push({ ply: Number(sel.value), text: inp.value.trim() });
-			inp.value = "";
-			renderApp();
-		}
-	};
-	bar.append("+ ", sel, inp, add);
-	return bar;
-}
-
 function helpPanel() {
 	const d = document.createElement("details");
 	d.className = "help";
@@ -543,7 +583,8 @@ function helpPanel() {
 	const ol = el("ol", {});
 	[
 		"Paste a PGN or upload a .pgn file, then click Load & Tag. Every variation in parentheses becomes its own line.",
-		"The mainline is the reference row. For each other line choose Sideline or Footnote, add a name/eval/note, or use ★ Make mainline to promote it.",
+		"The mainline is the reference row. For each other line choose Sideline or Footnote, add a name, or use ★ Make mainline to promote it.",
+		"Tap any move chip (or the end chip) on a line — a panel opens to add symbols and notes to that specific move; press done to close.",
 		"Switch layout between Horizontal and Vertical, or the Lines (print) view; toggle board diagrams; use the toolbar to flip the dark theme.",
 		"Click Save to keep this workbook in your browser (localStorage). Reopen it anytime from My saved workbooks.",
 		"Export PGN (editable chess notation for any chess software), Export Markdown (paste into Google Docs/Word), or Print → Save as PDF.",
@@ -575,30 +616,11 @@ function notesFootnotesPanel() {
 					textContent: moveRef(c.ply) + " — " + c.text,
 				}),
 			);
-			const edit = el("button", {
-				className: "chip mini",
-				textContent: "\u270e",
-			});
-			edit.onclick = () => {
-				const nt = prompt("Edit note:", c.text);
-				if (nt !== null && nt.trim()) {
-					c.text = nt.trim();
-					renderApp();
-				}
-			};
-			const del = el("button", {
-				className: "chip mini danger",
-				textContent: "\u2715",
-			});
-			del.onclick = () => {
-				current.comments.splice(i, 1);
-				renderApp();
-			};
-			row.append(edit, del);
 			box.appendChild(row);
 		});
 	}
-	box.appendChild(addNoteRow());
+	// Notes are edited per-move from the line editors above; this section is the
+	// read-only reference (and what prints/exports).
 	const footLines = current.lines.filter((l) => l.tag === "foot");
 	const mainL = current.lines.find((l) => l.isMain) || current.lines[0];
 	if (footLines.length) {

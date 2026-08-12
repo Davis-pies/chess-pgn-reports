@@ -70,7 +70,7 @@ function parseSeq(tokens, ctx, state) {
 				ctx.i++;
 				continue;
 			}
-			ctx.comments.push({ ply: last ? last.ply : 0, text });
+			ctx.comments.push({ ply: last ? last.ply : state.ply, text });
 			if (last) last.comments.push(text);
 			else
 				pendingComment = pendingComment ? pendingComment + "\n" + text : text;
