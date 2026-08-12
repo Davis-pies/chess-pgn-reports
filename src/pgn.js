@@ -63,23 +63,31 @@ export function fenAt(moves, ply) {
 // move, so it branches at the state before that move (same ply). ')' closes it.
 // Returns the node list. `state` is never mutated across sub-variations because
 // every step draws its position from the previous node's fen.
-function parseSeq(tokens, ctx, state, inVariation = false) {
+//
+// Comment handling:
+//  - Trunk comments are individual notes; a trunk comment that directly leads
+//    into a variation (next token is '(' and it doesn't end in sentence
+//    punctuation, e.g. "White threatened") is a lead-in: it is NOT emitted
+//    standalone but merged into the variation's note.
+//  - Within a variation, fragment comments separated only by moves merge into
+//    ONE note with the moves inline, attached to the variation's first move
+//    (so it lives on the variation, not on a ply-colliding mainline move).
+function parseSeq(tokens, ctx, state, inVariation = false, intro = null) {
 	const nodes = [];
 	let last = null;
 	let stateBeforeLast = state; // position before the most recent move
 	let cur = state;
-	let pendingComment = null; // comment seen before any move yet
-	// Within a variation, fragment comments like "If ... then ..." separated only
-	// by moves are merged into ONE note with the moves inline (e.g.
-	// "If 38...Rxa4 then 39.Nxd6 would of course win a piece.").
-	let narrative = null; // { ply, parts, firstNode }
+	let pendingComment = null; // trunk comment seen before any move yet
+	let variationIntro = null; // trunk lead-in carried into the next variation
+	let narrative = intro
+		? { ply: state.ply, parts: [intro], firstNode: null }
+		: null; // merged variation note: { ply, parts, firstNode }
 	const flushNarrative = () => {
 		if (narrative) {
 			const text = narrative.parts.join(" ");
 			const ply = narrative.firstNode ? narrative.firstNode.ply : narrative.ply;
 			ctx.comments.push({ ply, text, inVar: inVariation });
-			// attach the merged note to the line's first move so the comment
-			// lives on the variation itself, not on a ply-colliding mainline move
+			// the merged note lives on the variation's first move
 			if (narrative.firstNode) narrative.firstNode.comments.push(text);
 			narrative = null;
 		}
@@ -88,6 +96,7 @@ function parseSeq(tokens, ctx, state, inVariation = false) {
 		const n = Math.floor(m.ply / 2) + 1;
 		return (m.ply % 2 === 0 ? n + ". " : n + "... ") + m.san;
 	};
+
 	while (ctx.i < tokens.length) {
 		const t = tokens[ctx.i];
 		if (t.startsWith("{") || t.startsWith(";")) {
@@ -108,6 +117,9 @@ function parseSeq(tokens, ctx, state, inVariation = false) {
 						parts: [text],
 						firstNode: null,
 					};
+			} else if (tokens[ctx.i + 1] === "(" && !/[.!?、。！？]$/.test(text)) {
+				// trunk lead-in straight into a variation -> merge, don't emit
+				variationIntro = text;
 			} else {
 				ctx.comments.push({
 					ply: last ? last.ply : state.ply,
@@ -124,7 +136,8 @@ function parseSeq(tokens, ctx, state, inVariation = false) {
 		if (t === "(") {
 			flushNarrative();
 			ctx.i++;
-			const sub = parseSeq(tokens, ctx, stateBeforeLast, true);
+			const sub = parseSeq(tokens, ctx, stateBeforeLast, true, variationIntro);
+			variationIntro = null;
 			if (last) last.variations.push(sub);
 			else
 				nodes.push({

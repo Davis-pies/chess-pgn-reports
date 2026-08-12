@@ -9,23 +9,23 @@ export function keyFor(moves) {
 }
 
 export function saveNotebook(id, { name, pgn, lines }) {
-const mainLine = lines.find((l) => l.isMain) || lines[0];
-localStorage.setItem(
-PREFIX + id,
-JSON.stringify({
-name,
-pgn,
-main: mainLine ? keyFor(mainLine.moves) : "",
-tags: lines.map((l) => ({
-key: keyFor(l.moves),
-tag: l.tag || "sideline",
-name: l.name || "",
-meta: l.meta || {},
-marks: l.marks || {},
-comments: l.comments || [],
-})),
-}),
-);
+	const mainLine = lines.find((l) => l.isMain) || lines[0];
+	localStorage.setItem(
+		PREFIX + id,
+		JSON.stringify({
+			name,
+			pgn,
+			main: mainLine ? keyFor(mainLine.moves) : "",
+			tags: lines.map((l) => ({
+				key: keyFor(l.moves),
+				tag: l.tag || "sideline",
+				name: l.name || "",
+				meta: l.meta || {},
+				marks: l.marks || {},
+				comments: l.comments || [],
+			})),
+		}),
+	);
 }
 
 export function listNotebooks() {
