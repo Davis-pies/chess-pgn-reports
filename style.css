@@ -184,6 +184,24 @@ select:focus {
 .markup {
 	margin-top: 12px;
 }
+.lgroup {
+	border-left: 2px solid var(--line);
+	margin: 4px 0 4px 8px;
+	padding-left: 8px;
+}
+.lg-head {
+	cursor: pointer;
+	font-family: ui-monospace, Menlo, Consolas, monospace;
+	font-size: 0.85rem;
+	color: var(--muted);
+	padding: 2px 0;
+}
+.lg-head:hover {
+	color: var(--main);
+}
+.lgroup-body {
+	margin-top: 4px;
+}
 .ledge {
 	display: flex;
 	gap: 8px;
@@ -487,6 +505,15 @@ figure.board figcaption {
 
 /* ---- print: table hidden, linear cards shown ---- */
 @media print {
+	/* force dark-on-white, printable text colors */
+	:root {
+		--text: #111;
+		--muted: #222;
+		--line: #999;
+		--head-bg: #f0f0f0;
+		--panel: #fff;
+		--lift: #fff;
+	}
 	.toolbar,
 	.notebooks,
 	.orow,
@@ -505,8 +532,14 @@ figure.board figcaption {
 	.pv-htable {
 		display: block !important;
 	}
-	.pv-htable.no-print {
-		display: none !important;
+	.tbl td.ellip {
+		color: #555;
+	}
+	.tbl td.sideline {
+		color: #333;
+	}
+	.tbl td.foot {
+		color: #333;
 	}
 	.cards {
 		gap: 14px;

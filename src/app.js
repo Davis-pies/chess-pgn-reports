@@ -348,6 +348,54 @@ function orientationToggle() {
 	return bar;
 }
 
+// Trie of the side lines' divergent tails, so lines that share pieces of their
+// divergence from the mainline are grouped together (nested collapsible groups).
+function buildTrie(lines, main) {
+	const root = { children: new Map(), leaf: null };
+	for (const l of lines) {
+		if (l.isMain) continue;
+		const d = divergence(l, main);
+		let node = root;
+		for (const m of l.moves.slice(d)) {
+			const key = m.ply + ":" + m.san;
+			if (!node.children.has(key))
+				node.children.set(key, {
+					children: new Map(),
+					leaf: null,
+					move: m,
+				});
+			node = node.children.get(key);
+		}
+		node.leaf = l;
+	}
+	return root;
+}
+
+function countLeaves(node) {
+	let n = node.leaf ? 1 : 0;
+	node.children.forEach((c) => (n += countLeaves(c)));
+	return n;
+}
+
+function renderTrieNode(container, node, nameCounter, depth) {
+	if (!node.children.size && node.leaf) {
+		container.appendChild(lineEditor(node.leaf, nameCounter.n++));
+		return;
+	}
+	const det = el("details", { className: "lgroup" });
+	det.open = depth <= 1;
+	const head = fullmoveLabel(node.move.ply) + node.move.san;
+	const count = countLeaves(node);
+	det.appendChild(
+		el("summary", { className: "lg-head", textContent: `${head} \u00b7 ${count} lines` }),
+	);
+	const body = el("div", { className: "lgroup-body" });
+	if (node.leaf) body.appendChild(lineEditor(node.leaf, nameCounter.n++));
+	node.children.forEach((c) => renderTrieNode(body, c, nameCounter, depth + 1));
+	det.appendChild(body);
+	container.appendChild(det);
+}
+
 function markupPanel() {
 	const box = el("div", { className: "markup" });
 	box.appendChild(
@@ -356,13 +404,12 @@ function markupPanel() {
 				"The mainline is the reference row. Promote a sideline to make it the mainline; tag the rest Sideline or Footnote.",
 		}),
 	);
-	// mainline always first in the management UI
-	const ordered = [...current.lines].sort(
-		(a, b) => (b.isMain ? 1 : 0) - (a.isMain ? 1 : 0),
-	);
-	ordered.forEach((l, idx) => {
-		box.appendChild(lineEditor(l, idx));
-	});
+	// mainline first, then the side lines grouped as a trie of shared divergence
+	const main = current.lines.find((l) => l.isMain) || current.lines[0];
+	box.appendChild(lineEditor(main, 0));
+	const counter = { n: 1 };
+	const trie = buildTrie(current.lines, main);
+	trie.children.forEach((c) => renderTrieNode(box, c, counter, 1));
 	box.appendChild(
 		el("button", {
 			className: "chip",
