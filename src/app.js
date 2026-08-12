@@ -484,7 +484,9 @@ function moveStrip(l) {
 	owned.forEach((m) => {
 		const num = m.ply % 2 === 0 ? Math.floor(m.ply / 2) + 1 + ". " : "";
 		const mark = (l.marks || {})[m.ply];
-		const hasNote = (current.comments || []).some((c) => c.ply === m.ply);
+		const hasNote = (current.comments || []).some(
+			(c) => c.ply === m.ply && (l.isMain ? !c.inVar : c.inVar),
+		);
 		const sel = current.sel && current.sel.l === l && current.sel.ply === m.ply;
 		const b = el("button", {
 			type: "button",
@@ -501,22 +503,6 @@ function moveStrip(l) {
 		};
 		wrap.appendChild(b);
 	});
-	// a trailing "end" chip selects the line-end evaluation
-	const endSel = current.sel && current.sel.l === l && current.sel.ply == null;
-	const endChip = el("button", {
-		type: "button",
-		className: "move-chip" + (endSel ? " on" : "") + " endchip",
-		textContent:
-			"end\u00a0\u00b7\u00a0" + ((l.meta && l.meta.eval) || "\u2013"),
-	});
-	endChip.onclick = () => {
-		current.sel =
-			current.sel && current.sel.l === l && current.sel.ply == null
-				? null
-				: { l, ply: null };
-		renderApp();
-	};
-	wrap.appendChild(endChip);
 	return wrap;
 }
 
@@ -732,7 +718,9 @@ function notesFootnotesPanel() {
 			const row = el("div", { className: "nt" });
 			row.appendChild(el("sup", { textContent: "[" + (i + 1) + "]" }));
 			const span = document.createElement("span");
-			span.appendChild(document.createTextNode(moveRef(c.ply, c.inVar) + " \u2014 "));
+			span.appendChild(
+				document.createTextNode(moveRef(c.ply, c.inVar) + " \u2014 "),
+			);
 			renderInline(span, c.text);
 			row.appendChild(span);
 			box.appendChild(row);
