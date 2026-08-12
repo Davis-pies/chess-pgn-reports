@@ -381,8 +381,17 @@ function countLeaves(node) {
 }
 
 function renderTrieNode(container, node, nameCounter, depth) {
+	// a lone line (leaf, no fork): render it directly, no collapsing wrapper
 	if (!node.children.size && node.leaf) {
 		container.appendChild(lineEditor(node.leaf, nameCounter.n++));
+		return;
+	}
+	// a single-child chain with no leaf: inline it so lone lines don't get
+	// buried under nested groups — only fork points become collapsible groups
+	if (!node.leaf && node.children.size === 1) {
+		node.children.forEach((c) =>
+			renderTrieNode(container, c, nameCounter, depth),
+		);
 		return;
 	}
 	const det = el("details", { className: "lgroup" });
@@ -390,7 +399,10 @@ function renderTrieNode(container, node, nameCounter, depth) {
 	const head = fullmoveLabel(node.move.ply) + node.move.san;
 	const count = countLeaves(node);
 	det.appendChild(
-		el("summary", { className: "lg-head", textContent: `${head} \u00b7 ${count} lines` }),
+		el("summary", {
+			className: "lg-head",
+			textContent: `${head} \u00b7 ${count} lines`,
+		}),
 	);
 	const body = el("div", { className: "lgroup-body" });
 	if (node.leaf) body.appendChild(lineEditor(node.leaf, nameCounter.n++));

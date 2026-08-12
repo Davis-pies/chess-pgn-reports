@@ -53,35 +53,47 @@ main {
 	padding: 16px;
 }
 
-/* two-pane layout: table pinned left with its own scroll, editing on the right */
+/* two-pane layout: table pinned to the far-left of the screen with its own
+   (vertical + horizontal) scroll; the right panel sits centered in the rest. */
 .app-layout {
-	display: flex;
-	gap: 16px;
-	align-items: flex-start;
+	width: 100vw;
+	margin-left: calc(50% - 50vw); /* break out of the centered <main> */
+	min-height: 100vh;
 }
 .side-panel {
-	flex: 1 1 48%;
-	min-width: 360px;
-	max-width: 62%;
-	position: sticky;
+	position: fixed;
+	left: 0;
 	top: 0;
-	max-height: 100vh;
-	overflow: auto;
-	padding-right: 4px;
+	bottom: 0;
+	width: 420px;
+	overflow: auto; /* vertical + horizontal scroll for the table */
+	background: var(--bg);
+	padding: 14px;
+	z-index: 5;
+}
+.side-panel .pv-table {
+	margin-top: 8px;
 }
 .main-panel {
-	flex: 1 1 52%;
-	min-width: 0;
+	margin-left: 428px;
+	max-width: 1000px;
+	margin-right: auto;
+	padding: 16px;
 }
-@media (max-width: 900px) {
+@media (max-width: 1000px) {
 	.app-layout {
-		flex-direction: column;
+		width: auto;
+		margin-left: 0;
 	}
 	.side-panel {
 		position: static;
+		width: auto;
 		max-height: none;
-		flex: none;
-		width: 100%;
+		overflow: visible;
+	}
+	.main-panel {
+		margin-left: 0;
+		max-width: 100%;
 	}
 }
 
