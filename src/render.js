@@ -136,7 +136,7 @@ function moveCell(c, ply, noteByPly) {
 export function renderTable(container, grid, orientation, opts = {}) {
 	const { vars, maxPly, mainMoves } = grid;
 	const labels = {};
-	mainMoves.forEach((m) => (labels[m.ply] = fullmoveLabel(m.ply)));
+	mainMoves.forEach((m) => (labels[m.ply] = m.ply % 2 === 0 ? fullmoveLabel(m.ply) : ""));
 
 	const table = document.createElement("table");
 	table.className = "tbl";
@@ -267,6 +267,12 @@ export function renderCards(container, grid, opts = {}) {
 	container.appendChild(wrap);
 }
 
+// Standard algebraic pairing: the full-move number appears once on White's
+// half-move ("1. e4 e5 2. Nf3"), Black's half-move carries no number.
 export function fullMovesText(moves) {
-	return moves.map((m) => fullmoveLabel(m.ply) + " " + m.san).join("  ");
+	return moves
+		.map(
+			(m) => (m.ply % 2 === 0 ? Math.floor(m.ply / 2) + 1 + ". " : "") + m.san,
+		)
+		.join(" ");
 }

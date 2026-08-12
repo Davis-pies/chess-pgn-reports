@@ -72,12 +72,12 @@ test("renderCards produces one labeled card per line with moves", () => {
 	delete global.document;
 });
 
-test("fullMovesText renders move numbers with the moves", () => {
+test("fullMovesText pairs moves: number on white only, no '1...' for black", () => {
 	const lines = collectLines(parsePgn("1. e4 e5 (1... c5) 2. Nf3").nodes);
 	const main = lines[0];
 	const txt = fullMovesText(main.moves);
-	assert.ok(txt.includes("1. e4"));
-	assert.ok(txt.includes("2. Nf3"));
+	assert.strictEqual(txt, "1. e4 e5 2. Nf3");
+	assert.ok(!txt.includes("..."), "no ellipsis move-number for black");
 });
 
 test("horizontal layout transposes to one row per ply", () => {
