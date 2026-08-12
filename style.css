@@ -235,7 +235,7 @@ select:focus {
 	border-color: var(--main);
 }
 .move-chip.has-note::after {
-	content: " \u00b6";
+	content: " ¶";
 	color: var(--foot);
 	font-weight: 700;
 }
