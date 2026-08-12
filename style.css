@@ -447,6 +447,22 @@ figure.board figcaption {
 	line-height: 1.7;
 	font-size: 0.9rem;
 }
+.card-notes {
+	margin-top: 10px;
+	border-top: 1px solid var(--line);
+	padding-top: 8px;
+}
+.card-notes-h {
+	font-size: 0.75rem;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--muted);
+	margin-bottom: 4px;
+}
+.card-notes .nt {
+	margin: 2px 0;
+	line-height: 1.4;
+}
 .card-board .board-svg {
 	margin: 8px 0 0;
 }

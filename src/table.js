@@ -59,13 +59,13 @@ export function grid(lines, comments = []) {
 			label: TAG_META[tag].label,
 			name: l.name || "",
 			eval: (l.meta && l.meta.eval) || "",
+			note: (l.meta && l.meta.note) || "",
 			fen: l.fen,
 			moves: l.moves,
 			marks,
 			d,
 		};
-		if (tag === "foot")
-			footNotes.push({ ...base, note: (l.meta && l.meta.note) || "" });
+		if (tag === "foot") footNotes.push({ ...base, noteByPly });
 		else vars.push({ ...base, cells, noteByPly });
 	});
 	// mainline is the top reference row

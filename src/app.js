@@ -145,7 +145,7 @@ function previewGroup() {
 	c.appendChild(
 		el("h3", { textContent: "Print view — one line, one position" }),
 	);
-	renderCards(c, g);
+	renderCards(c, g, { comments: current.comments });
 	box.append(t, c);
 	const useCards = current.preview === "cards";
 	t.classList.toggle("hidden", useCards);

@@ -252,9 +252,13 @@ export function renderTable(container, grid, orientation, opts = {}) {
 // Linear print view: each line as a labeled card with its moves and a position
 // diagram, one after another (vs the packed table).
 export function renderCards(container, grid, opts = {}) {
+	const comments = opts.comments || [];
+	const strip = (s) =>
+		s.replace(/\*\*/g, "").replace(/`/g, "").replace(/\*/g, "").trim();
 	const wrap = document.createElement("div");
 	wrap.className = "cards";
-	for (const v of grid.vars) {
+	const all = [...grid.vars, ...grid.footNotes];
+	for (const v of all) {
 		const card = document.createElement("section");
 		card.className = "card";
 
@@ -281,8 +285,6 @@ export function renderCards(container, grid, opts = {}) {
 
 		const moves = document.createElement("div");
 		moves.className = "card-moves";
-		// split at the divergence: non-main lines show only their tail, not the
-		// repeated shared prefix
 		moves.textContent =
 			v.tag === "mainline"
 				? fullMovesText(v.moves, v.marks)
@@ -293,6 +295,36 @@ export function renderCards(container, grid, opts = {}) {
 		board.className = "card-board";
 		appendBoard(board, v.fen, opts.boardSize || 200);
 		card.appendChild(board);
+
+		// relevant notes for this line, below the image
+		const notesBox = document.createElement("div");
+		notesBox.className = "card-notes";
+		const owned = [];
+		for (const ply in v.noteByPly || {}) {
+			v.noteByPly[ply].forEach((n) => {
+				const c = comments[n - 1];
+				if (c) owned.push({ n, text: strip(c.text) });
+			});
+		}
+		if (owned.length) {
+			const h = document.createElement("div");
+			h.className = "card-notes-h";
+			h.textContent = "Notes";
+			notesBox.appendChild(h);
+			owned.forEach((o) => {
+				const row = document.createElement("div");
+				row.className = "nt";
+				row.textContent = `[${o.n}] ${o.text}`;
+				notesBox.appendChild(row);
+			});
+		}
+		if (v.note) {
+			const row = document.createElement("div");
+			row.className = "nt";
+			row.textContent = "Note: " + strip(v.note);
+			notesBox.appendChild(row);
+		}
+		if (notesBox.childNodes.length) card.appendChild(notesBox);
 		wrap.appendChild(card);
 	}
 	container.appendChild(wrap);
