@@ -380,39 +380,75 @@ function countLeaves(node) {
 	return n;
 }
 
-function renderTrieNode(container, node, nameCounter, depth) {
-	// a lone line (leaf, no fork): render it directly, no collapsing wrapper
+function branchLabel(move) {
+	return fullmoveLabel(move.ply) + move.san;
+}
+
+function renderTrieNode(container, node, nameCounter, depth, entryLabel) {
+	// a lone line (leaf, no fork): a non-collapsible block styled like a group,
+	// so single lines don't look out of place among the collapsible tries
 	if (!node.children.size && node.leaf) {
-		container.appendChild(lineEditor(node.leaf, nameCounter.n++));
+		const box = el("div", { className: "lgroup open" });
+		box.appendChild(
+			el("div", {
+				className: "lg-head",
+				textContent: (entryLabel || branchLabel(node.move)) + " \u00b7 1 line",
+			}),
+		);
+		const body = el("div", { className: "lgroup-body" });
+		body.appendChild(lineEditor(node.leaf, nameCounter.n++));
+		box.appendChild(body);
+		container.appendChild(box);
 		return;
 	}
 	// a single-child chain with no leaf: inline it so lone lines don't get
 	// buried under nested groups — only fork points become collapsible groups
 	if (!node.leaf && node.children.size === 1) {
 		node.children.forEach((c) =>
-			renderTrieNode(container, c, nameCounter, depth),
+			renderTrieNode(container, c, nameCounter, depth, entryLabel),
 		);
 		return;
 	}
 	const det = el("details", { className: "lgroup" });
 	det.open = depth <= 1;
-	const head = fullmoveLabel(node.move.ply) + node.move.san;
 	const count = countLeaves(node);
 	det.appendChild(
 		el("summary", {
 			className: "lg-head",
-			textContent: `${head} \u00b7 ${count} lines`,
+			textContent: `${entryLabel || branchLabel(node.move)} \u00b7 ${count} lines`,
 		}),
 	);
 	const body = el("div", { className: "lgroup-body" });
 	if (node.leaf) body.appendChild(lineEditor(node.leaf, nameCounter.n++));
-	node.children.forEach((c) => renderTrieNode(body, c, nameCounter, depth + 1));
+	node.children.forEach((c) =>
+		renderTrieNode(body, c, nameCounter, depth + 1, null),
+	);
 	det.appendChild(body);
 	container.appendChild(det);
 }
 
 function markupPanel() {
 	const box = el("div", { className: "markup" });
+	// view toggle: grouped (divergence trie) vs flat list
+	const row = el("div", { className: "orow" });
+	const grouped = el("button", {
+		className: "chip" + (current.groupView !== "flat" ? " on" : ""),
+		textContent: "Grouped",
+		onclick: () => {
+			current.groupView = "trie";
+			renderApp();
+		},
+	});
+	const flat = el("button", {
+		className: "chip" + (current.groupView === "flat" ? " on" : ""),
+		textContent: "Flat",
+		onclick: () => {
+			current.groupView = "flat";
+			renderApp();
+		},
+	});
+	row.append("View: ", grouped, flat);
+	box.appendChild(row);
 	box.appendChild(
 		el("h3", {
 			textContent:
@@ -424,7 +460,16 @@ function markupPanel() {
 	box.appendChild(lineEditor(main, 0));
 	const counter = { n: 1 };
 	const trie = buildTrie(current.lines, main);
-	trie.children.forEach((c) => renderTrieNode(box, c, counter, 1));
+	// flat view renders every non-main line in order; grouped uses the trie
+	if (current.groupView === "flat") {
+		current.lines.forEach((l) => {
+			if (!l.isMain) box.appendChild(lineEditor(l, counter.n++));
+		});
+	} else {
+		trie.children.forEach((c) =>
+			renderTrieNode(box, c, counter, 1, branchLabel(c.move)),
+		);
+	}
 	box.appendChild(
 		el("button", {
 			className: "chip",
