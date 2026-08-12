@@ -1,10 +1,11 @@
 // Browser glue: import PGN, tag each line, render the table, persist notebook.
-import { parsePgn } from "./pgn.js";
+import { parsePgn, fenAt } from "./pgn.js";
 import { collectLines } from "./tree.js";
 import { grid, divergence } from "./table.js";
 import {
 	renderTable,
 	renderCards,
+	appendBoard,
 	fullmoveLabel,
 	fullMovesText,
 } from "./render.js";
@@ -22,7 +23,7 @@ let current = {
 	pgn: "",
 	lines: [],
 	comments: [],
-	orientation: "vertical",
+	orientation: "horizontal",
 	showBoards: false,
 	preview: "table",
 	boardSize: 300,
@@ -30,6 +31,9 @@ let current = {
 };
 
 const $ = (id) => document.getElementById(id);
+// Approx. printable content width on a portrait page (px), used to decide
+// whether the horizontal table fits cleanly on the printed page.
+const PRINT_MAX_WIDTH = 740;
 
 function el(tag, props, children = []) {
 	const e = document.createElement(tag);
@@ -88,7 +92,7 @@ function viewRoot() {
 					name: "",
 					pgn: "",
 					lines: [],
-					orientation: "vertical",
+					orientation: "horizontal",
 					showBoards: false,
 				};
 				renderApp();
@@ -151,6 +155,17 @@ function previewGroup() {
 		boardSize: current.boardSize,
 	});
 	box.append(t, c);
+	// horizontal table for print/PDF — included only if it fits the page
+	const ht = el("div", { className: "pv-htable" });
+	ht.appendChild(el("h3", { textContent: "Table" }));
+	renderTable(ht, g, "horizontal", { showBoards: false });
+	// measure the natural width while rendered off-screen (it's display:none on
+	// screen, so scrollWidth would read 0), then mark too-wide tables to skip
+	ht.style.cssText = "position:absolute;left:-9999px;display:block;width:max-content;";
+	const w = ht.querySelector(".tbl")?.scrollWidth || 0;
+	ht.style.cssText = "";
+	if (w > PRINT_MAX_WIDTH) ht.classList.add("no-print");
+	box.appendChild(ht);
 	const useCards = current.preview === "cards";
 	t.classList.toggle("hidden", useCards);
 	c.classList.toggle("hidden", !useCards);
@@ -237,7 +252,7 @@ function openNotebook(id) {
 			name: "",
 			pgn: "",
 			lines: [],
-			orientation: "vertical",
+			orientation: "horizontal",
 			showBoards: false,
 		};
 		alert("Could not open workbook: " + e.message);
@@ -358,6 +373,8 @@ function lineEditor(l, idx) {
 	name.oninput = () => {
 		l.name = name.value;
 	};
+	// reflect the (renamed) line in the table/cards once the field is blurred
+	name.onchange = () => renderApp();
 	row.appendChild(name);
 	const tags = el("div", { className: "tags" });
 	if (isMain) {
@@ -387,6 +404,7 @@ function lineEditor(l, idx) {
 	note.oninput = () => {
 		l.meta = { ...(l.meta || {}), note: note.value };
 	};
+	note.onchange = () => renderApp();
 	row.appendChild(note);
 	return row;
 }
@@ -422,6 +440,15 @@ const EVAL_SYMBOLS = [
 	"?!",
 	"!!",
 	"??",
+	"\u25a1", // □ only move
+	"\u2299", // ⊙ zugzwang
+	"\u2191", // ↑ initiative
+	"\u2192", // → with attack / idea
+	"\u21c4", // ⇄ counterplay
+	"\u25b3", // △ with the threat
+	"\u2295", // ⊕ time trouble
+	"N", // novelty
+	"TN", // theoretical novelty
 ];
 
 // A per-line row of tappable symbol buttons; clicking one sets (or clears)
@@ -508,6 +535,12 @@ function movePanel(l) {
 	box.appendChild(
 		el("div", { className: "symlabel", textContent: "@ " + label + ":" }),
 	);
+	// a static board of the selected move's position
+	if (!atEnd) {
+		const board = el("div", { className: "mp-board" });
+		appendBoard(board, fenAt(l.moves, selPly), 260);
+		box.appendChild(board);
+	}
 	const apply = (sym) => {
 		if (atEnd) {
 			l.meta = { ...(l.meta || {}), eval: cur === sym ? "" : sym };
@@ -858,7 +891,7 @@ function importPanel() {
 				pgn: ta.value,
 				lines: collectLines(nodes),
 				comments,
-				orientation: "vertical",
+				orientation: "horizontal",
 				showBoards: false,
 				preview: "table",
 			};

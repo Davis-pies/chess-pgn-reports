@@ -253,6 +253,11 @@ select:focus {
 	padding: 8px;
 	background: var(--panel);
 }
+.mp-board {
+	flex: 1 1 100%;
+	display: flex;
+	justify-content: center;
+}
 .cedit {
 	display: flex;
 	flex-direction: column;
@@ -295,6 +300,13 @@ select:focus {
 }
 .hidden {
 	display: none !important;
+}
+/* the horizontal table is rendered for print only; hidden on screen */
+.pv-htable {
+	display: none;
+}
+.pv-htable .tbl {
+	margin: 0 auto;
 }
 
 .help {
@@ -491,6 +503,12 @@ figure.board figcaption {
 	}
 	.pv-cards {
 		display: block !important;
+	}
+	.pv-htable {
+		display: block !important;
+	}
+	.pv-htable.no-print {
+		display: none !important;
 	}
 	.cards {
 		gap: 14px;

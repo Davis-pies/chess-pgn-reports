@@ -16,7 +16,7 @@ test("full app flow: import PGN, tag a line, render table preview", async () => 
 	await import("../src/app.js");
 	dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
 
-	const view = doc("view");
+	let view = doc("view");
 	const textarea = view.querySelector("textarea.pgnin");
 	assert.ok(textarea, "import panel shown");
 	textarea.value = "1. e4 e5 (1... c5 2. Nf3 Nc6) 2. Nf3 Nc6";
@@ -25,6 +25,11 @@ test("full app flow: import PGN, tag a line, render table preview", async () => 
 	);
 	loadBtn.click();
 
+	// default layout is horizontal; switch to vertical so the tag badge shows
+	[...doc("view").querySelectorAll("button")]
+		.find((b) => b.textContent === "Vertical")
+		.click();
+	view = doc("view");
 	// Now in labeling view: line editors + a live table preview
 	assert.ok(view.querySelector(".markup"), "tagging panel present");
 	assert.ok(view.querySelector("table.tbl"), "table preview rendered");

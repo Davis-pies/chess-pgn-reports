@@ -102,7 +102,7 @@ export function boardSvg(fen, size = 220) {
 }
 
 // Append a board for `fen` to `container` (internal helper).
-function appendBoard(container, fen, size = 220) {
+export function appendBoard(container, fen, size = 220) {
 	container.appendChild(boardSvg(fen, size));
 	return container.lastElementChild;
 }

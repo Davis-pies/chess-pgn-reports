@@ -45,6 +45,19 @@ function attachPending(pending) {
 	return pending ? [pending] : [];
 }
 
+// Replay a line's moves up to and including the given ply and return the FEN
+// of the resulting position (handles -- null moves). Used to show a static
+// board for the move currently selected in the editor.
+export function fenAt(moves, ply) {
+	const chess = new Chess();
+	for (const m of moves) {
+		if (m.ply > ply) break;
+		if (m.san === "--") chess.load(flipToMove(chess.fen()));
+		else chess.move(m.san);
+	}
+	return chess.fen();
+}
+
 // Parses a run of moves starting at `state` ({fen, ply}: position BEFORE the
 // first move). A '(' starts a variation that is an ALTERNATIVE to the preceding
 // move, so it branches at the state before that move (same ply). ')' closes it.
