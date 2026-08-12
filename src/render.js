@@ -251,6 +251,28 @@ export function renderTable(container, grid, orientation, opts = {}) {
 
 // Linear print view: each line as a labeled card with its moves and a position
 // diagram, one after another (vs the packed table).
+// Moves text for a card: sidelines get a leading ellipsis + the preceding
+// (shared) move for divergence context, and every move that has notes gets its
+// [n] references appended inline so the moves point at the notes below.
+function cardMovesText(v) {
+	const parts = [];
+	if (v.tag !== "mainline" && v.d > 0) {
+		const pm = v.moves[v.d - 1];
+		const num = pm.ply % 2 === 0 ? Math.floor(pm.ply / 2) + 1 + ". " : "";
+		parts.push("\u22ef " + num + pm.san);
+	}
+	const range = v.tag === "mainline" ? v.moves : v.moves.slice(v.d);
+	range.forEach((m) => {
+		const num = m.ply % 2 === 0 ? Math.floor(m.ply / 2) + 1 + ". " : "";
+		const mark = v.marks && v.marks[m.ply] ? " " + v.marks[m.ply] : "";
+		const refs = ((v.noteByPly && v.noteByPly[m.ply]) || [])
+			.map((n) => "[" + n + "]")
+			.join("");
+		parts.push(num + m.san + mark + refs);
+	});
+	return parts.join("  ");
+}
+
 export function renderCards(container, grid, opts = {}) {
 	const comments = opts.comments || [];
 	const strip = (s) =>
@@ -285,10 +307,7 @@ export function renderCards(container, grid, opts = {}) {
 
 		const moves = document.createElement("div");
 		moves.className = "card-moves";
-		moves.textContent =
-			v.tag === "mainline"
-				? fullMovesText(v.moves, v.marks)
-				: fullMovesText(v.moves.slice(v.d), v.marks);
+		moves.textContent = cardMovesText(v);
 		card.appendChild(moves);
 
 		const board = document.createElement("div");
