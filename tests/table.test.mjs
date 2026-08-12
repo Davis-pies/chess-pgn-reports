@@ -11,11 +11,11 @@ function linesFrom(pgn) {
 // A variation line carries the full root-to-leaf path INCLUDING the shared
 // prefix. So finding a specific variation matches on any contained move.
 test("divergence finds where a variation splits from mainline", () => {
-	const lines = linesFrom("1. e4 c5 (1... e5 2. Nf3) 2. Nf3 d6");
-	const main = lines[0];
-	const e5var = lines.find((l) => l.moves.some((m) => m.san === "e5"));
-	// main: e4 c5 Nf3 d6 ; var: e4 c5 e5 Nf3  -> differ at index 2
-	assert.strictEqual(divergence(e5var, main), 2);
+const lines = linesFrom("1. e4 c5 (1... e5 2. Nf3) 2. Nf3 d6");
+const main = lines[0];
+const e5var = lines.find((l) => l.moves.some((m) => m.san === "e5"));
+// main: e4 c5 Nf3 d6 ; var: e4 e5 Nf3  -> differ at index 1
+assert.strictEqual(divergence(e5var, main), 1);
 });
 
 test("grid marks shared prefix as ellipsis and diverging moves with tag class", () => {

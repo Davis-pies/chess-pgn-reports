@@ -430,6 +430,19 @@ function moveStrip(l) {
 			mv[d].san === mainL.moves[d].san
 		)
 			d++;
+	// indicate the shared prefix (where this line diverges from the mainline)
+	if (!l.isMain && d > 0) {
+		const lab = (m) =>
+			(m.ply % 2 === 0 ? Math.floor(m.ply / 2) + 1 + ". " : "") + m.san;
+		const shared = mv.slice(0, d);
+		const ctx =
+			shared.length <= 3
+				? shared.map(lab).join(" ")
+				: lab(shared[0]) + " \u2026 " + lab(shared[d - 1]);
+		wrap.appendChild(
+			el("span", { className: "ctxchip", textContent: "\u22ef " + ctx }),
+		);
+	}
 	const owned = l.isMain ? mv : mv.slice(d);
 	owned.forEach((m) => {
 		const num = m.ply % 2 === 0 ? Math.floor(m.ply / 2) + 1 + ". " : "";
@@ -454,7 +467,8 @@ function moveStrip(l) {
 	const endChip = el("button", {
 		type: "button",
 		className: "move-chip" + (endSel ? " on" : "") + " endchip",
-		textContent: "end\u00a0\u00b7\u00a0" + ((l.meta && l.meta.eval) || "\u2013"),
+		textContent:
+			"end\u00a0\u00b7\u00a0" + ((l.meta && l.meta.eval) || "\u2013"),
 	});
 	endChip.onclick = () => {
 		current.sel =

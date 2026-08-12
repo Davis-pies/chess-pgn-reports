@@ -24,9 +24,11 @@ export function collectLines(nodes) {
 		const path = prefix.slice();
 		const own = []; // nodes in THIS line's tail (not the shared prefix)
 		seq.forEach((n) => {
+			// a variation's first move REPLACES n's move at the same ply, so the
+			// variation branches BEFORE n (n is not part of the variation's prefix)
+			n.variations.forEach((v) => walk(v, path, false));
 			path.push(n);
 			own.push(n);
-			n.variations.forEach((v) => walk(v, path, false));
 		});
 		if (!isTop) {
 			const last = path[path.length - 1];

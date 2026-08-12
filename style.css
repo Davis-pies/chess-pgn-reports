@@ -206,6 +206,16 @@ select:focus {
 	align-items: center;
 	flex: 1 1 100%;
 }
+.ctxchip {
+	font-family: ui-monospace, Menlo, Consolas, monospace;
+	font-size: 0.78rem;
+	color: var(--muted);
+	background: var(--head-bg);
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	padding: 2px 7px;
+	white-space: pre;
+}
 .move-chip {
 	border: 1px solid var(--line);
 	background: var(--lift);

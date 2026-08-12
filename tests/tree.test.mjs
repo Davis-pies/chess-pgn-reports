@@ -15,13 +15,13 @@ test("collects mainline plus each variation as a line", () => {
 		lines[0].moves.map((m) => m.san).join(" "),
 		"e4 c5 Nf3 d6",
 	);
-	// variation lines each carry the full path, branching from c5
+	// variation lines each carry the full path, WITHOUT the move they replaced
 	const v1 = lines.find((l) => l.moves.some((m) => m.san === "e5"));
 	assert.ok(v1);
-	assert.strictEqual(v1.moves.map((m) => m.san).join(" "), "e4 c5 e5 Nf3 Nc6");
+	assert.strictEqual(v1.moves.map((m) => m.san).join(" "), "e4 e5 Nf3 Nc6");
 	const v2 = lines.find((l) => l.moves.some((m) => m.san === "e6"));
 	assert.ok(v2);
-	assert.strictEqual(v2.moves.map((m) => m.san).join(" "), "e4 c5 e6 d4");
+	assert.strictEqual(v2.moves.map((m) => m.san).join(" "), "e4 e6 d4");
 });
 
 test("recurses through nested variations into distinct lines", () => {
@@ -31,5 +31,6 @@ test("recurses through nested variations into distinct lines", () => {
 	assert.strictEqual(lines.length, 3);
 	const f5 = lines.find((l) => l.moves.some((m) => m.san === "f5"));
 	assert.ok(f5);
-	assert.strictEqual(f5.moves.map((m) => m.san).join(" "), "d4 Nf6 d5 f5");
+	// f5 replaces the 1...d5 move, so it is not in the line
+	assert.strictEqual(f5.moves.map((m) => m.san).join(" "), "d4 f5");
 });
