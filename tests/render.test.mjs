@@ -1,52 +1,56 @@
-import { test } from 'node:test';
-import assert from 'node:assert';
-import { JSDOM } from 'jsdom';
-import { parsePgn } from '../src/pgn.js';
-import { collectLines } from '../src/tree.js';
-import { grid } from '../src/table.js';
-import { renderTable } from '../src/render.js';
+import { test } from "node:test";
+import assert from "node:assert";
+import { JSDOM } from "jsdom";
+import { parsePgn } from "../src/pgn.js";
+import { collectLines } from "../src/tree.js";
+import { grid } from "../src/table.js";
+import { renderTable } from "../src/render.js";
 
 function dom() {
-  return new JSDOM('<!DOCTYPE html><div id="view"></div>', { url: 'http://localhost/' });
+	return new JSDOM('<!DOCTYPE html><div id="view"></div>', {
+		url: "http://localhost/",
+	});
 }
 
-test('renders a vertical table with tagged variations into the DOM', () => {
-  const { window } = dom();
-  global.document = window.document;
-  global.DOMParser = window.DOMParser;
+test("renders a vertical table with tagged variations into the DOM", () => {
+	const { window } = dom();
+	global.document = window.document;
+	global.DOMParser = window.DOMParser;
 
-  const lines = collectLines(parsePgn('1. e4 e5 (1... c5 2. Nf3 Nc6) 2. Nf3 Nc6').nodes);
-  lines[0].tag = 'main';
-  lines[1].tag = 'minor';
+	const lines = collectLines(
+		parsePgn("1. e4 e5 (1... c5 2. Nf3 Nc6) 2. Nf3 Nc6").nodes,
+	);
+	lines[0].tag = "main";
+	lines[1].tag = "minor";
 
-  const container = document.createElement('div');
-  renderTable(container, grid(lines), 'vertical', { showBoards: true });
+	const container = document.createElement("div");
+	renderTable(container, grid(lines), "vertical", { showBoards: true });
 
-  const table = container.querySelector('table.tbl');
-  assert.ok(table, 'expected a table');
-  // one table; header + 2 variation rows
-  assert.strictEqual(table.querySelectorAll('tr').length, 3);
-  const rows = table.querySelectorAll('tr');
-  const header = rows[0];
-  // header labels include move numbers
-  assert.ok(header.textContent.includes('1.'));
-  assert.ok(header.textContent.includes('2.'));
-  // main row has a board diagram esp. via showBoards
-  const boards = container.querySelectorAll('figure.board svg');
-  assert.strictEqual(boards.length, 2);
+	const table = container.querySelector("table.tbl");
+	assert.ok(table, "expected a table");
+	// one table; header + 2 variation rows
+	assert.strictEqual(table.querySelectorAll("tr").length, 3);
+	const rows = table.querySelectorAll("tr");
+	const header = rows[0];
+	// header labels include move numbers
+	assert.ok(header.textContent.includes("1."));
+	assert.ok(header.textContent.includes("2."));
+	// main row has a board diagram esp. via showBoards
+	const boards = container.querySelectorAll("figure.board svg");
+	assert.strictEqual(boards.length, 2);
 
-  delete global.document;
-  delete global.DOMParser;
+	delete global.document;
+	delete global.DOMParser;
 });
 
-test('horizontal layout transposes to one row per ply', () => {
-  global.document = dom().window.document;
-  const lines = collectLines(parsePgn('1. e4 c5 (1... e5) 2. Nf3').nodes);
-  const container = document.createElement('div');
-  renderTable(container, grid(lines), 'horizontal', {});
-  const table = container.querySelector('table.tbl');
-  const rows = table.querySelectorAll('tr');
-  // header + maxPly+1 rows (ply 0..2) = 4 rows (e4,c5,e5,Nf3 -> maxPly 2)
-  assert.ok(rows.length >= 3, 'horizontal has ply rows');
-  delete global.document;
+test("horizontal layout transposes to one row per ply", () => {
+	global.document = dom().window.document;
+	const lines = collectLines(parsePgn("1. e4 c5 (1... e5) 2. Nf3").nodes);
+	const container = document.createElement("div");
+	renderTable(container, grid(lines), "horizontal", {});
+	const table = container.querySelector("table.tbl");
+	const rows = table.querySelectorAll("tr");
+	// header + maxPly+1 rows (ply 0..2) = 4 rows (e4,c5,e5,Nf3 -> maxPly 2)
+	assert.ok(rows.length >= 3, "horizontal has ply rows");
+	delete global.document;
 });

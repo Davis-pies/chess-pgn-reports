@@ -1,32 +1,32 @@
-import { Chess } from 'chess.js';
+import { Chess } from "chess.js";
 
-const START_FEN =
-  'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 export function tokenize(mt) {
-  const re = /(\(|\)|\{[^}]*\}|;[^\r\n]*|\d+\.\.\.|\d+\.|1-0|0-1|1\/2-1\/2|\*|[^\s(){};]+)/g;
-  return (mt.match(re) || []).filter(
-    (t) => !t.startsWith('{') && !t.startsWith(';')
-  );
+	const re =
+		/(\(|\)|\{[^}]*\}|;[^\r\n]*|\d+\.\.\.|\d+\.|1-0|0-1|1\/2-1\/2|\*|[^\s(){};]+)/g;
+	return (mt.match(re) || []).filter(
+		(t) => !t.startsWith("{") && !t.startsWith(";"),
+	);
 }
 
 export function parsePgn(mt) {
-  const tokens = tokenize(mt);
-  const ctx = { i: 0, result: '*' };
-  const nodes = parseSeq(tokens, ctx, { fen: START_FEN, ply: 0 });
-  return { nodes, result: ctx.result };
+	const tokens = tokenize(mt);
+	const ctx = { i: 0, result: "*" };
+	const nodes = parseSeq(tokens, ctx, { fen: START_FEN, ply: 0 });
+	return { nodes, result: ctx.result };
 }
 
 function stepFrom(state, san) {
-  const chess = new Chess();
-  chess.load(state.fen);
-  let m;
-  try {
-    m = chess.move(san, { strict: true });
-  } catch {
-    throw new Error('Illegal or ambiguous move in PGN: ' + san);
-  }
-  return { san: m.san, fen: chess.fen(), ply: state.ply, variations: [] };
+	const chess = new Chess();
+	chess.load(state.fen);
+	let m;
+	try {
+		m = chess.move(san, { strict: true });
+	} catch {
+		throw new Error("Illegal or ambiguous move in PGN: " + san);
+	}
+	return { san: m.san, fen: chess.fen(), ply: state.ply, variations: [] };
 }
 
 // Parses a run of moves starting at `state` ({fen, ply}: position BEFORE the
@@ -35,39 +35,45 @@ function stepFrom(state, san) {
 // Returns the node list. `state` is never mutated across sub-variations because
 // every step draws its position from the previous node's fen.
 function parseSeq(tokens, ctx, state) {
-  const nodes = [];
-  let last = null;
-  let stateBeforeLast = state; // position before the most recent move
-  let cur = state;
-  while (ctx.i < tokens.length) {
-    const t = tokens[ctx.i];
-    if (t === '(') {
-      ctx.i++;
-      const sub = parseSeq(tokens, ctx, stateBeforeLast);
-      if (last) last.variations.push(sub);
-      else nodes.push({ san: null, fen: state.fen, ply: state.ply - 1, variations: [sub] });
-      continue;
-    }
-    if (t === ')') {
-      ctx.i++;
-      return nodes;
-    }
-    if (/^(1-0|0-1|1\/2-1\/2|\*)$/.test(t)) {
-      ctx.result = t;
-      ctx.i++;
-      return nodes;
-    }
-    if (/^\d+\.\.?/.test(t)) {
-      // move-number token, redundant with ply; skip
-      ctx.i++;
-      continue;
-    }
-    const node = stepFrom(cur, t);
-    nodes.push(node);
-    stateBeforeLast = cur;
-    cur = { fen: node.fen, ply: node.ply + 1 };
-    last = node;
-    ctx.i++;
-  }
-  return nodes;
+	const nodes = [];
+	let last = null;
+	let stateBeforeLast = state; // position before the most recent move
+	let cur = state;
+	while (ctx.i < tokens.length) {
+		const t = tokens[ctx.i];
+		if (t === "(") {
+			ctx.i++;
+			const sub = parseSeq(tokens, ctx, stateBeforeLast);
+			if (last) last.variations.push(sub);
+			else
+				nodes.push({
+					san: null,
+					fen: state.fen,
+					ply: state.ply - 1,
+					variations: [sub],
+				});
+			continue;
+		}
+		if (t === ")") {
+			ctx.i++;
+			return nodes;
+		}
+		if (/^(1-0|0-1|1\/2-1\/2|\*)$/.test(t)) {
+			ctx.result = t;
+			ctx.i++;
+			return nodes;
+		}
+		if (/^\d+\.\.?/.test(t)) {
+			// move-number token, redundant with ply; skip
+			ctx.i++;
+			continue;
+		}
+		const node = stepFrom(cur, t);
+		nodes.push(node);
+		stateBeforeLast = cur;
+		cur = { fen: node.fen, ply: node.ply + 1 };
+		last = node;
+		ctx.i++;
+	}
+	return nodes;
 }
