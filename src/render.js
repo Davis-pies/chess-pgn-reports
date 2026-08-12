@@ -274,7 +274,7 @@ function cardMovesText(v) {
 }
 
 export function renderCards(container, grid, opts = {}) {
-	const comments = opts.comments || [];
+	const notes = opts.notes || [];
 	const strip = (s) =>
 		s.replace(/\*\*/g, "").replace(/`/g, "").replace(/\*/g, "").trim();
 	const wrap = document.createElement("div");
@@ -321,8 +321,8 @@ export function renderCards(container, grid, opts = {}) {
 		const owned = [];
 		for (const ply in v.noteByPly || {}) {
 			v.noteByPly[ply].forEach((n) => {
-				const c = comments[n - 1];
-				if (c) owned.push({ n, ply: Number(ply), text: strip(c.text) });
+				const note = notes[n - 1];
+				if (note) owned.push({ n, ply: Number(ply), text: strip(note.text) });
 			});
 		}
 		if (owned.length) {

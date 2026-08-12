@@ -22,13 +22,25 @@ let current = {
 	name: "",
 	pgn: "",
 	lines: [],
-	comments: [],
 	orientation: "horizontal",
 	showBoards: false,
 	preview: "table",
 	boardSize: 300,
 	sel: null, // { l: line, ply } — the move the symbol row targets (null = line-end)
 };
+
+// Flatten every line's own comments into the numbered Notes list (mainline
+// first, then each variation). Each entry remembers its owning line, so notes
+// are attached to a specific line rather than to a (colliding) ply.
+function allNotes() {
+	const out = [];
+	current.lines.forEach((l) => {
+		(l.comments || []).forEach((c) => {
+			out.push({ ply: c.ply, text: c.text, owner: l, n: out.length + 1 });
+		});
+	});
+	return out;
+}
 
 const $ = (id) => document.getElementById(id);
 // Approx. printable content width on a portrait page (px), used to decide
@@ -116,7 +128,6 @@ function viewRoot() {
 			name: current.name,
 			pgn: current.pgn,
 			lines: current.lines,
-			comments: current.comments,
 		});
 		save.textContent = "Saved ✓";
 		setTimeout(() => (save.textContent = "Save"), 1200);
@@ -140,7 +151,7 @@ function viewRoot() {
 // picks which is visible; at print time the cards are always used (media query).
 function previewGroup() {
 	const box = el("div", { className: "preview" });
-	const g = grid(current.lines, current.comments);
+	const g = grid(current.lines);
 	const t = el("div", { className: "pv-table" });
 	t.appendChild(el("h3", { textContent: "Table" }));
 	renderTable(t, g, current.orientation, {
@@ -151,7 +162,7 @@ function previewGroup() {
 		el("h3", { textContent: "Print view — one line, one position" }),
 	);
 	renderCards(c, g, {
-		comments: current.comments,
+		notes: allNotes(),
 		boardSize: current.boardSize,
 	});
 	box.append(t, c);
@@ -224,6 +235,7 @@ function openNotebook(id) {
 				l.name = t.name;
 				l.meta = t.meta || {};
 				l.marks = t.marks || {};
+				l.comments = t.comments || [];
 				// legacy notebooks used 'main'/'minor'; mainline is now structural
 				l.tag = l.isMain ? undefined : t.tag === "foot" ? "foot" : "sideline";
 			}
@@ -243,7 +255,6 @@ function openNotebook(id) {
 			name: nb.name,
 			pgn: nb.pgn,
 			lines,
-			comments: nb.comments || [],
 			orientation: current.orientation,
 			showBoards: current.showBoards,
 		};
@@ -484,9 +495,7 @@ function moveStrip(l) {
 	owned.forEach((m) => {
 		const num = m.ply % 2 === 0 ? Math.floor(m.ply / 2) + 1 + ". " : "";
 		const mark = (l.marks || {})[m.ply];
-		const hasNote = (current.comments || []).some(
-			(c) => c.ply === m.ply && (l.isMain ? !c.inVar : c.inVar),
-		);
+		const hasNote = (l.comments || []).some((c) => c.ply === m.ply);
 		const sel = current.sel && current.sel.l === l && current.sel.ply === m.ply;
 		const b = el("button", {
 			type: "button",
@@ -581,7 +590,7 @@ function movePanel(l) {
 // Edit/add notes attached to a specific move (plies are shared app-wide).
 function commentEditor(ply, l) {
 	const wrap = el("div", { className: "cedit" });
-	const mine = current.comments.filter((c) => c.ply === ply);
+	const mine = (l.comments || []).filter((c) => c.ply === ply);
 	mine.forEach((c) => {
 		const row = el("div", { className: "nt" });
 		const inp = el("input", { className: "lno", value: c.text });
@@ -594,7 +603,7 @@ function commentEditor(ply, l) {
 			textContent: "\u2715",
 		});
 		del.onclick = () => {
-			current.comments.splice(current.comments.indexOf(c), 1);
+			l.comments.splice(l.comments.indexOf(c), 1);
 			renderApp();
 		};
 		row.append(inp, del);
@@ -611,11 +620,8 @@ function commentEditor(ply, l) {
 	});
 	add.onclick = () => {
 		if (addInp.value.trim()) {
-			current.comments.push({
-				ply,
-				text: addInp.value.trim(),
-				inVar: !!(l && !l.isMain), // attach to this line's side
-			});
+			l.comments = l.comments || [];
+			l.comments.push({ ply, text: addInp.value.trim() });
 			addInp.value = "";
 			renderApp();
 		}
@@ -647,10 +653,10 @@ function helpPanel() {
 // A variation-owned note (inVar) is looked up among non-main lines, since a
 // variation's first move shares a ply with the mainline move it replaces (e.g.
 // the variation's cxd6 and the mainline Kf6 both at ply 71).
-function moveRef(ply, inVar) {
-	const pool = inVar
-		? current.lines.filter((l) => !l.isMain)
-		: current.lines.filter((l) => l.isMain);
+function moveRef(ply, owner) {
+	// use the owning line's move if given (a variation note at a colliding ply
+	// should reference the variation's move, not the mainline's)
+	const pool = owner ? [owner] : current.lines.filter((l) => l.isMain);
 	for (const l of pool) {
 		const m = l.moves.find((x) => x.ply === ply);
 		if (m) return fullmoveLabel(m.ply) + m.san;
@@ -711,17 +717,17 @@ function renderInline(container, text) {
 // Notes are numbered (PGN {comments}); tagged-Footnote lines are lettered.
 function notesFootnotesPanel() {
 	const box = el("div", { className: "notes" });
-	const comments = current.comments || [];
+	const notes = allNotes();
 	box.appendChild(el("h3", { textContent: "Notes" }));
-	if (comments.length) {
-		comments.forEach((c, i) => {
+	if (notes.length) {
+		notes.forEach((note) => {
 			const row = el("div", { className: "nt" });
-			row.appendChild(el("sup", { textContent: "[" + (i + 1) + "]" }));
+			row.appendChild(el("sup", { textContent: "[" + note.n + "]" }));
 			const span = document.createElement("span");
 			span.appendChild(
-				document.createTextNode(moveRef(c.ply, c.inVar) + " \u2014 "),
+				document.createTextNode(moveRef(note.ply, note.owner) + " \u2014 "),
 			);
-			renderInline(span, c.text);
+			renderInline(span, note.text);
 			row.appendChild(span);
 			box.appendChild(row);
 		});
@@ -811,7 +817,7 @@ function download(filename, text, mime) {
 
 // Editable, portable Markdown of the finished table — paste into Docs/Word.
 function buildMarkdown() {
-	const g = grid(current.lines, current.comments);
+	const g = grid(current.lines);
 	const L = [];
 	if (current.name) L.push("# " + current.name, "");
 	L.push("## Lines", "");
@@ -843,11 +849,11 @@ function buildMarkdown() {
 			);
 		});
 	}
-	const comments = current.comments || [];
-	if (comments.length) {
+	const notes = allNotes();
+	if (notes.length) {
 		L.push("", "## Notes", "");
-		comments.forEach((c, i) =>
-			L.push(`${i + 1}. ${moveRef(c.ply, c.inVar)} — ${c.text}`),
+		notes.forEach((note) =>
+			L.push(`${note.n}. ${moveRef(note.ply, note.owner)} — ${note.text}`),
 		);
 	}
 	return L.join("\n") + "\n";
@@ -876,7 +882,7 @@ function importPanel() {
 	const go = el("button", { textContent: "Load & Tag" });
 	go.onclick = () => {
 		try {
-			const { nodes, comments } = parsePgn(ta.value);
+			const { nodes } = parsePgn(ta.value);
 			if (!nodes.length) {
 				alert("No moves found in PGN");
 				return;
@@ -886,7 +892,6 @@ function importPanel() {
 				name: "",
 				pgn: ta.value,
 				lines: collectLines(nodes),
-				comments,
 				orientation: "horizontal",
 				showBoards: false,
 				preview: "table",

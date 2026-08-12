@@ -20,9 +20,11 @@ const TAG_META = {
 	foot: { label: "Footnote" },
 };
 
-export function grid(lines, comments = []) {
+export function grid(lines) {
 	const main = lines.find((l) => l.isMain) || lines[0];
-
+	// number the notes in line order (matches allNotes()); each line carries its
+	// own comments, so ownership is structural rather than inferred from ply
+	let noteNum = 0;
 	const vars = []; // mainline + sidelines (table rows)
 	const footNotes = []; // footnote lines (prose section)
 	lines.forEach((l) => {
@@ -45,16 +47,11 @@ export function grid(lines, comments = []) {
 			}
 			cells[m.ply] = { text, cls, mark: marks[m.ply] || "" };
 		});
-		// note markers keyed by ply, only for plies this line owns (its tail; the
-		// mainline owns every move). Comments are tagged inVar (inside a
-		// variation), so mainline cells show only mainline comments and a
-		// variation shows only its own — no branch-ply double display.
-		const tail = isMain ? l.moves : l.moves.slice(d);
-		const owned = new Set(tail.map((m) => m.ply));
+		// note markers keyed by ply, from the line's own comments
 		const noteByPly = {};
-		comments.forEach((c, i) => {
-			if (owned.has(c.ply) && (isMain ? !c.inVar : c.inVar))
-				(noteByPly[c.ply] = noteByPly[c.ply] || []).push(i + 1);
+		(l.comments || []).forEach((c) => {
+			noteNum++;
+			(noteByPly[c.ply] = noteByPly[c.ply] || []).push(noteNum);
 		});
 		const base = {
 			tag,
