@@ -577,6 +577,22 @@ figure.board figcaption {
 .card-board .board-svg {
 	margin: 8px 0 0;
 }
+.card-boards {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+}
+.card-board-cap {
+	font-size: 0.72rem;
+	color: var(--muted);
+	text-align: center;
+	margin-top: 2px;
+}
+.print-group {
+	margin: 12px 0 2px;
+	font-size: 0.85rem;
+	color: var(--muted);
+}
 
 .export {
 	margin: 16px 0;

@@ -4,6 +4,8 @@
 // tests, and prints cleanly. Board colors stay fixed so diagrams read on both the
 // light and dark page themes.
 
+import { fenAt } from "./pgn.js";
+
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 // Pieces come from the inline cburnett sprite (assets/pieces.svg, injected by
@@ -340,10 +342,29 @@ export function renderCards(container, grid, opts = {}) {
 		buildCardMoves(moves, v);
 		card.appendChild(moves);
 
-		const board = document.createElement("div");
-		board.className = "card-board";
-		appendBoard(board, v.fen, opts.boardSize || 200);
-		card.appendChild(board);
+		const boards = document.createElement("div");
+		boards.className = "card-boards";
+		const addBoard = (fen, cap) => {
+			const b = document.createElement("div");
+			b.className = "card-board";
+			appendBoard(b, fen, opts.boardSize || 200);
+			if (cap) {
+				const s = document.createElement("div");
+				s.className = "card-board-cap";
+				s.textContent = cap;
+				b.appendChild(s);
+			}
+			boards.appendChild(b);
+		};
+		if (opts.showFinalBoard !== false) addBoard(v.fen, null);
+		if (opts.showFirstDivBoard && v.d > 0 && v.d < (v.moves || []).length) {
+			const mv = v.moves[v.d];
+			addBoard(
+				fenAt(v.moves, mv.ply - 1),
+				"first divergence " + fullmoveLabel(mv.ply) + mv.san,
+			);
+		}
+		if (boards.childNodes.length) card.appendChild(boards);
 
 		// relevant notes for this line, below the image
 		const notesBox = document.createElement("div");

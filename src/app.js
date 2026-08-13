@@ -28,6 +28,8 @@ let current = {
 	showBoards: false,
 	preview: "table",
 	boardSize: 300,
+	showFinalBoard: true,
+	showFirstDivBoard: false,
 	sideWidth: 420, // px; the drag-resized table panel width
 	sel: null, // { l: line, ply } — the move the symbol row targets (null = line-end)
 };
@@ -151,6 +153,8 @@ function viewRoot() {
 					orientation: "horizontal",
 					showBoards: false,
 					boardSize: current.boardSize,
+					showFinalBoard: true,
+					showFirstDivBoard: false,
 					sideWidth: current.sideWidth,
 					sel: null,
 				};
@@ -196,7 +200,12 @@ function viewRoot() {
 	c.appendChild(
 		el("h3", { textContent: "Print view — one line, one position" }),
 	);
-	renderCards(c, g, { notes: allNotes(), boardSize: current.boardSize });
+	renderCards(c, g, {
+		notes: allNotes(),
+		boardSize: current.boardSize,
+		showFinalBoard: current.showFinalBoard,
+		showFirstDivBoard: current.showFirstDivBoard,
+	});
 	side.appendChild(c);
 	appendPrintTables(side, g); // print-only horizontal slices (hidden on screen)
 	const handle = el("div", {
@@ -246,13 +255,36 @@ function appendPrintTables(box, g) {
 	const mainV = g.vars[0]; // mainline sorts first
 	const others = g.vars.slice(1);
 	const size = 15; // mainline + 15 = 16 columns per slice
-	if (mainV && others.length > size) {
-		for (let i = 0; i < others.length; i += size) {
-			const vars = [mainV, ...others.slice(i, i + size)];
-			renderTable(wrap, { ...g, vars }, "horizontal", { showBoards: false });
-		}
+	if (!mainV || others.length <= size) {
+		renderTable(wrap, g, "horizontal");
 	} else {
-		renderTable(wrap, g, "horizontal", { showBoards: false });
+		// the table won't fit, so split it by trie branch: each printed table
+		// groups the lines of one shared continuation (a coherent cut, rather
+		// than an arbitrary 16-column slice)
+		const byKey = new Map();
+		const order = [];
+		for (const v of others) {
+			const mv = v.d > 0 ? v.moves[v.d] : null;
+			const key = mv ? mv.ply + ":" + mv.san : "\u2205";
+			if (!byKey.has(key)) {
+				byKey.set(key, []);
+				order.push(key);
+			}
+			byKey.get(key).push(v);
+		}
+		for (const key of order) {
+			const rows = byKey.get(key);
+			const mv = rows[0].d > 0 ? rows[0].moves[rows[0].d] : null;
+			const h = el("h4", {
+				className: "print-group",
+				textContent: rows.length + " lines · " + (mv ? fullmoveLabel(mv.ply) + mv.san : ""),
+			});
+			wrap.appendChild(h);
+			for (let i = 0; i < rows.length; i += size) {
+				const vars = [mainV, ...rows.slice(i, i + size)];
+				renderTable(wrap, { ...g, vars }, "horizontal");
+			}
+		}
 	}
 	box.appendChild(wrap);
 }
@@ -331,6 +363,8 @@ function openNotebook(id) {
 			orientation: current.orientation,
 			showBoards: current.showBoards,
 			boardSize: current.boardSize,
+			showFinalBoard: current.showFinalBoard !== false,
+			showFirstDivBoard: !!current.showFirstDivBoard,
 			sel: null,
 		};
 	} catch (e) {
@@ -1056,6 +1090,28 @@ function exportBar() {
 		setTimeout(() => (copy.textContent = "Copy report"), 1500);
 	};
 	bar.append(printBtn, pgn, md, copy);
+	// print/PDF options: which diagrams appear in the Lines (print) cards
+	const pOpts = el("div", { className: "printopts" });
+	const chk = (label, key, def) => {
+		const lab = el("label", {}, [
+			label + " ",
+			el("input", {
+				type: "checkbox",
+				checked: current[key] == null ? def : current[key],
+			}),
+		]);
+		lab.querySelector("input").onchange = (e) => {
+			current[key] = e.target.checked;
+			renderApp();
+		};
+		return lab;
+	};
+	pOpts.append(
+		"Cards: ",
+		chk("final-position image", "showFinalBoard", true),
+		chk("first-divergence image", "showFirstDivBoard", false),
+	);
+	bar.appendChild(pOpts);
 	return bar;
 }
 
@@ -1155,6 +1211,8 @@ function importPanel() {
 				showBoards: false,
 				preview: "table",
 				boardSize: current.boardSize,
+				showFinalBoard: true,
+				showFirstDivBoard: false,
 				sideWidth: current.sideWidth,
 				sel: null,
 			};
