@@ -72,6 +72,27 @@ function computeShared() {
 	sharedInfo = { byLine, idLines };
 }
 
+// For each line, the deepest prefix shared with any OTHER line — i.e. the
+// index of this line's first move that no other line matches (its "latest
+// divergence" / first moment of true uniqueness).
+const uniqInfo = new Map(); // moves-array -> first-unique-move index
+function computeUnique() {
+	uniqInfo.clear();
+	const lines = current.lines;
+	for (const l of lines) {
+		let best = 0;
+		const a = l.moves;
+		for (const y of lines) {
+			if (y === l) continue;
+			const b = y.moves;
+			let i = 0;
+			while (i < a.length && i < b.length && a[i].san === b[i].san) i++;
+			if (i > best) best = i;
+		}
+		uniqInfo.set(a, best);
+	}
+}
+
 // Flatten every line's own comments into the numbered Notes list (mainline
 // first, then each variation). Each entry remembers its owning line, so notes
 // are attached to a specific line rather than to a (colliding) ply.
@@ -131,6 +152,7 @@ function themeBtn() {
 function renderApp() {
 	const v = $("view");
 	computeShared(); // which lines carry each move (identical position + SAN)
+	computeUnique(); // each line's first move unique to it among all lines
 	v.replaceChildren();
 	v.appendChild(viewRoot());
 }
@@ -205,6 +227,7 @@ function viewRoot() {
 		boardSize: current.boardSize,
 		showFinalBoard: current.showFinalBoard,
 		showFirstDivBoard: current.showFirstDivBoard,
+		uniq: uniqInfo,
 	});
 	side.appendChild(c);
 	appendPrintTables(side, g); // print-only horizontal slices (hidden on screen)
@@ -1112,7 +1135,7 @@ function exportBar() {
 	pOpts.append(
 		"Cards: ",
 		chk("final-position image", "showFinalBoard", true),
-		chk("first-divergence image", "showFirstDivBoard", false),
+		chk("latest-divergence image", "showFirstDivBoard", false),
 	);
 	bar.appendChild(pOpts);
 	return bar;

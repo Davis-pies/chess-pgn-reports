@@ -357,11 +357,19 @@ export function renderCards(container, grid, opts = {}) {
 			boards.appendChild(b);
 		};
 		if (opts.showFinalBoard !== false) addBoard(v.fen, null);
-		if (opts.showFirstDivBoard && v.d > 0 && v.d < (v.moves || []).length) {
-			const mv = v.moves[v.d];
+		// "latest divergence": the first move this line no longer shares with
+		// ANY other line — its first moment of true uniqueness. Position shown
+		// after that move so the move itself is on the board.
+		const uniq = opts.uniq && opts.uniq.get(v.moves);
+		if (
+			opts.showFirstDivBoard &&
+			uniq != null &&
+			uniq < (v.moves || []).length
+		) {
+			const mv = v.moves[uniq];
 			addBoard(
-				fenAt(v.moves, mv.ply - 1),
-				"first divergence " + fullmoveLabel(mv.ply) + mv.san,
+				fenAt(v.moves, mv.ply),
+				"latest divergence " + fullmoveLabel(mv.ply) + mv.san,
 			);
 		}
 		if (boards.childNodes.length) card.appendChild(boards);
