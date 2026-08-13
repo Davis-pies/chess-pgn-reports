@@ -6,6 +6,7 @@ import { collectLines } from "../src/tree.js";
 import { grid } from "../src/table.js";
 import {
 	renderTable,
+	renderBoardOverview,
 	renderCards,
 	boardSvg,
 	fullMovesText,
@@ -39,7 +40,7 @@ test("renders a vertical table with tagged variations into the DOM", () => {
 	lines[1].tag = "sideline";
 
 	const container = document.createElement("div");
-	renderTable(container, grid(lines), "vertical", { showBoards: true });
+	renderTable(container, grid(lines), "vertical");
 
 	const table = container.querySelector("table.tbl");
 	assert.ok(table, "expected a table");
@@ -50,7 +51,8 @@ test("renders a vertical table with tagged variations into the DOM", () => {
 	// header labels include move numbers
 	assert.ok(header.textContent.includes("1."));
 	assert.ok(header.textContent.includes("2."));
-	// each variation gets a board diagram
+	// the board overview is a separate function, one diagram per line
+	renderBoardOverview(container, grid(lines), 200);
 	const boards = container.querySelectorAll("figure.board svg.board-svg");
 	assert.strictEqual(boards.length, 2);
 

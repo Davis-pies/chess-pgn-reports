@@ -162,7 +162,7 @@ function moveCell(c, ply, noteByPly) {
 }
 
 // Populates `container` with the table (+ optional board diagrams).
-export function renderTable(container, grid, orientation, opts = {}) {
+export function renderTable(container, grid, orientation) {
 	const { vars, maxPly, mainMoves } = grid;
 	const labels = {};
 	mainMoves.forEach(
@@ -232,21 +232,24 @@ export function renderTable(container, grid, orientation, opts = {}) {
 		}
 	}
 	container.appendChild(table);
+}
 
-	if (opts.showBoards) {
-		const boards = document.createElement("div");
-		boards.className = "boards";
-		for (const v of vars) {
-			const fig = document.createElement("figure");
-			fig.className = "board";
-			appendBoard(fig, v.fen, opts.boardSize);
-			const cap = document.createElement("figcaption");
-			cap.textContent = v.name || v.label;
-			fig.appendChild(cap);
-			boards.appendChild(fig);
-		}
-		container.appendChild(boards);
-	}
+// A grid of per-line position diagrams (the on-screen "Show boards" overview;
+// it lives in the main panel, separate from the table).
+export function renderBoardOverview(container, grid, boardSize) {
+	const boards = document.createElement("div");
+	boards.className = "boards";
+	grid.vars.forEach((v) => {
+		const fig = document.createElement("figure");
+		fig.className = "board";
+		appendBoard(fig, v.fen, boardSize);
+		const cap = document.createElement("figcaption");
+		cap.textContent = v.name || v.label;
+		fig.appendChild(cap);
+		boards.appendChild(fig);
+	});
+	container.appendChild(boards);
+	return boards;
 }
 
 // Linear print view: each line as a labeled card with its moves and a position

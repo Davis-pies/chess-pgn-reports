@@ -5,6 +5,7 @@ import { grid, divergence } from "./table.js";
 import {
 	renderTable,
 	renderCards,
+	renderBoardOverview,
 	appendBoard,
 	fullmoveLabel,
 	fullMovesText,
@@ -189,10 +190,7 @@ function viewRoot() {
 	// side: the preview (table, or print lines) with its own scroll, resizable
 	const t = el("div", { className: "pv-table" });
 	t.appendChild(el("h3", { textContent: "Table" }));
-	renderTable(t, g, current.orientation, {
-		showBoards: current.showBoards,
-		boardSize: current.boardSize,
-	});
+	renderTable(t, g, current.orientation);
 	side.appendChild(t);
 	const c = el("div", { className: "pv-cards" });
 	c.appendChild(
@@ -214,6 +212,8 @@ function viewRoot() {
 
 	// main (right): controls + management + reference sections
 	main.appendChild(orientationToggle());
+	// board-diagram overview lives here (full width, next to its controls)
+	if (current.showBoards) renderBoardOverview(main, g, current.boardSize);
 	main.appendChild(notebookList());
 	main.appendChild(helpPanel());
 	const markupBox = markupPanel();
@@ -700,9 +700,7 @@ function moveStrip(l) {
 			.filter(
 				(n) =>
 					n.ply === m.ply &&
-					(l.comments || []).some(
-						(c) => c.ply === n.ply && c.text === n.text,
-					),
+					(l.comments || []).some((c) => c.ply === n.ply && c.text === n.text),
 			)
 			.map((n) => n.n);
 		const sel =
