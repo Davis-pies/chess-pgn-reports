@@ -277,7 +277,10 @@ function appendPrintTables(box, g) {
 			const mv = rows[0].d > 0 ? rows[0].moves[rows[0].d] : null;
 			const h = el("h4", {
 				className: "print-group",
-				textContent: rows.length + " lines · " + (mv ? fullmoveLabel(mv.ply) + mv.san : ""),
+				textContent:
+					rows.length +
+					" lines · " +
+					(mv ? fullmoveLabel(mv.ply) + mv.san : ""),
 			});
 			wrap.appendChild(h);
 			for (let i = 0; i < rows.length; i += size) {

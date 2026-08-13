@@ -303,7 +303,11 @@ select:focus {
 	flex-wrap: wrap;
 	gap: 3px;
 	align-items: center;
-	flex: 1 1 100%;
+	flex: 1 1 auto; /* sit inline with the name/tags so short lines stay on one row */
+	min-width: 160px;
+}
+.moves .symlabel {
+	display: none; /* drop the always-on "Tap a move" hint for a compact editor */
 }
 .ctxchip {
 	font-family: ui-monospace, Menlo, Consolas, monospace;
