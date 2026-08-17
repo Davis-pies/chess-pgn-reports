@@ -2,7 +2,6 @@ import { test } from "node:test";
 import assert from "node:assert";
 import { JSDOM } from "jsdom";
 
-
 const tick = () => new Promise((r) => setTimeout(r, 60));
 
 test("full app flow: import PGN, tag a line, render table preview", async () => {
@@ -99,8 +98,11 @@ test("inline boards: flat shows one per line; grouped shows only expanded groups
 	label.querySelector("input").click();
 
 	// grouped view is the default; the fork group starts collapsed
-	assert.strictEqual(doc("view").querySelectorAll(".ledge-board").length, 1,
-		"only the mainline board shows while groups are collapsed");
+	assert.strictEqual(
+		doc("view").querySelectorAll(".ledge-board").length,
+		1,
+		"only the mainline board shows while groups are collapsed",
+	);
 
 	// expand the fork group: its lines' boards appear
 	const det = doc("view").querySelector("details.lgroup");
@@ -109,8 +111,11 @@ test("inline boards: flat shows one per line; grouped shows only expanded groups
 	// The second render sees openPaths populated — this is intentional.
 	det.open = true;
 	det.dispatchEvent(new dom.window.Event("toggle"));
-	assert.strictEqual(doc("view").querySelectorAll(".ledge-board").length, 3,
-		"expanding the group builds its lines' boards");
+	assert.strictEqual(
+		doc("view").querySelectorAll(".ledge-board").length,
+		3,
+		"expanding the group builds its lines' boards",
+	);
 
 	// flat view shows a board for every line
 	[...doc("view").querySelectorAll("button")]

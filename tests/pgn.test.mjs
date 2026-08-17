@@ -56,9 +56,7 @@ test("rejects illegal moves", () => {
 });
 
 test("fenMap records the FEN after every ply, matching fenAt (incl. null moves)", () => {
-	const { nodes } = parsePgn(
-		"1. d4 d5 2. c4 e6 (2... dxc4 -- e5) 3. Nc3",
-	);
+	const { nodes } = parsePgn("1. d4 d5 2. c4 e6 (2... dxc4 -- e5) 3. Nc3");
 	const lines = collectLines(nodes);
 	assert.ok(lines.length >= 2, "mainline + variation");
 	for (const l of lines) {

@@ -545,9 +545,7 @@ function renderTrieNode(container, node, nameCounter, path, allOpen) {
 			}),
 		);
 		const body = el("div", { className: "lgroup-body" });
-		body.appendChild(
-			lineEditor(node.leaf, nameCounter.n++, allOpen && boards),
-		);
+		body.appendChild(lineEditor(node.leaf, nameCounter.n++, allOpen && boards));
 		box.appendChild(body);
 		container.appendChild(box);
 		return;
