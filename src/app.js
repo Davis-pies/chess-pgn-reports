@@ -1,5 +1,5 @@
 // Browser glue: import PGN, tag each line, render the table, persist notebook.
-import { parsePgn, fenAt } from "./pgn.js";
+import { parsePgn, fenAt, fenMap } from "./pgn.js";
 import { collectLines } from "./tree.js";
 import { grid, divergence } from "./table.js";
 import {
@@ -44,8 +44,7 @@ const fenCache = new WeakMap(); // line -> Map(ply -> fen)
 let sharedInfo = {}; // { byLine: line -> Map(ply -> id), idLines: id -> [lines] }
 function fenAtLine(l, ply) {
 	let m = fenCache.get(l);
-	if (!m) fenCache.set(l, (m = new Map()));
-	if (!m.has(ply)) m.set(ply, fenAt(l.moves, ply));
+	if (!m) fenCache.set(l, (m = fenMap(l.moves)));
 	return m.get(ply);
 }
 function computeShared() {

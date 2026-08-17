@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { parsePgn } from "../src/pgn.js";
+import { parsePgn, fenAt, fenMap } from "../src/pgn.js";
+import { collectLines } from "../src/tree.js";
 
 test("parses a simple mainline with a parenthesized variation", () => {
 	const pgn = "1. e4 c5 (1... e5 2. Nf3) 2. Nf3 d6";
@@ -52,4 +53,19 @@ test("rejects illegal moves", () => {
 		/Illegal|ambiguous/,
 	);
 	// Nc5 is an illegal move for the knight (not reachable)
+});
+
+test("fenMap records the FEN after every ply, matching fenAt (incl. null moves)", () => {
+	const { nodes } = parsePgn(
+		"1. d4 d5 2. c4 e6 (2... dxc4 -- e5) 3. Nc3",
+	);
+	const lines = collectLines(nodes);
+	assert.ok(lines.length >= 2, "mainline + variation");
+	for (const l of lines) {
+		const map = fenMap(l.moves);
+		assert.strictEqual(map.size, l.moves.length, "one FEN per move");
+		l.moves.forEach((m) =>
+			assert.strictEqual(map.get(m.ply), fenAt(l.moves, m.ply)),
+		);
+	}
 });

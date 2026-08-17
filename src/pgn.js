@@ -58,6 +58,19 @@ export function fenAt(moves, ply) {
 	return chess.fen();
 }
 
+// One-pass variant of fenAt: replay a line's moves once and record the FEN
+// after each ply. Turns per-(line,ply) replays (O(n²) Chess steps) into O(n).
+export function fenMap(moves) {
+	const chess = new Chess();
+	const map = new Map();
+	for (const m of moves) {
+		if (m.san === "--") chess.load(flipToMove(chess.fen()));
+		else chess.move(m.san);
+		map.set(m.ply, chess.fen());
+	}
+	return map;
+}
+
 // Parses a run of moves starting at `state` ({fen, ply}: position BEFORE the
 // first move). A '(' starts a variation that is an ALTERNATIVE to the preceding
 // move, so it branches at the state before that move (same ply). ')' closes it.
