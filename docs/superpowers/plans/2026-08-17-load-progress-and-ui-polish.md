@@ -298,6 +298,13 @@ test("inline boards: flat shows one per line; grouped shows only expanded groups
  await import("../src/app.js");
  dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
 
+ // module state persists between tests in this file: the full-flow test above
+ // leaves lines loaded, so reset via the toolbar's New/Import button first
+ const resetBtn = [...doc("view").querySelectorAll("button")].find((b) =>
+  b.textContent.includes("New / Import"),
+ );
+ resetBtn.click();
+
  const textarea = doc("view").querySelector("textarea.pgnin");
  // 3 lines: mainline + 2 variations that share a divergence fork at ply 1
  textarea.value = "1. e4 e5 (1... c5 2. Nf3 Nc6) (1... e5 2. Nf3) 2. Nf3";
