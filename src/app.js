@@ -112,6 +112,26 @@ function allNotes() {
 
 const $ = (id) => document.getElementById(id);
 
+// Full-viewport loading feedback. Painted via double-rAF before the slow
+// synchronous parse+render runs, then removed. No fake progress: after the
+// fenMap fix most loads flash it sub-frame.
+const paintFrame = () =>
+	new Promise((r) =>
+		requestAnimationFrame(() => requestAnimationFrame(() => r())),
+	);
+async function withLoading(fn) {
+	const ov = el("div", { id: "loading", className: "loading-overlay" });
+	ov.appendChild(el("div", { className: "spinner" }));
+	ov.appendChild(el("span", { textContent: "Loading\u2026" }));
+	document.body.appendChild(ov);
+	await paintFrame();
+	try {
+		fn();
+	} finally {
+		ov.remove();
+	}
+}
+
 function el(tag, props, children = []) {
 	const e = document.createElement(tag);
 	Object.assign(e, props);
@@ -345,67 +365,69 @@ function notebookList() {
 }
 
 function openNotebook(id) {
-	const nb = loadNotebook(id);
-	if (!nb) {
-		alert("That workbook could not be read.");
-		return;
-	}
-	try {
-		const { nodes } = parsePgn(nb.pgn);
-		if (!nodes.length) {
-			alert("That workbook has no moves.");
+	withLoading(() => {
+		const nb = loadNotebook(id);
+		if (!nb) {
+			alert("That workbook could not be read.");
 			return;
 		}
-		const lines = collectLines(nodes);
-		// re-apply tags
-		lines.forEach((l) => {
-			const k = keyFor(l.moves);
-			const t = (nb.tags || []).find((x) => x.key === k);
-			if (t) {
-				l.name = t.name;
-				l.meta = t.meta || {};
-				l.marks = t.marks || {};
-				l.comments = t.comments || [];
-				// legacy notebooks used 'main'/'minor'; mainline is now structural
-				l.tag = l.isMain ? undefined : t.tag === "foot" ? "foot" : "sideline";
+		try {
+			const { nodes } = parsePgn(nb.pgn);
+			if (!nodes.length) {
+				alert("That workbook has no moves.");
+				return;
 			}
-		});
-		// restore a user-promoted mainline, if any
-		if (nb.main) {
-			const target = lines.find((l) => keyFor(l.moves) === nb.main);
-			if (target) {
-				lines.forEach((x) => {
-					x.isMain = x === target;
-					if (x === target) x.tag = undefined;
-				});
+			const lines = collectLines(nodes);
+			// re-apply tags
+			lines.forEach((l) => {
+				const k = keyFor(l.moves);
+				const t = (nb.tags || []).find((x) => x.key === k);
+				if (t) {
+					l.name = t.name;
+					l.meta = t.meta || {};
+					l.marks = t.marks || {};
+					l.comments = t.comments || [];
+					// legacy notebooks used 'main'/'minor'; mainline is now structural
+					l.tag = l.isMain ? undefined : t.tag === "foot" ? "foot" : "sideline";
+				}
+			});
+			// restore a user-promoted mainline, if any
+			if (nb.main) {
+				const target = lines.find((l) => keyFor(l.moves) === nb.main);
+				if (target) {
+					lines.forEach((x) => {
+						x.isMain = x === target;
+						if (x === target) x.tag = undefined;
+					});
+				}
 			}
+			current = {
+				id,
+				name: nb.name,
+				pgn: nb.pgn,
+				lines,
+				orientation: current.orientation,
+				showBoards: current.showBoards,
+				boardSize: current.boardSize,
+				showFinalBoard: current.showFinalBoard !== false,
+				showFirstDivBoard: !!current.showFirstDivBoard,
+				sel: null,
+			};
+		} catch (e) {
+			current = {
+				id: null,
+				name: "",
+				pgn: "",
+				lines: [],
+				orientation: "horizontal",
+				showBoards: false,
+				boardSize: current.boardSize || 300,
+				sel: null,
+			};
+			alert("Could not open workbook: " + e.message);
 		}
-		current = {
-			id,
-			name: nb.name,
-			pgn: nb.pgn,
-			lines,
-			orientation: current.orientation,
-			showBoards: current.showBoards,
-			boardSize: current.boardSize,
-			showFinalBoard: current.showFinalBoard !== false,
-			showFirstDivBoard: !!current.showFirstDivBoard,
-			sel: null,
-		};
-	} catch (e) {
-		current = {
-			id: null,
-			name: "",
-			pgn: "",
-			lines: [],
-			orientation: "horizontal",
-			showBoards: false,
-			boardSize: current.boardSize || 300,
-			sel: null,
-		};
-		alert("Could not open workbook: " + e.message);
-	}
-	renderApp();
+		renderApp();
+	});
 }
 
 function orientationToggle() {
@@ -1220,31 +1242,33 @@ function importPanel() {
 	};
 	const go = el("button", { textContent: "Load & Tag" });
 	go.onclick = () => {
-		try {
-			const { nodes } = parsePgn(ta.value);
-			if (!nodes.length) {
-				alert("No moves found in PGN");
-				return;
+		withLoading(() => {
+			try {
+				const { nodes } = parsePgn(ta.value);
+				if (!nodes.length) {
+					alert("No moves found in PGN");
+					return;
+				}
+				openPaths.clear();
+				current = {
+					id: current.id,
+					name: "",
+					pgn: ta.value,
+					lines: collectLines(nodes),
+					orientation: "horizontal",
+					showBoards: false,
+					preview: "table",
+					boardSize: current.boardSize,
+					showFinalBoard: true,
+					showFirstDivBoard: false,
+					sideWidth: current.sideWidth,
+					sel: null,
+				};
+				renderApp();
+			} catch (e) {
+				alert("Could not read PGN: " + e.message);
 			}
-			openPaths.clear(); // fresh trie: all groups start collapsed
-			current = {
-				id: current.id,
-				name: "",
-				pgn: ta.value,
-				lines: collectLines(nodes),
-				orientation: "horizontal",
-				showBoards: false,
-				preview: "table",
-				boardSize: current.boardSize,
-				showFinalBoard: true,
-				showFirstDivBoard: false,
-				sideWidth: current.sideWidth,
-				sel: null,
-			};
-			renderApp();
-		} catch (e) {
-			alert("Could not read PGN: " + e.message);
-		}
+		});
 	};
 	box.append(ta, el("div", {}, [file, go]));
 	return box;

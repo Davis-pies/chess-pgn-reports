@@ -2,6 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert";
 import { JSDOM } from "jsdom";
 
+const tick = () => new Promise((r) => setTimeout(r, 60));
+
 test("full app flow: import PGN, tag a line, render table preview", async () => {
 	const dom = new JSDOM('<!DOCTYPE html><main id="view"></main>', {
 		url: "http://localhost/",
@@ -12,6 +14,7 @@ test("full app flow: import PGN, tag a line, render table preview", async () => 
 	global.localStorage = dom.window.localStorage;
 	global.alert = () => {};
 	global.confirm = () => true;
+	global.requestAnimationFrame = dom.window.requestAnimationFrame;
 
 	await import("../src/app.js");
 	dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
@@ -24,6 +27,9 @@ test("full app flow: import PGN, tag a line, render table preview", async () => 
 		b.textContent.includes("Load"),
 	);
 	loadBtn.click();
+	assert.ok(doc("loading"), "loading overlay appears synchronously on click");
+	await tick();
+	assert.ok(!doc("loading"), "overlay removed after render");
 
 	// default layout is horizontal; switch to vertical so the tag badge shows
 	[...doc("view").querySelectorAll("button")]
