@@ -291,6 +291,7 @@ test("inline boards: flat shows one per line; grouped shows only expanded groups
  });
  global.window = dom.window;
  global.document = dom.window.document;
+ global.requestAnimationFrame = dom.window.requestAnimationFrame;
  global.localStorage = dom.window.localStorage;
  global.alert = () => {};
  global.confirm = () => true;
@@ -337,6 +338,7 @@ test("inline boards: flat shows one per line; grouped shows only expanded groups
 
  delete global.window;
  delete global.document;
+ delete global.requestAnimationFrame;
  delete global.localStorage;
  delete global.alert;
  delete global.confirm;
