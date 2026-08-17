@@ -117,22 +117,6 @@ main {
 		max-width: 100%;
 	}
 }
-@media (max-width: 1000px) {
-	.app-layout {
-		width: auto;
-		margin-left: 0;
-	}
-	.side-panel {
-		position: static;
-		width: auto;
-		max-height: none;
-		overflow: visible;
-	}
-	.main-panel {
-		margin-left: 0;
-		max-width: 100%;
-	}
-}
 
 h2 {
 	margin: 10px 0 6px;
@@ -185,14 +169,12 @@ h3 {
 	padding: 1px 7px;
 	font-size: 0.8rem;
 }
-.addbar {
-	display: flex;
-	gap: 6px;
-	align-items: center;
-	flex-wrap: wrap;
-	margin: 6px 0;
+.chip.primary {
+	background: var(--main);
+	border-color: var(--main);
+	color: #fff;
+	font-weight: 600;
 }
-.symbols,
 .sympick {
 	display: inline-flex;
 	gap: 4px;
@@ -285,18 +267,25 @@ select:focus {
 }
 .ledge {
 	display: flex;
+	flex-wrap: wrap;
 	gap: 8px;
 	align-items: center;
-	flex-wrap: wrap;
-	padding: 7px 0;
-	border-top: 1px solid var(--line);
+	padding: 10px 12px;
+	margin: 8px 0;
+	border: 1px solid var(--line);
+	border-radius: 10px;
+	background: var(--panel);
 }
-.lmoves {
-	font-family: ui-monospace, Menlo, Consolas, monospace;
-	font-size: 0.9rem;
-	min-width: 200px;
-	flex: 1;
-	color: var(--text);
+.ledge-head {
+	display: flex;
+	flex: 1 1 100%;
+	gap: 8px;
+	align-items: center;
+}
+.ledge-board {
+	flex: 1 1 100%;
+	display: flex;
+	justify-content: center;
 }
 .moves {
 	display: flex;
@@ -379,9 +368,7 @@ select:focus {
 .ln {
 	width: 100px;
 }
-.le {
-	width: 60px;
-}
+
 .lno {
 	width: 170px;
 }
@@ -394,10 +381,7 @@ select:focus {
 	flex-wrap: wrap;
 }
 
-.preview {
-	margin-top: 16px;
-	overflow-x: auto;
-}
+
 .hidden {
 	display: none !important;
 }

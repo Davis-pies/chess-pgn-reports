@@ -212,7 +212,7 @@ function viewRoot() {
 		current.name = name.value;
 	};
 	top.appendChild(name);
-	const save = el("button", { textContent: "Save" });
+	const save = el("button", { className: "chip primary", textContent: "Save" });
 	save.onclick = () => {
 		if (!current.name) current.name = "Untitled";
 		saveNotebook(current.id || (current.id = "n" + Date.now()), {
@@ -1007,7 +1007,6 @@ function helpPanel() {
 	return d;
 }
 
-// Explicit move reference for a note, e.g. "7.Nbd2" / "7...Nbd7" (number + SAN).
 // Explicit move reference for a note, e.g. "7.Nbd2" / "7...Nbd7" (number + SAN).
 // A variation-owned note (inVar) is looked up among non-main lines, since a
 // variation's first move shares a ply with the mainline move it replaces (e.g.
