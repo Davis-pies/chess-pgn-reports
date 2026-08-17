@@ -104,6 +104,9 @@ test("inline boards: flat shows one per line; grouped shows only expanded groups
 
 	// expand the fork group: its lines' boards appear
 	const det = doc("view").querySelector("details.lgroup");
+	// jsdom fires toggle synchronously on .open assignment, AND the
+	// explicit dispatchEvent fires a second one, so renderApp runs twice.
+	// The second render sees openPaths populated — this is intentional.
 	det.open = true;
 	det.dispatchEvent(new dom.window.Event("toggle"));
 	assert.strictEqual(doc("view").querySelectorAll(".ledge-board").length, 3,

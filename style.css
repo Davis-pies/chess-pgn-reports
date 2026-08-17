@@ -619,9 +619,6 @@ sup {
 	.pv-table {
 		display: none !important;
 	}
-	.preview {
-		overflow: visible;
-	}
 	.side-panel {
 		position: static;
 		max-height: none;

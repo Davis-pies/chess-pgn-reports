@@ -423,6 +423,7 @@ function openNotebook(id) {
 			};
 			alert("Could not open workbook: " + e.message);
 		}
+		openPaths.clear();
 		renderApp();
 	});
 }
