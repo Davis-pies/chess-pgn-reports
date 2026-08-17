@@ -5,7 +5,6 @@ import { grid, divergence } from "./table.js";
 import {
 	renderTable,
 	renderCards,
-	renderBoardOverview,
 	appendBoard,
 	fullmoveLabel,
 	fullMovesText,
@@ -263,8 +262,6 @@ function viewRoot() {
 
 	// main (right): controls + management + reference sections
 	main.appendChild(orientationToggle());
-	// board-diagram overview lives here (full width, next to its controls)
-	if (current.showBoards) renderBoardOverview(main, g, current.boardSize);
 	main.appendChild(notebookList());
 	main.appendChild(helpPanel());
 	const markupBox = markupPanel();
@@ -531,10 +528,11 @@ function branchLabel(move) {
 	return fullmoveLabel(move.ply) + move.san;
 }
 
-function renderTrieNode(container, node, nameCounter, path) {
+function renderTrieNode(container, node, nameCounter, path, allOpen) {
 	const nextPath = path
 		? path + "  " + branchLabel(node.move)
 		: branchLabel(node.move);
+	const boards = current.showBoards; // inline-boards master toggle
 	// a lone line (leaf, no fork): a non-collapsible block; header shows the
 	// full shared path up to this move
 	if (!node.children.size && node.leaf) {
@@ -546,7 +544,9 @@ function renderTrieNode(container, node, nameCounter, path) {
 			}),
 		);
 		const body = el("div", { className: "lgroup-body" });
-		body.appendChild(lineEditor(node.leaf, nameCounter.n++));
+		body.appendChild(
+			lineEditor(node.leaf, nameCounter.n++, allOpen && boards),
+		);
 		box.appendChild(body);
 		container.appendChild(box);
 		return;
@@ -555,7 +555,7 @@ function renderTrieNode(container, node, nameCounter, path) {
 	// continuation shows as one compressed header, not nested single groups
 	if (!node.leaf && node.children.size === 1) {
 		node.children.forEach((c) =>
-			renderTrieNode(container, c, nameCounter, nextPath),
+			renderTrieNode(container, c, nameCounter, nextPath, allOpen),
 		);
 		return;
 	}
@@ -566,6 +566,9 @@ function renderTrieNode(container, node, nameCounter, path) {
 	det.addEventListener("toggle", () => {
 		if (det.open) openPaths.add(node.key);
 		else openPaths.delete(node.key);
+		renderApp(); // boards appear/disappear with expansion
+		// ponytail: whole-app re-render; if toggling feels slow on huge files,
+		// scope the rebuild to the markup panel only
 	});
 	const count = countLeaves(node);
 	det.appendChild(
@@ -575,8 +578,14 @@ function renderTrieNode(container, node, nameCounter, path) {
 		}),
 	);
 	const body = el("div", { className: "lgroup-body" });
-	if (node.leaf) body.appendChild(lineEditor(node.leaf, nameCounter.n++));
-	node.children.forEach((c) => renderTrieNode(body, c, nameCounter, ""));
+	const open = det.open;
+	if (node.leaf)
+		body.appendChild(
+			lineEditor(node.leaf, nameCounter.n++, allOpen && open && boards),
+		);
+	node.children.forEach((c) =>
+		renderTrieNode(body, c, nameCounter, "", allOpen && open),
+	);
 	det.appendChild(body);
 	container.appendChild(det);
 }
@@ -611,16 +620,17 @@ function markupPanel() {
 	);
 	// mainline first, then the side lines grouped as a trie of shared divergence
 	const main = current.lines.find((l) => l.isMain) || current.lines[0];
-	box.appendChild(lineEditor(main, 0));
+	box.appendChild(lineEditor(main, 0, current.showBoards));
 	const counter = { n: 1 };
 	const trie = buildTrie(current.lines, main);
 	// flat view renders every non-main line in order; grouped uses the trie
 	if (current.groupView === "flat") {
 		current.lines.forEach((l) => {
-			if (!l.isMain) box.appendChild(lineEditor(l, counter.n++));
+			if (!l.isMain)
+				box.appendChild(lineEditor(l, counter.n++, current.showBoards));
 		});
 	} else {
-		trie.children.forEach((c) => renderTrieNode(box, c, counter, ""));
+		trie.children.forEach((c) => renderTrieNode(box, c, counter, "", true));
 	}
 	box.appendChild(
 		el("button", {
@@ -637,7 +647,7 @@ function markupPanel() {
 	return box;
 }
 
-function lineEditor(l, idx) {
+function lineEditor(l, idx, showBoard = false) {
 	const row = el("div", { className: "ledge" });
 	const tag = l.tag || "";
 	const btn = (t, txt) => {
@@ -660,7 +670,6 @@ function lineEditor(l, idx) {
 	};
 	// reflect the (renamed) line in the table/cards once the field is blurred
 	name.onchange = () => renderApp();
-	row.appendChild(name);
 	const tags = el("div", { className: "tags" });
 	if (isMain) {
 		tags.appendChild(
@@ -677,7 +686,9 @@ function lineEditor(l, idx) {
 		};
 		tags.appendChild(promote);
 	}
-	row.appendChild(tags);
+	const head = el("div", { className: "ledge-head" });
+	head.append(name, tags);
+	row.appendChild(head);
 	row.appendChild(moveStrip(l));
 	// the symbol/comment panel appears once, on the first line of the group
 	if (current.sel && current.sel.lines && current.sel.lines[0] === l)
@@ -692,6 +703,12 @@ function lineEditor(l, idx) {
 	};
 	note.onchange = () => renderApp();
 	row.appendChild(note);
+	// the line's end-position board, next to its line (inline boards toggle)
+	if (showBoard) {
+		const bw = el("div", { className: "ledge-board" });
+		appendBoard(bw, l.fen, current.boardSize || 220);
+		row.appendChild(bw);
+	}
 	return row;
 }
 

@@ -236,24 +236,6 @@ export function renderTable(container, grid, orientation) {
 	container.appendChild(table);
 }
 
-// A grid of per-line position diagrams (the on-screen "Show boards" overview;
-// it lives in the main panel, separate from the table).
-export function renderBoardOverview(container, grid, boardSize) {
-	const boards = document.createElement("div");
-	boards.className = "boards";
-	grid.vars.forEach((v) => {
-		const fig = document.createElement("figure");
-		fig.className = "board";
-		appendBoard(fig, v.fen, boardSize);
-		const cap = document.createElement("figcaption");
-		cap.textContent = v.name || v.label;
-		fig.appendChild(cap);
-		boards.appendChild(fig);
-	});
-	container.appendChild(boards);
-	return boards;
-}
-
 // Linear print view: each line as a labeled card with its moves and a position
 // diagram, one after another (vs the packed table).
 // Moves text for a card: sidelines get a leading ellipsis + the preceding
