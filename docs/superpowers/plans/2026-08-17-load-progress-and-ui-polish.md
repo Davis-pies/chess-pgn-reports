@@ -296,19 +296,23 @@ test("inline boards: flat shows one per line; grouped shows only expanded groups
  global.alert = () => {};
  global.confirm = () => true;
 
- await import("../src/app.js");
+ await import("../src/app.js?t=2");
  dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
 
- // module state persists between tests in this file: the full-flow test above
- // leaves lines loaded, so reset via the toolbar's New/Import button first
- const resetBtn = [...doc("view").querySelectorAll("button")].find((b) =>
-  b.textContent.includes("New / Import"),
- );
- resetBtn.click();
+ // The cache-busted import gets a FRESH module instance, so its
+ // DOMContentLoaded handler registers on THIS test's document and module state
+ // starts empty (import panel showing) — no reset needed. (The plain import in
+ // the first test is cached: its listener is bound to that test's document, so
+ // re-importing without the query would not register here.)
 
  const textarea = doc("view").querySelector("textarea.pgnin");
- // 3 lines: mainline + 2 variations that share a divergence fork at ply 1
- textarea.value = "1. e4 e5 (1... c5 2. Nf3 Nc6) (1... e5 2. Nf3) 2. Nf3";
+ // 3 lines: mainline + 2 variations that share a divergence prefix 1... c5
+ // 2. Nf3 and fork at ply 2 (Nc6 vs Nf6) — a fork INSIDE the trie collapses
+ // into a <details> group. (A fork at the trie root never collapses: root
+ // children render as lone-line blocks, so the brief's original PGN with two
+ // different first moves produced no collapsible group.)
+ textarea.value =
+  "1. e4 e5 (1... c5 2. Nf3 Nc6) (1... c5 2. Nf3 Nf6) 2. Nf3";
  [...doc("view").querySelectorAll("button")]
   .find((b) => b.textContent.includes("Load"))
   .click();
