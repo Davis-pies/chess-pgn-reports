@@ -47,6 +47,19 @@ test("handles nested variations and result", () => {
 	assert.strictEqual(subVarNode.variations[0][0].ply, 2);
 });
 
+test("a comment at the end of a variation attaches to its last move", () => {
+	const { nodes } = parsePgn(
+		"1. e4 e5 (1... c5 2. Nf3 Nc6 3. Bb5 {sicilian}) 2. Nf3",
+	);
+	const lines = collectLines(nodes);
+	const varLine = lines.find((l) => !l.isMain);
+	assert.ok(varLine, "variation line exists");
+	const note = varLine.comments.find((c) => c.text === "sicilian");
+	assert.ok(note, "trailing variation comment is attached to the line");
+	const bb5 = varLine.moves.find((m) => m.san === "Bb5");
+	assert.strictEqual(note.ply, bb5.ply, "note sits on the move it follows");
+});
+
 test("rejects illegal moves", () => {
 	assert.throws(
 		() => parsePgn("1. e4 e5 2. Nf3 e6 3. Qh5 Nf6 4. Nc5 d6"),

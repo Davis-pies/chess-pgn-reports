@@ -100,8 +100,11 @@ function parseSeq(tokens, ctx, state, inVariation = false, intro = null) {
 			const text = narrative.parts.join(" ");
 			const ply = narrative.firstNode ? narrative.firstNode.ply : narrative.ply;
 			ctx.comments.push({ ply, text, inVar: inVariation });
-			// the merged note lives on the variation's first move
+			// the merged note lives on the variation's first move; when the
+			// comment trails the variation (no move follows it), it attaches to
+			// the move it follows — like trunk comments
 			if (narrative.firstNode) narrative.firstNode.comments.push(text);
+			else if (last) last.comments.push(text);
 			narrative = null;
 		}
 	};
