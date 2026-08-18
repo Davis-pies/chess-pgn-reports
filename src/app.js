@@ -37,6 +37,10 @@ let sideDragging = false; // dragging the table-panel resize handle
 // trie groups the user expanded — details open state survives re-renders
 const openPaths = new Set();
 
+// trie groups the user expanded in the TABLE preview — separate from the
+// editor's openPaths: expanding a table branch does not expand the editor
+const openTablePaths = new Set();
+
 // identical-move tracking: a shared move (same position reached + same SAN)
 // is annotated once and applied to every line carrying it
 const fenCache = new WeakMap(); // line -> Map(ply -> fen)
@@ -234,7 +238,7 @@ function viewRoot() {
 	// side: the preview (table, or print lines) with its own scroll, resizable
 	const t = el("div", { className: "pv-table" });
 	t.appendChild(el("h3", { textContent: "Table" }));
-	renderTable(t, g, current.orientation);
+	renderTrieTable(t, g, current.orientation);
 	side.appendChild(t);
 	const c = el("div", { className: "pv-cards" });
 	c.appendChild(
@@ -519,6 +523,69 @@ function buildTrie(lines, main) {
 	return root;
 }
 
+// Left-panel preview: mainline always visible (left column strip in horizontal
+// layout), then one collapsible section per top-level trie branch. Branches
+// start collapsed; expanding shows that branch's lines as its own table slice.
+function renderTrieTable(container, g, orientation) {
+	const mainV = g.vars[0]; // mainline sorts first
+	const others = g.vars.slice(1);
+	const trie = buildTrie(others, mainV);
+	const controls = el("div", { className: "orow tbl-controls" });
+	controls.appendChild(el("span", { textContent: "Branches: " }));
+	const ex = el("button", { className: "chip mini", textContent: "Expand all" });
+	ex.onclick = () => {
+		openTablePaths.clear();
+		trie.children.forEach((c) => collectKeys(c, openTablePaths));
+		renderApp();
+	};
+	const col = el("button", {
+		className: "chip mini",
+		textContent: "Collapse all",
+	});
+	col.onclick = () => {
+		openTablePaths.clear();
+		renderApp();
+	};
+	controls.append(ex, col);
+	container.appendChild(controls);
+	if (!mainV) return;
+	// the reference row/column, always visible
+	const mainBlock = el("div", { className: "tbl-main" });
+	mainBlock.appendChild(
+		el("h4", { className: "tbl-group", textContent: "Mainline" }),
+	);
+	renderTable(mainBlock, { ...g, vars: [mainV] }, orientation);
+	container.appendChild(mainBlock);
+	trie.children.forEach((c) => renderTblGroup(container, c, g, mainV, orientation));
+}
+
+function renderTblGroup(container, node, g, _mainV, orientation) {
+	const det = el("details", { className: "lgroup tbl-group" });
+	det.open = openTablePaths.has(node.key);
+	det.addEventListener("toggle", () => {
+		// same state-change guard as the editor groups (see Task 1): a rebuild
+		// re-sets open=true on fresh elements, and without it jsdom re-fires
+		// toggle forever
+		const had = openTablePaths.has(node.key);
+		if (det.open && !had) openTablePaths.add(node.key);
+		else if (!det.open && had) openTablePaths.delete(node.key);
+		else return;
+		renderApp();
+	});
+	const count = countLeaves(node);
+	det.appendChild(
+		el("summary", {
+			className: "lg-head",
+			textContent: `${tblPath(node)} \u00b7 ${count} line${count === 1 ? "" : "s"}`,
+		}),
+	);
+	const body = el("div", { className: "lgroup-body" });
+	const lines = leavesOf(node);
+	if (lines.length) renderTable(body, { ...g, vars: lines }, orientation);
+	det.appendChild(body);
+	container.appendChild(det);
+}
+
 function countLeaves(node) {
 	let n = node.leaf ? 1 : 0;
 	node.children.forEach((c) => (n += countLeaves(c)));
@@ -527,6 +594,33 @@ function countLeaves(node) {
 
 function branchLabel(move) {
 	return fullmoveLabel(move.ply) + move.san;
+}
+
+// All descendant lines of a trie node, depth-first (the flat row/column set
+// a table branch contributes to the preview).
+function leavesOf(node) {
+	const out = [];
+	if (node.leaf) out.push(node.leaf);
+	node.children.forEach((c) => out.push(...leavesOf(c)));
+	return out;
+}
+
+// Shared move path of a branch, accumulated through its single-child chain
+// (e.g. "1... c5 2. Nf3") for the group header.
+function tblPath(node) {
+	let p = branchLabel(node.move);
+	let n = node;
+	while (!n.leaf && n.children.size === 1) {
+		n = [...n.children.values()][0];
+		p += "  " + branchLabel(n.move);
+	}
+	return p;
+}
+
+// Collect a node's key and every descendant's key (for "Expand all").
+function collectKeys(node, into) {
+	if (node.key) into.add(node.key);
+	node.children.forEach((c) => collectKeys(c, into));
 }
 
 function renderTrieNode(container, node, nameCounter, path, allOpen) {
@@ -581,6 +675,7 @@ function renderTrieNode(container, node, nameCounter, path, allOpen) {
 function markupPanel() {
 	const box = el("div", { className: "markup" });
 	// view toggle: grouped (divergence trie) vs flat list
+	const main = current.lines.find((l) => l.isMain) || current.lines[0];
 	const row = el("div", { className: "orow" });
 	const grouped = el("button", {
 		className: "chip" + (current.groupView !== "flat" ? " on" : ""),
@@ -599,6 +694,27 @@ function markupPanel() {
 		},
 	});
 	row.append("View: ", grouped, flat);
+	if (current.groupView !== "flat") {
+		const all = el("button", {
+			className: "chip mini",
+			textContent: "Expand all",
+			onclick: () => {
+				const trie = buildTrie(current.lines, main);
+				openPaths.clear();
+				trie.children.forEach((c) => collectKeys(c, openPaths));
+				renderApp();
+			},
+		});
+		const none = el("button", {
+			className: "chip mini",
+			textContent: "Collapse all",
+			onclick: () => {
+				openPaths.clear();
+				renderApp();
+			},
+		});
+		row.append(all, none);
+	}
 	box.appendChild(row);
 	box.appendChild(
 		el("h3", {
@@ -607,7 +723,6 @@ function markupPanel() {
 		}),
 	);
 	// mainline first, then the side lines grouped as a trie of shared divergence
-	const main = current.lines.find((l) => l.isMain) || current.lines[0];
 	box.appendChild(lineEditor(main, 0, current.showBoards));
 	const counter = { n: 1 };
 	const trie = buildTrie(current.lines, main);

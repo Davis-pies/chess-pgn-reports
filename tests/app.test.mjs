@@ -48,9 +48,11 @@ test("full app flow: import PGN, tag a line, render table preview", async () => 
 		(b) => b.textContent === "Sideline",
 	);
 	sidelineBtn.click();
-	// preview should now carry a sideline tag label
-	const view2 = doc("view");
-	const preview = view2.querySelector("table.tbl");
+	// the sideline rows live in a collapsed trie branch; expand it
+	const tb = doc("view").querySelector(".pv-table details.tbl-group");
+	tb.open = true;
+	tb.dispatchEvent(new dom.window.Event("toggle"));
+	const preview = doc("view").querySelector(".pv-table");
 	assert.ok(
 		preview.textContent.toLowerCase().includes("sideline"),
 		"sideline tag appears in table",
@@ -191,3 +193,58 @@ test("lone-line editor groups are collapsible details, closed by default", async
 function doc(id) {
 	return global.document.getElementById(id);
 }
+
+test("table preview: mainline always visible, branches collapsed by default", async () => {
+	const dom = new JSDOM('<!DOCTYPE html><main id="view"></main>', {
+		url: "http://localhost/",
+		pretendToBeVisual: true,
+	});
+	global.window = dom.window;
+	global.document = dom.window.document;
+	global.requestAnimationFrame = dom.window.requestAnimationFrame;
+	global.localStorage = dom.window.localStorage;
+	global.alert = () => {};
+	global.confirm = () => true;
+
+	await import("../src/app.js?t=4");
+	dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
+
+	const textarea = doc("view").querySelector("textarea.pgnin");
+	textarea.value = "1. e4 e5 (1... c5 2. Nf3) (1... e6 2. d4) 2. Nf3";
+	[...doc("view").querySelectorAll("button")]
+		.find((b) => b.textContent.includes("Load"))
+		.click();
+	await tick();
+
+	const pv = doc("view").querySelector(".pv-table");
+	// mainline reference table is always present
+	assert.ok(pv.querySelector(".tbl-main table.tbl"), "mainline block visible");
+	// two branches, both collapsed by default
+	const groups = pv.querySelectorAll("details.tbl-group");
+	assert.strictEqual(groups.length, 2);
+	assert.ok(!groups[0].open && !groups[1].open, "branches start collapsed");
+
+	// expand the first branch -> its table slice appears
+	groups[0].open = true;
+	groups[0].dispatchEvent(new dom.window.Event("toggle"));
+	const pv2 = doc("view").querySelector(".pv-table");
+	assert.strictEqual(pv2.querySelectorAll("details.tbl-group").length, 2);
+	assert.ok(pv2.querySelector("details.tbl-group[open]"), "a branch is expanded");
+
+	// expand-all opens every branch
+	[...pv2.querySelectorAll("button")]
+		.find((b) => b.textContent === "Expand all")
+		.click();
+	assert.strictEqual(
+		doc("view").querySelectorAll(".pv-table details.tbl-group[open]").length,
+		2,
+		"expand all opens both branches",
+	);
+
+	delete global.window;
+	delete global.document;
+	delete global.requestAnimationFrame;
+	delete global.localStorage;
+	delete global.alert;
+	delete global.confirm;
+});

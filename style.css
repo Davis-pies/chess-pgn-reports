@@ -265,6 +265,19 @@ select:focus {
 .lgroup-body {
 	margin-top: 4px;
 }
+.tbl-controls {
+	margin: 4px 0;
+}
+.tbl-main {
+	margin: 6px 0 10px;
+}
+.tbl-group {
+	font-family: ui-monospace, Menlo, Consolas, monospace;
+	font-size: 0.85rem;
+	color: var(--muted);
+	font-weight: 400;
+	margin: 0 0 4px;
+}
 .ledge {
 	display: flex;
 	flex-wrap: wrap;
