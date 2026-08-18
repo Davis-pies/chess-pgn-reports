@@ -41,6 +41,24 @@ const openPaths = new Set();
 // editor's openPaths: expanding a table branch does not expand the editor
 const openTablePaths = new Set();
 
+// Rebuild-only-the-panel refs: expanding/collapsing a trie group must not
+// re-render the whole app (that resets the side-panel scroll and other view
+// state), so these two panels rebuild in place instead.
+let tableBox = null; // the .pv-table container
+let markupBox = null; // the .markup container
+function rerenderTable() {
+	if (!tableBox) return;
+	const g = grid(current.lines);
+	tableBox.replaceChildren();
+	tableBox.appendChild(el("h3", { textContent: "Table" }));
+	renderTrieTable(tableBox, g, current.orientation);
+}
+function rerenderMarkup() {
+	if (!markupBox) return;
+	const nb = markupPanel();
+	markupBox.replaceChildren(...nb.children);
+}
+
 // identical-move tracking: a shared move (same position reached + same SAN)
 // is annotated once and applied to every line carrying it
 const fenCache = new WeakMap(); // line -> Map(ply -> fen)
@@ -237,6 +255,7 @@ function viewRoot() {
 
 	// side: the preview (table, or print lines) with its own scroll, resizable
 	const t = el("div", { className: "pv-table" });
+	tableBox = t;
 	t.appendChild(el("h3", { textContent: "Table" }));
 	renderTrieTable(t, g, current.orientation);
 	side.appendChild(t);
@@ -268,9 +287,10 @@ function viewRoot() {
 	main.appendChild(orientationToggle());
 	main.appendChild(notebookList());
 	main.appendChild(helpPanel());
-	const markupBox = markupPanel();
+	const mb = markupPanel();
+	markupBox = mb; // module ref for in-place re-renders
 	const notesBox = notesFootnotesPanel();
-	main.appendChild(markupBox);
+	main.appendChild(mb);
 	main.appendChild(notesBox);
 	main.appendChild(exportBar());
 	layout.appendChild(main);
@@ -296,13 +316,13 @@ function viewRoot() {
 // Highest ply present in a subset of table vars — so a per-branch print table
 // doesn't render empty rows down to the notebook's global max.
 function subMaxPly(vars) {
- let m = 0;
- for (const v of vars)
-  for (const p of Object.keys(v.cells)) {
-   const n = Number(p);
-   if (n > m) m = n;
-  }
- return m;
+	let m = 0;
+	for (const v of vars)
+		for (const p of Object.keys(v.cells)) {
+			const n = Number(p);
+			if (n > m) m = n;
+		}
+	return m;
 }
 
 function appendPrintTables(box, g) {
@@ -351,11 +371,7 @@ function printBranch(wrap, node, g, mainV, size) {
 		// a leaf-heavy branch with no sub-fork: row-chunk as a last resort
 		for (let i = 0; i < lines.length; i += size) {
 			const vars = [mainV, ...lines.slice(i, i + size)];
-			renderTable(
-				wrap,
-				{ ...g, vars, maxPly: subMaxPly(vars) },
-				"horizontal",
-			);
+			renderTable(wrap, { ...g, vars, maxPly: subMaxPly(vars) }, "horizontal");
 		}
 	}
 }
@@ -566,7 +582,7 @@ function renderTrieTable(container, g, orientation) {
 	ex.onclick = () => {
 		openTablePaths.clear();
 		trie.children.forEach((c) => collectKeys(c, openTablePaths));
-		renderApp();
+		rerenderTable();
 	};
 	const col = el("button", {
 		className: "chip mini",
@@ -574,19 +590,29 @@ function renderTrieTable(container, g, orientation) {
 	});
 	col.onclick = () => {
 		openTablePaths.clear();
-		renderApp();
+		rerenderTable();
 	};
 	controls.append(ex, col);
 	container.appendChild(controls);
 	if (!mainV) return;
-	// build the single table's var list: mainline + each branch (expanded -> its
-	// real lines; collapsed -> one shared-continuation column)
+	// build the single table's var list: mainline + each branch. Expanded
+	// branches contribute their real lines (each header clickable to collapse
+	// the whole branch); collapsed ones a single shared-continuation column.
 	const vars = [mainV];
 	trie.children.forEach((c) => {
-		if (openTablePaths.has(c.key)) vars.push(...leavesOf(c));
-		else vars.push(collapsedVar(c));
+		if (openTablePaths.has(c.key)) {
+			const collapse = () => {
+				openTablePaths.delete(c.key);
+				rerenderTable();
+			};
+			leavesOf(c).forEach((l) => vars.push({ ...l, onclick: collapse }));
+		} else {
+			vars.push(collapsedVar(c));
+		}
 	});
-	renderTable(container, { ...g, vars }, orientation);
+	// rows span only the VISIBLE columns — collapsed branches don't stretch the
+	// table down to the deepest hidden line
+	renderTable(container, { ...g, vars, maxPly: subMaxPly(vars) }, orientation);
 }
 
 // A collapsed trie branch as a single column/row of its shared continuation:
@@ -600,7 +626,8 @@ function collapsedVar(node) {
 	});
 	// ellipsis prefix before the branch's first shared move, like a sideline
 	const d = shared.length ? shared[0].ply : 0;
-	for (let ply = 0; ply < d; ply++) cells[ply] = { text: "\u2026", cls: "ellip" };
+	for (let ply = 0; ply < d; ply++)
+		cells[ply] = { text: "\u2026", cls: "ellip" };
 	const count = countLeaves(node);
 	return {
 		tag: "collapse",
@@ -612,7 +639,7 @@ function collapsedVar(node) {
 		collapsed: true,
 		onclick: () => {
 			openTablePaths.add(node.key);
-			renderApp();
+			rerenderTable();
 		},
 	};
 }
@@ -692,7 +719,7 @@ function renderTrieNode(container, node, nameCounter, path, allOpen) {
 		if (det.open && !had) openPaths.add(node.key);
 		else if (!det.open && had) openPaths.delete(node.key);
 		else return;
-		renderApp(); // boards appear/disappear with expansion
+		rerenderMarkup(); // boards appear/disappear with expansion (in-place, so the table scroll keeps its position)
 		// ponytail: whole-app re-render; if toggling feels slow on huge files,
 		// scope the rebuild to the markup panel only
 	});
@@ -726,7 +753,7 @@ function markupPanel() {
 		textContent: "Grouped",
 		onclick: () => {
 			current.groupView = "trie";
-			renderApp();
+			rerenderMarkup();
 		},
 	});
 	const flat = el("button", {
@@ -734,7 +761,7 @@ function markupPanel() {
 		textContent: "Flat",
 		onclick: () => {
 			current.groupView = "flat";
-			renderApp();
+			rerenderMarkup();
 		},
 	});
 	row.append("View: ", grouped, flat);

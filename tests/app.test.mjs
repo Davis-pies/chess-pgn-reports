@@ -51,7 +51,7 @@ test("full app flow: import PGN, tag a line, render table preview", async () => 
 	// the sideline is a collapsed branch in the single table (we're in vertical
 	// layout); click its row header to expand it
 	const branchHead = doc("view").querySelector(
-		".pv-table td.var-head.clickable",
+		".pv-table td.var-head.clickable.collapsed",
 	);
 	assert.ok(branchHead, "collapsed branch row present");
 	branchHead.click();
@@ -288,33 +288,95 @@ test("table preview: mainline always visible, branches collapsed by default", as
 	);
 
 	// expand the first collapsed branch by clicking its header
-	const firstBranch = pv.querySelector("table.tbl th.clickable");
+	const firstBranch = pv.querySelector("table.tbl th.clickable.collapsed");
 	firstBranch.click();
 	const pv2 = doc("view").querySelector(".pv-table");
 	assert.strictEqual(
-		pv2.querySelectorAll("table.tbl th.clickable").length,
+		pv2.querySelectorAll("table.tbl th.clickable.collapsed").length,
 		1,
 		"expanding one branch leaves one collapsed",
 	);
+	assert.strictEqual(
+		pv2.querySelectorAll("table.tbl th.clickable:not(.collapsed)").length,
+		1,
+		"expanded branch's line header is clickable (to collapse)",
+	);
+
+	// clicking the expanded line header collapses the branch again
+	pv2.querySelector("table.tbl th.clickable:not(.collapsed)").click();
+	assert.strictEqual(
+		doc("view").querySelectorAll(".pv-table th.clickable.collapsed").length,
+		2,
+		"clicking an expanded line collapses its branch",
+	);
 
 	// expand all opens every branch
-	[...pv2.querySelectorAll("button")]
+	[...doc("view").querySelectorAll(".pv-table button")]
 		.find((b) => b.textContent === "Expand all")
 		.click();
 	assert.strictEqual(
-		doc("view").querySelectorAll(".pv-table th.clickable").length,
+		doc("view").querySelectorAll(".pv-table th.clickable.collapsed").length,
 		0,
 		"expand all expands every branch",
 	);
 
 	// collapse all returns to the collapsed view
-	[...doc("view").querySelectorAll("button")]
+	[...doc("view").querySelectorAll(".pv-table button")]
 		.find((b) => b.textContent === "Collapse all")
 		.click();
 	assert.strictEqual(
-		doc("view").querySelectorAll(".pv-table th.clickable").length,
+		doc("view").querySelectorAll(".pv-table th.clickable.collapsed").length,
 		2,
 		"collapse all collapses every branch",
+	);
+
+	delete global.window;
+	delete global.document;
+	delete global.requestAnimationFrame;
+	delete global.localStorage;
+	delete global.alert;
+	delete global.confirm;
+});
+
+test("table preview: rows span only visible columns, no trailing empty rows", async () => {
+	const dom = new JSDOM('<!DOCTYPE html><main id="view"></main>', {
+		url: "http://localhost/",
+		pretendToBeVisual: true,
+	});
+	global.window = dom.window;
+	global.document = dom.window.document;
+	global.requestAnimationFrame = dom.window.requestAnimationFrame;
+	global.localStorage = dom.window.localStorage;
+	global.alert = () => {};
+	global.confirm = () => true;
+
+	await import("../src/app.js?t=6");
+	dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
+
+	// a forking branch whose lines reach ply 4 while the mainline stops at ply 2
+	const textarea = doc("view").querySelector("textarea.pgnin");
+	textarea.value =
+		"1. e4 e5 (1... c5 2. Nf3 Nc6 3. Bb5) (1... c5 2. Nf3 Nc6 3. a4) 2. Nf3";
+	[...doc("view").querySelectorAll("button")]
+		.find((b) => b.textContent.includes("Load"))
+		.click();
+	await tick();
+
+	// collapsed: rows span the deepest VISIBLE column (shared moves end at ply 3)
+	const rows = doc("view").querySelectorAll(".pv-table table.tbl tr");
+	assert.strictEqual(
+		rows.length,
+		5,
+		"collapsed branch does not stretch rows to the hidden deep plies (header + ply 0..3)",
+	);
+
+	// expand the branch: rows extend to the deepest line (ply 4)
+	doc("view").querySelector(".pv-table th.clickable.collapsed").click();
+	const rows2 = doc("view").querySelectorAll(".pv-table table.tbl tr");
+	assert.strictEqual(
+		rows2.length,
+		6,
+		"expanded branch extends rows to its deepest ply (header + ply 0..4)",
 	);
 
 	delete global.window;

@@ -176,15 +176,23 @@ export function renderTable(container, grid, orientation) {
 
 	const varHead = (v) => {
 		const c = document.createElement("td");
-		c.className = "var-head" + (v.onclick ? " clickable" : "") + (v.collapsed ? " collapsed" : "");
+		c.className =
+			"var-head" +
+			(v.onclick ? " clickable" : "") +
+			(v.collapsed ? " collapsed" : "");
 		if (v.onclick) {
 			c.onclick = v.onclick;
-			c.title = "expand branch";
+			c.title = v.collapsed ? "expand branch" : "collapse branch";
 		}
 		if (v.collapsed) {
 			const cue = document.createElement("span");
 			cue.className = "collapse-cue";
 			cue.textContent = "\u25b8 ";
+			c.appendChild(cue);
+		} else if (v.onclick) {
+			const cue = document.createElement("span");
+			cue.className = "collapse-cue";
+			cue.textContent = "\u25be ";
 			c.appendChild(cue);
 		}
 		if (v.label) {
@@ -208,15 +216,17 @@ export function renderTable(container, grid, orientation) {
 		head.appendChild(document.createElement("th")).textContent = "ply";
 		vars.forEach((v) => {
 			const th = document.createElement("th");
-			th.className = "var-head" + (v.onclick ? " clickable" : "") + (v.collapsed ? " collapsed" : "");
+			th.className =
+				"var-head" +
+				(v.onclick ? " clickable" : "") +
+				(v.collapsed ? " collapsed" : "");
 			if (v.onclick) {
 				th.onclick = v.onclick;
-				th.title = "expand branch";
+				th.title = v.collapsed ? "expand branch" : "collapse branch";
 			}
+			const cue = v.collapsed ? "\u25b8 " : v.onclick ? "\u25be " : "";
 			th.textContent =
-				(v.collapsed ? "\u25b8 " : "") +
-				(v.name || v.label) +
-				(v.eval ? " " + v.eval : "");
+				cue + (v.name || v.label) + (v.eval ? " " + v.eval : "");
 			head.appendChild(th);
 		});
 		table.appendChild(head);
