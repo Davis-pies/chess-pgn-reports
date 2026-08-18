@@ -104,17 +104,31 @@ test("inline boards: flat shows one per line; grouped shows only expanded groups
 		"only the mainline board shows while groups are collapsed",
 	);
 
-	// expand the fork group: its lines' boards appear
-	const det = doc("view").querySelector("details.lgroup");
-	// jsdom fires toggle synchronously on .open assignment, AND the
-	// explicit dispatchEvent fires a second one, so renderApp runs twice.
-	// The second render sees openPaths populated — this is intentional.
-	det.open = true;
-	det.dispatchEvent(new dom.window.Event("toggle"));
+	// expand the fork group: its lone-line children are themselves collapsed,
+	// so no new boards yet — expanding the line reveals its editor/board
+	const fork = doc("view").querySelector(".markup details.lgroup");
+	fork.open = true;
+	fork.dispatchEvent(new dom.window.Event("toggle"));
 	assert.strictEqual(
 		doc("view").querySelectorAll(".ledge-board").length,
-		3,
-		"expanding the group builds its lines' boards",
+		1,
+		"lone-line children stay collapsed: no boards until each is expanded",
+	);
+
+	// expand the first lone-line child: its editor + board appear (scoped
+	// query — jsdom's document-wide querySelector skips <details> content)
+	const fork2 = doc("view").querySelector(".markup details.lgroup");
+	const leaf = fork2.querySelector(".lgroup-body > details.lgroup");
+	assert.ok(leaf, "lone-line child rendered under the fork");
+	leaf.open = true;
+	leaf.dispatchEvent(new dom.window.Event("toggle"));
+	const leaf2 = doc("view")
+		.querySelector(".markup details.lgroup")
+		.querySelector(".lgroup-body > details.lgroup");
+	assert.strictEqual(
+		leaf2.querySelectorAll(".ledge-board").length,
+		1,
+		"expanding a lone line shows its board",
 	);
 
 	// flat view shows a board for every line
@@ -122,6 +136,49 @@ test("inline boards: flat shows one per line; grouped shows only expanded groups
 		.find((b) => b.textContent === "Flat")
 		.click();
 	assert.strictEqual(doc("view").querySelectorAll(".ledge-board").length, 3);
+
+delete global.window;
+delete global.document;
+delete global.requestAnimationFrame;
+delete global.localStorage;
+delete global.alert;
+delete global.confirm;
+});
+
+test("lone-line editor groups are collapsible details, closed by default", async () => {
+	const dom = new JSDOM('<!DOCTYPE html><main id="view"></main>', {
+		url: "http://localhost/",
+		pretendToBeVisual: true,
+	});
+	global.window = dom.window;
+	global.document = dom.window.document;
+	global.requestAnimationFrame = dom.window.requestAnimationFrame;
+	global.localStorage = dom.window.localStorage;
+	global.alert = () => {};
+	global.confirm = () => true;
+
+	await import("../src/app.js?t=3");
+	dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
+
+	// one variation = one lone line in the trie (no fork)
+	const textarea = doc("view").querySelector("textarea.pgnin");
+	textarea.value = "1. e4 e5 (1... c5 2. Nf3) 2. Nf3";
+	[...doc("view").querySelectorAll("button")]
+		.find((b) => b.textContent.includes("Load"))
+		.click();
+	await tick();
+
+	const det = doc("view").querySelector(".markup details.lgroup");
+	assert.ok(det, "lone line renders as a details group");
+	assert.strictEqual(det.open, false, "collapsed by default");
+	assert.ok(det.querySelector("summary").textContent.includes("1 line"));
+
+	// expanding reveals the line editor
+	det.open = true;
+	det.dispatchEvent(new dom.window.Event("toggle"));
+	const det2 = doc("view").querySelector(".markup details.lgroup");
+	assert.ok(det2.open, "expanded after toggle");
+	assert.ok(det2.querySelector(".ledge"), "line editor present when open");
 
 	delete global.window;
 	delete global.document;

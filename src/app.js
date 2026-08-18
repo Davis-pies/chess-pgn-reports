@@ -534,22 +534,6 @@ function renderTrieNode(container, node, nameCounter, path, allOpen) {
 		? path + "  " + branchLabel(node.move)
 		: branchLabel(node.move);
 	const boards = current.showBoards; // inline-boards master toggle
-	// a lone line (leaf, no fork): a non-collapsible block; header shows the
-	// full shared path up to this move
-	if (!node.children.size && node.leaf) {
-		const box = el("div", { className: "lgroup open" });
-		box.appendChild(
-			el("div", {
-				className: "lg-head",
-				textContent: `${nextPath} \u00b7 1 line`,
-			}),
-		);
-		const body = el("div", { className: "lgroup-body" });
-		body.appendChild(lineEditor(node.leaf, nameCounter.n++, allOpen && boards));
-		box.appendChild(body);
-		container.appendChild(box);
-		return;
-	}
 	// single-child chain: inline it, accumulating the path so a long shared
 	// continuation shows as one compressed header, not nested single groups
 	if (!node.leaf && node.children.size === 1) {
@@ -558,13 +542,18 @@ function renderTrieNode(container, node, nameCounter, path, allOpen) {
 		);
 		return;
 	}
-	// a fork: a collapsible group, all closed by default; header shows the full
-	// shared path up to the fork
+	// every node — fork OR lone line — is a collapsible group, closed by
+	// default; header shows the full shared path up to this node
 	const det = el("details", { className: "lgroup" });
 	det.open = openPaths.has(node.key);
 	det.addEventListener("toggle", () => {
-		if (det.open) openPaths.add(node.key);
-		else openPaths.delete(node.key);
+		// only rebuild when the open-state actually changed; jsdom fires a
+		// toggle when a rebuilt element gets open=true, and without this guard
+		// that rebuild re-schedules another toggle forever
+		const had = openPaths.has(node.key);
+		if (det.open && !had) openPaths.add(node.key);
+		else if (!det.open && had) openPaths.delete(node.key);
+		else return;
 		renderApp(); // boards appear/disappear with expansion
 		// ponytail: whole-app re-render; if toggling feels slow on huge files,
 		// scope the rebuild to the markup panel only
@@ -573,7 +562,7 @@ function renderTrieNode(container, node, nameCounter, path, allOpen) {
 	det.appendChild(
 		el("summary", {
 			className: "lg-head",
-			textContent: `${nextPath} \u00b7 ${count} lines`,
+			textContent: `${nextPath} \u00b7 ${count} line${count === 1 ? "" : "s"}`,
 		}),
 	);
 	const body = el("div", { className: "lgroup-body" });
