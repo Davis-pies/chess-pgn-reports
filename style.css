@@ -282,6 +282,15 @@ select:focus {
 	font-style: italic;
 	color: var(--muted);
 }
+/* a collapsed branch's header holds its full shared path — cap its width so a
+   long continuation doesn't blow the table out */
+.tbl th.var-head.collapsed,
+.tbl td.var-head.collapsed {
+	max-width: 220px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
 .ledge {
 	display: flex;
 	flex-wrap: wrap;

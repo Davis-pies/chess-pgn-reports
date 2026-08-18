@@ -182,7 +182,7 @@ export function renderTable(container, grid, orientation) {
 			(v.collapsed ? " collapsed" : "");
 		if (v.onclick) {
 			c.onclick = v.onclick;
-			c.title = v.collapsed ? "expand branch" : "collapse branch";
+			c.title = v.collapsed ? v.name || "expand branch" : "collapse branch";
 		}
 		if (v.collapsed) {
 			const cue = document.createElement("span");
@@ -222,11 +222,10 @@ export function renderTable(container, grid, orientation) {
 				(v.collapsed ? " collapsed" : "");
 			if (v.onclick) {
 				th.onclick = v.onclick;
-				th.title = v.collapsed ? "expand branch" : "collapse branch";
+				th.title = v.collapsed ? v.name || "expand branch" : "collapse branch";
 			}
 			const cue = v.collapsed ? "\u25b8 " : v.onclick ? "\u25be " : "";
-			th.textContent =
-				cue + (v.name || v.label) + (v.eval ? " " + v.eval : "");
+			th.textContent = cue + (v.name || v.label) + (v.eval ? " " + v.eval : "");
 			head.appendChild(th);
 		});
 		table.appendChild(head);
