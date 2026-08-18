@@ -1040,7 +1040,7 @@ function movePanel(l) {
 	// a static board of the selected move's position
 	if (!atEnd) {
 		const board = el("div", { className: "mp-board" });
-		appendBoard(board, fenAt(l.moves, selPly), 260);
+		appendBoard(board, fenAt(l.moves, selPly), current.boardSize || 220);
 		box.appendChild(board);
 	}
 	const apply = (sym) => {
@@ -1339,9 +1339,7 @@ function exportBar() {
 	const pOpts = el("div", { className: "printopts" });
 	const group = (title, checks) => {
 		const g = el("div", { className: "optgroup" });
-		g.appendChild(
-			el("span", { className: "optgroup-h", textContent: title }),
-		);
+		g.appendChild(el("span", { className: "optgroup-h", textContent: title }));
 		checks.forEach(([label, key, def]) => {
 			const lab = el("label", { className: "opt" }, [
 				el("input", {
