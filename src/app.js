@@ -330,51 +330,63 @@ function appendPrintTables(box, g) {
 	wrap.appendChild(el("h3", { textContent: "Table" }));
 	const mainV = g.vars[0]; // mainline sorts first
 	const others = g.vars.slice(1);
-	const size = 15; // mainline + 15 = 16 columns per slice
+	const size = 15; // mainline + 15 = 16 columns per table
 	if (!mainV) {
 		box.appendChild(wrap);
 		return;
 	}
-	const trie = buildTrie(others, mainV);
 	const split = current.showSplitTrie === true;
 	if (!split && others.length <= size) {
 		renderTable(wrap, g, "horizontal");
 	} else {
-		trie.children.forEach((c) => printBranch(wrap, c, g, mainV, size));
+		// pack branches into tables of up to `size` lines: tiny branches share
+		// a table, and an oversized fork is cut at its own sub-forks — every
+		// table spans only the deepest line it actually covers (the mainline
+		// reference column stops there too)
+		packForPrint(buildTrie(others, mainV), size).forEach((lines) =>
+			renderTable(
+				wrap,
+				{ ...g, vars: [mainV, ...lines], maxPly: subMaxPly(lines) },
+				"horizontal",
+			),
+		);
 	}
 	box.appendChild(wrap);
 }
 
-function printBranch(wrap, node, g, mainV, size) {
-	const lines = leavesOf(node);
-	const count = lines.length;
-	wrap.appendChild(
-		el("h4", {
-			className: "print-group",
-			textContent: `${count} lines \u00b7 ${tblPath(node)}`,
-		}),
-	);
-	if (count <= size) {
-		renderTable(
-			wrap,
-			{
-				...g,
-				vars: [mainV, ...lines],
-				maxPly: subMaxPly([mainV, ...lines]),
-			},
-			"horizontal",
-		);
-	} else if (node.children.size) {
-		// too wide: cut at the branch's real forks, not arbitrary rows
-		node.children.forEach((c) => printBranch(wrap, c, g, mainV, size));
-	} else {
-		// a leaf-heavy branch with no sub-fork: row-chunk as a last resort
-		for (let i = 0; i < lines.length; i += size) {
-			const vars = [mainV, ...lines.slice(i, i + size)];
-			renderTable(wrap, { ...g, vars, maxPly: subMaxPly(vars) }, "horizontal");
+// Greedily pack trie branches into print-table line groups. A fork's lines stay
+// together; only a fork bigger than the cap is split at its sub-forks.
+function packForPrint(trie, size) {
+	const groups = [];
+	let cur = [];
+	const flush = () => {
+		if (cur.length) groups.push(cur);
+		cur = [];
+	};
+	const pack = (node) => {
+		const lines = leavesOf(node);
+		if (lines.length <= size) {
+			if (cur.length + lines.length > size) flush();
+			cur.push(...lines);
+		} else if (node.children.size) {
+			// a line ending exactly at a fork is packed on its own first
+			if (node.leaf)
+				pack({ children: new Map(), leaf: node.leaf, move: null });
+			node.children.forEach((c) => pack(c));
+		} else {
+			// leaf-heavy branch, no sub-fork: contiguous row chunks
+			for (let i = 0; i < lines.length; i += size) {
+				const slice = lines.slice(i, i + size);
+				if (cur.length + slice.length > size) flush();
+				cur.push(...slice);
+			}
 		}
-	}
+	};
+	trie.children.forEach((c) => pack(c));
+	flush();
+	return groups;
 }
+
 
 function notebookList() {
 	const items = listNotebooks();
@@ -681,16 +693,6 @@ function leavesOf(node) {
 
 // Shared move path of a branch, accumulated through its single-child chain
 // (e.g. "1... c5 2. Nf3") for the group header.
-function tblPath(node) {
-	let p = branchLabel(node.move);
-	let n = node;
-	while (!n.leaf && n.children.size === 1) {
-		n = [...n.children.values()][0];
-		p += "  " + branchLabel(n.move);
-	}
-	return p;
-}
-
 // Collect a node's key and every descendant's key (for "Expand all").
 function collectKeys(node, into) {
 	if (node.key) into.add(node.key);

@@ -47,6 +47,23 @@ body {
 	transition:
 		background 0.2s,
 		color 0.2s;
+	scrollbar-width: thin;
+	scrollbar-color: var(--muted) transparent;
+}
+/* thin, lean scrollbars (WebKit/Blink) */
+::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+}
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+::-webkit-scrollbar-thumb {
+	background: var(--muted);
+	border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+	background: var(--main);
 }
 
 main {
@@ -689,6 +706,11 @@ sup {
 	}
 	.tbl tr:nth-child(even) td:not(.sticky-col) {
 		background: #fff; /* no zebra in print */
+	}
+	/* sticky reference columns break border-collapse rendering in the PDF
+	   engine (missing vertical/horizontal lines) — make them static for print */
+	.tbl .sticky-col {
+		position: static;
 	}
 	.tbl td.sideline {
 		color: #333;

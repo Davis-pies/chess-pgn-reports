@@ -222,10 +222,63 @@ test("print table: split-by-trie checkbox toggles per-branch tables", async () =
 	);
 	lab.querySelector("input").click();
 
+	// split ON still packs tiny branches into ONE shared table (no per-branch
+	// tables for single-line tries) — compactness over per-branch sections
 	assert.strictEqual(
 		doc("view").querySelectorAll(".pv-htable table.tbl").length,
-		2,
-		"two branch tables when split-by-trie is on",
+		1,
+		"single-line branches pack into one table even with split on",
+	);
+
+	delete global.window;
+	delete global.document;
+	delete global.requestAnimationFrame;
+	delete global.localStorage;
+	delete global.alert;
+	delete global.confirm;
+});
+
+test("print table: wide notebooks pack into multiple tables, oversized forks chunk at sub-forks", async () => {
+	const dom = new JSDOM('<!DOCTYPE html><main id="view"></main>', {
+		url: "http://localhost/",
+		pretendToBeVisual: true,
+	});
+	global.window = dom.window;
+	global.document = dom.window.document;
+	global.requestAnimationFrame = dom.window.requestAnimationFrame;
+	global.localStorage = dom.window.localStorage;
+	global.alert = () => {};
+	global.confirm = () => true;
+
+	await import("../src/app.js?t=7");
+	dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
+
+	// 16 variations share 1... c5 2. Nf3 Nc6 and fork at white's 3rd move:
+	// one top-level branch of 16 lines — over the 15-line cap
+	const thirds = [
+		"Bb5", "Bc4", "Be2", "d4", "d3", "c3", "a3", "b3",
+		"g3", "h3", "a4", "b4", "c4", "Na3", "Nc3", "Qe2",
+	];
+	const pgn =
+		"1. e4 e5 " +
+		thirds.map((t) => `(1... c5 2. Nf3 Nc6 3. ${t})`).join(" ") +
+		" 2. Nf3";
+	const textarea = doc("view").querySelector("textarea.pgnin");
+	textarea.value = pgn;
+	[...doc("view").querySelectorAll("button")]
+		.find((b) => b.textContent.includes("Load"))
+		.click();
+	await tick();
+
+	// >15 lines: the wide branch is cut at its sub-forks into multiple tables,
+	// each at most 16 columns (mainline + 15)
+	const tables = doc("view").querySelectorAll(".pv-htable table.tbl");
+	assert.ok(tables.length >= 2, "wide notebook splits into multiple tables");
+	[...tables].forEach((t) =>
+		assert.ok(
+			t.querySelectorAll("tr:first-child th").length <= 17,
+			"each printed table stays within ply + mainline + 15 lines",
+		),
 	);
 
 	delete global.window;
