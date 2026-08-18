@@ -354,36 +354,39 @@ function appendPrintTables(box, g) {
 	box.appendChild(wrap);
 }
 
-// Greedily pack trie branches into print-table line groups. A fork's lines stay
-// together; only a fork bigger than the cap is split at its sub-forks.
+// Greedily pack trie branches into print-table line groups, targeting FULL
+// tables. Coherent chunks (a fork's lines, kept together while they fit the
+// cap) fill each table to the cap; only the final table may be sparse. A fork
+// bigger than the cap is split at its own sub-forks first.
 function packForPrint(trie, size) {
-	const groups = [];
-	let cur = [];
-	const flush = () => {
-		if (cur.length) groups.push(cur);
-		cur = [];
-	};
-	const pack = (node) => {
+	const chunks = [];
+	const collect = (node) => {
 		const lines = leavesOf(node);
 		if (lines.length <= size) {
-			if (cur.length + lines.length > size) flush();
-			cur.push(...lines);
-		} else if (node.children.size) {
-			// a line ending exactly at a fork is packed on its own first
-			if (node.leaf) pack({ children: new Map(), leaf: node.leaf, move: null });
-			node.children.forEach((c) => pack(c));
-		} else {
-			// leaf-heavy branch, no sub-fork: contiguous row chunks
-			for (let i = 0; i < lines.length; i += size) {
-				const slice = lines.slice(i, i + size);
-				if (cur.length + slice.length > size) flush();
-				cur.push(...slice);
-			}
+			chunks.push(lines);
+			return;
 		}
+		// too big for one table: split at the real sub-forks
+		if (node.leaf) chunks.push([node.leaf]);
+		node.children.forEach((c) => collect(c));
 	};
-	trie.children.forEach((c) => pack(c));
-	flush();
-	return groups;
+	trie.children.forEach((c) => collect(c));
+	// fill every table to the cap, splitting a chunk at the boundary so no
+	// table is left sparse except the last one
+	const tables = [];
+	let cur = [];
+	for (const chunk of chunks) {
+		if (cur.length + chunk.length <= size) {
+			cur.push(...chunk);
+		} else {
+			const take = size - cur.length;
+			cur.push(...chunk.slice(0, take));
+			tables.push(cur);
+			cur = chunk.slice(take);
+		}
+	}
+	if (cur.length) tables.push(cur);
+	return tables;
 }
 
 function notebookList() {
