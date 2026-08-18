@@ -165,14 +165,15 @@ function moveCell(c, ply, noteByPly) {
 
 // Populates `container` with the table (+ optional board diagrams).
 export function renderTable(container, grid, orientation) {
-	const { vars, maxPly, mainMoves } = grid;
+	const { vars, maxPly } = grid;
 	const labels = {};
-	mainMoves.forEach(
-		(m) => (labels[m.ply] = m.ply % 2 === 0 ? fullmoveLabel(m.ply) : ""),
-	);
+	// number every WHITE (even) ply, not just the mainline's — rows that only
+	// exist because of a side line keep their move number
+	for (let ply = 0; ply <= maxPly; ply++)
+		labels[ply] = ply % 2 === 0 ? fullmoveLabel(ply) : "";
 
 	const table = document.createElement("table");
-	table.className = "tbl";
+	table.className = "tbl" + (orientation === "horizontal" ? " tbl-h" : "");
 
 	const varHead = (v) => {
 		const c = document.createElement("td");
@@ -213,11 +214,15 @@ export function renderTable(container, grid, orientation) {
 	if (orientation === "horizontal") {
 		// rows = ply, columns = variations
 		const head = document.createElement("tr");
-		head.appendChild(document.createElement("th")).textContent = "ply";
-		vars.forEach((v) => {
+		const plyTh = document.createElement("th");
+		plyTh.className = "ply-col sticky-col";
+		plyTh.textContent = "ply";
+		head.appendChild(plyTh);
+		vars.forEach((v, i) => {
 			const th = document.createElement("th");
 			th.className =
 				"var-head" +
+				(i === 0 ? " main-col sticky-col" : "") +
 				(v.onclick ? " clickable" : "") +
 				(v.collapsed ? " collapsed" : "");
 			if (v.onclick) {
@@ -232,10 +237,12 @@ export function renderTable(container, grid, orientation) {
 		for (let ply = 0; ply <= maxPly; ply++) {
 			const tr = document.createElement("tr");
 			const num = document.createElement("th");
+			num.className = "ply-col sticky-col";
 			if (labels[ply]) num.textContent = labels[ply];
 			tr.appendChild(num);
 			for (const v of vars) {
 				const c = moveCell(v.cells[ply], ply, v.noteByPly);
+				if (v === vars[0]) c.classList.add("main-col", "sticky-col");
 				if (v.onclick && v.collapsed) {
 					c.classList.add("clickable");
 					c.onclick = v.onclick;
@@ -247,7 +254,10 @@ export function renderTable(container, grid, orientation) {
 	} else {
 		// vertical: rows = variations, columns = ply
 		const head = document.createElement("tr");
-		head.appendChild(document.createElement("th")).textContent = "Variation";
+		const vth = document.createElement("th");
+		vth.className = "sticky-col";
+		vth.textContent = "Variation";
+		head.appendChild(vth);
 		for (let ply = 0; ply <= maxPly; ply++) {
 			const th = document.createElement("th");
 			if (labels[ply]) th.textContent = labels[ply];
@@ -257,7 +267,9 @@ export function renderTable(container, grid, orientation) {
 		table.appendChild(head);
 		for (const v of vars) {
 			const tr = document.createElement("tr");
-			tr.appendChild(varHead(v));
+			const vh = varHead(v);
+			vh.classList.add("sticky-col");
+			tr.appendChild(vh);
 			for (let ply = 0; ply <= maxPly; ply++) {
 				const c = moveCell(v.cells[ply], ply, v.noteByPly);
 				if (v.onclick && v.collapsed) {

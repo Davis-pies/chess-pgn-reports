@@ -48,13 +48,7 @@ test("full app flow: import PGN, tag a line, render table preview", async () => 
 		(b) => b.textContent === "Sideline",
 	);
 	sidelineBtn.click();
-	// the sideline is a collapsed branch in the single table (we're in vertical
-	// layout); click its row header to expand it
-	const branchHead = doc("view").querySelector(
-		".pv-table td.var-head.clickable.collapsed",
-	);
-	assert.ok(branchHead, "collapsed branch row present");
-	branchHead.click();
+	// a single sideline is ONE line — rendered as a plain row, always visible
 	const preview = doc("view").querySelector(".pv-table");
 	assert.ok(
 		preview.textContent.toLowerCase().includes("sideline"),
@@ -258,7 +252,8 @@ test("table preview: mainline always visible, branches collapsed by default", as
 	dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
 
 	const textarea = doc("view").querySelector("textarea.pgnin");
-	textarea.value = "1. e4 e5 (1... c5 2. Nf3) (1... e6 2. d4) 2. Nf3";
+	textarea.value =
+		"1. e4 e5 (1... c5 2. Nf3 Nc6) (1... c5 2. Nf3 Nf6) (1... e6 2. d4) 2. Nf3";
 	[...doc("view").querySelectorAll("button")]
 		.find((b) => b.textContent.includes("Load"))
 		.click();
@@ -267,14 +262,19 @@ test("table preview: mainline always visible, branches collapsed by default", as
 	const pv = doc("view").querySelector(".pv-table");
 	// ONE single table
 	assert.strictEqual(pv.querySelectorAll("table.tbl").length, 1, "one table");
-	// header: ply | mainline | branch(es); the two branches start collapsed (their
-	// column headers are .clickable, the mainline's is not)
+	// header: ply | mainline | collapsed fork | single-line branch = 4 columns
 	const headers = pv.querySelectorAll("table.tbl tr:first-child th");
-	assert.strictEqual(headers.length, 4, "ply + mainline + 2 branches");
+	assert.strictEqual(headers.length, 4, "ply + mainline + fork + single line");
+	// only the FORK is collapsible; the single-line branch is a plain column
+	assert.strictEqual(
+		pv.querySelectorAll("table.tbl th.clickable.collapsed").length,
+		1,
+		"only the multi-line fork starts collapsed",
+	);
 	assert.strictEqual(
 		pv.querySelectorAll("table.tbl th.clickable").length,
-		2,
-		"both branches start collapsed",
+		1,
+		"single-line branch is a plain column (no collapse affordance)",
 	);
 	const mainTh = headers[1];
 	assert.ok(
@@ -287,47 +287,47 @@ test("table preview: mainline always visible, branches collapsed by default", as
 		"collapsed branch shows shared moves",
 	);
 
-	// expand the first collapsed branch by clicking its header
-	const firstBranch = pv.querySelector("table.tbl th.clickable.collapsed");
-	firstBranch.click();
+	// expand the fork by clicking its header
+	const fork = pv.querySelector("table.tbl th.clickable.collapsed");
+	fork.click();
 	const pv2 = doc("view").querySelector(".pv-table");
 	assert.strictEqual(
 		pv2.querySelectorAll("table.tbl th.clickable.collapsed").length,
-		1,
-		"expanding one branch leaves one collapsed",
+		0,
+		"fork expanded",
 	);
 	assert.strictEqual(
 		pv2.querySelectorAll("table.tbl th.clickable:not(.collapsed)").length,
-		1,
-		"expanded branch's line header is clickable (to collapse)",
+		2,
+		"fork's two line headers are clickable (to collapse)",
 	);
 
-	// clicking the expanded line header collapses the branch again
+	// clicking an expanded line collapses the fork again
 	pv2.querySelector("table.tbl th.clickable:not(.collapsed)").click();
 	assert.strictEqual(
 		doc("view").querySelectorAll(".pv-table th.clickable.collapsed").length,
-		2,
+		1,
 		"clicking an expanded line collapses its branch",
 	);
 
-	// expand all opens every branch
+	// expand all
 	[...doc("view").querySelectorAll(".pv-table button")]
 		.find((b) => b.textContent === "Expand all")
 		.click();
 	assert.strictEqual(
 		doc("view").querySelectorAll(".pv-table th.clickable.collapsed").length,
 		0,
-		"expand all expands every branch",
+		"expand all expands the fork",
 	);
 
-	// collapse all returns to the collapsed view
+	// collapse all
 	[...doc("view").querySelectorAll(".pv-table button")]
 		.find((b) => b.textContent === "Collapse all")
 		.click();
 	assert.strictEqual(
 		doc("view").querySelectorAll(".pv-table th.clickable.collapsed").length,
-		2,
-		"collapse all collapses every branch",
+		1,
+		"collapse all collapses the fork",
 	);
 
 	delete global.window;

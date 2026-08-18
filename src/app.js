@@ -595,12 +595,15 @@ function renderTrieTable(container, g, orientation) {
 	controls.append(ex, col);
 	container.appendChild(controls);
 	if (!mainV) return;
-	// build the single table's var list: mainline + each branch. Expanded
-	// branches contribute their real lines (each header clickable to collapse
-	// the whole branch); collapsed ones a single shared-continuation column.
+	// build the single table's var list: mainline + each branch. A branch with
+	// ONE line is a plain column (no collapse affordance). A multi-line branch
+	// collapses to a single compact column ("▸ N lines" header, shared moves in
+	// its cells); its expanded lines are clickable to collapse the branch again.
 	const vars = [mainV];
 	trie.children.forEach((c) => {
-		if (openTablePaths.has(c.key)) {
+		if (countLeaves(c) === 1) {
+			vars.push(...leavesOf(c));
+		} else if (openTablePaths.has(c.key)) {
 			const collapse = () => {
 				openTablePaths.delete(c.key);
 				rerenderTable();
@@ -632,7 +635,7 @@ function collapsedVar(node) {
 	return {
 		tag: "collapse",
 		label: "",
-		name: `${tblPath(node)}` + (count > 1 ? ` \u00b7 ${count} lines` : ""),
+		name: `${count} lines`, // compact: the shared moves are in the column cells
 		eval: "",
 		cells,
 		noteByPly: {},

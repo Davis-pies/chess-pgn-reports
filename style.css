@@ -2,6 +2,7 @@
 	--main: #1d4ed8;
 	--sideline: #b45309;
 	--foot: #92400e;
+	--zebra: #f5f6f8;
 
 	--bg: #ffffff;
 	--panel: #ffffff;
@@ -17,6 +18,7 @@
 	--main: #60a5fa;
 	--sideline: #f0b14f;
 	--foot: #d4a373;
+	--zebra: #1b1d24;
 
 	--bg: #17181d;
 	--panel: #1e2026;
@@ -290,6 +292,31 @@ select:focus {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+/* zebra striping: alternate data rows, keeping the pinned reference columns
+   and headers untouched */
+.tbl tr:nth-child(even) td:not(.sticky-col) {
+	background: var(--zebra);
+}
+/* pinned reference columns: the ply numbers (and mainline column, horizontal
+   layout) stay visible while the table scrolls sideways */
+.tbl .sticky-col {
+	position: sticky;
+	z-index: 2;
+	background: var(--panel);
+}
+.tbl th.sticky-col {
+	background: var(--head-bg);
+	z-index: 3;
+}
+.tbl .ply-col {
+	left: 0;
+	width: 2.6em;
+	min-width: 2.6em;
+	text-align: right;
+}
+.tbl-h .main-col {
+	left: 2.6em;
 }
 .ledge {
 	display: flex;
@@ -659,6 +686,9 @@ sup {
 	}
 	.tbl td.ellip {
 		color: #555;
+	}
+	.tbl tr:nth-child(even) td:not(.sticky-col) {
+		background: #fff; /* no zebra in print */
 	}
 	.tbl td.sideline {
 		color: #333;
