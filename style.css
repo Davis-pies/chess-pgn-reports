@@ -636,6 +636,31 @@ sup {
 .export {
 	margin: 16px 0;
 }
+/* print/PDF option groups: checkbox-first options, separated by target */
+.printopts {
+	display: flex;
+	gap: 22px;
+	align-items: flex-start;
+	margin-top: 10px;
+	flex-wrap: wrap;
+}
+.optgroup {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+.optgroup-h {
+	font-size: 0.75rem;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--muted);
+}
+.opt {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	font-size: 0.85rem;
+}
 
 .panel .toolbar {
 	justify-content: flex-start;

@@ -1333,28 +1333,37 @@ function exportBar() {
 		setTimeout(() => (copy.textContent = "Copy report"), 1500);
 	};
 	bar.append(printBtn, pgn, md, copy);
-	// print/PDF options: which diagrams appear in the Lines (print) cards
+	// print/PDF options: which diagrams appear in the Lines (print) cards, and
+	// whether the table splits by trie. Each option is checkbox-first; they're
+	// grouped by target with a clear gap between groups.
 	const pOpts = el("div", { className: "printopts" });
-	const chk = (label, key, def) => {
-		const lab = el("label", {}, [
-			label + " ",
-			el("input", {
-				type: "checkbox",
-				checked: current[key] == null ? def : current[key],
-			}),
-		]);
-		lab.querySelector("input").onchange = (e) => {
-			current[key] = e.target.checked;
-			renderApp();
-		};
-		return lab;
+	const group = (title, checks) => {
+		const g = el("div", { className: "optgroup" });
+		g.appendChild(
+			el("span", { className: "optgroup-h", textContent: title }),
+		);
+		checks.forEach(([label, key, def]) => {
+			const lab = el("label", { className: "opt" }, [
+				el("input", {
+					type: "checkbox",
+					checked: current[key] == null ? def : current[key],
+				}),
+				" " + label,
+			]);
+			lab.querySelector("input").onchange = (e) => {
+				current[key] = e.target.checked;
+				renderApp();
+			};
+			g.appendChild(lab);
+		});
+		return g;
 	};
 	pOpts.append(
-		"Cards: ",
-		chk("final-position image", "showFinalBoard", true),
-		chk("latest-divergence image", "showFirstDivBoard", false),
-		" Table: ",
-		chk("split table by trie", "showSplitTrie", false),
+		group("Cards", [
+			["final-position image", "showFinalBoard", true],
+			["latest-divergence image", "showFirstDivBoard", false],
+		]),
+		group("Table", [["split table by trie", "showSplitTrie", false]]),
 	);
 	bar.appendChild(pOpts);
 	return bar;
