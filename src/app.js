@@ -330,7 +330,7 @@ function appendPrintTables(box, g) {
 	wrap.appendChild(el("h3", { textContent: "Table" }));
 	const mainV = g.vars[0]; // mainline sorts first
 	const others = g.vars.slice(1);
-	const size = 15; // mainline + 15 = 16 columns per table
+	const size = 13; // mainline + 13 = 14 data columns per table (fits a page)
 	if (!mainV) {
 		box.appendChild(wrap);
 		return;
@@ -370,8 +370,7 @@ function packForPrint(trie, size) {
 			cur.push(...lines);
 		} else if (node.children.size) {
 			// a line ending exactly at a fork is packed on its own first
-			if (node.leaf)
-				pack({ children: new Map(), leaf: node.leaf, move: null });
+			if (node.leaf) pack({ children: new Map(), leaf: node.leaf, move: null });
 			node.children.forEach((c) => pack(c));
 		} else {
 			// leaf-heavy branch, no sub-fork: contiguous row chunks
@@ -386,7 +385,6 @@ function packForPrint(trie, size) {
 	flush();
 	return groups;
 }
-
 
 function notebookList() {
 	const items = listNotebooks();

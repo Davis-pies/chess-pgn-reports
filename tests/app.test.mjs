@@ -256,8 +256,22 @@ test("print table: wide notebooks pack into multiple tables, oversized forks chu
 	// 16 variations share 1... c5 2. Nf3 Nc6 and fork at white's 3rd move:
 	// one top-level branch of 16 lines — over the 15-line cap
 	const thirds = [
-		"Bb5", "Bc4", "Be2", "d4", "d3", "c3", "a3", "b3",
-		"g3", "h3", "a4", "b4", "c4", "Na3", "Nc3", "Qe2",
+		"Bb5",
+		"Bc4",
+		"Be2",
+		"d4",
+		"d3",
+		"c3",
+		"a3",
+		"b3",
+		"g3",
+		"h3",
+		"a4",
+		"b4",
+		"c4",
+		"Na3",
+		"Nc3",
+		"Qe2",
 	];
 	const pgn =
 		"1. e4 e5 " +
@@ -276,8 +290,8 @@ test("print table: wide notebooks pack into multiple tables, oversized forks chu
 	assert.ok(tables.length >= 2, "wide notebook splits into multiple tables");
 	[...tables].forEach((t) =>
 		assert.ok(
-			t.querySelectorAll("tr:first-child th").length <= 17,
-			"each printed table stays within ply + mainline + 15 lines",
+			t.querySelectorAll("tr:first-child th").length <= 15,
+			"each printed table stays within ply + mainline + 13 lines",
 		),
 	);
 

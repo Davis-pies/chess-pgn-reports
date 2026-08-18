@@ -702,7 +702,16 @@ sup {
 		display: block !important;
 	}
 	.tbl td.ellip {
-		color: #555;
+		color: #444;
+		opacity: 1; /* the 0.6 screen opacity prints as washed-out grey */
+	}
+	.pv-htable table.tbl {
+		break-inside: avoid;
+		page-break-inside: avoid; /* keep each table whole; a table that doesn't
+		                            fit the remaining page moves to the next */
+	}
+	.pv-htable h3 {
+		break-after: avoid;
 	}
 	.tbl tr:nth-child(even) td:not(.sticky-col) {
 		background: #fff; /* no zebra in print */
