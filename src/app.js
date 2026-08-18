@@ -556,10 +556,10 @@ function renderTrieTable(container, g, orientation) {
 	);
 	renderTable(mainBlock, { ...g, vars: [mainV] }, orientation);
 	container.appendChild(mainBlock);
-	trie.children.forEach((c) => renderTblGroup(container, c, g, mainV, orientation));
+	trie.children.forEach((c) => renderTblGroup(container, c, g, orientation));
 }
 
-function renderTblGroup(container, node, g, _mainV, orientation) {
+function renderTblGroup(container, node, g, orientation) {
 	const det = el("details", { className: "lgroup tbl-group" });
 	det.open = openTablePaths.has(node.key);
 	det.addEventListener("toggle", () => {
