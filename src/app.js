@@ -298,41 +298,41 @@ function appendPrintTables(box, g) {
 	const mainV = g.vars[0]; // mainline sorts first
 	const others = g.vars.slice(1);
 	const size = 15; // mainline + 15 = 16 columns per slice
-	if (!mainV || others.length <= size) {
+	if (!mainV) {
+		box.appendChild(wrap);
+		return;
+	}
+	const trie = buildTrie(others, mainV);
+	const split = current.showSplitTrie === true;
+	if (!split && others.length <= size) {
 		renderTable(wrap, g, "horizontal");
 	} else {
-		// the table won't fit, so split it by trie branch: each printed table
-		// groups the lines of one shared continuation (a coherent cut, rather
-		// than an arbitrary 16-column slice)
-		const byKey = new Map();
-		const order = [];
-		for (const v of others) {
-			const mv = v.d > 0 ? v.moves[v.d] : null;
-			const key = mv ? mv.ply + ":" + mv.san : "\u2205";
-			if (!byKey.has(key)) {
-				byKey.set(key, []);
-				order.push(key);
-			}
-			byKey.get(key).push(v);
-		}
-		for (const key of order) {
-			const rows = byKey.get(key);
-			const mv = rows[0].d > 0 ? rows[0].moves[rows[0].d] : null;
-			const h = el("h4", {
-				className: "print-group",
-				textContent:
-					rows.length +
-					" lines · " +
-					(mv ? fullmoveLabel(mv.ply) + mv.san : ""),
-			});
-			wrap.appendChild(h);
-			for (let i = 0; i < rows.length; i += size) {
-				const vars = [mainV, ...rows.slice(i, i + size)];
-				renderTable(wrap, { ...g, vars }, "horizontal");
-			}
-		}
+		trie.children.forEach((c) => printBranch(wrap, c, g, mainV, size));
 	}
 	box.appendChild(wrap);
+}
+
+function printBranch(wrap, node, g, mainV, size) {
+	const lines = leavesOf(node);
+	const count = lines.length;
+	wrap.appendChild(
+		el("h4", {
+			className: "print-group",
+			textContent: `${count} lines \u00b7 ${tblPath(node)}`,
+		}),
+	);
+	if (count <= size) {
+		renderTable(wrap, { ...g, vars: [mainV, ...lines] }, "horizontal");
+	} else if (node.children.size) {
+		// too wide: cut at the branch's real forks, not arbitrary rows
+		node.children.forEach((c) => printBranch(wrap, c, g, mainV, size));
+	} else {
+		// a leaf-heavy branch with no sub-fork: row-chunk as a last resort
+		for (let i = 0; i < lines.length; i += size) {
+			const vars = [mainV, ...lines.slice(i, i + size)];
+			renderTable(wrap, { ...g, vars }, "horizontal");
+		}
+	}
 }
 
 function notebookList() {
@@ -1276,6 +1276,8 @@ function exportBar() {
 		"Cards: ",
 		chk("final-position image", "showFinalBoard", true),
 		chk("latest-divergence image", "showFirstDivBoard", false),
+		" Table: ",
+		chk("split table by trie", "showSplitTrie", false),
 	);
 	bar.appendChild(pOpts);
 	return bar;

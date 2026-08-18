@@ -190,6 +190,55 @@ test("lone-line editor groups are collapsible details, closed by default", async
 	delete global.confirm;
 });
 
+test("print table: split-by-trie checkbox toggles per-branch tables", async () => {
+ const dom = new JSDOM('<!DOCTYPE html><main id="view"></main>', {
+  url: "http://localhost/",
+  pretendToBeVisual: true,
+ });
+ global.window = dom.window;
+ global.document = dom.window.document;
+ global.requestAnimationFrame = dom.window.requestAnimationFrame;
+ global.localStorage = dom.window.localStorage;
+ global.alert = () => {};
+ global.confirm = () => true;
+
+ await import("../src/app.js?t=5");
+ dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
+
+ const textarea = doc("view").querySelector("textarea.pgnin");
+ // two variations with DIFFERENT first moves = two top-level branches
+ textarea.value = "1. e4 e5 (1... c5 2. Nf3) (1... e6 2. d4) 2. Nf3";
+ [...doc("view").querySelectorAll("button")]
+  .find((b) => b.textContent.includes("Load"))
+  .click();
+ await tick();
+
+ // default: split off, fits -> one print table
+ assert.strictEqual(
+  doc("view").querySelectorAll(".pv-htable table.tbl").length,
+  1,
+  "one table when split-by-trie is off",
+ );
+
+ const lab = [...doc("view").querySelectorAll("label")].find((l) =>
+  l.textContent.includes("split table by trie"),
+ );
+ lab.querySelector("input").click();
+
+ assert.strictEqual(
+  doc("view").querySelectorAll(".pv-htable table.tbl").length,
+  2,
+  "two branch tables when split-by-trie is on",
+ );
+
+ delete global.window;
+ delete global.document;
+ delete global.requestAnimationFrame;
+ delete global.localStorage;
+ delete global.alert;
+ delete global.confirm;
+});
+
 function doc(id) {
 	return global.document.getElementById(id);
 }
