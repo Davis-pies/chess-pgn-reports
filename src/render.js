@@ -176,12 +176,24 @@ export function renderTable(container, grid, orientation) {
 
 	const varHead = (v) => {
 		const c = document.createElement("td");
-		c.className = "var-head";
-		const tag = document.createElement("span");
-		tag.className = "tag " + v.tag;
-		tag.textContent = v.label;
-		c.appendChild(tag);
-		c.appendChild(document.createTextNode(" " + v.name));
+		c.className = "var-head" + (v.onclick ? " clickable" : "") + (v.collapsed ? " collapsed" : "");
+		if (v.onclick) {
+			c.onclick = v.onclick;
+			c.title = "expand branch";
+		}
+		if (v.collapsed) {
+			const cue = document.createElement("span");
+			cue.className = "collapse-cue";
+			cue.textContent = "\u25b8 ";
+			c.appendChild(cue);
+		}
+		if (v.label) {
+			const tag = document.createElement("span");
+			tag.className = "tag " + v.tag;
+			tag.textContent = v.label;
+			c.appendChild(tag);
+		}
+		c.appendChild(document.createTextNode(" " + (v.name || "")));
 		if (v.letter) {
 			const s = document.createElement("sup");
 			s.textContent = "[" + v.letter + "]";
@@ -196,7 +208,15 @@ export function renderTable(container, grid, orientation) {
 		head.appendChild(document.createElement("th")).textContent = "ply";
 		vars.forEach((v) => {
 			const th = document.createElement("th");
-			th.textContent = (v.name || v.label) + (v.eval ? " " + v.eval : "");
+			th.className = "var-head" + (v.onclick ? " clickable" : "") + (v.collapsed ? " collapsed" : "");
+			if (v.onclick) {
+				th.onclick = v.onclick;
+				th.title = "expand branch";
+			}
+			th.textContent =
+				(v.collapsed ? "\u25b8 " : "") +
+				(v.name || v.label) +
+				(v.eval ? " " + v.eval : "");
 			head.appendChild(th);
 		});
 		table.appendChild(head);
@@ -206,8 +226,12 @@ export function renderTable(container, grid, orientation) {
 			if (labels[ply]) num.textContent = labels[ply];
 			tr.appendChild(num);
 			for (const v of vars) {
-				const c = v.cells[ply];
-				tr.appendChild(moveCell(c, ply, v.noteByPly));
+				const c = moveCell(v.cells[ply], ply, v.noteByPly);
+				if (v.onclick && v.collapsed) {
+					c.classList.add("clickable");
+					c.onclick = v.onclick;
+				}
+				tr.appendChild(c);
 			}
 			table.appendChild(tr);
 		}
@@ -226,8 +250,12 @@ export function renderTable(container, grid, orientation) {
 			const tr = document.createElement("tr");
 			tr.appendChild(varHead(v));
 			for (let ply = 0; ply <= maxPly; ply++) {
-				const c = v.cells[ply];
-				tr.appendChild(moveCell(c, ply, v.noteByPly));
+				const c = moveCell(v.cells[ply], ply, v.noteByPly);
+				if (v.onclick && v.collapsed) {
+					c.classList.add("clickable");
+					c.onclick = v.onclick;
+				}
+				tr.appendChild(c);
 			}
 			tr.appendChild(td(v.eval, "eval"));
 			table.appendChild(tr);

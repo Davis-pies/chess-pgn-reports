@@ -48,10 +48,13 @@ test("full app flow: import PGN, tag a line, render table preview", async () => 
 		(b) => b.textContent === "Sideline",
 	);
 	sidelineBtn.click();
-	// the sideline rows live in a collapsed trie branch; expand it
-	const tb = doc("view").querySelector(".pv-table details.tbl-group");
-	tb.open = true;
-	tb.dispatchEvent(new dom.window.Event("toggle"));
+	// the sideline is a collapsed branch in the single table (we're in vertical
+	// layout); click its row header to expand it
+	const branchHead = doc("view").querySelector(
+		".pv-table td.var-head.clickable",
+	);
+	assert.ok(branchHead, "collapsed branch row present");
+	branchHead.click();
 	const preview = doc("view").querySelector(".pv-table");
 	assert.ok(
 		preview.textContent.toLowerCase().includes("sideline"),
@@ -139,12 +142,12 @@ test("inline boards: flat shows one per line; grouped shows only expanded groups
 		.click();
 	assert.strictEqual(doc("view").querySelectorAll(".ledge-board").length, 3);
 
-delete global.window;
-delete global.document;
-delete global.requestAnimationFrame;
-delete global.localStorage;
-delete global.alert;
-delete global.confirm;
+	delete global.window;
+	delete global.document;
+	delete global.requestAnimationFrame;
+	delete global.localStorage;
+	delete global.alert;
+	delete global.confirm;
 });
 
 test("lone-line editor groups are collapsible details, closed by default", async () => {
@@ -262,28 +265,56 @@ test("table preview: mainline always visible, branches collapsed by default", as
 	await tick();
 
 	const pv = doc("view").querySelector(".pv-table");
-	// mainline reference table is always present
-	assert.ok(pv.querySelector(".tbl-main table.tbl"), "mainline block visible");
-	// two branches, both collapsed by default
-	const groups = pv.querySelectorAll("details.tbl-group");
-	assert.strictEqual(groups.length, 2);
-	assert.ok(!groups[0].open && !groups[1].open, "branches start collapsed");
+	// ONE single table
+	assert.strictEqual(pv.querySelectorAll("table.tbl").length, 1, "one table");
+	// header: ply | mainline | branch(es); the two branches start collapsed (their
+	// column headers are .clickable, the mainline's is not)
+	const headers = pv.querySelectorAll("table.tbl tr:first-child th");
+	assert.strictEqual(headers.length, 4, "ply + mainline + 2 branches");
+	assert.strictEqual(
+		pv.querySelectorAll("table.tbl th.clickable").length,
+		2,
+		"both branches start collapsed",
+	);
+	const mainTh = headers[1];
+	assert.ok(
+		!mainTh.classList.contains("clickable"),
+		"mainline column is always visible (not collapsible)",
+	);
+	// a collapsed branch column holds its shared continuation moves
+	assert.ok(
+		pv.querySelectorAll("td.collapsed").length > 0,
+		"collapsed branch shows shared moves",
+	);
 
-	// expand the first branch -> its table slice appears
-	groups[0].open = true;
-	groups[0].dispatchEvent(new dom.window.Event("toggle"));
+	// expand the first collapsed branch by clicking its header
+	const firstBranch = pv.querySelector("table.tbl th.clickable");
+	firstBranch.click();
 	const pv2 = doc("view").querySelector(".pv-table");
-	assert.strictEqual(pv2.querySelectorAll("details.tbl-group").length, 2);
-	assert.ok(pv2.querySelector("details.tbl-group[open]"), "a branch is expanded");
+	assert.strictEqual(
+		pv2.querySelectorAll("table.tbl th.clickable").length,
+		1,
+		"expanding one branch leaves one collapsed",
+	);
 
-	// expand-all opens every branch
+	// expand all opens every branch
 	[...pv2.querySelectorAll("button")]
 		.find((b) => b.textContent === "Expand all")
 		.click();
 	assert.strictEqual(
-		doc("view").querySelectorAll(".pv-table details.tbl-group[open]").length,
+		doc("view").querySelectorAll(".pv-table th.clickable").length,
+		0,
+		"expand all expands every branch",
+	);
+
+	// collapse all returns to the collapsed view
+	[...doc("view").querySelectorAll("button")]
+		.find((b) => b.textContent === "Collapse all")
+		.click();
+	assert.strictEqual(
+		doc("view").querySelectorAll(".pv-table th.clickable").length,
 		2,
-		"expand all opens both branches",
+		"collapse all collapses every branch",
 	);
 
 	delete global.window;
@@ -297,4 +328,3 @@ test("table preview: mainline always visible, branches collapsed by default", as
 function doc(id) {
 	return global.document.getElementById(id);
 }
-

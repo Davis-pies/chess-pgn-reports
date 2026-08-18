@@ -268,15 +268,19 @@ select:focus {
 .tbl-controls {
 	margin: 4px 0;
 }
-.tbl-main {
-	margin: 6px 0 10px;
+.tbl .var-head.clickable,
+.tbl .clickable {
+	cursor: pointer;
 }
-.tbl-group {
-	font-family: ui-monospace, Menlo, Consolas, monospace;
-	font-size: 0.85rem;
+.tbl .var-head.clickable:hover {
+	color: var(--main);
+}
+.tbl .collapse-cue {
+	color: var(--main);
+}
+.tbl td.collapsed {
+	font-style: italic;
 	color: var(--muted);
-	font-weight: 400;
-	margin: 0 0 4px;
 }
 .ledge {
 	display: flex;

@@ -292,6 +292,19 @@ function viewRoot() {
 // Print/PDF horizontal table. The mainline is always shown as the reference
 // column; the side lines are split into vertical slices of ~16 columns so the
 // table wraps across pages instead of being cut off or scaled.
+
+// Highest ply present in a subset of table vars — so a per-branch print table
+// doesn't render empty rows down to the notebook's global max.
+function subMaxPly(vars) {
+ let m = 0;
+ for (const v of vars)
+  for (const p of Object.keys(v.cells)) {
+   const n = Number(p);
+   if (n > m) m = n;
+  }
+ return m;
+}
+
 function appendPrintTables(box, g) {
 	const wrap = el("div", { className: "pv-htable" });
 	wrap.appendChild(el("h3", { textContent: "Table" }));
@@ -322,7 +335,15 @@ function printBranch(wrap, node, g, mainV, size) {
 		}),
 	);
 	if (count <= size) {
-		renderTable(wrap, { ...g, vars: [mainV, ...lines] }, "horizontal");
+		renderTable(
+			wrap,
+			{
+				...g,
+				vars: [mainV, ...lines],
+				maxPly: subMaxPly([mainV, ...lines]),
+			},
+			"horizontal",
+		);
 	} else if (node.children.size) {
 		// too wide: cut at the branch's real forks, not arbitrary rows
 		node.children.forEach((c) => printBranch(wrap, c, g, mainV, size));
@@ -330,7 +351,11 @@ function printBranch(wrap, node, g, mainV, size) {
 		// a leaf-heavy branch with no sub-fork: row-chunk as a last resort
 		for (let i = 0; i < lines.length; i += size) {
 			const vars = [mainV, ...lines.slice(i, i + size)];
-			renderTable(wrap, { ...g, vars }, "horizontal");
+			renderTable(
+				wrap,
+				{ ...g, vars, maxPly: subMaxPly(vars) },
+				"horizontal",
+			);
 		}
 	}
 }
@@ -523,16 +548,21 @@ function buildTrie(lines, main) {
 	return root;
 }
 
-// Left-panel preview: mainline always visible (left column strip in horizontal
-// layout), then one collapsible section per top-level trie branch. Branches
-// start collapsed; expanding shows that branch's lines as its own table slice.
+// Left-panel preview: ONE table. The mainline column is always visible (left
+// in horizontal, top row in vertical); each top-level trie branch contributes
+// its columns. A collapsed branch is compressed to a single shared-continuation
+// column (the moves all its lines have in common up to the fork); clicking that
+// column's header expands it back into its individual line columns.
 function renderTrieTable(container, g, orientation) {
 	const mainV = g.vars[0]; // mainline sorts first
 	const others = g.vars.slice(1);
 	const trie = buildTrie(others, mainV);
 	const controls = el("div", { className: "orow tbl-controls" });
 	controls.appendChild(el("span", { textContent: "Branches: " }));
-	const ex = el("button", { className: "chip mini", textContent: "Expand all" });
+	const ex = el("button", {
+		className: "chip mini",
+		textContent: "Expand all",
+	});
 	ex.onclick = () => {
 		openTablePaths.clear();
 		trie.children.forEach((c) => collectKeys(c, openTablePaths));
@@ -549,41 +579,55 @@ function renderTrieTable(container, g, orientation) {
 	controls.append(ex, col);
 	container.appendChild(controls);
 	if (!mainV) return;
-	// the reference row/column, always visible
-	const mainBlock = el("div", { className: "tbl-main" });
-	mainBlock.appendChild(
-		el("h4", { className: "tbl-group", textContent: "Mainline" }),
-	);
-	renderTable(mainBlock, { ...g, vars: [mainV] }, orientation);
-	container.appendChild(mainBlock);
-	trie.children.forEach((c) => renderTblGroup(container, c, g, orientation));
+	// build the single table's var list: mainline + each branch (expanded -> its
+	// real lines; collapsed -> one shared-continuation column)
+	const vars = [mainV];
+	trie.children.forEach((c) => {
+		if (openTablePaths.has(c.key)) vars.push(...leavesOf(c));
+		else vars.push(collapsedVar(c));
+	});
+	renderTable(container, { ...g, vars }, orientation);
 }
 
-function renderTblGroup(container, node, g, orientation) {
-	const det = el("details", { className: "lgroup tbl-group" });
-	det.open = openTablePaths.has(node.key);
-	det.addEventListener("toggle", () => {
-		// same state-change guard as the editor groups (see Task 1): a rebuild
-		// re-sets open=true on fresh elements, and without it jsdom re-fires
-		// toggle forever
-		const had = openTablePaths.has(node.key);
-		if (det.open && !had) openTablePaths.add(node.key);
-		else if (!det.open && had) openTablePaths.delete(node.key);
-		else return;
-		renderApp();
+// A collapsed trie branch as a single column/row of its shared continuation:
+// the moves common to all its lines up to the first fork, with divergent cells
+// empty. Its header is clickable to expand.
+function collapsedVar(node) {
+	const shared = sharedMoves(node); // [{ ply, san }] down the single-child chain
+	const cells = {};
+	shared.forEach((m) => {
+		cells[m.ply] = { text: m.san, cls: "collapsed" };
 	});
+	// ellipsis prefix before the branch's first shared move, like a sideline
+	const d = shared.length ? shared[0].ply : 0;
+	for (let ply = 0; ply < d; ply++) cells[ply] = { text: "\u2026", cls: "ellip" };
 	const count = countLeaves(node);
-	det.appendChild(
-		el("summary", {
-			className: "lg-head",
-			textContent: `${tblPath(node)} \u00b7 ${count} line${count === 1 ? "" : "s"}`,
-		}),
-	);
-	const body = el("div", { className: "lgroup-body" });
-	const lines = leavesOf(node);
-	if (lines.length) renderTable(body, { ...g, vars: lines }, orientation);
-	det.appendChild(body);
-	container.appendChild(det);
+	return {
+		tag: "collapse",
+		label: "",
+		name: `${tblPath(node)}` + (count > 1 ? ` \u00b7 ${count} lines` : ""),
+		eval: "",
+		cells,
+		noteByPly: {},
+		collapsed: true,
+		onclick: () => {
+			openTablePaths.add(node.key);
+			renderApp();
+		},
+	};
+}
+
+// The moves a branch's lines share, from the branch's root child down its
+// single-child chain to the first fork (or the leaf).
+function sharedMoves(node) {
+	const out = [];
+	let n = node;
+	while (true) {
+		out.push({ ply: n.move.ply, san: n.move.san });
+		if (n.leaf || n.children.size !== 1) break;
+		n = [...n.children.values()][0];
+	}
+	return out;
 }
 
 function countLeaves(node) {
