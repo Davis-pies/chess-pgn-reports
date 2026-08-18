@@ -15,6 +15,7 @@
 - Keep both light/dark themes working; use existing CSS vars.
 - DOM built via the existing `el()` helper; no `innerHTML` for user content.
 - The `current` object literal resets (New/Import, openNotebook, importPanel) do NOT need `showSplitTrie` — the checkbox helper defaults `undefined` to `false`.
+- TESTS: jsdom's document-wide `querySelector`/`querySelectorAll` skips ALL content inside a `<details>` element (open or closed); queries scoped to the details element itself work (`detailsEl.querySelector(...)`). Any test targeting content inside a details must scope the query to that details element.
 - Every task ends with `npm test` green + a commit.
 
 ---
@@ -107,8 +108,13 @@ function renderTrieNode(container, node, nameCounter, path, allOpen) {
  const det = el("details", { className: "lgroup" });
  det.open = openPaths.has(node.key);
  det.addEventListener("toggle", () => {
-  if (det.open) openPaths.add(node.key);
-  else openPaths.delete(node.key);
+  // only rebuild when the open-state actually changed; jsdom fires a toggle
+  // when a rebuilt element gets open=true, and without this guard that
+  // rebuild re-schedules another toggle forever
+  const had = openPaths.has(node.key);
+  if (det.open && !had) openPaths.add(node.key);
+  else if (!det.open && had) openPaths.delete(node.key);
+  else return;
   renderApp(); // boards appear/disappear with expansion
   // ponytail: whole-app re-render; if toggling feels slow on huge files,
   // scope the rebuild to the markup panel only
@@ -137,7 +143,7 @@ function renderTrieNode(container, node, nameCounter, path, allOpen) {
 - [ ] **Step 3: Run the full suite**
 
 Run: `npm test`
-Expected: 26/26 pass. The existing inline-boards test still passes (its PGN forks inside the trie; fork behavior unchanged).
+Expected: 26/26 pass. NOTE: the pre-existing inline-boards test must be updated in the same task — its old expectation (expanding a fork immediately shows its leaves' boards) is obsolete now that fork children are collapsed lone-line groups, and its board queries must be SCOPED to the details element (see the jsdom `<details>` selector constraint). Updated expectations: fork collapsed → 1 board (mainline only); fork expanded → still 1 (children collapsed); expanding a lone-line child → its board appears (scoped query); flat view → 3 boards.
 
 - [ ] **Step 4: Commit**
 
@@ -172,7 +178,7 @@ The left-panel table (`pv-table`) becomes: mainline always visible, then one col
 
 In `tests/app.test.mjs`:
 
-(a) The inline-boards test queries `doc("view").querySelector("details.lgroup")` to find the EDITOR fork. The table will now also have `details.lgroup` groups rendered EARLIER in the document (side panel before main panel), so scope the query to the markup panel. Change the line `const det = doc("view").querySelector("details.lgroup");` to `const det = doc("view").querySelector(".markup details.lgroup");`.
+(a) The inline-boards test was already scoped to `.markup` in Task 1 (when the fork's children became details) — verify its query is `.markup details.lgroup` and leave it.
 
 (b) The full-flow test's last assertions check the table preview text for "sideline", but branch rows are now hidden until expanded. Replace the tail of that test:
 
@@ -289,8 +295,13 @@ function renderTblGroup(container, node, g, mainV, orientation) {
  const det = el("details", { className: "lgroup tbl-group" });
  det.open = openTablePaths.has(node.key);
  det.addEventListener("toggle", () => {
-  if (det.open) openTablePaths.add(node.key);
-  else openTablePaths.delete(node.key);
+  // same state-change guard as the editor groups (see Task 1): a rebuild
+  // re-sets open=true on fresh elements, and without it jsdom re-fires
+  // toggle forever
+  const had = openTablePaths.has(node.key);
+  if (det.open && !had) openTablePaths.add(node.key);
+  else if (!det.open && had) openTablePaths.delete(node.key);
+  else return;
   renderApp();
  });
  const count = countLeaves(node);
