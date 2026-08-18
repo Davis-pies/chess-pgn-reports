@@ -710,8 +710,20 @@ sup {
 	.markup,
 	.help,
 	.export,
-	.pv-table {
+	.pv-table,
+	.notes {
 		display: none !important;
+	}
+	.print-notes {
+		margin: 8px 0 16px;
+		page-break-inside: avoid;
+	}
+	.print-notes-h {
+		font-size: 0.75rem;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+		color: #222;
+		margin-bottom: 4px;
 	}
 	.side-panel {
 		position: static;

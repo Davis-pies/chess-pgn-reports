@@ -338,20 +338,68 @@ function appendPrintTables(box, g) {
 	const split = current.showSplitTrie === true;
 	if (!split && others.length <= size) {
 		renderTable(wrap, g, "horizontal");
+		renderTableNotes(wrap, g.vars, true);
 	} else {
 		// pack branches into tables of up to `size` lines: tiny branches share
 		// a table, and an oversized fork is cut at its own sub-forks — every
 		// table spans only the deepest line it actually covers (the mainline
-		// reference column stops there too)
-		packForPrint(buildTrie(others, mainV), size).forEach((lines) =>
+		// reference column stops there too). Each table's notes render under
+		// it; the mainline's notes only under the first table.
+		packForPrint(buildTrie(others, mainV), size).forEach((lines, i) => {
 			renderTable(
 				wrap,
 				{ ...g, vars: [mainV, ...lines], maxPly: subMaxPly(lines) },
 				"horizontal",
-			),
-		);
+			);
+			renderTableNotes(wrap, [mainV, ...lines], i === 0);
+		});
 	}
 	box.appendChild(wrap);
+}
+
+// The numbered notes belonging to a table's var (matched back to its source
+// line by move-array identity). Numbers match the superscripts in the cells.
+function notesForVar(v) {
+	const line = current.lines.find((l) => l.moves === v.moves);
+	if (!line) return [];
+	const all = allNotes();
+	const out = [];
+	const seen = new Set();
+	(line.comments || []).forEach((c) => {
+		const n = all.find((x) => x.ply === c.ply && x.text === c.text);
+		if (!n || seen.has(n.n)) return;
+		seen.add(n.n);
+		out.push(n);
+	});
+	return out;
+}
+
+// A table's notes rendered beneath it in the print report. `showMain` includes
+// the mainline's notes (first table only — the mainline column repeats in
+// every packed table).
+function renderTableNotes(wrap, vars, showMain) {
+	const rows = [];
+	vars.forEach((v) => {
+		if (v.tag === "mainline" && !showMain) return;
+		notesForVar(v).forEach((n) => rows.push(n));
+	});
+	if (!rows.length) return;
+	const box = el("div", { className: "print-notes" });
+	box.appendChild(
+		el("div", { className: "print-notes-h", textContent: "Notes" }),
+	);
+	rows.forEach((n) => {
+		const row = el("div", { className: "nt" });
+		row.appendChild(el("sup", { textContent: "[" + n.n + "]" }));
+		const span = document.createElement("span");
+		span.appendChild(
+			document.createTextNode(moveRef(n.ply, n.owner) + " \u2014 "),
+		);
+		renderInline(span, n.text);
+		row.appendChild(span);
+		box.appendChild(row);
+	});
+	wrap.appendChild(box);
 }
 
 // Greedily pack trie branches into print-table line groups, targeting FULL
@@ -992,11 +1040,11 @@ function moveStrip(l) {
 				"move-chip" + (sel ? " on" : "") + (hasNote ? " has-note" : ""),
 			textContent: num + m.san + (mark ? " \u00b7 " + mark : ""),
 		});
-		noteNums.forEach((n) => {
+		if (noteNums.length) {
 			const sup = document.createElement("sup");
-			sup.textContent = String(n);
+			sup.textContent = noteNums.join(",");
 			b.appendChild(sup);
-		});
+		}
 		b.onclick = () => {
 			// annotating a shared move targets the whole identical group
 			current.sel =

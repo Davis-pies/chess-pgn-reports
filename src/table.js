@@ -49,14 +49,19 @@ export function grid(lines) {
 			cells[m.ply] = { text, cls, mark: marks[m.ply] || "" };
 		});
 		// note markers keyed by ply; identical (ply,text) notes shared across
-		// lines get one number, matching allNotes()
+		// lines get one number, matching allNotes(). A line that carries the
+		// same note text twice at one ply still gets the number only once.
 		const noteByPly = {};
+		const lineSeen = new Set();
 		(l.comments || []).forEach((c) => {
 			const k = c.ply + "|" + c.text;
 			if (!seen.has(k)) {
 				seen.add(k);
 				noteNum++;
 			}
+			const lk = c.ply + "|" + noteNum;
+			if (lineSeen.has(lk)) return;
+			lineSeen.add(lk);
 			(noteByPly[c.ply] = noteByPly[c.ply] || []).push(noteNum);
 		});
 		const base = {

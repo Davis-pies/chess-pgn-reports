@@ -154,12 +154,12 @@ function moveCell(c, ply, noteByPly) {
 	const e = td(c ? c.text : "", c ? c.cls : "");
 	if (c && c.mark) e.appendChild(document.createTextNode(" " + c.mark));
 	const notes = noteByPly && noteByPly[ply];
-	if (notes)
-		notes.forEach((n) => {
-			const s = document.createElement("sup");
-			s.textContent = String(n);
-			e.appendChild(s);
-		});
+	if (notes && notes.length) {
+		// comma-separated so multiple notes at one move stay readable
+		const s = document.createElement("sup");
+		s.textContent = notes.join(",");
+		e.appendChild(s);
+	}
 	return e;
 }
 
@@ -328,11 +328,12 @@ function buildCardMoves(container, v) {
 		const num = m.ply % 2 === 0 ? Math.floor(m.ply / 2) + 1 + ". " : "";
 		const mark = v.marks && v.marks[m.ply] ? " " + v.marks[m.ply] : "";
 		seg(num + m.san + mark);
-		((v.noteByPly && v.noteByPly[m.ply]) || []).forEach((n) => {
+		const refs = (v.noteByPly && v.noteByPly[m.ply]) || [];
+		if (refs.length) {
 			const sup = document.createElement("sup");
-			sup.textContent = String(n);
+			sup.textContent = refs.join(",");
 			container.appendChild(sup);
-		});
+		}
 	});
 }
 
