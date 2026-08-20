@@ -5,11 +5,11 @@ import { renderTable } from "./render.js";
 import { el } from "./dom.js";
 import { getCurrent } from "./state.js";
 import { allNotes } from "./notes.js";
-// buildTrie/leavesOf (seam 2) and moveRef/renderInline (seam 4) still live in
-// app.js at this point in the extraction -- imported back from there for now.
-// Once those seams are pulled out, these two imports move to point at
-// ./trie-view.js and ./export.js respectively.
-import { buildTrie, leavesOf, moveRef, renderInline } from "./app.js";
+import { buildTrie, leavesOf } from "./trie-view.js";
+// moveRef/renderInline (seam 4) still live in app.js at this point in the
+// extraction -- imported back from there for now. Once that seam is pulled
+// out, this import moves to point at ./export.js.
+import { moveRef, renderInline } from "./app.js";
 
 // Highest ply present in a subset of table vars — so a per-branch print table
 // doesn't render empty rows down to the notebook's global max.

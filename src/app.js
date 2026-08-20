@@ -3,7 +3,6 @@ import { parsePgn, fenAt, fenMap } from "./pgn.js";
 import { collectLines } from "./tree.js";
 import { grid, divergence } from "./table.js";
 import {
-	renderTable,
 	renderCards,
 	appendBoard,
 	fullmoveLabel,
@@ -25,9 +24,16 @@ import {
 	openTablePaths,
 	getSharedInfo,
 	setSharedInfo,
+	setRenderHooks,
 } from "./state.js";
 import { allNotes } from "./notes.js";
-import { appendPrintTables, subMaxPly } from "./print.js";
+import { appendPrintTables } from "./print.js";
+import {
+	buildTrie,
+	renderTrieTable,
+	collectKeys,
+	renderTrieNode,
+} from "./trie-view.js";
 
 // Canonical reset for `current`. Every "start over" path (New/Import, Load &
 // Tag, opening a saved notebook, a failed open) rebuilt this object from an
@@ -55,6 +61,19 @@ function freshState(overrides = {}) {
 }
 
 setCurrent(freshState());
+// Reset the shared UI-open state too. In production this module body runs
+// exactly once per page load, so these sets are already empty here and this
+// is a no-op; it only matters for the test suite, which re-imports app.js
+// (with a cache-busting query string) to get fresh state per test -- since
+// openPaths/openTablePaths now live in the state.js singleton rather than as
+// module-local `const`s of app.js, they'd otherwise carry leftover entries
+// from a previous test's app.js instance into this one.
+openPaths.clear();
+openTablePaths.clear();
+// Point the extracted view modules' callbacks at *this* app.js instance --
+// see the comment on setRenderHooks() in state.js for why this indirection
+// (rather than a static `import ... from "./app.js"`) is necessary.
+setRenderHooks({ renderApp, rerenderTable, rerenderMarkup, lineEditor });
 let sideDragging = false; // dragging the table-panel resize handle
 
 // Rebuild-only-the-panel refs: expanding/collapsing a trie group must not
@@ -62,14 +81,14 @@ let sideDragging = false; // dragging the table-panel resize handle
 // state), so these two panels rebuild in place instead.
 let tableBox = null; // the .pv-table container
 let markupBox = null; // the .markup container
-function rerenderTable() {
+export function rerenderTable() {
 	if (!tableBox) return;
 	const g = grid(getCurrent().lines);
 	tableBox.replaceChildren();
 	tableBox.appendChild(el("h3", { textContent: "Table" }));
 	renderTrieTable(tableBox, g, getCurrent().orientation);
 }
-function rerenderMarkup() {
+export function rerenderMarkup() {
 	if (!markupBox) return;
 	const nb = markupPanel();
 	markupBox.replaceChildren(...nb.children);
@@ -453,206 +472,6 @@ function orientationToggle() {
 	return bar;
 }
 
-// Trie of the side lines' divergent tails, so lines that share pieces of their
-// divergence from the mainline are grouped together (nested collapsible groups).
-export function buildTrie(lines, main) {
-	const root = { children: new Map(), leaf: null };
-	for (const l of lines) {
-		if (l.isMain) continue;
-		const d = divergence(l, main);
-		let node = root;
-		for (const m of l.moves.slice(d)) {
-			const k = m.ply + ":" + m.san;
-			let child = node.children.get(k);
-			if (!child) {
-				child = {
-					children: new Map(),
-					leaf: null,
-					move: m,
-					// root-relative path key: stable across renders, used to
-					// remember which <details> groups are open
-					key: (node.key ? node.key + "/" : "") + k,
-				};
-				node.children.set(k, child);
-			}
-			node = child;
-		}
-		node.leaf = l;
-	}
-	return root;
-}
-
-// Left-panel preview: ONE table. The mainline column is always visible (left
-// in horizontal, top row in vertical); each top-level trie branch contributes
-// its columns. A collapsed branch is compressed to a single shared-continuation
-// column (the moves all its lines have in common up to the fork); clicking that
-// column's header expands it back into its individual line columns.
-function renderTrieTable(container, g, orientation) {
-	const mainV = g.vars[0]; // mainline sorts first
-	const others = g.vars.slice(1);
-	const trie = buildTrie(others, mainV);
-	const controls = el("div", { className: "orow tbl-controls" });
-	controls.appendChild(el("span", { textContent: "Branches: " }));
-	const ex = el("button", {
-		className: "chip mini",
-		textContent: "Expand all",
-	});
-	ex.onclick = () => {
-		openTablePaths.clear();
-		trie.children.forEach((c) => collectKeys(c, openTablePaths));
-		rerenderTable();
-	};
-	const col = el("button", {
-		className: "chip mini",
-		textContent: "Collapse all",
-	});
-	col.onclick = () => {
-		openTablePaths.clear();
-		rerenderTable();
-	};
-	controls.append(ex, col);
-	container.appendChild(controls);
-	if (!mainV) return;
-	// build the single table's var list: mainline + each branch. A branch with
-	// ONE line is a plain column (no collapse affordance). A multi-line branch
-	// collapses to a single compact column ("▸ N lines" header, shared moves in
-	// its cells); its expanded lines are clickable to collapse the branch again.
-	const vars = [mainV];
-	trie.children.forEach((c) => {
-		if (countLeaves(c) === 1) {
-			vars.push(...leavesOf(c));
-		} else if (openTablePaths.has(c.key)) {
-			const collapse = () => {
-				openTablePaths.delete(c.key);
-				rerenderTable();
-			};
-			leavesOf(c).forEach((l) => vars.push({ ...l, onclick: collapse }));
-		} else {
-			vars.push(collapsedVar(c));
-		}
-	});
-	// rows span only the VISIBLE columns — collapsed branches don't stretch the
-	// table down to the deepest hidden line
-	renderTable(container, { ...g, vars, maxPly: subMaxPly(vars) }, orientation);
-}
-
-// A collapsed trie branch as a single column/row of its shared continuation:
-// the moves common to all its lines up to the first fork, with divergent cells
-// empty. Its header is clickable to expand.
-function collapsedVar(node) {
-	const shared = sharedMoves(node); // [{ ply, san }] down the single-child chain
-	const cells = {};
-	shared.forEach((m) => {
-		cells[m.ply] = { text: m.san, cls: "collapsed" };
-	});
-	// ellipsis prefix before the branch's first shared move, like a sideline
-	const d = shared.length ? shared[0].ply : 0;
-	for (let ply = 0; ply < d; ply++)
-		cells[ply] = { text: "…", cls: "ellip" };
-	const count = countLeaves(node);
-	return {
-		tag: "collapse",
-		label: "",
-		name: `${count} lines`, // compact: the shared moves are in the column cells
-		eval: "",
-		cells,
-		noteByPly: {},
-		collapsed: true,
-		onclick: () => {
-			openTablePaths.add(node.key);
-			rerenderTable();
-		},
-	};
-}
-
-// The moves a branch's lines share, from the branch's root child down its
-// single-child chain to the first fork (or the leaf).
-function sharedMoves(node) {
-	const out = [];
-	let n = node;
-	while (true) {
-		out.push({ ply: n.move.ply, san: n.move.san });
-		if (n.leaf || n.children.size !== 1) break;
-		n = [...n.children.values()][0];
-	}
-	return out;
-}
-
-function countLeaves(node) {
-	let n = node.leaf ? 1 : 0;
-	node.children.forEach((c) => (n += countLeaves(c)));
-	return n;
-}
-
-function branchLabel(move) {
-	return fullmoveLabel(move.ply) + move.san;
-}
-
-// All descendant lines of a trie node, depth-first (the flat row/column set
-// a table branch contributes to the preview).
-export function leavesOf(node) {
-	const out = [];
-	if (node.leaf) out.push(node.leaf);
-	node.children.forEach((c) => out.push(...leavesOf(c)));
-	return out;
-}
-
-// Shared move path of a branch, accumulated through its single-child chain
-// (e.g. "1... c5 2. Nf3") for the group header.
-// Collect a node's key and every descendant's key (for "Expand all").
-function collectKeys(node, into) {
-	if (node.key) into.add(node.key);
-	node.children.forEach((c) => collectKeys(c, into));
-}
-
-function renderTrieNode(container, node, nameCounter, path, allOpen) {
-	const nextPath = path
-		? path + "  " + branchLabel(node.move)
-		: branchLabel(node.move);
-	const boards = getCurrent().showBoards; // inline-boards master toggle
-	// single-child chain: inline it, accumulating the path so a long shared
-	// continuation shows as one compressed header, not nested single groups
-	if (!node.leaf && node.children.size === 1) {
-		node.children.forEach((c) =>
-			renderTrieNode(container, c, nameCounter, nextPath, allOpen),
-		);
-		return;
-	}
-	// every node — fork OR lone line — is a collapsible group, closed by
-	// default; header shows the full shared path up to this node
-	const det = el("details", { className: "lgroup" });
-	det.open = openPaths.has(node.key);
-	det.addEventListener("toggle", () => {
-		// only rebuild when the open-state actually changed; jsdom fires a
-		// toggle when a rebuilt element gets open=true, and without this guard
-		// that rebuild re-schedules another toggle forever
-		const had = openPaths.has(node.key);
-		if (det.open && !had) openPaths.add(node.key);
-		else if (!det.open && had) openPaths.delete(node.key);
-		else return;
-		rerenderMarkup(); // boards appear/disappear with expansion (in-place, so the table scroll keeps its position)
-		// ponytail: whole-app re-render; if toggling feels slow on huge files,
-		// scope the rebuild to the markup panel only
-	});
-	const count = countLeaves(node);
-	det.appendChild(
-		el("summary", {
-			className: "lg-head",
-			textContent: `${nextPath} · ${count} line${count === 1 ? "" : "s"}`,
-		}),
-	);
-	const body = el("div", { className: "lgroup-body" });
-	const open = det.open;
-	if (node.leaf)
-		body.appendChild(
-			lineEditor(node.leaf, nameCounter.n++, allOpen && open && boards),
-		);
-	node.children.forEach((c) =>
-		renderTrieNode(body, c, nameCounter, "", allOpen && open),
-	);
-	det.appendChild(body);
-	container.appendChild(det);
-}
 
 function markupPanel() {
 	const box = el("div", { className: "markup" });
@@ -732,7 +551,7 @@ function markupPanel() {
 	return box;
 }
 
-function lineEditor(l, idx, showBoard = false) {
+export function lineEditor(l, idx, showBoard = false) {
 	const row = el("div", { className: "ledge" });
 	const tag = l.tag || "";
 	const btn = (t, txt) => {
