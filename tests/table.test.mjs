@@ -71,6 +71,22 @@ test("footnote lines are pulled out of the table rows into footNotes", () => {
 	);
 });
 
+test("footnote letters fall back to a double-letter scheme past z", () => {
+	const main = { isMain: true, moves: [], comments: [] };
+	const feet = Array.from({ length: 28 }, (_, i) => ({
+		tag: "foot",
+		moves: [],
+		comments: [],
+		name: "f" + i,
+	}));
+	const { footNotes } = grid([main, ...feet]);
+	assert.strictEqual(footNotes.length, 28);
+	assert.strictEqual(footNotes[0].letter, "a");
+	assert.strictEqual(footNotes[25].letter, "z");
+	assert.strictEqual(footNotes[26].letter, "aa");
+	assert.strictEqual(footNotes[27].letter, "ab");
+});
+
 test("a comment's note marker appears only on the line that owns it", () => {
 	const pgn = "1. e4 {Central} e5 (1... c5 2. Nf3) 2. Nf3";
 	const comments = parsePgn(pgn).comments;
@@ -83,6 +99,26 @@ test("a comment's note marker appears only on the line that owns it", () => {
 		!sidVar.noteByPly[0] || sidVar.noteByPly[0].length === 0,
 		"sideline carries no duplicate marker",
 	);
+});
+
+test("a repeated note keeps its original number even after a distinct note is assigned in between", () => {
+	const lines = linesFrom(
+		"1. e4 e5 2. Nf3 Nc6 (2... Nf6) (2... Bc5)",
+	);
+	// mainline carries "REPEAT" at ply 2, the first sideline carries a
+	// distinct "UNIQUE" note at ply 3, and the second sideline repeats
+	// "REPEAT" at ply 2 again — it must be numbered 1 (its original number),
+	// not whatever noteNum has advanced to since (2, from "UNIQUE").
+	lines[0].comments = [{ ply: 2, text: "REPEAT" }];
+	lines[1].comments = [{ ply: 3, text: "UNIQUE" }];
+	lines[2].comments = [{ ply: 2, text: "REPEAT" }];
+	const { vars } = grid(lines);
+	const mainVar = vars.find((v) => v.tag === "mainline");
+	const repeatAgainVar = vars.find(
+		(v) => v.tag !== "mainline" && v.moves.some((m) => m.san === "Bc5"),
+	);
+	assert.deepStrictEqual(mainVar.noteByPly[2], [1]);
+	assert.deepStrictEqual(repeatAgainVar.noteByPly[2], [1]);
 });
 
 test("a variation's note shows only on the variation, not the mainline branch move", () => {

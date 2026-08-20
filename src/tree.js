@@ -19,6 +19,14 @@ function nodeComments(seq) {
 }
 
 export function collectLines(nodes) {
+	// Result-only or empty movetext (e.g. "*", or no moves at all): there is no
+	// mainline to build (no moves were ever played), so there are no lines.
+	// Callers (see app.js) already treat an empty `nodes` as "no moves found"
+	// before ever reaching collectLines/grid, so an empty array here matches
+	// the "no game" state they already handle rather than fabricating a
+	// synthetic empty mainline (which would need an invented starting FEN).
+	if (!nodes.length) return [];
+
 	const lines = [];
 	function walk(seq, prefix, isTop) {
 		const path = prefix.slice();

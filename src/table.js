@@ -14,6 +14,18 @@ export function divergence(line, main) {
 	return i;
 }
 
+// Footnote letter for index i (0-based): a..z, then aa, ab, ... az, ba, ...
+function footLetter(i) {
+	let n = i + 1;
+	let s = "";
+	while (n > 0) {
+		n--;
+		s = String.fromCharCode(97 + (n % 26)) + s;
+		n = Math.floor(n / 26);
+	}
+	return s;
+}
+
 const TAG_META = {
 	mainline: { label: "Mainline" },
 	sideline: { label: "Sideline" },
@@ -25,7 +37,7 @@ export function grid(lines) {
 	// number the notes in line order (matches allNotes()); each line carries its
 	// own comments, so ownership is structural rather than inferred from ply
 	let noteNum = 0;
-	const seen = new Set(); // identical (ply,text) notes collapse to one number
+	const seen = new Map(); // identical (ply,text) key -> the number first assigned to it
 	const vars = []; // mainline + sidelines (table rows)
 	const footNotes = []; // footnote lines (prose section)
 	lines.forEach((l) => {
@@ -55,14 +67,16 @@ export function grid(lines) {
 		const lineSeen = new Set();
 		(l.comments || []).forEach((c) => {
 			const k = c.ply + "|" + c.text;
-			if (!seen.has(k)) {
-				seen.add(k);
+			let num = seen.get(k);
+			if (num === undefined) {
 				noteNum++;
+				num = noteNum;
+				seen.set(k, num);
 			}
-			const lk = c.ply + "|" + noteNum;
+			const lk = c.ply + "|" + num;
 			if (lineSeen.has(lk)) return;
 			lineSeen.add(lk);
-			(noteByPly[c.ply] = noteByPly[c.ply] || []).push(noteNum);
+			(noteByPly[c.ply] = noteByPly[c.ply] || []).push(num);
 		});
 		const base = {
 			tag,
@@ -83,8 +97,10 @@ export function grid(lines) {
 		(a, b) => (a.tag === "mainline" ? -1 : 1) - (b.tag === "mainline" ? -1 : 1),
 	);
 
-	// letter the footnote lines
-	footNotes.forEach((f, i) => (f.letter = String.fromCharCode(97 + i)));
+	// letter the footnote lines: a, b, ..., z, aa, ab, ... (spreadsheet-column
+	// style bijective base-26) so a 27th+ footnote doesn't overflow into
+	// punctuation/non-printable code points past 'z'.
+	footNotes.forEach((f, i) => (f.letter = footLetter(i)));
 
 	const maxPly = vars.reduce(
 		(m, v) => Math.max(m, ...Object.keys(v.cells).map(Number)),
