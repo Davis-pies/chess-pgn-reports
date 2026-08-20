@@ -34,3 +34,8 @@ test("recurses through nested variations into distinct lines", () => {
 	// f5 replaces the 1...d5 move, so it is not in the line
 	assert.strictEqual(f5.moves.map((m) => m.san).join(" "), "d4 f5");
 });
+
+test("returns no lines for movetext with no moves (empty or result-only)", () => {
+	assert.deepStrictEqual(collectLines(parsePgn("").nodes), []);
+	assert.deepStrictEqual(collectLines(parsePgn("*").nodes), []);
+});
