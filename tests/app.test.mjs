@@ -3,7 +3,28 @@ import assert from "node:assert";
 import { JSDOM } from "jsdom";
 import { saveNotebook } from "../src/store.js";
 
-const tick = () => new Promise((r) => setTimeout(r, 60));
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Wait for a condition instead of guessing a duration. `withLoading` awaits a
+// double requestAnimationFrame (~32ms of jsdom frames) *before* running the
+// synchronous parse+render, so a fixed delay races the machine: it fits on an
+// idle laptop and misses on a loaded CI runner.
+const waitFor = async (pred, label, timeout = 5000) => {
+	const deadline = Date.now() + timeout;
+	while (!pred()) {
+		if (Date.now() > deadline)
+			throw new Error(`waitFor timed out after ${timeout}ms: ${label}`);
+		await sleep(5);
+	}
+};
+
+// Settle the UI: the loading overlay is present for exactly as long as
+// `withLoading` is in flight, so its absence is the "render finished" signal.
+const tick = async () => {
+	await sleep(5);
+	await waitFor(() => !document.getElementById("loading"), "loading overlay");
+	await sleep(5);
+};
 
 test("full app flow: import PGN, tag a line, render table preview", async () => {
 	const dom = new JSDOM('<!DOCTYPE html><main id="view"></main>', {
