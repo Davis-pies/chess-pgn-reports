@@ -1,15 +1,8 @@
 // Browser glue: import PGN, tag each line, render the table, persist notebook.
-import { parsePgn, fenAt, fenMap } from "./pgn.js";
+import { parsePgn, fenMap } from "./pgn.js";
 import { collectLines } from "./tree.js";
-import { grid, divergence } from "./table.js";
-import {
-	renderTable,
-	renderCards,
-	appendBoard,
-	fullmoveLabel,
-	fullMovesText,
-	cardMovesText,
-} from "./render.js";
+import { grid } from "./table.js";
+import { renderCards } from "./render.js";
 import {
 	saveNotebook,
 	listNotebooks,
@@ -17,6 +10,25 @@ import {
 	deleteNotebook,
 	keyFor,
 } from "./store.js";
+import { el } from "./dom.js";
+import {
+	getCurrent,
+	setCurrent,
+	openPaths,
+	openTablePaths,
+	setSharedInfo,
+	setRenderHooks,
+} from "./state.js";
+import { allNotes } from "./notes.js";
+import { appendPrintTables } from "./print.js";
+import {
+	buildTrie,
+	renderTrieTable,
+	collectKeys,
+	renderTrieNode,
+} from "./trie-view.js";
+import { lineEditor } from "./line-editor.js";
+import { notesFootnotesPanel, exportBar } from "./export.js";
 
 // Canonical reset for `current`. Every "start over" path (New/Import, Load &
 // Tag, opening a saved notebook, a failed open) rebuilt this object from an
@@ -43,29 +55,35 @@ function freshState(overrides = {}) {
 	};
 }
 
-let current = freshState();
+setCurrent(freshState());
+// Reset the shared UI-open state too. In production this module body runs
+// exactly once per page load, so these sets are already empty here and this
+// is a no-op; it only matters for the test suite, which re-imports app.js
+// (with a cache-busting query string) to get fresh state per test -- since
+// openPaths/openTablePaths now live in the state.js singleton rather than as
+// module-local `const`s of app.js, they'd otherwise carry leftover entries
+// from a previous test's app.js instance into this one.
+openPaths.clear();
+openTablePaths.clear();
+// Point the extracted view modules' callbacks at *this* app.js instance --
+// see the comment on setRenderHooks() in state.js for why this indirection
+// (rather than a static `import ... from "./app.js"`) is necessary.
+setRenderHooks({ renderApp, rerenderTable, rerenderMarkup, lineEditor });
 let sideDragging = false; // dragging the table-panel resize handle
-
-// trie groups the user expanded — details open state survives re-renders
-const openPaths = new Set();
-
-// trie groups the user expanded in the TABLE preview — separate from the
-// editor's openPaths: expanding a table branch does not expand the editor
-const openTablePaths = new Set();
 
 // Rebuild-only-the-panel refs: expanding/collapsing a trie group must not
 // re-render the whole app (that resets the side-panel scroll and other view
 // state), so these two panels rebuild in place instead.
 let tableBox = null; // the .pv-table container
 let markupBox = null; // the .markup container
-function rerenderTable() {
+export function rerenderTable() {
 	if (!tableBox) return;
-	const g = grid(current.lines);
+	const g = grid(getCurrent().lines);
 	tableBox.replaceChildren();
 	tableBox.appendChild(el("h3", { textContent: "Table" }));
-	renderTrieTable(tableBox, g, current.orientation);
+	renderTrieTable(tableBox, g, getCurrent().orientation);
 }
-function rerenderMarkup() {
+export function rerenderMarkup() {
 	if (!markupBox) return;
 	const nb = markupPanel();
 	markupBox.replaceChildren(...nb.children);
@@ -74,7 +92,6 @@ function rerenderMarkup() {
 // identical-move tracking: a shared move (same position reached + same SAN)
 // is annotated once and applied to every line carrying it
 const fenCache = new WeakMap(); // line -> Map(ply -> fen)
-let sharedInfo = {}; // { byLine: line -> Map(ply -> id), idLines: id -> [lines] }
 function fenAtLine(l, ply) {
 	let m = fenCache.get(l);
 	if (!m) fenCache.set(l, (m = fenMap(l.moves)));
@@ -85,7 +102,7 @@ function computeShared() {
 	const idLines = new Map();
 	const byFenSan = new Map();
 	let next = 0;
-	current.lines.forEach((l) => {
+	getCurrent().lines.forEach((l) => {
 		const per = new Map();
 		l.moves.forEach((m) => {
 			const k = fenAtLine(l, m.ply) + "\u0000" + m.san;
@@ -101,7 +118,7 @@ function computeShared() {
 		});
 		byLine.set(l, per);
 	});
-	sharedInfo = { byLine, idLines };
+	setSharedInfo({ byLine, idLines });
 }
 
 // For each line, the deepest prefix shared with any OTHER line — i.e. the
@@ -110,7 +127,7 @@ function computeShared() {
 const uniqInfo = new Map(); // moves-array -> first-unique-move index
 function computeUnique() {
 	uniqInfo.clear();
-	const lines = current.lines;
+	const lines = getCurrent().lines;
 	for (const l of lines) {
 		let best = 0;
 		const a = l.moves;
@@ -125,24 +142,6 @@ function computeUnique() {
 	}
 }
 
-// Flatten every line's own comments into the numbered Notes list (mainline
-// first, then each variation). Each entry remembers its owning line, so notes
-// are attached to a specific line rather than to a (colliding) ply.
-function allNotes() {
-	const out = [];
-	const seen = new Set();
-	current.lines.forEach((l) => {
-		(l.comments || []).forEach((c) => {
-			// identical (ply,text) notes carried by several shared lines are one note
-			const k = c.ply + "|" + c.text;
-			if (seen.has(k)) return;
-			seen.add(k);
-			out.push({ ply: c.ply, text: c.text, owner: l, n: out.length + 1 });
-		});
-	});
-	return out;
-}
-
 const $ = (id) => document.getElementById(id);
 
 // Full-viewport loading feedback. Painted via double-rAF before the slow
@@ -155,7 +154,7 @@ const paintFrame = () =>
 async function withLoading(fn) {
 	const ov = el("div", { id: "loading", className: "loading-overlay" });
 	ov.appendChild(el("div", { className: "spinner" }));
-	ov.appendChild(el("span", { textContent: "Loading\u2026" }));
+	ov.appendChild(el("span", { textContent: "Loading…" }));
 	document.body.appendChild(ov);
 	await paintFrame();
 	try {
@@ -163,17 +162,6 @@ async function withLoading(fn) {
 	} finally {
 		ov.remove();
 	}
-}
-
-function el(tag, props, children = []) {
-	const e = document.createElement(tag);
-	Object.assign(e, props);
-	(Array.isArray(children) ? children : [children]).forEach((c) =>
-		typeof c === "string"
-			? e.appendChild(document.createTextNode(c))
-			: e.appendChild(c),
-	);
-	return e;
 }
 
 const THEME_KEY = "ott-theme";
@@ -211,7 +199,7 @@ function renderApp() {
 
 function viewRoot() {
 	const wrap = el("div", { className: "app" });
-	if (!current.lines.length) {
+	if (!getCurrent().lines.length) {
 		wrap.appendChild(importPanel());
 		return wrap;
 	}
@@ -219,32 +207,37 @@ function viewRoot() {
 	top.appendChild(
 		el("button", {
 			onclick: () => {
-				current = freshState({
-					boardSize: current.boardSize,
-					sideWidth: current.sideWidth,
-				});
+				setCurrent(
+					freshState({
+						boardSize: getCurrent().boardSize,
+						sideWidth: getCurrent().sideWidth,
+					}),
+				);
 				renderApp();
 			},
 			textContent: "New / Import",
 		}),
 	);
 	const name = el("input", {
-		value: current.name,
+		value: getCurrent().name,
 		placeholder: "Notebook name",
 		className: "name",
 	});
 	name.oninput = () => {
-		current.name = name.value;
+		getCurrent().name = name.value;
 	};
 	top.appendChild(name);
 	const save = el("button", { className: "chip primary", textContent: "Save" });
 	save.onclick = () => {
-		if (!current.name) current.name = "Untitled";
-		const ok = saveNotebook(current.id || (current.id = "n" + Date.now()), {
-			name: current.name,
-			pgn: current.pgn,
-			lines: current.lines,
-		});
+		if (!getCurrent().name) getCurrent().name = "Untitled";
+		const ok = saveNotebook(
+			getCurrent().id || (getCurrent().id = "n" + Date.now()),
+			{
+				name: getCurrent().name,
+				pgn: getCurrent().pgn,
+				lines: getCurrent().lines,
+			},
+		);
 		if (ok) {
 			save.textContent = "Saved ✓";
 			setTimeout(() => (save.textContent = "Save"), 1200);
@@ -258,13 +251,13 @@ function viewRoot() {
 	const layout = el("div", { className: "app-layout" });
 	const side = el("aside", { className: "side-panel" });
 	const main = el("div", { className: "main-panel" });
-	const g = grid(current.lines);
+	const g = grid(getCurrent().lines);
 
 	// side: the preview (table, or print lines) with its own scroll, resizable
 	const t = el("div", { className: "pv-table" });
 	tableBox = t;
 	t.appendChild(el("h3", { textContent: "Table" }));
-	renderTrieTable(t, g, current.orientation);
+	renderTrieTable(t, g, getCurrent().orientation);
 	side.appendChild(t);
 	const c = el("div", { className: "pv-cards" });
 	c.appendChild(
@@ -272,9 +265,9 @@ function viewRoot() {
 	);
 	renderCards(c, g, {
 		notes: allNotes(),
-		boardSize: current.boardSize,
-		showFinalBoard: current.showFinalBoard,
-		showFirstDivBoard: current.showFirstDivBoard,
+		boardSize: getCurrent().boardSize,
+		showFinalBoard: getCurrent().showFinalBoard,
+		showFirstDivBoard: getCurrent().showFirstDivBoard,
 		uniq: uniqInfo,
 	});
 	side.appendChild(c);
@@ -304,159 +297,22 @@ function viewRoot() {
 	wrap.appendChild(layout);
 
 	// `preview` flips the LEFT panel between the table and the print lines
-	const useCards = current.preview === "cards";
+	const useCards = getCurrent().preview === "cards";
 	t.classList.toggle("hidden", useCards);
 	c.classList.toggle("hidden", !useCards);
 	// apply the (drag-resized) table panel width — one CSS var drives the side
 	// width and the main/toolbar left margins so everything stays aligned
 	document.documentElement.style.setProperty(
 		"--side-w",
-		(current.sideWidth || 420) + "px",
+		(getCurrent().sideWidth || 420) + "px",
 	);
 	return wrap;
-}
-
-// Print/PDF horizontal table. The mainline is always shown as the reference
-// column; the side lines are split into vertical slices of ~16 columns so the
-// table wraps across pages instead of being cut off or scaled.
-
-// Highest ply present in a subset of table vars — so a per-branch print table
-// doesn't render empty rows down to the notebook's global max.
-function subMaxPly(vars) {
-	let m = 0;
-	for (const v of vars)
-		for (const p of Object.keys(v.cells)) {
-			const n = Number(p);
-			if (n > m) m = n;
-		}
-	return m;
-}
-
-function appendPrintTables(box, g) {
-	const wrap = el("div", { className: "pv-htable" });
-	wrap.appendChild(el("h3", { textContent: "Table" }));
-	const mainV = g.vars[0]; // mainline sorts first
-	const others = g.vars.slice(1);
-	const size = 13; // mainline + 13 = 14 data columns per table (fits a page)
-	if (!mainV) {
-		box.appendChild(wrap);
-		return;
-	}
-	const split = current.showSplitTrie === true;
-	if (!split && others.length <= size) {
-		renderTable(wrap, g, "horizontal");
-		renderTableNotes(wrap, g.vars, true);
-	} else {
-		// pack branches into tables of up to `size` lines: tiny branches share
-		// a table, and an oversized fork is cut at its own sub-forks — every
-		// table spans only the deepest line it actually covers (the mainline
-		// reference column stops there too). Each table's notes render under
-		// it; the mainline's notes only under the first table.
-		packForPrint(buildTrie(others, mainV), size).forEach((lines, i) => {
-			renderTable(
-				wrap,
-				{ ...g, vars: [mainV, ...lines], maxPly: subMaxPly(lines) },
-				"horizontal",
-			);
-			renderTableNotes(wrap, [mainV, ...lines], i === 0);
-		});
-	}
-	box.appendChild(wrap);
-}
-
-// The numbered notes belonging to a table's var (matched back to its source
-// line by move-array identity). Numbers match the superscripts in the cells.
-function notesForVar(v) {
-	const line = current.lines.find((l) => l.moves === v.moves);
-	if (!line) return [];
-	const all = allNotes();
-	const out = [];
-	const seen = new Set();
-	(line.comments || []).forEach((c) => {
-		const n = all.find((x) => x.ply === c.ply && x.text === c.text);
-		if (!n || seen.has(n.n)) return;
-		seen.add(n.n);
-		out.push(n);
-	});
-	return out;
-}
-
-// A table's notes rendered beneath it in the print report. `showMain` includes
-// the mainline's notes (first table only — the mainline column repeats in
-// every packed table).
-function renderTableNotes(wrap, vars, showMain) {
-	const rows = [];
-	// Notes are shared: the editor writes one note onto every line in an
-	// equal-position group, and identical PGN comment text at the same ply
-	// collapses to a single note in allNotes(). So dedupe ACROSS lines here —
-	// notesForVar only dedupes within one line.
-	const seen = new Set();
-	vars.forEach((v) => {
-		if (v.tag === "mainline" && !showMain) return;
-		notesForVar(v).forEach((n) => {
-			if (seen.has(n.n)) return;
-			seen.add(n.n);
-			rows.push(n);
-		});
-	});
-	if (!rows.length) return;
-	const box = el("div", { className: "print-notes" });
-	box.appendChild(
-		el("div", { className: "print-notes-h", textContent: "Notes" }),
-	);
-	rows.forEach((n) => {
-		const row = el("div", { className: "nt" });
-		row.appendChild(el("sup", { textContent: "[" + n.n + "]" }));
-		const span = document.createElement("span");
-		span.appendChild(
-			document.createTextNode(moveRef(n.ply, n.owner) + " \u2014 "),
-		);
-		renderInline(span, n.text);
-		row.appendChild(span);
-		box.appendChild(row);
-	});
-	wrap.appendChild(box);
-}
-
-// Greedily pack trie branches into print-table line groups, targeting FULL
-// tables. Coherent chunks (a fork's lines, kept together while they fit the
-// cap) fill each table to the cap; only the final table may be sparse. A fork
-// bigger than the cap is split at its own sub-forks first.
-function packForPrint(trie, size) {
-	const chunks = [];
-	const collect = (node) => {
-		const lines = leavesOf(node);
-		if (lines.length <= size) {
-			chunks.push(lines);
-			return;
-		}
-		// too big for one table: split at the real sub-forks
-		if (node.leaf) chunks.push([node.leaf]);
-		node.children.forEach((c) => collect(c));
-	};
-	trie.children.forEach((c) => collect(c));
-	// fill every table to the cap, splitting a chunk at the boundary so no
-	// table is left sparse except the last one
-	const tables = [];
-	let cur = [];
-	for (const chunk of chunks) {
-		if (cur.length + chunk.length <= size) {
-			cur.push(...chunk);
-		} else {
-			const take = size - cur.length;
-			cur.push(...chunk.slice(0, take));
-			tables.push(cur);
-			cur = chunk.slice(take);
-		}
-	}
-	if (cur.length) tables.push(cur);
-	return tables;
 }
 
 function notebookList() {
 	const items = listNotebooks();
 	const box = el("div", { className: "notebooks" });
-	const shown = items.filter((n) => n.id !== current.id);
+	const shown = items.filter((n) => n.id !== getCurrent().id);
 	if (!shown.length) return box;
 	box.appendChild(
 		el("div", {
@@ -520,23 +376,27 @@ function openNotebook(id) {
 					});
 				}
 			}
-			current = freshState({
-				id,
-				name: nb.name,
-				pgn: nb.pgn,
-				lines,
-				orientation: current.orientation,
-				showBoards: current.showBoards,
-				boardSize: current.boardSize,
-				showFinalBoard: current.showFinalBoard !== false,
-				showFirstDivBoard: !!current.showFirstDivBoard,
-				sideWidth: current.sideWidth,
-			});
+			setCurrent(
+				freshState({
+					id,
+					name: nb.name,
+					pgn: nb.pgn,
+					lines,
+					orientation: getCurrent().orientation,
+					showBoards: getCurrent().showBoards,
+					boardSize: getCurrent().boardSize,
+					showFinalBoard: getCurrent().showFinalBoard !== false,
+					showFirstDivBoard: !!getCurrent().showFirstDivBoard,
+					sideWidth: getCurrent().sideWidth,
+				}),
+			);
 		} catch (e) {
-			current = freshState({
-				boardSize: current.boardSize || 300,
-				sideWidth: current.sideWidth,
-			});
+			setCurrent(
+				freshState({
+					boardSize: getCurrent().boardSize || 300,
+					sideWidth: getCurrent().sideWidth,
+				}),
+			);
 			alert("Could not open workbook: " + e.message);
 		}
 		openPaths.clear();
@@ -548,293 +408,94 @@ function orientationToggle() {
 	const bar = el("div", { className: "orow" });
 	bar.appendChild(el("span", { textContent: "Layout: " }));
 	const h = el("button", {
-		className: "chip" + (current.orientation === "horizontal" ? " on" : ""),
+		className:
+			"chip" + (getCurrent().orientation === "horizontal" ? " on" : ""),
 		textContent: "Horizontal",
 	});
 	h.onclick = () => {
-		current.orientation = "horizontal";
+		getCurrent().orientation = "horizontal";
 		renderApp();
 	};
 	const v = el("button", {
-		className: "chip" + (current.orientation === "vertical" ? " on" : ""),
+		className: "chip" + (getCurrent().orientation === "vertical" ? " on" : ""),
 		textContent: "Vertical",
 	});
 	v.onclick = () => {
-		current.orientation = "vertical";
+		getCurrent().orientation = "vertical";
 		renderApp();
 	};
 	bar.append(h, v);
-	bar.appendChild(el("span", { textContent: "\u00a0 View: " }));
+	bar.appendChild(el("span", { textContent: "  View: " }));
 	const tb = el("button", {
-		className: "chip" + (current.preview === "table" ? " on" : ""),
+		className: "chip" + (getCurrent().preview === "table" ? " on" : ""),
 		textContent: "Table",
 	});
 	tb.onclick = () => {
-		current.preview = "table";
+		getCurrent().preview = "table";
 		renderApp();
 	};
 	const cb = el("button", {
-		className: "chip" + (current.preview === "cards" ? " on" : ""),
+		className: "chip" + (getCurrent().preview === "cards" ? " on" : ""),
 		textContent: "Lines (print)",
 	});
 	cb.onclick = () => {
-		current.preview = "cards";
+		getCurrent().preview = "cards";
 		renderApp();
 	};
 	bar.append(tb, cb);
 	bar.appendChild(el("span", { textContent: " Board: " }));
 	[220, 300, 400].forEach((s) => {
 		const sb = el("button", {
-			className: "chip" + (current.boardSize === s ? " on" : ""),
+			className: "chip" + (getCurrent().boardSize === s ? " on" : ""),
 			textContent: String(s),
 		});
 		sb.onclick = () => {
-			current.boardSize = s;
+			getCurrent().boardSize = s;
 			renderApp();
 		};
 		bar.appendChild(sb);
 	});
 	const b = el("label", {}, [
 		"Board diagrams ",
-		el("input", { type: "checkbox", checked: current.showBoards }),
+		el("input", { type: "checkbox", checked: getCurrent().showBoards }),
 	]);
 	b.querySelector("input").onchange = (e) => {
-		current.showBoards = e.target.checked;
+		getCurrent().showBoards = e.target.checked;
 		renderApp();
 	};
 	bar.appendChild(b);
 	return bar;
 }
 
-// Trie of the side lines' divergent tails, so lines that share pieces of their
-// divergence from the mainline are grouped together (nested collapsible groups).
-function buildTrie(lines, main) {
-	const root = { children: new Map(), leaf: null };
-	for (const l of lines) {
-		if (l.isMain) continue;
-		const d = divergence(l, main);
-		let node = root;
-		for (const m of l.moves.slice(d)) {
-			const k = m.ply + ":" + m.san;
-			let child = node.children.get(k);
-			if (!child) {
-				child = {
-					children: new Map(),
-					leaf: null,
-					move: m,
-					// root-relative path key: stable across renders, used to
-					// remember which <details> groups are open
-					key: (node.key ? node.key + "/" : "") + k,
-				};
-				node.children.set(k, child);
-			}
-			node = child;
-		}
-		node.leaf = l;
-	}
-	return root;
-}
-
-// Left-panel preview: ONE table. The mainline column is always visible (left
-// in horizontal, top row in vertical); each top-level trie branch contributes
-// its columns. A collapsed branch is compressed to a single shared-continuation
-// column (the moves all its lines have in common up to the fork); clicking that
-// column's header expands it back into its individual line columns.
-function renderTrieTable(container, g, orientation) {
-	const mainV = g.vars[0]; // mainline sorts first
-	const others = g.vars.slice(1);
-	const trie = buildTrie(others, mainV);
-	const controls = el("div", { className: "orow tbl-controls" });
-	controls.appendChild(el("span", { textContent: "Branches: " }));
-	const ex = el("button", {
-		className: "chip mini",
-		textContent: "Expand all",
-	});
-	ex.onclick = () => {
-		openTablePaths.clear();
-		trie.children.forEach((c) => collectKeys(c, openTablePaths));
-		rerenderTable();
-	};
-	const col = el("button", {
-		className: "chip mini",
-		textContent: "Collapse all",
-	});
-	col.onclick = () => {
-		openTablePaths.clear();
-		rerenderTable();
-	};
-	controls.append(ex, col);
-	container.appendChild(controls);
-	if (!mainV) return;
-	// build the single table's var list: mainline + each branch. A branch with
-	// ONE line is a plain column (no collapse affordance). A multi-line branch
-	// collapses to a single compact column ("▸ N lines" header, shared moves in
-	// its cells); its expanded lines are clickable to collapse the branch again.
-	const vars = [mainV];
-	trie.children.forEach((c) => {
-		if (countLeaves(c) === 1) {
-			vars.push(...leavesOf(c));
-		} else if (openTablePaths.has(c.key)) {
-			const collapse = () => {
-				openTablePaths.delete(c.key);
-				rerenderTable();
-			};
-			leavesOf(c).forEach((l) => vars.push({ ...l, onclick: collapse }));
-		} else {
-			vars.push(collapsedVar(c));
-		}
-	});
-	// rows span only the VISIBLE columns — collapsed branches don't stretch the
-	// table down to the deepest hidden line
-	renderTable(container, { ...g, vars, maxPly: subMaxPly(vars) }, orientation);
-}
-
-// A collapsed trie branch as a single column/row of its shared continuation:
-// the moves common to all its lines up to the first fork, with divergent cells
-// empty. Its header is clickable to expand.
-function collapsedVar(node) {
-	const shared = sharedMoves(node); // [{ ply, san }] down the single-child chain
-	const cells = {};
-	shared.forEach((m) => {
-		cells[m.ply] = { text: m.san, cls: "collapsed" };
-	});
-	// ellipsis prefix before the branch's first shared move, like a sideline
-	const d = shared.length ? shared[0].ply : 0;
-	for (let ply = 0; ply < d; ply++)
-		cells[ply] = { text: "\u2026", cls: "ellip" };
-	const count = countLeaves(node);
-	return {
-		tag: "collapse",
-		label: "",
-		name: `${count} lines`, // compact: the shared moves are in the column cells
-		eval: "",
-		cells,
-		noteByPly: {},
-		collapsed: true,
-		onclick: () => {
-			openTablePaths.add(node.key);
-			rerenderTable();
-		},
-	};
-}
-
-// The moves a branch's lines share, from the branch's root child down its
-// single-child chain to the first fork (or the leaf).
-function sharedMoves(node) {
-	const out = [];
-	let n = node;
-	while (true) {
-		out.push({ ply: n.move.ply, san: n.move.san });
-		if (n.leaf || n.children.size !== 1) break;
-		n = [...n.children.values()][0];
-	}
-	return out;
-}
-
-function countLeaves(node) {
-	let n = node.leaf ? 1 : 0;
-	node.children.forEach((c) => (n += countLeaves(c)));
-	return n;
-}
-
-function branchLabel(move) {
-	return fullmoveLabel(move.ply) + move.san;
-}
-
-// All descendant lines of a trie node, depth-first (the flat row/column set
-// a table branch contributes to the preview).
-function leavesOf(node) {
-	const out = [];
-	if (node.leaf) out.push(node.leaf);
-	node.children.forEach((c) => out.push(...leavesOf(c)));
-	return out;
-}
-
-// Shared move path of a branch, accumulated through its single-child chain
-// (e.g. "1... c5 2. Nf3") for the group header.
-// Collect a node's key and every descendant's key (for "Expand all").
-function collectKeys(node, into) {
-	if (node.key) into.add(node.key);
-	node.children.forEach((c) => collectKeys(c, into));
-}
-
-function renderTrieNode(container, node, nameCounter, path, allOpen) {
-	const nextPath = path
-		? path + "  " + branchLabel(node.move)
-		: branchLabel(node.move);
-	const boards = current.showBoards; // inline-boards master toggle
-	// single-child chain: inline it, accumulating the path so a long shared
-	// continuation shows as one compressed header, not nested single groups
-	if (!node.leaf && node.children.size === 1) {
-		node.children.forEach((c) =>
-			renderTrieNode(container, c, nameCounter, nextPath, allOpen),
-		);
-		return;
-	}
-	// every node — fork OR lone line — is a collapsible group, closed by
-	// default; header shows the full shared path up to this node
-	const det = el("details", { className: "lgroup" });
-	det.open = openPaths.has(node.key);
-	det.addEventListener("toggle", () => {
-		// only rebuild when the open-state actually changed; jsdom fires a
-		// toggle when a rebuilt element gets open=true, and without this guard
-		// that rebuild re-schedules another toggle forever
-		const had = openPaths.has(node.key);
-		if (det.open && !had) openPaths.add(node.key);
-		else if (!det.open && had) openPaths.delete(node.key);
-		else return;
-		rerenderMarkup(); // boards appear/disappear with expansion (in-place, so the table scroll keeps its position)
-		// ponytail: whole-app re-render; if toggling feels slow on huge files,
-		// scope the rebuild to the markup panel only
-	});
-	const count = countLeaves(node);
-	det.appendChild(
-		el("summary", {
-			className: "lg-head",
-			textContent: `${nextPath} \u00b7 ${count} line${count === 1 ? "" : "s"}`,
-		}),
-	);
-	const body = el("div", { className: "lgroup-body" });
-	const open = det.open;
-	if (node.leaf)
-		body.appendChild(
-			lineEditor(node.leaf, nameCounter.n++, allOpen && open && boards),
-		);
-	node.children.forEach((c) =>
-		renderTrieNode(body, c, nameCounter, "", allOpen && open),
-	);
-	det.appendChild(body);
-	container.appendChild(det);
-}
 
 function markupPanel() {
 	const box = el("div", { className: "markup" });
 	// view toggle: grouped (divergence trie) vs flat list
-	const main = current.lines.find((l) => l.isMain) || current.lines[0];
+	const main = getCurrent().lines.find((l) => l.isMain) || getCurrent().lines[0];
 	const row = el("div", { className: "orow" });
 	const grouped = el("button", {
-		className: "chip" + (current.groupView !== "flat" ? " on" : ""),
+		className: "chip" + (getCurrent().groupView !== "flat" ? " on" : ""),
 		textContent: "Grouped",
 		onclick: () => {
-			current.groupView = "trie";
+			getCurrent().groupView = "trie";
 			rerenderMarkup();
 		},
 	});
 	const flat = el("button", {
-		className: "chip" + (current.groupView === "flat" ? " on" : ""),
+		className: "chip" + (getCurrent().groupView === "flat" ? " on" : ""),
 		textContent: "Flat",
 		onclick: () => {
-			current.groupView = "flat";
+			getCurrent().groupView = "flat";
 			rerenderMarkup();
 		},
 	});
 	row.append("View: ", grouped, flat);
-	if (current.groupView !== "flat") {
+	if (getCurrent().groupView !== "flat") {
 		const all = el("button", {
 			className: "chip mini",
 			textContent: "Expand all",
 			onclick: () => {
-				const trie = buildTrie(current.lines, main);
+				const trie = buildTrie(getCurrent().lines, main);
 				openPaths.clear();
 				trie.children.forEach((c) => collectKeys(c, openPaths));
 				renderApp();
@@ -858,14 +519,14 @@ function markupPanel() {
 		}),
 	);
 	// mainline first, then the side lines grouped as a trie of shared divergence
-	box.appendChild(lineEditor(main, 0, current.showBoards));
+	box.appendChild(lineEditor(main, 0, getCurrent().showBoards));
 	const counter = { n: 1 };
-	const trie = buildTrie(current.lines, main);
+	const trie = buildTrie(getCurrent().lines, main);
 	// flat view renders every non-main line in order; grouped uses the trie
-	if (current.groupView === "flat") {
-		current.lines.forEach((l) => {
+	if (getCurrent().groupView === "flat") {
+		getCurrent().lines.forEach((l) => {
 			if (!l.isMain)
-				box.appendChild(lineEditor(l, counter.n++, current.showBoards));
+				box.appendChild(lineEditor(l, counter.n++, getCurrent().showBoards));
 		});
 	} else {
 		trie.children.forEach((c) => renderTrieNode(box, c, counter, "", true));
@@ -875,7 +536,7 @@ function markupPanel() {
 			className: "chip",
 			textContent: "Tag remaining as sideline",
 			onclick: () => {
-				current.lines.forEach((l) => {
+				getCurrent().lines.forEach((l) => {
 					if (!l.tag && !l.isMain) l.tag = "sideline";
 				});
 				renderApp();
@@ -883,348 +544,6 @@ function markupPanel() {
 		}),
 	);
 	return box;
-}
-
-function lineEditor(l, idx, showBoard = false) {
-	const row = el("div", { className: "ledge" });
-	const tag = l.tag || "";
-	const btn = (t, txt) => {
-		const b = el("button", {
-			className: "chip tag " + t + (tag === t ? " on" : ""),
-			textContent: txt,
-		});
-		b.onclick = () => {
-			l.tag = l.tag === t ? null : t;
-			renderApp();
-		};
-		return b;
-	};
-	const isMain = !!l.isMain;
-	// name comes first, pre-populated
-	if (!l.name) l.name = isMain ? "Mainline" : "Line " + idx;
-	const name = el("input", { className: "ln", value: l.name });
-	name.oninput = () => {
-		l.name = name.value;
-	};
-	// reflect the (renamed) line in the table/cards once the field is blurred
-	name.onchange = () => renderApp();
-	const tags = el("div", { className: "tags" });
-	if (isMain) {
-		tags.appendChild(
-			el("span", { className: "maintag", textContent: "Mainline" }),
-		);
-	} else {
-		tags.append(btn("sideline", "Sideline"), btn("foot", "Footnote"));
-		const promote = el("button", {
-			className: "chip",
-			textContent: "\u2605 Make mainline",
-		});
-		promote.onclick = () => {
-			promoteMainline(l);
-		};
-		tags.appendChild(promote);
-	}
-	const head = el("div", { className: "ledge-head" });
-	head.append(name, tags);
-	row.appendChild(head);
-	row.appendChild(moveStrip(l));
-	// the symbol/comment panel appears once, on the first line of the group
-	if (current.sel && current.sel.lines && current.sel.lines[0] === l)
-		row.appendChild(movePanel(l));
-	const note = el("input", {
-		className: "lno",
-		placeholder: "note",
-		value: (l.meta && l.meta.note) || "",
-	});
-	note.oninput = () => {
-		l.meta = { ...(l.meta || {}), note: note.value };
-	};
-	note.onchange = () => renderApp();
-	row.appendChild(note);
-	// the line's end-position board, next to its line (inline boards toggle)
-	if (showBoard) {
-		const bw = el("div", { className: "ledge-board" });
-		appendBoard(bw, l.fen, current.boardSize || 220);
-		row.appendChild(bw);
-	}
-	return row;
-}
-
-// Promote a sideline/footnote line to be the mainline; demote the old one.
-function promoteMainline(l) {
-	current.lines.forEach((x) => {
-		if (x === l) {
-			x.isMain = true;
-			x.tag = undefined;
-		} else if (x.isMain) {
-			x.isMain = false;
-			if (!x.tag) x.tag = "sideline";
-		}
-	});
-	renderApp();
-}
-
-// Advantage/quality symbols offered in the line editor's evaluation picker.
-const EVAL_SYMBOLS = [
-	"",
-	"=",
-	"\u00b1",
-	"\u2213",
-	"+=",
-	"=+",
-	"\u221e",
-	"+\u2212",
-	"\u2212+",
-	"!",
-	"?",
-	"!?",
-	"?!",
-	"!!",
-	"??",
-	"\u25a1", // □ only move
-	"\u2299", // ⊙ zugzwang
-	"\u2191", // ↑ initiative
-	"\u2192", // → with attack / idea
-	"\u21c4", // ⇄ counterplay
-	"\u25b3", // △ with the threat
-	"\u2295", // ⊕ time trouble
-	"N", // novelty
-	"TN", // theoretical novelty
-];
-
-// A per-line row of tappable symbol buttons; clicking one sets (or clears)
-// that line's evaluation, which then shows in the table and lines/card views.
-// A tappable strip of a line's moves. Clicking a move selects it as the target
-// for the symbol row; the current mark, if any, is shown on the chip.
-function moveStrip(l) {
-	const mainL = current.lines.find((x) => x.isMain) || current.lines[0];
-	const wrap = el("span", { className: "moves" });
-	wrap.appendChild(
-		el("span", {
-			className: "symlabel",
-			textContent: "Tap a move\u00a0\u2192",
-		}),
-	);
-	let d = 0;
-	const mv = l.moves;
-	if (!l.isMain)
-		while (
-			d < mv.length &&
-			d < mainL.moves.length &&
-			mv[d].san === mainL.moves[d].san
-		)
-			d++;
-	// indicate the directly preceding move (where this line diverges)
-	if (!l.isMain) {
-		const ctx = branchContext(l);
-		if (ctx)
-			wrap.appendChild(el("span", { className: "ctxchip", textContent: ctx }));
-	}
-	const owned = l.isMain ? mv : mv.slice(d);
-	owned.forEach((m) => {
-		const num = m.ply % 2 === 0 ? Math.floor(m.ply / 2) + 1 + ". " : "";
-		const mark = (l.marks || {})[m.ply];
-		// this move's shared group: every line reaching the identical position
-		const gid = sharedInfo.byLine.get(l)?.get(m.ply);
-		const group = gid ? sharedInfo.idLines.get(gid) : [l];
-		// a note lives on whichever lines carry it; shared notes sit on all of them
-		const hasNote = group.some((x) =>
-			(x.comments || []).some((c) => c.ply === m.ply),
-		);
-		// numbered note references for this move's chip (superscript numbers, no brackets)
-		const noteNums = allNotes()
-			.filter(
-				(n) =>
-					n.ply === m.ply &&
-					(l.comments || []).some((c) => c.ply === n.ply && c.text === n.text),
-			)
-			.map((n) => n.n);
-		const sel =
-			current.sel &&
-			current.sel.ply === m.ply &&
-			current.sel.lines &&
-			current.sel.lines.includes(l);
-		const b = el("button", {
-			type: "button",
-			className:
-				"move-chip" + (sel ? " on" : "") + (hasNote ? " has-note" : ""),
-			textContent: num + m.san + (mark ? " \u00b7 " + mark : ""),
-		});
-		if (noteNums.length) {
-			const sup = document.createElement("sup");
-			sup.textContent = noteNums.join(",");
-			b.appendChild(sup);
-		}
-		b.onclick = () => {
-			// annotating a shared move targets the whole identical group
-			current.sel =
-				current.sel &&
-				current.sel.ply === m.ply &&
-				current.sel.lines &&
-				current.sel.lines.includes(l)
-					? null
-					: { lines: group, ply: m.ply };
-			renderApp();
-		};
-		wrap.appendChild(b);
-	});
-	return wrap;
-}
-
-// Symbol row. Applies to the selected move (a per-move mark) or, when no move
-// is selected, to the line-end evaluation.
-// Revealed when a move (or line-end) is selected on a line: symbol buttons and
-// a per-move comment editor. Collapses via the done button.
-function movePanel(l) {
-	const box = el("div", { className: "movepanel" });
-	const selPly = current.sel.ply;
-	const atEnd = selPly == null;
-	const lines = current.sel.lines || [l];
-	const cur = atEnd
-		? (l.meta && l.meta.eval) || ""
-		: (l.marks || {})[selPly] || "";
-	const mm = atEnd ? null : l.moves.find((x) => x.ply === selPly);
-	const label = atEnd ? "line-end" : fullmoveLabel(selPly) + (mm ? mm.san : "");
-	box.appendChild(
-		el("div", {
-			className: "symlabel",
-			textContent:
-				"@ " +
-				label +
-				(lines.length > 1 ? " \u00b7 " + lines.length + " shared" : "") +
-				":",
-		}),
-	);
-	// a static board of the selected move's position
-	if (!atEnd) {
-		const board = el("div", { className: "mp-board" });
-		appendBoard(board, fenAt(l.moves, selPly), current.boardSize || 220);
-		box.appendChild(board);
-	}
-	const apply = (sym) => {
-		if (atEnd) {
-			lines.forEach((x) => {
-				x.meta = { ...(x.meta || {}), eval: cur === sym ? "" : sym };
-			});
-		} else {
-			lines.forEach((x) => {
-				x.marks = x.marks || {};
-				if (cur === sym) delete x.marks[selPly];
-				else x.marks[selPly] = sym;
-				if (!Object.keys(x.marks).length) x.marks = undefined;
-			});
-		}
-	};
-	const srow = el("span", { className: "sympick" });
-	EVAL_SYMBOLS.forEach((sym) => {
-		if (!sym) return;
-		const b = el("button", {
-			type: "button",
-			className: "chip mini" + (cur === sym ? " on" : ""),
-			textContent: sym,
-		});
-		b.onclick = () => {
-			apply(sym);
-			renderApp();
-		};
-		srow.appendChild(b);
-	});
-	const clear = el("button", {
-		type: "button",
-		className: "chip mini danger",
-		textContent: "\u2715",
-		title: "clear",
-	});
-	clear.onclick = () => {
-		apply("");
-		renderApp();
-	};
-	srow.appendChild(clear);
-	box.appendChild(srow);
-	if (!atEnd) box.appendChild(commentEditor(selPly, lines));
-	const done = el("button", {
-		type: "button",
-		className: "chip mini",
-		textContent: "done",
-	});
-	done.onclick = () => {
-		current.sel = null;
-		renderApp();
-	};
-	box.appendChild(done);
-	return box;
-}
-
-// Edit/add notes attached to an (identical) move; `lines` is the shared
-// group, so every line carrying the position gets the same note.
-function commentEditor(ply, lines) {
-	const wrap = el("div", { className: "cedit" });
-	// the distinct notes at this ply across the group (deduped by text)
-	const snapshot = () => {
-		const out = [];
-		const seen = new Set();
-		lines.forEach((l) =>
-			(l.comments || []).forEach((c) => {
-				if (c.ply !== ply || seen.has(c.text)) return;
-				seen.add(c.text);
-				out.push(c.text);
-			}),
-		);
-		return out;
-	};
-	// write the same set of notes onto every line in the group
-	const writeAll = (texts) => {
-		lines.forEach((l) => {
-			l.comments = (l.comments || []).filter((c) => c.ply !== ply);
-		});
-		texts.forEach((t) => {
-			if (!t.trim()) return;
-			lines.forEach((l) => {
-				l.comments = l.comments || [];
-				l.comments.push({ ply, text: t.trim() });
-			});
-		});
-	};
-	const texts = snapshot(); // live row order; edits update this array
-	texts.forEach((_, i) => {
-		const row = el("div", { className: "nt" });
-		const inp = el("input", { className: "lno", value: texts[i] });
-		inp.oninput = () => {
-			texts[i] = inp.value;
-			writeAll(texts);
-		};
-		const del = el("button", {
-			type: "button",
-			className: "chip mini danger",
-			textContent: "\u2715",
-		});
-		del.onclick = () => {
-			texts.splice(i, 1);
-			writeAll(texts);
-			renderApp();
-		};
-		row.append(inp, del);
-		wrap.appendChild(row);
-	});
-	const addInp = el("input", {
-		className: "lno",
-		placeholder: texts.length ? "add another note…" : "note at this move…",
-	});
-	const add = el("button", {
-		type: "button",
-		className: "chip",
-		textContent: "Add note",
-	});
-	add.onclick = () => {
-		if (addInp.value.trim()) {
-			texts.push(addInp.value.trim());
-			writeAll(texts);
-			addInp.value = "";
-			renderApp();
-		}
-	};
-	wrap.append(addInp, add);
-	return wrap;
 }
 
 // A form to append a note to a specific mainline move.
@@ -1243,244 +562,6 @@ function helpPanel() {
 	].forEach((s) => ol.appendChild(el("li", { textContent: s })));
 	d.appendChild(ol);
 	return d;
-}
-
-// Explicit move reference for a note, e.g. "7.Nbd2" / "7...Nbd7" (number + SAN).
-// A variation-owned note (inVar) is looked up among non-main lines, since a
-// variation's first move shares a ply with the mainline move it replaces (e.g.
-// the variation's cxd6 and the mainline Kf6 both at ply 71).
-function moveRef(ply, owner) {
-	// use the owning line's move if given (a variation note at a colliding ply
-	// should reference the variation's move, not the mainline's)
-	const pool = owner ? [owner] : current.lines.filter((l) => l.isMain);
-	for (const l of pool) {
-		const m = l.moves.find((x) => x.ply === ply);
-		if (m) return fullmoveLabel(m.ply) + m.san;
-	}
-	return fullmoveLabel(ply);
-}
-
-// "→ <directly preceding move>" so a branched line's divergence point is clear.
-function branchContext(l) {
-	if (l.isMain) return "";
-	const mainL = current.lines.find((x) => x.isMain) || current.lines[0];
-	let d = 0;
-	const mv = l.moves;
-	while (
-		d < mv.length &&
-		d < mainL.moves.length &&
-		mv[d].san === mainL.moves[d].san
-	)
-		d++;
-	if (!d) return "";
-	const m = mv[d - 1];
-	return (
-		"\u2192 " +
-		(m.ply % 2 === 0 ? Math.floor(m.ply / 2) + 1 + ". " : "") +
-		m.san
-	);
-}
-
-// Safely render a small markdown subset (bold/italic/code + newlines) into DOM
-// nodes (no innerHTML, so note text can't inject markup).
-function renderInline(container, text) {
-	const lines = text.split("\n");
-	lines.forEach((line, li) => {
-		if (li) container.appendChild(document.createElement("br"));
-		const re = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g;
-		let last = 0;
-		let m;
-		while ((m = re.exec(line))) {
-			if (m.index > last)
-				container.appendChild(
-					document.createTextNode(line.slice(last, m.index)),
-				);
-			const tok = m[0];
-			const bold = tok.startsWith("**");
-			const code = tok.startsWith("`");
-			const node = document.createElement(
-				bold ? "strong" : code ? "code" : "em",
-			);
-			node.textContent = tok.slice(bold ? 2 : 1, tok.length - (bold ? 2 : 1));
-			container.appendChild(node);
-			last = m.index + tok.length;
-		}
-		if (last < line.length)
-			container.appendChild(document.createTextNode(line.slice(last)));
-	});
-}
-
-// Notes are numbered (PGN {comments}); tagged-Footnote lines are lettered.
-function notesFootnotesPanel() {
-	const box = el("div", { className: "notes" });
-	const notes = allNotes();
-	box.appendChild(el("h3", { textContent: "Notes" }));
-	if (notes.length) {
-		notes.forEach((note) => {
-			const row = el("div", { className: "nt" });
-			row.appendChild(el("sup", { textContent: "[" + note.n + "]" }));
-			const span = document.createElement("span");
-			span.appendChild(
-				document.createTextNode(moveRef(note.ply, note.owner) + " \u2014 "),
-			);
-			renderInline(span, note.text);
-			row.appendChild(span);
-			box.appendChild(row);
-		});
-	}
-	// Notes are edited per-move from the line editors above; this section is the
-	// read-only reference (and what prints/exports).
-	const footLines = current.lines.filter((l) => l.tag === "foot");
-	const mainL = current.lines.find((l) => l.isMain) || current.lines[0];
-	if (footLines.length) {
-		box.appendChild(el("h3", { textContent: "Footnotes" }));
-		footLines.forEach((l, i) => {
-			const row = el("div", { className: "nt" });
-			row.appendChild(el("sup", { textContent: String.fromCharCode(97 + i) }));
-			const note = (l.meta && l.meta.note) || "";
-			const d = divergence(l, mainL);
-			const ctx = branchContext(l);
-			const span = document.createElement("span");
-			span.appendChild(
-				document.createTextNode(
-					(l.name ? l.name + ": " : "") +
-						(ctx ? ctx + " " : "") +
-						fullMovesText(l.moves.slice(d), l.marks),
-				),
-			);
-			if (note) {
-				span.appendChild(document.createTextNode(" \u2014 "));
-				renderInline(span, note);
-			}
-			row.appendChild(span);
-			box.appendChild(row);
-		});
-	}
-	return box;
-}
-
-function exportBar() {
-	const bar = el("div", { className: "export" });
-	const printBtn = el("button", {
-		className: "chip",
-		textContent: "Print / Save as PDF",
-	});
-	printBtn.onclick = () => window.print();
-	const pgn = el("button", { className: "chip", textContent: "Export PGN" });
-	pgn.onclick = () =>
-		download(slug() + ".pgn", current.pgn, "application/x-chess-pgn");
-	const md = el("button", {
-		className: "chip",
-		textContent: "Export Markdown",
-	});
-	md.onclick = () => download(slug() + ".md", buildMarkdown(), "text/markdown");
-	const copy = el("button", { className: "chip", textContent: "Copy report" });
-	copy.onclick = async () => {
-		const text = buildMarkdown();
-		try {
-			await navigator.clipboard.writeText(text);
-		} catch {
-			const ta = document.createElement("textarea");
-			ta.value = text;
-			document.body.appendChild(ta);
-			ta.select();
-			document.execCommand("copy");
-			ta.remove();
-		}
-		copy.textContent = "Copied \u2713";
-		setTimeout(() => (copy.textContent = "Copy report"), 1500);
-	};
-	bar.append(printBtn, pgn, md, copy);
-	// print/PDF options: which diagrams appear in the Lines (print) cards, and
-	// whether the table splits by trie. Each option is checkbox-first; they're
-	// grouped by target with a clear gap between groups.
-	const pOpts = el("div", { className: "printopts" });
-	const group = (title, checks) => {
-		const g = el("div", { className: "optgroup" });
-		g.appendChild(el("span", { className: "optgroup-h", textContent: title }));
-		checks.forEach(([label, key, def]) => {
-			const lab = el("label", { className: "opt" }, [
-				el("input", {
-					type: "checkbox",
-					checked: current[key] == null ? def : current[key],
-				}),
-				" " + label,
-			]);
-			lab.querySelector("input").onchange = (e) => {
-				current[key] = e.target.checked;
-				renderApp();
-			};
-			g.appendChild(lab);
-		});
-		return g;
-	};
-	pOpts.append(
-		group("Cards", [
-			["final-position image", "showFinalBoard", true],
-			["latest-divergence image", "showFirstDivBoard", false],
-		]),
-		group("Table", [["split table by trie", "showSplitTrie", false]]),
-	);
-	bar.appendChild(pOpts);
-	return bar;
-}
-
-function slug() {
-	return (current.name || "opening-table")
-		.replace(/[^a-z0-9_-]+/gi, "-")
-		.replace(/^-+|-+$/g, "");
-}
-
-function download(filename, text, mime) {
-	const blob = new Blob([text], { type: mime });
-	const a = document.createElement("a");
-	a.href = URL.createObjectURL(blob);
-	a.download = filename;
-	document.body.appendChild(a);
-	a.click();
-	a.remove();
-	URL.revokeObjectURL(a.href);
-}
-
-// Editable, portable Markdown of the finished table — paste into Docs/Word.
-function buildMarkdown() {
-	const g = grid(current.lines);
-	const L = [];
-	if (current.name) L.push("# " + current.name, "");
-	L.push("## Lines", "");
-	for (const v of g.vars) {
-		const lead =
-			v.tag === "mainline" ? "**Mainline**" : "- " + v.label.toUpperCase();
-		const moves = cardMovesText(v);
-		L.push(
-			`${lead}${v.name ? " (" + v.name + ")" : ""}${v.eval ? " " + v.eval : ""}: ${moves}`,
-		);
-	}
-	if (g.footNotes.length) {
-		L.push("", "## Footnotes", "");
-		g.footNotes.forEach((f) => {
-			const prec =
-				f.d > 0
-					? "\u2192 " +
-						(f.moves[f.d - 1].ply % 2 === 0
-							? Math.floor(f.moves[f.d - 1].ply / 2) + 1 + ". "
-							: "") +
-						f.moves[f.d - 1].san +
-						" "
-					: "";
-			L.push(
-				`- ${f.letter}${f.name ? " " + f.name : ""}${f.eval ? " " + f.eval : ""}: ${prec}${fullMovesText(f.moves.slice(f.d), f.marks)}${f.note ? " — " + f.note : ""}`,
-			);
-		});
-	}
-	const notes = allNotes();
-	if (notes.length) {
-		L.push("", "## Notes", "");
-		notes.forEach((note) =>
-			L.push(`${note.n}. ${moveRef(note.ply, note.owner)} — ${note.text}`),
-		);
-	}
-	return L.join("\n") + "\n";
 }
 
 function importPanel() {
@@ -1513,13 +594,15 @@ function importPanel() {
 					return;
 				}
 				openPaths.clear();
-				current = freshState({
-					id: current.id,
-					pgn: ta.value,
-					lines: collectLines(nodes),
-					boardSize: current.boardSize,
-					sideWidth: current.sideWidth,
-				});
+				setCurrent(
+					freshState({
+						id: getCurrent().id,
+						pgn: ta.value,
+						lines: collectLines(nodes),
+						boardSize: getCurrent().boardSize,
+						sideWidth: getCurrent().sideWidth,
+					}),
+				);
 				renderApp();
 			} catch (e) {
 				alert("Could not read PGN: " + e.message);
@@ -1542,7 +625,7 @@ document.addEventListener("DOMContentLoaded", () => {
 	document.addEventListener("mousemove", (e) => {
 		if (!sideDragging) return;
 		const w = Math.max(280, Math.min(window.innerWidth * 0.7, e.clientX));
-		current.sideWidth = w;
+		getCurrent().sideWidth = w;
 		document.documentElement.style.setProperty("--side-w", w + "px");
 	});
 	document.addEventListener("mouseup", () => {
