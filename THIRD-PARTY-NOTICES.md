@@ -1,6 +1,6 @@
 # Third-party notices
 
-The project's own source is covered by [LICENSE](LICENSE) (0BSD). The
+The project's own source is covered by [LICENSE](LICENSE) (MIT). The
 third-party material below keeps its own terms.
 
 ## Chess piece graphics — `assets/pieces.svg`

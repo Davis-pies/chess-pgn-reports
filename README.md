@@ -67,9 +67,7 @@ replaces (standard PGN `(1... e5)` semantics).
 
 ## License
 
-The project's own source is released under the
-[0BSD](LICENSE) license — public-domain-equivalent, with no attribution
-requirement.
+The project's own source is released under the [MIT](LICENSE) license.
 
 The chess piece graphics in `assets/pieces.svg` are third-party work by
 Wikimedia Commons user *Cburnett*, used under the BSD 3-clause license. See

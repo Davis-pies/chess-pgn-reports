@@ -16,7 +16,7 @@
     "eco"
   ],
   "author": "Davis Pies",
-  "license": "0BSD",
+  "license": "MIT",
   "type": "module",
   "dependencies": {
     "chess.js": "^1.4.0"
