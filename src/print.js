@@ -74,9 +74,18 @@ function notesForVar(v) {
 // every packed table).
 function renderTableNotes(wrap, vars, showMain) {
 	const rows = [];
+	// Notes are shared: the editor writes one note onto every line in an
+	// equal-position group, and identical PGN comment text at the same ply
+	// collapses to a single note in allNotes(). So dedupe ACROSS lines here —
+	// notesForVar only dedupes within one line.
+	const seen = new Set();
 	vars.forEach((v) => {
 		if (v.tag === "mainline" && !showMain) return;
-		notesForVar(v).forEach((n) => rows.push(n));
+		notesForVar(v).forEach((n) => {
+			if (seen.has(n.n)) return;
+			seen.add(n.n);
+			rows.push(n);
+		});
 	});
 	if (!rows.length) return;
 	const box = el("div", { className: "print-notes" });
