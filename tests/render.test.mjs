@@ -28,6 +28,34 @@ test("boardSvg draws all 64 squares with pieces and coordinates", () => {
 	delete global.document;
 });
 
+test("boardSvg falls back to the start position instead of crashing on a malformed FEN", () => {
+	global.document = dom().window.document;
+	// a FEN board field with too few ranks (7, not 8)
+	assert.doesNotThrow(() => boardSvg("8/8/8/8/8/8/8 w - - 0 1"));
+	// not a FEN at all
+	assert.doesNotThrow(() => boardSvg("not-a-fen-at-all"));
+	const svg = boardSvg("not-a-fen-at-all");
+	assert.strictEqual(svg.querySelectorAll("rect").length, 64);
+	// falls back to the start position, so the opening piece count is intact
+	assert.strictEqual(svg.querySelectorAll("use").length, 32);
+	delete global.document;
+});
+
+test("boardSvg carries an accessible name", () => {
+	global.document = dom().window.document;
+	const svg = boardSvg("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+	assert.strictEqual(svg.getAttribute("role"), "img");
+	const label = svg.getAttribute("aria-label");
+	assert.ok(label, "expected an aria-label");
+	assert.ok(/white/i.test(label), "label should describe the position");
+
+	const blackToMove = boardSvg(
+		"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1",
+	);
+	assert.ok(/black/i.test(blackToMove.getAttribute("aria-label")));
+	delete global.document;
+});
+
 test("renders a vertical table with tagged variations into the DOM", () => {
 	const { window } = dom();
 	global.document = window.document;
@@ -74,6 +102,90 @@ test("fullMovesText pairs moves: number on white only, no '1...' for black", () 
 	const txt = fullMovesText(main.moves);
 	assert.strictEqual(txt, "1. e4 e5 2. Nf3");
 	assert.ok(!txt.includes("..."), "no ellipsis move-number for black");
+});
+
+test("collapse/expand variation headers are keyboard accessible", () => {
+	const { window } = dom();
+	global.document = window.document;
+
+	const lines = collectLines(
+		parsePgn("1. e4 e5 (1... c5 2. Nf3 Nc6) 2. Nf3 Nc6").nodes,
+	);
+	const g = grid(lines);
+	let called = 0;
+	g.vars[1].onclick = () => {
+		called++;
+	};
+
+	const container = document.createElement("div");
+	renderTable(container, g, "vertical");
+
+	const cell = container.querySelector("td.var-head.clickable");
+	assert.ok(cell, "expected a clickable variation head");
+	assert.strictEqual(cell.tabIndex, 0);
+	assert.strictEqual(cell.getAttribute("role"), "button");
+	// not collapsed -> expanded
+	assert.strictEqual(cell.getAttribute("aria-expanded"), "true");
+
+	cell.dispatchEvent(
+		new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+	);
+	assert.strictEqual(called, 1, "Enter should activate the control");
+	cell.dispatchEvent(
+		new window.KeyboardEvent("keydown", { key: " ", bubbles: true }),
+	);
+	assert.strictEqual(called, 2, "Space should activate the control");
+
+	delete global.document;
+});
+
+test("collapsed branch cells (horizontal + vertical) are keyboard accessible and marked not-expanded", () => {
+	const { window } = dom();
+	global.document = window.document;
+
+	const lines = collectLines(
+		parsePgn("1. e4 e5 (1... c5 2. Nf3 Nc6) 2. Nf3 Nc6").nodes,
+	);
+
+	// vertical: a collapsed row's move cells are clickable to re-expand
+	let vCalled = 0;
+	const gv = grid(lines);
+	gv.vars[1].onclick = () => {
+		vCalled++;
+	};
+	gv.vars[1].collapsed = true;
+	const vContainer = document.createElement("div");
+	renderTable(vContainer, gv, "vertical");
+	const vCell = vContainer.querySelector("td.clickable:not(.var-head)");
+	assert.ok(vCell, "expected a clickable collapsed move cell (vertical)");
+	assert.strictEqual(vCell.tabIndex, 0);
+	assert.strictEqual(vCell.getAttribute("role"), "button");
+	assert.strictEqual(vCell.getAttribute("aria-expanded"), "false");
+	vCell.dispatchEvent(
+		new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+	);
+	assert.strictEqual(vCalled, 1);
+
+	// horizontal: same, but the collapsed column's per-ply cells
+	let hCalled = 0;
+	const gh = grid(lines);
+	gh.vars[1].onclick = () => {
+		hCalled++;
+	};
+	gh.vars[1].collapsed = true;
+	const hContainer = document.createElement("div");
+	renderTable(hContainer, gh, "horizontal");
+	const hCell = hContainer.querySelector("td.clickable");
+	assert.ok(hCell, "expected a clickable collapsed move cell (horizontal)");
+	assert.strictEqual(hCell.tabIndex, 0);
+	assert.strictEqual(hCell.getAttribute("role"), "button");
+	assert.strictEqual(hCell.getAttribute("aria-expanded"), "false");
+	hCell.dispatchEvent(
+		new window.KeyboardEvent("keydown", { key: " ", bubbles: true }),
+	);
+	assert.strictEqual(hCalled, 1);
+
+	delete global.document;
 });
 
 test("horizontal layout transposes to one row per ply", () => {
