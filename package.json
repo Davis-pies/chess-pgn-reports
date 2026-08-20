@@ -1,8 +1,7 @@
 {
   "name": "chess-pgn-reports",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Turn a chess PGN into a printable opening theory table (ECO/MCO style).",
   "directories": {
     "doc": "docs"
   },
