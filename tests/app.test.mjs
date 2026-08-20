@@ -660,6 +660,48 @@ test("opening a saved notebook carries forward the dragged side panel width", as
 	delete global.confirm;
 });
 
+// A note carried by several lines (either from identical PGN comment text, or
+// written across a shared-position group by the note editor) is ONE note. The
+// printed Notes list must show it once, not once per line carrying it.
+test("print notes: a note shared by several lines is listed once", async () => {
+	const dom = new JSDOM('<!DOCTYPE html><main id="view"></main>', {
+		url: "http://localhost/",
+		pretendToBeVisual: true,
+	});
+	global.window = dom.window;
+	global.document = dom.window.document;
+	global.requestAnimationFrame = dom.window.requestAnimationFrame;
+	global.localStorage = dom.window.localStorage;
+	global.alert = () => {};
+	global.confirm = () => true;
+
+	await import("../src/app.js?t=11");
+	dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
+
+	const textarea = doc("view").querySelector("textarea.pgnin");
+	// both variations carry the identical comment at the same ply -> one note
+	textarea.value =
+		"1. e4 e5 2. Nf3 (2. Bc4 Nc6 {tricky bishop}) (2. d4 exd4 {tricky bishop}) Nc6";
+	[...doc("view").querySelectorAll("button")]
+		.find((b) => b.textContent.includes("Load"))
+		.click();
+	await tick();
+
+	const rows = [...global.document.querySelectorAll(".print-notes .nt")];
+	assert.strictEqual(
+		rows.length,
+		1,
+		"one row per distinct note, not one per line carrying it",
+	);
+
+	delete global.window;
+	delete global.document;
+	delete global.requestAnimationFrame;
+	delete global.localStorage;
+	delete global.alert;
+	delete global.confirm;
+});
+
 function doc(id) {
 	return global.document.getElementById(id);
 }
