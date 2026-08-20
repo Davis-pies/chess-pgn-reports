@@ -8,24 +8,32 @@ export function keyFor(moves) {
 	return moves.map((m) => m.san).join(" ");
 }
 
+// Returns true on success, false if the write failed (e.g. QuotaExceededError
+// on a full store, or SecurityError when storage is blocked/disabled) so the
+// caller can surface the failure instead of silently losing the notebook.
 export function saveNotebook(id, { name, pgn, lines }) {
 	const mainLine = lines.find((l) => l.isMain) || lines[0];
-	localStorage.setItem(
-		PREFIX + id,
-		JSON.stringify({
-			name,
-			pgn,
-			main: mainLine ? keyFor(mainLine.moves) : "",
-			tags: lines.map((l) => ({
-				key: keyFor(l.moves),
-				tag: l.tag || "sideline",
-				name: l.name || "",
-				meta: l.meta || {},
-				marks: l.marks || {},
-				comments: l.comments || [],
-			})),
-		}),
-	);
+	try {
+		localStorage.setItem(
+			PREFIX + id,
+			JSON.stringify({
+				name,
+				pgn,
+				main: mainLine ? keyFor(mainLine.moves) : "",
+				tags: lines.map((l) => ({
+					key: keyFor(l.moves),
+					tag: l.tag || "sideline",
+					name: l.name || "",
+					meta: l.meta || {},
+					marks: l.marks || {},
+					comments: l.comments || [],
+				})),
+			}),
+		);
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 export function listNotebooks() {

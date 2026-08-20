@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert";
 import { JSDOM } from "jsdom";
+import { saveNotebook } from "../src/store.js";
 
 const tick = () => new Promise((r) => setTimeout(r, 60));
 
@@ -444,6 +445,190 @@ test("table preview: rows span only visible columns, no trailing empty rows", as
 		rows2.length,
 		6,
 		"expanded branch extends rows to its deepest ply (header + ply 0..4)",
+	);
+
+	delete global.window;
+	delete global.document;
+	delete global.requestAnimationFrame;
+	delete global.localStorage;
+	delete global.alert;
+	delete global.confirm;
+});
+
+test("deleting one saved workbook removes only its row, not the whole list", async () => {
+	const dom = new JSDOM('<!DOCTYPE html><main id="view"></main>', {
+		url: "http://localhost/",
+		pretendToBeVisual: true,
+	});
+	global.window = dom.window;
+	global.document = dom.window.document;
+	global.requestAnimationFrame = dom.window.requestAnimationFrame;
+	global.localStorage = dom.window.localStorage;
+	global.alert = () => {};
+	global.confirm = () => true;
+
+	// pre-seed two saved notebooks directly via store.js, so the app starts
+	// with both already listed (avoids a same-millisecond id collision that
+	// saving twice through the UI could hit)
+	const lineFor = (san) => [{ isMain: true, moves: [{ san, ply: 0 }] }];
+	saveNotebook("bookA", { name: "Book A", pgn: "1. e4", lines: lineFor("e4") });
+	saveNotebook("bookB", { name: "Book B", pgn: "1. d4", lines: lineFor("d4") });
+
+	await import("../src/app.js?t=8");
+	dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
+
+	let box = doc("view").querySelector(".notebooks");
+	assert.ok(box, "notebooks panel present");
+	assert.ok(box.querySelector(".nb-head"), "header present before delete");
+
+	const rowA = [...box.querySelectorAll("span")].find((s) =>
+		s.textContent.includes("Book A"),
+	);
+	assert.ok(rowA, "Book A row present");
+	const delA = [...rowA.querySelectorAll("button")].find(
+		(b) => b.textContent === "✕",
+	);
+	delA.click();
+
+	box = doc("view").querySelector(".notebooks");
+	assert.ok(box, "notebooks panel still present after deleting one entry");
+	assert.ok(
+		box.querySelector(".nb-head"),
+		"header still present — the whole list wasn't wiped",
+	);
+	assert.ok(
+		[...box.querySelectorAll("span")].some((s) =>
+			s.textContent.includes("Book B"),
+		),
+		"the untouched workbook's row is still visible",
+	);
+	assert.ok(
+		![...box.querySelectorAll("span")].some((s) =>
+			s.textContent.includes("Book A"),
+		),
+		"the deleted workbook's row is gone",
+	);
+
+	delete global.window;
+	delete global.document;
+	delete global.requestAnimationFrame;
+	delete global.localStorage;
+	delete global.alert;
+	delete global.confirm;
+});
+
+test("Save surfaces a storage failure instead of silently losing the notebook", async () => {
+	const dom = new JSDOM('<!DOCTYPE html><main id="view"></main>', {
+		url: "http://localhost/",
+		pretendToBeVisual: true,
+	});
+	global.window = dom.window;
+	global.document = dom.window.document;
+	global.requestAnimationFrame = dom.window.requestAnimationFrame;
+	global.localStorage = dom.window.localStorage;
+	const alerts = [];
+	global.alert = (msg) => alerts.push(msg);
+	global.confirm = () => true;
+
+	await import("../src/app.js?t=9");
+	dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
+
+	const textarea = doc("view").querySelector("textarea.pgnin");
+	textarea.value = "1. e4 e5";
+	[...doc("view").querySelectorAll("button")]
+		.find((b) => b.textContent.includes("Load"))
+		.click();
+	await tick();
+
+	// jsdom's Storage writes any property assignment through to the backing
+	// store (named-property setter per the WebStorage spec), so a plain
+	// `localStorage.setItem = fn` silently no-ops instead of overriding the
+	// method — stub it on the prototype instead.
+	const proto = Object.getPrototypeOf(global.localStorage);
+	const origSetItem = proto.setItem;
+	proto.setItem = () => {
+		throw new Error("QuotaExceededError");
+	};
+	try {
+		const saveBtn = [...doc("view").querySelectorAll("button")].find(
+			(b) => b.textContent === "Save",
+		);
+		saveBtn.click();
+		assert.strictEqual(alerts.length, 1, "failure is surfaced via alert");
+		assert.notStrictEqual(
+			saveBtn.textContent,
+			"Saved ✓",
+			"button does not falsely claim success",
+		);
+	} finally {
+		proto.setItem = origSetItem;
+	}
+
+	delete global.window;
+	delete global.document;
+	delete global.requestAnimationFrame;
+	delete global.localStorage;
+	delete global.alert;
+	delete global.confirm;
+});
+
+test("opening a saved notebook carries forward the dragged side panel width", async () => {
+	const dom = new JSDOM('<!DOCTYPE html><main id="view"></main>', {
+		url: "http://localhost/",
+		pretendToBeVisual: true,
+	});
+	global.window = dom.window;
+	global.document = dom.window.document;
+	global.requestAnimationFrame = dom.window.requestAnimationFrame;
+	global.localStorage = dom.window.localStorage;
+	global.alert = () => {};
+	global.confirm = () => true;
+
+	await import("../src/app.js?t=10");
+	dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
+
+	const textarea = doc("view").querySelector("textarea.pgnin");
+	textarea.value = "1. e4 e5";
+	[...doc("view").querySelectorAll("button")]
+		.find((b) => b.textContent.includes("Load"))
+		.click();
+	await tick();
+
+	const nameInput = doc("view").querySelector("input.name");
+	nameInput.value = "Book A";
+	nameInput.dispatchEvent(new dom.window.Event("input"));
+	[...doc("view").querySelectorAll("button")]
+		.find((b) => b.textContent === "Save")
+		.click();
+
+	// drag the side-resize handle to a non-default width
+	const handle = doc("view").querySelector(".side-resize");
+	handle.dispatchEvent(new dom.window.Event("mousedown"));
+	dom.window.document.dispatchEvent(
+		new dom.window.MouseEvent("mousemove", { clientX: 555 }),
+	);
+	dom.window.document.dispatchEvent(new dom.window.MouseEvent("mouseup"));
+	assert.strictEqual(
+		dom.window.document.documentElement.style.getPropertyValue("--side-w"),
+		"555px",
+		"drag applied",
+	);
+
+	// back to the import panel, then reopen the notebook we just saved
+	[...doc("view").querySelectorAll("button")]
+		.find((b) => b.textContent === "New / Import")
+		.click();
+	const openBtn = [...doc("view").querySelectorAll("button")].find((b) =>
+		b.textContent.includes("Open: Book A"),
+	);
+	assert.ok(openBtn, "saved notebook listed");
+	openBtn.click();
+	await tick();
+
+	assert.strictEqual(
+		dom.window.document.documentElement.style.getPropertyValue("--side-w"),
+		"555px",
+		"the dragged side panel width survives opening a saved notebook",
 	);
 
 	delete global.window;

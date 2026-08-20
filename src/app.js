@@ -18,20 +18,32 @@ import {
 	keyFor,
 } from "./store.js";
 
-let current = {
-	id: null,
-	name: "",
-	pgn: "",
-	lines: [],
-	orientation: "horizontal",
-	showBoards: false,
-	preview: "table",
-	boardSize: 300,
-	showFinalBoard: true,
-	showFirstDivBoard: false,
-	sideWidth: 420, // px; the drag-resized table panel width
-	sel: null, // { l: line, ply } — the move the symbol row targets (null = line-end)
-};
+// Canonical reset for `current`. Every "start over" path (New/Import, Load &
+// Tag, opening a saved notebook, a failed open) rebuilt this object from an
+// ad-hoc literal, and the fields drifted apart between them — most notably
+// sideWidth being dropped from the openNotebook success path, which silently
+// reset the user's dragged panel width back to the 420px default. Building
+// every reset from this shared base plus explicit overrides keeps every site
+// carrying the same fields by construction.
+function freshState(overrides = {}) {
+	return {
+		id: null,
+		name: "",
+		pgn: "",
+		lines: [],
+		orientation: "horizontal",
+		showBoards: false,
+		preview: "table",
+		boardSize: 300,
+		showFinalBoard: true,
+		showFirstDivBoard: false,
+		sideWidth: 420, // px; the drag-resized table panel width
+		sel: null, // { l: line, ply } — the move the symbol row targets (null = line-end)
+		...overrides,
+	};
+}
+
+let current = freshState();
 let sideDragging = false; // dragging the table-panel resize handle
 
 // trie groups the user expanded — details open state survives re-renders
@@ -207,19 +219,10 @@ function viewRoot() {
 	top.appendChild(
 		el("button", {
 			onclick: () => {
-				current = {
-					id: null,
-					name: "",
-					pgn: "",
-					lines: [],
-					orientation: "horizontal",
-					showBoards: false,
+				current = freshState({
 					boardSize: current.boardSize,
-					showFinalBoard: true,
-					showFirstDivBoard: false,
 					sideWidth: current.sideWidth,
-					sel: null,
-				};
+				});
 				renderApp();
 			},
 			textContent: "New / Import",
@@ -237,13 +240,17 @@ function viewRoot() {
 	const save = el("button", { className: "chip primary", textContent: "Save" });
 	save.onclick = () => {
 		if (!current.name) current.name = "Untitled";
-		saveNotebook(current.id || (current.id = "n" + Date.now()), {
+		const ok = saveNotebook(current.id || (current.id = "n" + Date.now()), {
 			name: current.name,
 			pgn: current.pgn,
 			lines: current.lines,
 		});
-		save.textContent = "Saved ✓";
-		setTimeout(() => (save.textContent = "Save"), 1200);
+		if (ok) {
+			save.textContent = "Saved ✓";
+			setTimeout(() => (save.textContent = "Save"), 1200);
+		} else {
+			alert("Could not save: storage is full or unavailable.");
+		}
 	};
 	top.appendChild(save);
 	top.appendChild(themeBtn());
@@ -455,13 +462,13 @@ function notebookList() {
 		});
 		b.onclick = () => openNotebook(n.id);
 		const del = el("button", { className: "chip danger", textContent: "✕" });
+		const cell = el("span", {}, [b, del]);
 		del.onclick = () => {
 			if (confirm(`Delete "${n.name}"?`)) {
 				deleteNotebook(n.id);
-				box.remove();
+				cell.remove();
 			}
 		};
-		const cell = el("span", {}, [b, del]);
 		box.appendChild(cell);
 	});
 	return box;
@@ -504,7 +511,7 @@ function openNotebook(id) {
 					});
 				}
 			}
-			current = {
+			current = freshState({
 				id,
 				name: nb.name,
 				pgn: nb.pgn,
@@ -514,19 +521,13 @@ function openNotebook(id) {
 				boardSize: current.boardSize,
 				showFinalBoard: current.showFinalBoard !== false,
 				showFirstDivBoard: !!current.showFirstDivBoard,
-				sel: null,
-			};
+				sideWidth: current.sideWidth,
+			});
 		} catch (e) {
-			current = {
-				id: null,
-				name: "",
-				pgn: "",
-				lines: [],
-				orientation: "horizontal",
-				showBoards: false,
+			current = freshState({
 				boardSize: current.boardSize || 300,
-				sel: null,
-			};
+				sideWidth: current.sideWidth,
+			});
 			alert("Could not open workbook: " + e.message);
 		}
 		openPaths.clear();
@@ -1503,20 +1504,13 @@ function importPanel() {
 					return;
 				}
 				openPaths.clear();
-				current = {
+				current = freshState({
 					id: current.id,
-					name: "",
 					pgn: ta.value,
 					lines: collectLines(nodes),
-					orientation: "horizontal",
-					showBoards: false,
-					preview: "table",
 					boardSize: current.boardSize,
-					showFinalBoard: true,
-					showFirstDivBoard: false,
 					sideWidth: current.sideWidth,
-					sel: null,
-				};
+				});
 				renderApp();
 			} catch (e) {
 				alert("Could not read PGN: " + e.message);
