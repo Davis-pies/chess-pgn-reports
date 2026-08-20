@@ -687,11 +687,15 @@ test("print notes: a note shared by several lines is listed once", async () => {
 		.click();
 	await tick();
 
+	const boxes = [...global.document.querySelectorAll(".print-notes")];
+	const tables = [...global.document.querySelectorAll(".pv-htable table.tbl")];
 	const rows = [...global.document.querySelectorAll(".print-notes .nt")];
 	assert.strictEqual(
 		rows.length,
 		1,
-		"one row per distinct note, not one per line carrying it",
+		`one row per distinct note, not one per line carrying it. ` +
+			`boxes=${boxes.length} tables=${tables.length} rows=${rows.length} ` +
+			`texts=${JSON.stringify(rows.map((r) => r.textContent))}`,
 	);
 
 	delete global.window;
