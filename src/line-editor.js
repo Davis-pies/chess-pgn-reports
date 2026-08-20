@@ -3,12 +3,7 @@ import { appendBoard, fullmoveLabel } from "./render.js";
 import { el } from "./dom.js";
 import { getCurrent, getSharedInfo, getRenderHooks } from "./state.js";
 import { allNotes } from "./notes.js";
-// branchContext (seam 4) still lives in app.js at this point in the
-// extraction -- imported back from there for now (it's a pure function of
-// `current.lines`, so unlike renderApp this static import carries none of
-// the per-test-instance staleness risk noted in state.js's setRenderHooks()
-// comment). Once seam 4 is pulled out, this import moves to ./export.js.
-import { branchContext } from "./app.js";
+import { branchContext } from "./export.js";
 
 export function lineEditor(l, idx, showBoard = false) {
 	const row = el("div", { className: "ledge" });
