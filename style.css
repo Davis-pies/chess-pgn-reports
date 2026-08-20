@@ -3,6 +3,10 @@
 	--sideline: #b45309;
 	--foot: #92400e;
 	--zebra: #f5f6f8;
+	/* text color for .tag badges, whose backgrounds are --main/--sideline/--foot;
+	   kept separate from those vars because in dark theme they're pastels tuned
+	   to work as foreground text, not as backgrounds under white text */
+	--badge-text: #fff;
 
 	--bg: #ffffff;
 	--panel: #ffffff;
@@ -19,6 +23,9 @@
 	--sideline: #f0b14f;
 	--foot: #d4a373;
 	--zebra: #1b1d24;
+	/* dark badge text: --main/--sideline/--foot are light pastels here, so white
+	   text on them fails contrast (see style.css badge rule below) */
+	--badge-text: #111;
 
 	--bg: #17181d;
 	--panel: #1e2026;
@@ -199,9 +206,6 @@ h3 {
 	gap: 4px;
 	flex-wrap: wrap;
 	align-items: center;
-	margin: 4px 0;
-}
-.sympick {
 	margin: 0;
 }
 .symlabel {
@@ -533,7 +537,7 @@ sup {
 	text-transform: uppercase;
 	border-radius: 4px;
 	padding: 1px 6px;
-	color: #fff;
+	color: var(--badge-text);
 	margin-right: 5px;
 }
 .tbl .tag.mainline {
@@ -588,9 +592,6 @@ sup {
 	color: var(--muted);
 	font-weight: 700;
 }
-.card-eval::before {
-	content: ""; /* spacer via margin already */
-}
 .card-moves {
 	font-family: ui-monospace, Menlo, Consolas, monospace;
 	margin: 10px 0;
@@ -627,12 +628,6 @@ sup {
 	text-align: center;
 	margin-top: 2px;
 }
-.print-group {
-	margin: 12px 0 2px;
-	font-size: 0.85rem;
-	color: var(--muted);
-}
-
 .export {
 	margin: 16px 0;
 }
@@ -703,6 +698,7 @@ sup {
 		--head-bg: #f0f0f0;
 		--panel: #fff;
 		--lift: #fff;
+		--bg: #fff;
 	}
 	.toolbar,
 	.notebooks,
@@ -769,6 +765,9 @@ sup {
 	}
 	.card {
 		border-color: #ccc;
+		box-shadow: none;
+	}
+	.board-svg {
 		box-shadow: none;
 	}
 	body {

@@ -32,6 +32,10 @@ const FILES = "abcdefgh";
 
 function fenGrid(fen) {
 	const ranks = (fen || START_FEN).split(" ")[0].split("/");
+	// a well-formed FEN board field always has exactly 8 ranks; anything else
+	// (truncated, garbage, malformed input) falls back to the start position
+	// rather than leaving boardSvg to index a missing row
+	if (ranks.length !== 8) return fenGrid(START_FEN);
 	return ranks.map((rank) => {
 		const row = [];
 		for (const ch of rank) {
@@ -55,6 +59,11 @@ export function boardSvg(fen, size = 220) {
 	svg.setAttribute("height", size);
 	svg.setAttribute("shape-rendering", "geometricPrecision");
 	svg.classList.add("board-svg");
+	// accessible name: boards otherwise carry no text alternative for screen
+	// reader users, on screen or in the printed PDF
+	const turn = (fen || START_FEN).split(" ")[1] === "b" ? "Black" : "White";
+	svg.setAttribute("role", "img");
+	svg.setAttribute("aria-label", `Chess position, ${turn} to move`);
 	for (let r = 0; r < 8; r++) {
 		for (let f = 0; f < 8; f++) {
 			const x = f * sq;
@@ -142,6 +151,22 @@ export function fullmoveLabel(ply) {
 	return ply % 2 === 0 ? `${n}.` : `${n}...`;
 }
 
+// Make a clickable collapse/expand control (a bare td/th with an onclick)
+// operable from the keyboard: focusable, announced as a button with its
+// expanded/collapsed state, and triggerable with Enter or Space.
+function wireExpandControl(el, handler, expanded) {
+	el.tabIndex = 0;
+	el.setAttribute("role", "button");
+	el.setAttribute("aria-expanded", String(expanded));
+	el.onclick = handler;
+	el.onkeydown = (e) => {
+		if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") {
+			e.preventDefault();
+			handler(e);
+		}
+	};
+}
+
 function td(text, cls) {
 	const e = document.createElement("td");
 	if (text) e.textContent = text;
@@ -182,7 +207,7 @@ export function renderTable(container, grid, orientation) {
 			(v.onclick ? " clickable" : "") +
 			(v.collapsed ? " collapsed" : "");
 		if (v.onclick) {
-			c.onclick = v.onclick;
+			wireExpandControl(c, v.onclick, !v.collapsed);
 			c.title = v.collapsed ? v.name || "expand branch" : "collapse branch";
 		}
 		if (v.collapsed) {
@@ -226,7 +251,7 @@ export function renderTable(container, grid, orientation) {
 				(v.onclick ? " clickable" : "") +
 				(v.collapsed ? " collapsed" : "");
 			if (v.onclick) {
-				th.onclick = v.onclick;
+				wireExpandControl(th, v.onclick, !v.collapsed);
 				th.title = v.collapsed ? v.name || "expand branch" : "collapse branch";
 			}
 			const cue = v.collapsed ? "\u25b8 " : v.onclick ? "\u25be " : "";
@@ -245,7 +270,7 @@ export function renderTable(container, grid, orientation) {
 				if (v === vars[0]) c.classList.add("main-col", "sticky-col");
 				if (v.onclick && v.collapsed) {
 					c.classList.add("clickable");
-					c.onclick = v.onclick;
+					wireExpandControl(c, v.onclick, false);
 				}
 				tr.appendChild(c);
 			}
@@ -274,7 +299,7 @@ export function renderTable(container, grid, orientation) {
 				const c = moveCell(v.cells[ply], ply, v.noteByPly);
 				if (v.onclick && v.collapsed) {
 					c.classList.add("clickable");
-					c.onclick = v.onclick;
+					wireExpandControl(c, v.onclick, false);
 				}
 				tr.appendChild(c);
 			}
