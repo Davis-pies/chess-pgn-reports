@@ -8,9 +8,15 @@
   "scripts": {
     "test": "node --test 'tests/**/*.test.mjs'"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "chess",
+    "pgn",
+    "opening",
+    "theory-table",
+    "eco"
+  ],
+  "author": "Davis Pies",
+  "license": "0BSD",
   "type": "module",
   "dependencies": {
     "chess.js": "^1.4.0"

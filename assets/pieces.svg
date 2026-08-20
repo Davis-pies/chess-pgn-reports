@@ -1,4 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <!--
+    cburnett chess piece set. Copyright (c) 2006 Cburnett.
+    Source: https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces
+    Used under the BSD 3-clause license, one of four alternative licenses
+    offered by the author. Full license text: ../THIRD-PARTY-NOTICES.md
+  -->
   <symbol id="wK" viewBox="0 0 45 45"><g fill="none" fill-rule="evenodd" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">
     <path stroke-linejoin="miter" d="M22.5 11.63V6M20 8h5"/>
     <path fill="#fff" stroke-linecap="butt" stroke-linejoin="miter" d="M22.5 25s4.5-7.5 3-10.5c0 0-1-2.5-3-2.5s-3 2.5-3 2.5c-1.5 3 3 10.5 3 10.5"/>
