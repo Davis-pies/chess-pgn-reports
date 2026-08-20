@@ -3,8 +3,15 @@ import { Chess } from "chess.js";
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 export function tokenize(mt) {
+	// A '{' with no matching '}' can't form a valid \{[^}]*\} token, so it's
+	// silently dropped by the main regex below and its body gets retokenized
+	// as if it were SAN -- producing a confusing "illegal move" error that
+	// names a comment word instead of the real problem. Catch it explicitly.
+	if (mt.replace(/\{[^}]*\}/g, "").includes("{")) {
+		throw new Error("Unterminated comment: missing closing '}'");
+	}
 	const re =
-		/(\(|\)|\{[^}]*\}|;[^\r\n]*|\d+\.\.\.|\d+\.|1-0|0-1|1\/2-1\/2|\*|[^\s(){};]+)/g;
+		/(\(|\)|\{[^}]*\}|;[^\r\n]*|\d+\.\.\.|\d+\.|1-0|0-1|1\/2-1\/2|\*|\$\d+|[^\s(){};]+)/g;
 	return mt.match(re) || [];
 }
 
@@ -170,13 +177,33 @@ function parseSeq(tokens, ctx, state, inVariation = false, intro = null) {
 			return nodes;
 		}
 		if (/^(1-0|0-1|1\/2-1\/2|\*)$/.test(t)) {
+			if (inVariation) {
+				// A result token can only legitimately appear once all
+				// variations have closed; hitting one while still inside a
+				// variation means the ')' that should have closed it is
+				// missing (e.g. a truncated PGN) -- don't silently swallow
+				// the result into the variation.
+				throw new Error("Unclosed variation: missing closing ')'");
+			}
 			ctx.result = t;
 			ctx.i++;
 			flushNarrative();
 			return nodes;
 		}
-		if (/^\d+\.\.?/.test(t)) {
-			// move-number token, redundant with ply; skip
+		if (/^\d+\.\.?/.test(t) || t === "...") {
+			// move-number token (and a standalone spaced ellipsis, e.g.
+			// "3. ... a6"), redundant with ply; skip
+			ctx.i++;
+			continue;
+		}
+		if (/^\$\d+$/.test(t)) {
+			// NAG (Numeric Annotation Glyph), e.g. $1 for "!"; record on the
+			// preceding move, not surfaced in the UI.
+			if (last) {
+				const code = Number(t.slice(1));
+				if (!last.nags) last.nags = [];
+				last.nags.push(code);
+			}
 			ctx.i++;
 			continue;
 		}
@@ -215,6 +242,14 @@ function parseSeq(tokens, ctx, state, inVariation = false, intro = null) {
 		cur = { fen: node.fen, ply: node.ply + 1 };
 		last = node;
 		ctx.i++;
+	}
+	if (inVariation) {
+		// Ran out of tokens without hitting the ')' that should have closed
+		// this variation -- e.g. the PGN was truncated. Left unchecked, this
+		// silently folds the rest of the game (including the result) into
+		// the unclosed variation with no warning, producing a plausible but
+		// wrong table.
+		throw new Error("Unclosed variation: missing closing ')'");
 	}
 	flushNarrative();
 	return nodes;

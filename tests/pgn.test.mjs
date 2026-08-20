@@ -68,6 +68,36 @@ test("rejects illegal moves", () => {
 	// Nc5 is an illegal move for the knight (not reachable)
 });
 
+test("NAG tokens ($1, $6, ...) are skipped without crashing the parser", () => {
+	const { nodes } = parsePgn("1. e4 $1 e5 2. Nf3 $6 Nc6");
+	assert.strictEqual(nodes.map((n) => n.san).join(" "), "e4 e5 Nf3 Nc6");
+});
+
+test("a standalone spaced ellipsis (move-number then '...' as its own token) is skipped", () => {
+	// Same shape as the tight-ellipsis variation test above ("1... e5"), but
+	// with a space between the move number's dot and the ellipsis dots -- a
+	// spacing convention some PGN exporters use.
+	const { nodes } = parsePgn("1. e4 c5 (1. ... e5 2. Nf3) 2. Nf3 d6");
+	assert.strictEqual(nodes.map((n) => n.san).join(" "), "e4 c5 Nf3 d6");
+	const varLine = nodes[1].variations[0];
+	assert.strictEqual(varLine.map((n) => n.san).join(" "), "e5 Nf3");
+	assert.strictEqual(varLine[0].ply, 1); // black's first move -> ply 1
+});
+
+test("an unterminated { comment throws a clear, specific error", () => {
+	assert.throws(
+		() => parsePgn("1. e4 e5 {oops 2. Nf3"),
+		/[Uu]nterminated comment/,
+	);
+});
+
+test("an unclosed ( variation throws instead of silently swallowing the rest of the game", () => {
+	assert.throws(
+		() => parsePgn("1. e4 e5 2. Nf3 Nc6 (2... d6 3. d4 1-0"),
+		/[Uu]nclosed variation/,
+	);
+});
+
 test("fenMap records the FEN after every ply, matching fenAt (incl. null moves)", () => {
 	const { nodes } = parsePgn("1. d4 d5 2. c4 e6 (2... dxc4 -- e5) 3. Nc3");
 	const lines = collectLines(nodes);
