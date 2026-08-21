@@ -532,7 +532,10 @@ sup {
 }
 .tbl .tag,
 .card-head .tag {
-  font-size: 0.68rem;
+  /* em, so the mainline/sideline badge scales with the card text setting like
+     the rest of the card. The .tag base class is shared with the table, which
+     must not scale — hence the .card-head prefix. */
+  font-size: 0.68em;
   text-transform: uppercase;
   border-radius: 4px;
   padding: 1px 6px;
