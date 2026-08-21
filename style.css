@@ -639,7 +639,8 @@ sup {
   display: flex;
   gap: 22px;
   align-items: flex-start;
-  margin-top: 10px;
+  /* the options now sit above the action buttons, so the spacing goes below */
+  margin: 0 0 10px;
   flex-wrap: wrap;
 }
 .optgroup {
