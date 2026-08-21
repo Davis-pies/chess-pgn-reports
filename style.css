@@ -788,9 +788,6 @@ sup {
     page-break-inside: avoid; /* keep each table whole; a table that doesn't
 		                            fit the remaining page moves to the next */
   }
-  .pv-htable h3 {
-    break-after: avoid;
-  }
   .tbl tr:nth-child(even) td:not(.sticky-col) {
     background: #fff; /* no zebra in print */
   }
