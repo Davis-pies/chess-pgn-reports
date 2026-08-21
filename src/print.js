@@ -44,9 +44,13 @@ export function appendPrintTables(box, g) {
     // reference column stops there too). Each table's notes render under
     // it; the mainline's notes only under the first table.
     packForPrint(buildTrie(others, mainV), size).forEach((lines, i) => {
+      // Later tables stop at the deepest line they actually cover. The FIRST
+      // table is the reader's reference for the whole opening, so it runs the
+      // mainline out to its full length even when its own branches are short.
+      const maxPly = i === 0 ? subMaxPly([mainV, ...lines]) : subMaxPly(lines);
       renderTable(
         wrap,
-        { ...g, vars: [mainV, ...lines], maxPly: subMaxPly(lines) },
+        { ...g, vars: [mainV, ...lines], maxPly },
         "horizontal",
       );
       renderTableNotes(wrap, [mainV, ...lines], i === 0);
@@ -82,10 +86,19 @@ function renderTableNotes(wrap, vars, showMain) {
   // collapses to a single note in allNotes(). So dedupe ACROSS lines here —
   // notesForVar only dedupes within one line.
   const seen = new Set();
+  // Skipping the mainline var is not enough to keep its notes off later
+  // tables: a note written on the mainline is copied onto every line in its
+  // equal-position group, so a sideline in a later table carries it too and
+  // would reprint it. Suppress the mainline's notes by number instead.
+  const mainOnly = new Set();
+  if (!showMain) {
+    const mainV = vars.find((v) => v.tag === "mainline");
+    if (mainV) notesForVar(mainV).forEach((n) => mainOnly.add(n.n));
+  }
   vars.forEach((v) => {
     if (v.tag === "mainline" && !showMain) return;
     notesForVar(v).forEach((n) => {
-      if (seen.has(n.n)) return;
+      if (seen.has(n.n) || mainOnly.has(n.n)) return;
       seen.add(n.n);
       rows.push(n);
     });
