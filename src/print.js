@@ -103,8 +103,14 @@ function renderTableNotes(wrap, vars, showMain) {
       rows.push(n);
     });
   });
+  // Always emitted, even with nothing in it: this block carries the gap to the
+  // next table, so every table gets the same separation without the spacing
+  // having to depend on whether notes happen to exist.
+  const box = el("div", {
+    className: "print-notes" + (rows.length ? "" : " empty"),
+  });
+  wrap.appendChild(box);
   if (!rows.length) return;
-  const box = el("div", { className: "print-notes" });
   box.appendChild(
     el("div", { className: "print-notes-h", textContent: "Notes" }),
   );
@@ -117,7 +123,6 @@ function renderTableNotes(wrap, vars, showMain) {
     row.appendChild(span);
     box.appendChild(row);
   });
-  wrap.appendChild(box);
 }
 
 // Greedily pack trie branches into print-table line groups, targeting FULL

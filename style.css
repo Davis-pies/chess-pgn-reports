@@ -462,15 +462,10 @@ select:focus {
   display: none;
 }
 .pv-htable .tbl {
-  /* Tight to whatever follows inside the same section — its notes belong with
-     the table, not across the gap. The big separation goes after the unit:
-     on .print-notes when the table has notes, and on the table itself when it
-     has none (:has, so the gap stays a bottom margin and is truncated at a
-     page break rather than indenting the top of the next page). */
+  /* Tight to its notes, which belong with the table rather than across the gap.
+     Every table is followed by a .print-notes block (empty when it has none),
+     and that block carries the separation to the next table. */
   margin: 0 auto 6px;
-}
-.pv-htable table.tbl:has(+ table.tbl) {
-  margin-bottom: 72px;
 }
 
 .help {
@@ -726,9 +721,16 @@ sup {
     display: none !important;
   }
   .print-notes {
-    /* sits directly under its table, and carries the gap to the next one */
+    /* sits directly under its table, and carries the gap to the next one. A
+       bottom margin, so a page break falling in the gap truncates it instead
+       of indenting the top of the next page. */
     margin: 0 0 72px;
     page-break-inside: avoid;
+  }
+  /* an empty block still has to hold the gap open, and margins on an empty
+     block collapse together — give it the height explicitly */
+  .print-notes.empty {
+    height: 0;
   }
   .print-notes-h {
     font-size: 0.75rem;

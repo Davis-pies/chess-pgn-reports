@@ -66,3 +66,20 @@ test("the mainline's notes print under the first table only", () => {
   );
   off();
 });
+
+test("every table is followed by a notes block, empty when it has no notes", () => {
+  const off = installDom();
+  const box = printTables(`1. e4 e5 ${ALTS} ${MAIN}`);
+  const tables = box.querySelectorAll("table.tbl");
+  const blocks = box.querySelectorAll(".print-notes");
+  // the blocks carry the gap between tables, so there must be one per table
+  assert.strictEqual(blocks.length, tables.length);
+  assert.ok(
+    [...blocks].some((b) => b.classList.contains("empty")),
+    "a table without notes still gets a block, marked empty",
+  );
+  [...blocks]
+    .filter((b) => b.classList.contains("empty"))
+    .forEach((b) => assert.strictEqual(b.childNodes.length, 0));
+  off();
+});
