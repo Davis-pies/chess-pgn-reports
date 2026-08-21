@@ -246,6 +246,12 @@ function viewRoot() {
         name: getCurrent().name,
         pgn: getCurrent().pgn,
         lines: getCurrent().lines,
+        view: {
+          boardSize: getCurrent().boardSize,
+          showBoards: getCurrent().showBoards,
+          showFinalBoard: getCurrent().showFinalBoard,
+          showFirstDivBoard: getCurrent().showFirstDivBoard,
+        },
       },
     );
     if (ok) {
@@ -363,6 +369,7 @@ function openNotebook(id) {
         return;
       }
       const lines = collectLines(nodes);
+      const view = nb.view || {};
       // re-apply tags
       lines.forEach((l) => {
         const k = keyFor(l.moves);
@@ -393,10 +400,15 @@ function openNotebook(id) {
           pgn: nb.pgn,
           lines,
           orientation: getCurrent().orientation,
-          showBoards: getCurrent().showBoards,
-          boardSize: getCurrent().boardSize,
-          showFinalBoard: getCurrent().showFinalBoard !== false,
-          showFirstDivBoard: !!getCurrent().showFirstDivBoard,
+          // a saved notebook carries its own board settings; fall back to the
+          // session's for notebooks saved before `view` existed
+          showBoards: view.showBoards ?? getCurrent().showBoards,
+          boardSize: view.boardSize || getCurrent().boardSize,
+          showFinalBoard:
+            (view.showFinalBoard ?? getCurrent().showFinalBoard) !== false,
+          showFirstDivBoard: !!(
+            view.showFirstDivBoard ?? getCurrent().showFirstDivBoard
+          ),
           sideWidth: getCurrent().sideWidth,
         }),
       );

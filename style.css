@@ -800,6 +800,25 @@ sup {
   .board-svg {
     box-shadow: none;
   }
+  /* boardSvg() writes fixed px width/height attributes (up to the 400 setting).
+     A card showing both the final and the latest-divergence board puts two of
+     them in a row — 812px at 400 — which overruns the printable width, and
+     Chrome's response is to scale the WHOLE document down, shrinking the body
+     text along with the boards. CSS beats the presentation attributes and the
+     SVG has a viewBox, so giving each board a share of the row keeps the pair
+     within the page at any board size and leaves the type at full size. */
+  .card-boards {
+    flex-wrap: nowrap;
+  }
+  .card-board {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 48%;
+  }
+  .card-board .board-svg {
+    width: 100%;
+    height: auto;
+  }
   body {
     background: #fff;
   }
