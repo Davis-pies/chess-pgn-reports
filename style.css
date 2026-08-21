@@ -462,7 +462,10 @@ select:focus {
   display: none;
 }
 .pv-htable .tbl {
-  margin: 0 auto;
+  /* the bottom margin is the only gap between two consecutive print tables:
+     .print-notes supplies spacing when a table has notes, but it renders
+     nothing at all when there are none, leaving the tables touching. */
+  margin: 0 auto 18px;
 }
 
 .help {
