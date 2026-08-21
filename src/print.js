@@ -21,7 +21,11 @@ export function subMaxPly(vars) {
 }
 
 export function appendPrintTables(box, g) {
-	const wrap = el("div", { className: "pv-htable" });
+	// the whole horizontal-table section can be left out of the printed report
+	const wrap = el("div", {
+		className:
+			"pv-htable" + (getCurrent().printTables === false ? " noprint" : ""),
+	});
 	wrap.appendChild(el("h3", { textContent: "Table" }));
 	const mainV = g.vars[0]; // mainline sorts first
 	const others = g.vars.slice(1);

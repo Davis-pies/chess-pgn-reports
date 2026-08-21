@@ -47,6 +47,7 @@ function freshState(overrides = {}) {
     showBoards: false,
     preview: "table",
     boardSize: 300,
+    cardFont: 100,
     showFinalBoard: true,
     showFirstDivBoard: false,
     sideWidth: 420, // px; the drag-resized table panel width
@@ -185,6 +186,12 @@ function applyTheme(t) {
     localStorage.setItem(THEME_KEY, t);
   } catch {}
 }
+// card text size as a percentage; falls back to 100 for workbooks saved before
+// the setting existed.
+function cardFont() {
+  return getCurrent().cardFont || 100;
+}
+
 function themeBtn() {
   const target = currentTheme() === "light" ? "dark" : "light";
   const b = el("button", {
@@ -219,6 +226,7 @@ function viewRoot() {
         setCurrent(
           freshState({
             boardSize: getCurrent().boardSize,
+            cardFont: getCurrent().cardFont,
             sideWidth: getCurrent().sideWidth,
           }),
         );
@@ -248,6 +256,9 @@ function viewRoot() {
         lines: getCurrent().lines,
         view: {
           boardSize: getCurrent().boardSize,
+          cardFont: getCurrent().cardFont,
+          printCards: getCurrent().printCards,
+          printTables: getCurrent().printTables,
           showBoards: getCurrent().showBoards,
           showFinalBoard: getCurrent().showFinalBoard,
           showFirstDivBoard: getCurrent().showFirstDivBoard,
@@ -274,7 +285,10 @@ function viewRoot() {
   t.appendChild(el("h3", { textContent: "Table" }));
   renderTrieTable(t, g, getCurrent().orientation);
   side.appendChild(t);
-  const c = el("div", { className: "pv-cards" });
+  const c = el("div", {
+    className:
+      "pv-cards" + (getCurrent().printCards === false ? " noprint" : ""),
+  });
   c.appendChild(
     el("h3", { textContent: "Print view — one line, one position" }),
   );
@@ -321,6 +335,10 @@ function viewRoot() {
   document.documentElement.style.setProperty(
     "--side-w",
     (getCurrent().sideWidth || 420) + "px",
+  );
+  document.documentElement.style.setProperty(
+    "--card-font",
+    cardFont() / 100 + "rem",
   );
   return wrap;
 }
@@ -404,6 +422,9 @@ function openNotebook(id) {
           // session's for notebooks saved before `view` existed
           showBoards: view.showBoards ?? getCurrent().showBoards,
           boardSize: view.boardSize || getCurrent().boardSize,
+          cardFont: view.cardFont || getCurrent().cardFont,
+          printCards: view.printCards ?? getCurrent().printCards,
+          printTables: view.printTables ?? getCurrent().printTables,
           showFinalBoard:
             (view.showFinalBoard ?? getCurrent().showFinalBoard) !== false,
           showFirstDivBoard: !!(
@@ -416,6 +437,7 @@ function openNotebook(id) {
       setCurrent(
         freshState({
           boardSize: getCurrent().boardSize || 300,
+          cardFont: getCurrent().cardFont,
           sideWidth: getCurrent().sideWidth,
         }),
       );
@@ -476,6 +498,21 @@ function orientationToggle() {
       renderApp();
     };
     bar.appendChild(sb);
+  });
+  // card text size, as a percentage of the default. Cards only — the table's
+  // columns are sized by their content, so scaling its text there changes the
+  // print pagination too.
+  bar.appendChild(el("span", { textContent: " Card text: " }));
+  [85, 100, 115, 130].forEach((p) => {
+    const fb = el("button", {
+      className: "chip" + (cardFont() === p ? " on" : ""),
+      textContent: p + "%",
+    });
+    fb.onclick = () => {
+      getCurrent().cardFont = p;
+      renderApp();
+    };
+    bar.appendChild(fb);
   });
   const b = el("label", {}, [
     "Board diagrams ",
@@ -629,6 +666,7 @@ function importPanel() {
             pgn: ta.value,
             lines: collectLines(nodes),
             boardSize: getCurrent().boardSize,
+            cardFont: getCurrent().cardFont,
             sideWidth: getCurrent().sideWidth,
           }),
         );

@@ -568,6 +568,10 @@ sup {
   flex-direction: column;
   gap: 18px;
   margin-top: 6px;
+  /* one knob for all card text: every size inside a card is an em of this, so
+     the picker scales moves, notes and captions together and keeps their
+     relative proportions. Only the cards read it — the table is unaffected. */
+  font-size: var(--card-font, 1rem);
 }
 .card {
   border: 1px solid var(--line);
@@ -595,7 +599,7 @@ sup {
   font-family: ui-monospace, Menlo, Consolas, monospace;
   margin: 10px 0;
   line-height: 1.7;
-  font-size: 0.9rem;
+  font-size: 0.9em;
 }
 .card-notes {
   margin-top: 10px;
@@ -603,7 +607,7 @@ sup {
   padding-top: 8px;
 }
 .card-notes-h {
-  font-size: 0.75rem;
+  font-size: 0.75em;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--muted);
@@ -622,7 +626,7 @@ sup {
   gap: 12px;
 }
 .card-board-cap {
-  font-size: 0.72rem;
+  font-size: 0.72em;
   color: var(--muted);
   text-align: center;
   margin-top: 2px;
@@ -750,6 +754,13 @@ sup {
   }
   .pv-cards {
     display: block !important;
+  }
+  /* the "include in print" options. These need to beat the display:block
+     !important that reveals each section for print, hence the compound
+     selectors and !important. */
+  .pv-cards.noprint,
+  .pv-htable.noprint {
+    display: none !important;
   }
   /* the screen-only label for this section. Printed it was both unwanted and
      harmful: it landed at the foot of a page, and because .card sets

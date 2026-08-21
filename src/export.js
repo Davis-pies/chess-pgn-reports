@@ -175,10 +175,14 @@ export function exportBar() {
 	};
 	pOpts.append(
 		group("Cards", [
+			["include in print", "printCards", true],
 			["final-position image", "showFinalBoard", true],
 			["latest-divergence image", "showFirstDivBoard", false],
 		]),
-		group("Table", [["split table by trie", "showSplitTrie", false]]),
+		group("Table", [
+			["include in print", "printTables", true],
+			["split table by trie", "showSplitTrie", false],
+		]),
 	);
 	bar.appendChild(pOpts);
 	return bar;
