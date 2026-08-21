@@ -21,4 +21,17 @@ jobs:
 
       - run: npm ci
 
+      - run: npm run lint
+
       - run: npm test
+
+      # Coverage floors sit just below the current numbers so the ratchet
+      # catches regressions; raise them as coverage improves.
+      - name: Coverage
+        run: >-
+          node --test --experimental-test-coverage
+          --test-coverage-exclude='tests/**'
+          --test-coverage-lines=70
+          --test-coverage-branches=73
+          --test-coverage-functions=58
+          'tests/**/*.test.mjs'
