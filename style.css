@@ -727,6 +727,27 @@ sup {
     overflow: visible;
     flex: none;
     width: 100%;
+    max-width: none;
+    padding: 0;
+  }
+  .side-resize {
+    display: none !important;
+  }
+  /* on screen the layout breaks out of the centered <main> with viewport
+     units and reserves --side-w for the fixed table pane. Neither applies to
+     a page box: the negative margin pushed content off the left edge and the
+     reserved gutter left every card indented. Undo both so cards fill the
+     printable width. */
+  .app-layout {
+    width: auto;
+    margin-left: 0;
+    min-height: 0;
+  }
+  .main-panel {
+    margin-left: 0;
+    margin-right: 0;
+    max-width: none;
+    padding: 0;
   }
   .pv-cards {
     display: block !important;
