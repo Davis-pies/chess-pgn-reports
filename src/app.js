@@ -257,7 +257,6 @@ function viewRoot() {
   };
   top.appendChild(save);
   top.appendChild(themeBtn());
-  wrap.appendChild(top);
   const layout = el("div", { className: "app-layout" });
   const side = el("aside", { className: "side-panel" });
   const main = el("div", { className: "main-panel" });
@@ -294,6 +293,7 @@ function viewRoot() {
   layout.appendChild(side);
 
   // main (right): controls + management + reference sections
+  main.appendChild(top);
   main.appendChild(orientationToggle());
   main.appendChild(notebookList());
   main.appendChild(helpPanel());

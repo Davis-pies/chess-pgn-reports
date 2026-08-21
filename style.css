@@ -121,9 +121,6 @@ main {
   margin-right: auto;
   padding: 16px;
 }
-.toolbar {
-  margin-left: calc(var(--side-w, 420px) + 8px);
-}
 @media (max-width: 1000px) {
   .app-layout {
     width: auto;
@@ -135,8 +132,7 @@ main {
     max-height: none;
     overflow: visible;
   }
-  .main-panel,
-  .toolbar {
+  .main-panel {
     margin-left: 0;
   }
   .main-panel {
@@ -163,8 +159,11 @@ h3 {
   margin-bottom: 10px;
 }
 .name {
-  flex: 1;
+  flex: 1 1 200px;
   min-width: 160px;
+  /* without a cap the input eats every spare pixel and flings Save and the
+     theme button against the far right edge, away from the content below */
+  max-width: 320px;
 }
 
 .chip {
@@ -751,6 +750,16 @@ sup {
   }
   .pv-cards {
     display: block !important;
+  }
+  /* the screen-only label for this section. Printed it was both unwanted and
+     harmful: it landed at the foot of a page, and because .card sets
+     break-inside: avoid the first card jumped to the next page, leaving the
+     heading stranded above a page break. */
+  .pv-cards > h3 {
+    display: none;
+  }
+  .pv-cards > .cards {
+    margin-top: 0;
   }
   .pv-htable {
     display: block !important;
