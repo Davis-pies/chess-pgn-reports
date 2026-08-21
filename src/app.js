@@ -499,21 +499,6 @@ function orientationToggle() {
     };
     bar.appendChild(sb);
   });
-  // card text size, as a percentage of the default. Cards only — the table's
-  // columns are sized by their content, so scaling its text there changes the
-  // print pagination too.
-  bar.appendChild(el("span", { textContent: " Card text: " }));
-  [85, 100, 115, 130].forEach((p) => {
-    const fb = el("button", {
-      className: "chip" + (cardFont() === p ? " on" : ""),
-      textContent: p + "%",
-    });
-    fb.onclick = () => {
-      getCurrent().cardFont = p;
-      renderApp();
-    };
-    bar.appendChild(fb);
-  });
   const b = el("label", {}, [
     "Board diagrams ",
     el("input", { type: "checkbox", checked: getCurrent().showBoards }),

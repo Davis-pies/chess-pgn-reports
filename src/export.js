@@ -174,12 +174,27 @@ export function exportBar() {
     });
     return g;
   };
+  const cards = group("Cards", [
+    ["include in print", "printCards", true],
+    ["final-position image", "showFinalBoard", true],
+    ["latest-divergence image", "showFirstDivBoard", false],
+  ]);
+  // Card text size, as a percentage of the default. Cards only: the table's
+  // columns are sized by their content, so scaling its text would move the
+  // print pagination as well.
+  const sel = el("select", { className: "optsel" });
+  [85, 100, 115, 130].forEach((p) => {
+    const o = el("option", { value: String(p), textContent: p + "%" });
+    if ((getCurrent().cardFont || 100) === p) o.selected = true;
+    sel.appendChild(o);
+  });
+  sel.onchange = () => {
+    getCurrent().cardFont = Number(sel.value);
+    getRenderHooks().renderApp();
+  };
+  cards.appendChild(el("label", { className: "opt" }, ["text size ", sel]));
   pOpts.append(
-    group("Cards", [
-      ["include in print", "printCards", true],
-      ["final-position image", "showFinalBoard", true],
-      ["latest-divergence image", "showFirstDivBoard", false],
-    ]),
+    cards,
     group("Table", [
       ["include in print", "printTables", true],
       ["split table by trie", "showSplitTrie", false],

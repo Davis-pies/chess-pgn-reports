@@ -870,3 +870,18 @@ sup {
 .filein::file-selector-button:hover {
   border-color: var(--main);
 }
+
+/* the card text-size dropdown, sitting with the checkboxes in its option group */
+.optsel {
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--text);
+  background: var(--lift);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 1px 4px;
+  cursor: pointer;
+}
+.optsel:hover {
+  border-color: var(--main);
+}

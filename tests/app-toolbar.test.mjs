@@ -214,21 +214,23 @@ test("an unparseable PGN is reported rather than rendering an empty table", asyn
 
 after(() => app.teardown());
 
-test("card text size buttons drive the --card-font variable", async () => {
+test("the card text size dropdown drives the --card-font variable", async () => {
   app.reset();
   await app.loadPgn(PGN);
   const font = () =>
     app.dom.window.document.documentElement.style.getPropertyValue(
       "--card-font",
     );
-  // 100% is the default and is marked active
-  assert.match(app.button("100%").className, /\bon\b/);
+  const sel = () => app.view().querySelector(".optsel");
+  // 100% is the default and is the selected option
+  assert.strictEqual(sel().value, "100");
   assert.strictEqual(font(), "1rem");
-  app.button("130%").click();
-  assert.match(app.button("130%").className, /\bon\b/);
-  assert.ok(!/\bon\b/.test(app.button("100%").className));
+  sel().value = "130";
+  sel().onchange();
   assert.strictEqual(font(), "1.3rem");
-  app.button("85%").click();
+  assert.strictEqual(sel().value, "130", "selection survives the re-render");
+  sel().value = "85";
+  sel().onchange();
   assert.strictEqual(font(), "0.85rem");
 });
 
