@@ -875,6 +875,7 @@ sup {
 .optsel {
   font: inherit;
   font-size: 0.85rem;
+  width: 4.5em;
   color: var(--text);
   background: var(--lift);
   border: 1px solid var(--line);

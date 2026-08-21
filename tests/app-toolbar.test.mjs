@@ -214,24 +214,33 @@ test("an unparseable PGN is reported rather than rendering an empty table", asyn
 
 after(() => app.teardown());
 
-test("the card text size dropdown drives the --card-font variable", async () => {
+test("the card text size input drives --card-font and clamps out-of-range values", async () => {
   app.reset();
   await app.loadPgn(PGN);
   const font = () =>
     app.dom.window.document.documentElement.style.getPropertyValue(
       "--card-font",
     );
-  const sel = () => app.view().querySelector(".optsel");
-  // 100% is the default and is the selected option
-  assert.strictEqual(sel().value, "100");
+  const box = () => app.view().querySelector(".optsel");
+  assert.strictEqual(box().value, "100", "defaults to 100%");
   assert.strictEqual(font(), "1rem");
-  sel().value = "130";
-  sel().onchange();
-  assert.strictEqual(font(), "1.3rem");
-  assert.strictEqual(sel().value, "130", "selection survives the re-render");
-  sel().value = "85";
-  sel().onchange();
-  assert.strictEqual(font(), "0.85rem");
+
+  box().value = "175";
+  box().onchange();
+  assert.strictEqual(font(), "1.75rem");
+
+  // out of range in both directions clamps to the bounds
+  box().value = "500";
+  box().onchange();
+  assert.strictEqual(font(), "2rem", "clamped to the 200% ceiling");
+  box().value = "10";
+  box().onchange();
+  assert.strictEqual(font(), "0.6rem", "clamped to the 60% floor");
+
+  // a blank field falls back to the default instead of a zero font size
+  box().value = "";
+  box().onchange();
+  assert.strictEqual(font(), "1rem");
 });
 
 test("include-in-print toggles mark the card and table sections noprint", async () => {

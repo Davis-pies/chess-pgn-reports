@@ -118,6 +118,10 @@ export function notesFootnotesPanel() {
   return box;
 }
 
+// card text size bounds, as a percentage of the default
+const FONT_MIN = 60;
+const FONT_MAX = 200;
+
 export function exportBar() {
   const bar = el("div", { className: "export" });
   const printBtn = el("button", {
@@ -182,17 +186,31 @@ export function exportBar() {
   // Card text size, as a percentage of the default. Cards only: the table's
   // columns are sized by their content, so scaling its text would move the
   // print pagination as well.
-  const sel = el("select", { className: "optsel" });
-  [85, 100, 115, 130].forEach((p) => {
-    const o = el("option", { value: String(p), textContent: p + "%" });
-    if ((getCurrent().cardFont || 100) === p) o.selected = true;
-    sel.appendChild(o);
+  const sel = el("input", {
+    className: "optsel",
+    type: "number",
+    min: String(FONT_MIN),
+    max: String(FONT_MAX),
+    step: "5",
+    value: String(getCurrent().cardFont || 100),
   });
+  // on change, not on input: every commit re-renders the whole app, so reacting
+  // per keystroke would tear the field out from under the cursor mid-number.
   sel.onchange = () => {
-    getCurrent().cardFont = Number(sel.value);
+    const raw = String(sel.value).trim();
+    const n = Math.round(Number(raw));
+    // a blank or non-numeric field falls back to the default. Note Number("")
+    // is 0, which is finite — so the emptiness check has to come first, or a
+    // cleared field would clamp to the minimum instead of resetting.
+    getCurrent().cardFont =
+      raw === "" || !Number.isFinite(n)
+        ? 100
+        : Math.min(FONT_MAX, Math.max(FONT_MIN, n));
     getRenderHooks().renderApp();
   };
-  cards.appendChild(el("label", { className: "opt" }, ["text size ", sel]));
+  cards.appendChild(
+    el("label", { className: "opt" }, ["text size ", sel, " %"]),
+  );
   pOpts.append(
     cards,
     group("Table", [
