@@ -51,7 +51,7 @@ export function loadState(pgn, { tags = {}, name = "", renderHooks = {} } = {}) 
 // Mirror of app.js's private computeShared(): group moves that reach an
 // identical position by the same SAN, which is what moveStrip/movePanel read
 // to decide that annotating one move annotates the whole group.
-export function computeShared(lines) {
+function computeShared(lines) {
 	const byLine = new Map();
 	const idLines = new Map();
 	const byFenSan = new Map();

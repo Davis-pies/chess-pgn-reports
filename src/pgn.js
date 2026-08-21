@@ -2,7 +2,7 @@ import { Chess } from "chess.js";
 
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-export function tokenize(mt) {
+function tokenize(mt) {
 	// A '{' with no matching '}' can't form a valid \{[^}]*\} token, so it's
 	// silently dropped by the main regex below and its body gets retokenized
 	// as if it were SAN -- producing a confusing "illegal move" error that
