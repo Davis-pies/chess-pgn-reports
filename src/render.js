@@ -118,34 +118,6 @@ export function appendBoard(container, fen, size = 220) {
 	return container.lastElementChild;
 }
 
-// A standalone SVG board for export: every <use> piece reference is expanded
-// into inline piece content, so the SVG renders without the injected sprite
-// (needed for embedding diagrams in the Markdown export).
-export function selfContainedBoardSvg(fen, size = 220) {
-	const svg = boardSvg(fen, size);
-	svg.querySelectorAll("use").forEach((u) => {
-		const sym = document.getElementById(
-			(u.getAttribute("href") || "").slice(1),
-		);
-		if (!sym) {
-			u.remove();
-			return;
-		}
-		const x = Number(u.getAttribute("x") || 0);
-		const y = Number(u.getAttribute("y") || 0);
-		const w = Number(u.getAttribute("width") || 45);
-		const h = Number(u.getAttribute("height") || 45);
-		const g = document.createElementNS(NS, "g");
-		g.setAttribute(
-			"transform",
-			`translate(${x} ${y}) scale(${w / 45} ${h / 45})`,
-		);
-		sym.childNodes.forEach((n) => g.appendChild(n.cloneNode(true)));
-		u.replaceWith(g);
-	});
-	return svg;
-}
-
 export function fullmoveLabel(ply) {
 	const n = Math.floor(ply / 2) + 1;
 	return ply % 2 === 0 ? `${n}.` : `${n}...`;

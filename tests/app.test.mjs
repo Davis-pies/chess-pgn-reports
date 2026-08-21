@@ -1,7 +1,15 @@
-import { test } from "node:test";
+import { test, after } from "node:test";
 import assert from "node:assert";
-import { JSDOM } from "jsdom";
 import { saveNotebook } from "../src/store.js";
+import { bootApp } from "./helpers.mjs";
+
+// One app.js instance for the whole file. Each test calls app.reset() to get
+// back to the import panel with clean storage. See bootApp's note on why the
+// tests must NOT re-import app.js with a cache-busting query string.
+const app = await bootApp();
+const dom = app.dom;
+const alerts = app.alerts;
+after(() => app.teardown());
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -27,19 +35,7 @@ const tick = async () => {
 };
 
 test("full app flow: import PGN, tag a line, render table preview", async () => {
-	const dom = new JSDOM('<!DOCTYPE html><main id="view"></main>', {
-		url: "http://localhost/",
-		pretendToBeVisual: true,
-	});
-	global.window = dom.window;
-	global.document = dom.window.document;
-	global.localStorage = dom.window.localStorage;
-	global.alert = () => {};
-	global.confirm = () => true;
-	global.requestAnimationFrame = dom.window.requestAnimationFrame;
-
-	await import("../src/app.js");
-	dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
+	app.reset();
 
 	let view = doc("view");
 	const textarea = view.querySelector("textarea.pgnin");
@@ -77,30 +73,10 @@ test("full app flow: import PGN, tag a line, render table preview", async () => 
 		"sideline tag appears in table",
 	);
 
-	delete global.window;
-	delete global.document;
-	delete global.localStorage;
-	delete global.alert;
-	delete global.confirm;
-	delete global.requestAnimationFrame;
 });
 
 test("inline boards: flat shows one per line; grouped shows only expanded groups", async () => {
-	const dom = new JSDOM('<!DOCTYPE html><main id="view"></main>', {
-		url: "http://localhost/",
-		pretendToBeVisual: true,
-	});
-	global.window = dom.window;
-	global.document = dom.window.document;
-	global.requestAnimationFrame = dom.window.requestAnimationFrame;
-	global.localStorage = dom.window.localStorage;
-	global.alert = () => {};
-	global.confirm = () => true;
-
-	// cache-busting import so the DOMContentLoaded handler registers on
-	// this test's document (the first test's handler is on the old document)
-	await import("../src/app.js?t=2");
-	dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
+	app.reset();
 
 	// cache-busted import starts with fresh state (empty lines), so we're at
 	// the import panel already — no reset needed
@@ -158,28 +134,10 @@ test("inline boards: flat shows one per line; grouped shows only expanded groups
 		.click();
 	assert.strictEqual(doc("view").querySelectorAll(".ledge-board").length, 3);
 
-	delete global.window;
-	delete global.document;
-	delete global.requestAnimationFrame;
-	delete global.localStorage;
-	delete global.alert;
-	delete global.confirm;
 });
 
 test("lone-line editor groups are collapsible details, closed by default", async () => {
-	const dom = new JSDOM('<!DOCTYPE html><main id="view"></main>', {
-		url: "http://localhost/",
-		pretendToBeVisual: true,
-	});
-	global.window = dom.window;
-	global.document = dom.window.document;
-	global.requestAnimationFrame = dom.window.requestAnimationFrame;
-	global.localStorage = dom.window.localStorage;
-	global.alert = () => {};
-	global.confirm = () => true;
-
-	await import("../src/app.js?t=3");
-	dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
+	app.reset();
 
 	// one variation = one lone line in the trie (no fork)
 	const textarea = doc("view").querySelector("textarea.pgnin");
@@ -201,28 +159,10 @@ test("lone-line editor groups are collapsible details, closed by default", async
 	assert.ok(det2.open, "expanded after toggle");
 	assert.ok(det2.querySelector(".ledge"), "line editor present when open");
 
-	delete global.window;
-	delete global.document;
-	delete global.requestAnimationFrame;
-	delete global.localStorage;
-	delete global.alert;
-	delete global.confirm;
 });
 
 test("print table: split-by-trie checkbox toggles per-branch tables", async () => {
-	const dom = new JSDOM('<!DOCTYPE html><main id="view"></main>', {
-		url: "http://localhost/",
-		pretendToBeVisual: true,
-	});
-	global.window = dom.window;
-	global.document = dom.window.document;
-	global.requestAnimationFrame = dom.window.requestAnimationFrame;
-	global.localStorage = dom.window.localStorage;
-	global.alert = () => {};
-	global.confirm = () => true;
-
-	await import("../src/app.js?t=5");
-	dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
+	app.reset();
 
 	const textarea = doc("view").querySelector("textarea.pgnin");
 	// two variations with DIFFERENT first moves = two top-level branches
@@ -252,28 +192,10 @@ test("print table: split-by-trie checkbox toggles per-branch tables", async () =
 		"single-line branches pack into one table even with split on",
 	);
 
-	delete global.window;
-	delete global.document;
-	delete global.requestAnimationFrame;
-	delete global.localStorage;
-	delete global.alert;
-	delete global.confirm;
 });
 
 test("print table: wide notebooks pack into multiple tables, oversized forks chunk at sub-forks", async () => {
-	const dom = new JSDOM('<!DOCTYPE html><main id="view"></main>', {
-		url: "http://localhost/",
-		pretendToBeVisual: true,
-	});
-	global.window = dom.window;
-	global.document = dom.window.document;
-	global.requestAnimationFrame = dom.window.requestAnimationFrame;
-	global.localStorage = dom.window.localStorage;
-	global.alert = () => {};
-	global.confirm = () => true;
-
-	await import("../src/app.js?t=7");
-	dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
+	app.reset();
 
 	// 16 variations share 1... c5 2. Nf3 Nc6 and fork at white's 3rd move:
 	// one top-level branch of 16 lines — over the 15-line cap
@@ -317,28 +239,10 @@ test("print table: wide notebooks pack into multiple tables, oversized forks chu
 		),
 	);
 
-	delete global.window;
-	delete global.document;
-	delete global.requestAnimationFrame;
-	delete global.localStorage;
-	delete global.alert;
-	delete global.confirm;
 });
 
 test("table preview: mainline always visible, branches collapsed by default", async () => {
-	const dom = new JSDOM('<!DOCTYPE html><main id="view"></main>', {
-		url: "http://localhost/",
-		pretendToBeVisual: true,
-	});
-	global.window = dom.window;
-	global.document = dom.window.document;
-	global.requestAnimationFrame = dom.window.requestAnimationFrame;
-	global.localStorage = dom.window.localStorage;
-	global.alert = () => {};
-	global.confirm = () => true;
-
-	await import("../src/app.js?t=4");
-	dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
+	app.reset();
 
 	const textarea = doc("view").querySelector("textarea.pgnin");
 	textarea.value =
@@ -419,28 +323,10 @@ test("table preview: mainline always visible, branches collapsed by default", as
 		"collapse all collapses the fork",
 	);
 
-	delete global.window;
-	delete global.document;
-	delete global.requestAnimationFrame;
-	delete global.localStorage;
-	delete global.alert;
-	delete global.confirm;
 });
 
 test("table preview: rows span only visible columns, no trailing empty rows", async () => {
-	const dom = new JSDOM('<!DOCTYPE html><main id="view"></main>', {
-		url: "http://localhost/",
-		pretendToBeVisual: true,
-	});
-	global.window = dom.window;
-	global.document = dom.window.document;
-	global.requestAnimationFrame = dom.window.requestAnimationFrame;
-	global.localStorage = dom.window.localStorage;
-	global.alert = () => {};
-	global.confirm = () => true;
-
-	await import("../src/app.js?t=6");
-	dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
+	app.reset();
 
 	// a forking branch whose lines reach ply 4 while the mainline stops at ply 2
 	const textarea = doc("view").querySelector("textarea.pgnin");
@@ -468,35 +354,19 @@ test("table preview: rows span only visible columns, no trailing empty rows", as
 		"expanded branch extends rows to its deepest ply (header + ply 0..4)",
 	);
 
-	delete global.window;
-	delete global.document;
-	delete global.requestAnimationFrame;
-	delete global.localStorage;
-	delete global.alert;
-	delete global.confirm;
 });
 
 test("deleting one saved workbook removes only its row, not the whole list", async () => {
-	const dom = new JSDOM('<!DOCTYPE html><main id="view"></main>', {
-		url: "http://localhost/",
-		pretendToBeVisual: true,
-	});
-	global.window = dom.window;
-	global.document = dom.window.document;
-	global.requestAnimationFrame = dom.window.requestAnimationFrame;
-	global.localStorage = dom.window.localStorage;
-	global.alert = () => {};
-	global.confirm = () => true;
-
-	// pre-seed two saved notebooks directly via store.js, so the app starts
-	// with both already listed (avoids a same-millisecond id collision that
-	// saving twice through the UI could hit)
+	app.reset();
+	// pre-seed two saved notebooks directly via store.js (avoids a
+	// same-millisecond id collision that saving twice through the UI could
+	// hit), then load and leave a notebook so "New / Import" re-renders the
+	// import panel with both already listed
 	const lineFor = (san) => [{ isMain: true, moves: [{ san, ply: 0 }] }];
+	await app.loadPgn("1. e4 e5");
 	saveNotebook("bookA", { name: "Book A", pgn: "1. e4", lines: lineFor("e4") });
 	saveNotebook("bookB", { name: "Book B", pgn: "1. d4", lines: lineFor("d4") });
-
-	await import("../src/app.js?t=8");
-	dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
+	app.clickText("New / Import");
 
 	let box = doc("view").querySelector(".notebooks");
 	assert.ok(box, "notebooks panel present");
@@ -530,29 +400,10 @@ test("deleting one saved workbook removes only its row, not the whole list", asy
 		"the deleted workbook's row is gone",
 	);
 
-	delete global.window;
-	delete global.document;
-	delete global.requestAnimationFrame;
-	delete global.localStorage;
-	delete global.alert;
-	delete global.confirm;
 });
 
 test("Save surfaces a storage failure instead of silently losing the notebook", async () => {
-	const dom = new JSDOM('<!DOCTYPE html><main id="view"></main>', {
-		url: "http://localhost/",
-		pretendToBeVisual: true,
-	});
-	global.window = dom.window;
-	global.document = dom.window.document;
-	global.requestAnimationFrame = dom.window.requestAnimationFrame;
-	global.localStorage = dom.window.localStorage;
-	const alerts = [];
-	global.alert = (msg) => alerts.push(msg);
-	global.confirm = () => true;
-
-	await import("../src/app.js?t=9");
-	dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
+	app.reset();
 
 	const textarea = doc("view").querySelector("textarea.pgnin");
 	textarea.value = "1. e4 e5";
@@ -585,28 +436,10 @@ test("Save surfaces a storage failure instead of silently losing the notebook", 
 		proto.setItem = origSetItem;
 	}
 
-	delete global.window;
-	delete global.document;
-	delete global.requestAnimationFrame;
-	delete global.localStorage;
-	delete global.alert;
-	delete global.confirm;
 });
 
 test("opening a saved notebook carries forward the dragged side panel width", async () => {
-	const dom = new JSDOM('<!DOCTYPE html><main id="view"></main>', {
-		url: "http://localhost/",
-		pretendToBeVisual: true,
-	});
-	global.window = dom.window;
-	global.document = dom.window.document;
-	global.requestAnimationFrame = dom.window.requestAnimationFrame;
-	global.localStorage = dom.window.localStorage;
-	global.alert = () => {};
-	global.confirm = () => true;
-
-	await import("../src/app.js?t=10");
-	dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
+	app.reset();
 
 	const textarea = doc("view").querySelector("textarea.pgnin");
 	textarea.value = "1. e4 e5";
@@ -652,31 +485,13 @@ test("opening a saved notebook carries forward the dragged side panel width", as
 		"the dragged side panel width survives opening a saved notebook",
 	);
 
-	delete global.window;
-	delete global.document;
-	delete global.requestAnimationFrame;
-	delete global.localStorage;
-	delete global.alert;
-	delete global.confirm;
 });
 
 // A note carried by several lines (either from identical PGN comment text, or
 // written across a shared-position group by the note editor) is ONE note. The
 // printed Notes list must show it once, not once per line carrying it.
 test("print notes: a note shared by several lines is listed once", async () => {
-	const dom = new JSDOM('<!DOCTYPE html><main id="view"></main>', {
-		url: "http://localhost/",
-		pretendToBeVisual: true,
-	});
-	global.window = dom.window;
-	global.document = dom.window.document;
-	global.requestAnimationFrame = dom.window.requestAnimationFrame;
-	global.localStorage = dom.window.localStorage;
-	global.alert = () => {};
-	global.confirm = () => true;
-
-	await import("../src/app.js?t=11");
-	dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
+	app.reset();
 
 	const textarea = doc("view").querySelector("textarea.pgnin");
 	// both variations carry the identical comment at the same ply -> one note
@@ -698,12 +513,6 @@ test("print notes: a note shared by several lines is listed once", async () => {
 			`texts=${JSON.stringify(rows.map((r) => r.textContent))}`,
 	);
 
-	delete global.window;
-	delete global.document;
-	delete global.requestAnimationFrame;
-	delete global.localStorage;
-	delete global.alert;
-	delete global.confirm;
 });
 
 function doc(id) {

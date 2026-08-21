@@ -21,4 +21,21 @@ jobs:
 
       - run: npm ci
 
+      - run: npm run lint
+
+      # Fails the build on exports/files/dependencies nothing imports, so a
+      # refactor cannot quietly leave dead code behind.
+      - run: npm run knip
+
       - run: npm test
+
+      # Coverage floors sit just below the current numbers so the ratchet
+      # catches regressions; raise them as coverage improves.
+      - name: Coverage
+        run: >-
+          node --test --experimental-test-coverage
+          --test-coverage-exclude='tests/**'
+          --test-coverage-lines=97
+          --test-coverage-branches=87
+          --test-coverage-functions=97
+          'tests/**/*.test.mjs'

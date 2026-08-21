@@ -40,7 +40,7 @@ export function listNotebooks() {
 	return Object.keys(localStorage)
 		.filter((k) => k.startsWith(PREFIX))
 		.map((k) => {
-			let d = null;
+			let d;
 			try {
 				d = JSON.parse(localStorage.getItem(k));
 			} catch {

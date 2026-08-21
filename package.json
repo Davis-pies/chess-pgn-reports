@@ -6,7 +6,11 @@
     "doc": "docs"
   },
   "scripts": {
-    "test": "node --test 'tests/**/*.test.mjs'"
+    "test": "node --test 'tests/**/*.test.mjs'",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "coverage": "node --test --experimental-test-coverage --test-coverage-exclude='tests/**' 'tests/**/*.test.mjs'",
+    "knip": "knip"
   },
   "keywords": [
     "chess",
@@ -22,6 +26,10 @@
     "chess.js": "^1.4.0"
   },
   "devDependencies": {
-    "jsdom": "^30.0.1"
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.9.0",
+    "globals": "^17.11.0",
+    "jsdom": "^30.0.1",
+    "knip": "^6.32.2"
   }
 }
