@@ -77,14 +77,23 @@ let sideDragging = false; // dragging the table-panel resize handle
 let tableBox = null; // the .pv-table container
 let markupBox = null; // the .markup container
 export function rerenderTable() {
-	if (!tableBox) return;
+	if (!tableBox || !hasNotebook()) return;
 	const g = grid(getCurrent().lines);
 	tableBox.replaceChildren();
 	tableBox.appendChild(el("h3", { textContent: "Table" }));
 	renderTrieTable(tableBox, g, getCurrent().orientation);
 }
+// A <details> toggle queued by a previous render can fire after the app has
+// gone back to the import panel (the element is detached by then, but the
+// event still dispatches). Rebuilding the markup panel at that point would
+// read lines off a notebook that is no longer loaded, so both rerender entry
+// points bail unless one is.
+function hasNotebook() {
+	const c = getCurrent();
+	return !!(c && c.lines && c.lines.length);
+}
 export function rerenderMarkup() {
-	if (!markupBox) return;
+	if (!markupBox || !hasNotebook()) return;
 	const nb = markupPanel();
 	markupBox.replaceChildren(...nb.children);
 }

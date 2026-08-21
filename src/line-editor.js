@@ -233,7 +233,9 @@ export function movePanel(l) {
 		} else {
 			lines.forEach((x) => {
 				x.marks = x.marks || {};
-				if (cur === sym) delete x.marks[selPly];
+				// an empty symbol is the clear button: always a delete, never an
+				// empty-string mark that would linger in the saved notebook
+				if (!sym || cur === sym) delete x.marks[selPly];
 				else x.marks[selPly] = sym;
 				if (!Object.keys(x.marks).length) x.marks = undefined;
 			});

@@ -31,7 +31,7 @@ jobs:
         run: >-
           node --test --experimental-test-coverage
           --test-coverage-exclude='tests/**'
-          --test-coverage-lines=70
-          --test-coverage-branches=73
-          --test-coverage-functions=58
+          --test-coverage-lines=95
+          --test-coverage-branches=87
+          --test-coverage-functions=96
           'tests/**/*.test.mjs'

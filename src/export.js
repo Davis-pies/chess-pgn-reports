@@ -202,7 +202,7 @@ function download(filename, text, mime) {
 }
 
 // Editable, portable Markdown of the finished table — paste into Docs/Word.
-function buildMarkdown() {
+export function buildMarkdown() {
 	const g = grid(getCurrent().lines);
 	const L = [];
 	if (getCurrent().name) L.push("# " + getCurrent().name, "");
