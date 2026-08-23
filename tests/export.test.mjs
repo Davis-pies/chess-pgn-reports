@@ -4,7 +4,7 @@ import { installDom, loadState } from "./helpers.mjs";
 import { renderInline } from "../src/dom.js";
 import {
   buildMarkdown,
-  notesFootnotesPanel,
+  notesPanel,
   moveRef,
   branchContext,
   exportBar,
@@ -136,14 +136,14 @@ test("renderInline turns newlines into <br> elements", () => {
   off();
 });
 
-test("notesFootnotesPanel lists notes and footnotes in one numbered sequence", () => {
+test("notesPanel lists notes and footnotes in one numbered sequence", () => {
   const off = installDom();
   const s = loadState("1. e4 {solid} e5 (1... c5 2. Nf3 Nc6) 2. Nf3 Nc6", {
     name: "Book",
     tags: { 1: "foot" },
   });
   s.lines[1].meta.note = "the **Sicilian**";
-  const box = notesFootnotesPanel();
+  const box = notesPanel();
   const heads = [...box.querySelectorAll("h3")].map((h) => h.textContent);
   assert.deepStrictEqual(heads, ["Notes"]);
   const sups = [...box.querySelectorAll("sup")].map((s) => s.textContent);
@@ -154,10 +154,10 @@ test("notesFootnotesPanel lists notes and footnotes in one numbered sequence", (
   off();
 });
 
-test("notesFootnotesPanel omits the Footnotes heading when nothing is tagged foot", () => {
+test("notesPanel omits the Footnotes heading when nothing is tagged foot", () => {
   const off = installDom();
   loadState("1. e4 {solid} e5 2. Nf3", { name: "Book" });
-  const heads = [...notesFootnotesPanel().querySelectorAll("h3")].map(
+  const heads = [...notesPanel().querySelectorAll("h3")].map(
     (h) => h.textContent,
   );
   assert.deepStrictEqual(heads, ["Notes"]);
@@ -330,7 +330,7 @@ test("the notes panel renders footnotes as numbered notes with no separate secti
     tags: { 1: "foot" },
   });
   s.lines.find((l) => l.moves.some((m) => m.san === "c5")).name = "Sicilian";
-  const box = notesFootnotesPanel();
+  const box = notesPanel();
   const headings = [...box.querySelectorAll("h3")].map((h) => h.textContent);
   assert.deepStrictEqual(headings, ["Notes"], "no Footnotes heading");
   const rows = [...box.querySelectorAll(".nt")];

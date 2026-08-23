@@ -28,7 +28,7 @@ import {
   renderTrieNode,
 } from "./trie-view.js";
 import { lineEditor } from "./line-editor.js";
-import { notesFootnotesPanel, exportBar } from "./export.js";
+import { notesPanel, exportBar } from "./export.js";
 
 // Canonical reset for `current`. Every "start over" path (New/Import, Load &
 // Tag, opening a saved notebook, a failed open) rebuilt this object from an
@@ -319,7 +319,7 @@ function viewRoot() {
   main.appendChild(helpPanel());
   const mb = markupPanel();
   markupBox = mb; // module ref for in-place re-renders
-  const notesBox = notesFootnotesPanel();
+  const notesBox = notesPanel();
   main.appendChild(mb);
   main.appendChild(notesBox);
   main.appendChild(exportBar());

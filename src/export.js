@@ -47,7 +47,7 @@ export function branchContext(l) {
 // The read-only reference list that prints and exports. Notes are numbered
 // (PGN {comments}); a Footnote-tagged line derives an entry in the same
 // sequence, anchored on the mainline move it replaces.
-export function notesFootnotesPanel() {
+export function notesPanel() {
   const box = el("div", { className: "notes" });
   const notes = allNotes();
   box.appendChild(el("h3", { textContent: "Notes" }));
