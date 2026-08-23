@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert";
 import { loadState } from "./helpers.mjs";
 import { numberNotes, allNotes } from "../src/notes.js";
+import { grid } from "../src/table.js";
 
 test("numberNotes numbers notes in line order and maps them back per line", () => {
 	const s = loadState("1. e4 {first} e5 (1... c5 {second}) 2. Nf3");
@@ -47,4 +48,27 @@ test("allNotes returns the numbered entries for the current notebook", () => {
 		allNotes().map((n) => [n.n, n.text, n.owner === s.lines[0]]),
 		[[1, "first", true]],
 	);
+});
+
+test("grid's note markers use the same numbers as allNotes", () => {
+	const s = loadState(
+		"1. e4 {opening} e5 (1... c5 {sicilian} 2. Nf3 {knight}) 2. Nf3 {develops} Nc6",
+	);
+	const { vars } = grid(s.lines);
+	const byNumber = new Map(allNotes().map((n) => [n.n, n]));
+	let checked = 0;
+	vars.forEach((v) => {
+		Object.entries(v.noteByPly).forEach(([ply, nums]) => {
+			nums.forEach((n) => {
+				assert.ok(byNumber.has(n), `note ${n} exists in the notes list`);
+				assert.strictEqual(
+					byNumber.get(n).ply,
+					Number(ply),
+					`note ${n} is anchored at the same ply in both`,
+				);
+				checked++;
+			});
+		});
+	});
+	assert.ok(checked >= 3, `the fixture exercised markers (got ${checked})`);
 });
