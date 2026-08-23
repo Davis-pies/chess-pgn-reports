@@ -4,6 +4,7 @@ import { JSDOM } from "jsdom";
 import { parsePgn } from "../src/pgn.js";
 import { collectLines } from "../src/tree.js";
 import { grid } from "../src/table.js";
+import { installDom } from "./helpers.mjs";
 import {
 	renderTable,
 	renderCards,
@@ -17,13 +18,6 @@ function dom() {
 	return new JSDOM('<!DOCTYPE html><div id="view"></div>', {
 		url: "http://localhost/",
 	});
-}
-
-function installDom() {
-	global.document = dom().window.document;
-	return () => {
-		delete global.document;
-	};
 }
 
 test("boardSvg draws all 64 squares with pieces and coordinates", () => {
