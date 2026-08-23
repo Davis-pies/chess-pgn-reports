@@ -567,7 +567,13 @@ Expected: PASS, 8 tests.
 - [ ] **Step 5: Run the full suite**
 
 Run: `npm test && npm run lint`
-Expected: PASS. Existing footnote tests still pass — the lettered section has not been touched yet, it now simply has a numbered entry alongside it.
+Expected: 124 tests, **123 passing and 1 failing**. This task deliberately leaves the suite red.
+
+`tests/export.test.mjs:138` ("notesFootnotesPanel lists numbered notes and lettered footnotes") now fails with `Cannot read properties of undefined (reading 'split')`. The cause is not a defect in this task: `notesFootnotesPanel` (`src/export.js:72`) iterates `allNotes()` and calls `renderInline(span, note.text)` unconditionally, and a footnote entry has no `.text` by design. Task 7 rewrites that panel to branch on `entry.foot`, which fixes it.
+
+Do **not** patch `src/export.js` here — that is Task 7's work, and a stopgap guard would be thrown away immediately.
+
+The branch stays red from this commit until Task 7 lands. Task 8 fixes the same class of breakage in the print cards (`renderCards` does `strip(note.text)` at `src/render.js:411`), which has no test covering it today but would throw at runtime for any notebook containing a footnote. Prioritise Tasks 7 and 8 over 9 and 10 to get back to green.
 
 - [ ] **Step 6: Commit**
 
@@ -1275,6 +1281,20 @@ test("table markers and the notes list agree with footnotes in the mix", () => {
 			});
 		});
 	});
+	// no marker VANISHED: every number in the list is rendered somewhere. The
+	// Task 4 parity test only checks that markers resolve to real notes, which
+	// cannot catch a note that stopped being marked at all.
+	const marked = new Set();
+	[...vars, ...footNotes].forEach((v) =>
+		Object.values(v.noteByPly).forEach((nums) =>
+			nums.forEach((n) => marked.add(n)),
+		),
+	);
+	assert.deepStrictEqual(
+		[...marked].sort((a, b) => a - b),
+		notes.map((n) => n.n),
+		"every numbered note is marked somewhere",
+	);
 	// the footnote's inner note is its own entry, marked inside the footnote text
 	const inner = notes.find((n) => n.text === "knight");
 	assert.ok(inner, "the inner note survives as its own entry");
