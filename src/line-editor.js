@@ -49,11 +49,14 @@ export function lineEditor(l, idx, showBoard = false) {
 	row.appendChild(head);
 	row.appendChild(moveStrip(l));
 	// the symbol/comment panel appears once, on the first line of the group
-	if (
-		getCurrent().sel &&
-		getCurrent().sel.lines &&
-		getCurrent().sel.lines[0] === l
-	)
+	const sel = getCurrent().sel;
+	const panelHere = !!(sel && sel.lines && sel.lines[0] === l);
+	// movePanel draws the selected move's position, and that board REPLACES the
+	// line's end-position board rather than sitting beside it — two boards for
+	// one line reads as a rendering glitch. Only the panel's own line swaps: a
+	// sibling sharing the selection still shows its end position.
+	const editingBoard = panelHere && sel.ply != null;
+	if (panelHere)
 		row.appendChild(movePanel(l));
 	const note = el("input", {
 		className: "lno",
@@ -66,7 +69,7 @@ export function lineEditor(l, idx, showBoard = false) {
 	note.onchange = () => getRenderHooks().renderApp();
 	row.appendChild(note);
 	// the line's end-position board, next to its line (inline boards toggle)
-	if (showBoard) {
+	if (showBoard && !editingBoard) {
 		const bw = el("div", { className: "ledge-board" });
 		appendBoard(bw, l.fen, getCurrent().boardSize || 220);
 		row.appendChild(bw);

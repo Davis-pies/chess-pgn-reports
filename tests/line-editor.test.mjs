@@ -317,3 +317,50 @@ test("lineEditor shows the move panel only on the first line of the selected gro
 	assert.ok(lineEditor(s.lines[1], 1).querySelector(".movepanel"));
 	off();
 });
+
+test("selecting a move swaps the line's end-position board for the edit board", () => {
+	const off = installDom();
+	const s = loadState(TWO_LINES);
+	const main = s.lines[0];
+	// nothing selected: the inline end-position board is the only board
+	const idle = lineEditor(main, 0, true);
+	assert.ok(idle.querySelector(".ledge-board"), "end-position board shown");
+	assert.strictEqual(idle.querySelector(".mp-board"), null);
+	// a move selected on this line: the edit board REPLACES it rather than
+	// rendering a second board beside it
+	getCurrent().sel = { ply: 2, lines: [main] };
+	const editing = lineEditor(main, 0, true);
+	assert.ok(editing.querySelector(".mp-board svg"), "edit board shown");
+	assert.strictEqual(
+		editing.querySelector(".ledge-board"),
+		null,
+		"the end-position board is hidden while editing a move",
+	);
+	off();
+});
+
+test("a line-end selection keeps the end-position board", () => {
+	const off = installDom();
+	const s = loadState(TWO_LINES);
+	const main = s.lines[0];
+	// ply null is the line-end selection: movePanel draws no board, so the
+	// line's own end-position board has nothing to give way to
+	getCurrent().sel = { ply: null, lines: [main] };
+	const box = lineEditor(main, 0, true);
+	assert.strictEqual(box.querySelector(".mp-board"), null);
+	assert.ok(box.querySelector(".ledge-board"), "end-position board kept");
+	off();
+});
+
+test("a sibling sharing the selection keeps its own end-position board", () => {
+	const off = installDom();
+	const s = loadState(TWO_LINES);
+	const [main, other] = s.lines;
+	// the panel renders only on sel.lines[0]; the sibling shows no edit board,
+	// so hiding its end-position board would leave it with none at all
+	getCurrent().sel = { ply: 2, lines: [main, other] };
+	const box = lineEditor(other, 1, true);
+	assert.strictEqual(box.querySelector(".mp-board"), null);
+	assert.ok(box.querySelector(".ledge-board"), "sibling keeps its board");
+	off();
+});
