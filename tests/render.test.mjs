@@ -272,8 +272,23 @@ test("appendFootnote with no divergent tail renders name and commentary alone", 
 	});
 	// a footnote that shares everything it has with the mainline has no tail to
 	// show, so it is just its name, the anchor move, and its commentary
-	assert.match(span.textContent, /^Transposes: ⋯ 1\.e4\s+— same position$/);
+	assert.strictEqual(span.textContent, "Transposes: ⋯ 1.e4 — same position");
 	off();
+});
+
+test("footnoteText with no divergent tail renders name and commentary alone", () => {
+	assert.strictEqual(
+		footnoteText({
+			name: "Transposes",
+			eval: "",
+			note: "same position",
+			moves: [{ san: "e4", ply: 0 }],
+			marks: {},
+			noteByPly: {},
+			d: 1,
+		}),
+		"Transposes: ⋯ 1.e4 — same position",
+	);
 });
 
 test("footnoteText renders the same footnote as plain text", () => {

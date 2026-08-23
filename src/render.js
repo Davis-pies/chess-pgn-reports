@@ -457,12 +457,10 @@ export function fullMovesText(moves, marks) {
 export function appendFootnote(container, foot) {
 	const t = (s) => container.appendChild(document.createTextNode(s));
 	if (foot.name) t(foot.name + ": ");
-	if (foot.d > 0) {
-		const pm = foot.moves[foot.d - 1];
-		t("⋯ " + fullmoveLabel(pm.ply) + pm.san + " ");
-	}
+	const pm = foot.d > 0 ? foot.moves[foot.d - 1] : null;
+	if (pm) t("⋯ " + fullmoveLabel(pm.ply) + pm.san);
 	foot.moves.slice(foot.d).forEach((m, i) => {
-		if (i) t(" ");
+		if (i || pm) t(" ");
 		const mark = foot.marks && foot.marks[m.ply] ? " " + foot.marks[m.ply] : "";
 		t(fullmoveLabel(m.ply) + m.san + mark);
 		const refs = (foot.noteByPly && foot.noteByPly[m.ply]) || [];
@@ -483,7 +481,7 @@ export function appendFootnote(container, foot) {
 // markers are dropped: a text export has no superscripts to render them as.
 export function footnoteText(foot) {
 	const pm = foot.d > 0 ? foot.moves[foot.d - 1] : null;
-	const ctx = pm ? "⋯ " + fullmoveLabel(pm.ply) + pm.san + " " : "";
+	const ctx = pm ? "⋯ " + fullmoveLabel(pm.ply) + pm.san : "";
 	const tail = foot.moves
 		.slice(foot.d)
 		.map(
@@ -493,10 +491,10 @@ export function footnoteText(foot) {
 				(foot.marks && foot.marks[m.ply] ? " " + foot.marks[m.ply] : ""),
 		)
 		.join(" ");
+	const moves = [ctx, tail].filter(Boolean).join(" ");
 	return (
 		(foot.name ? foot.name + ": " : "") +
-		ctx +
-		tail +
+		moves +
 		(foot.eval ? " " + foot.eval : "") +
 		(foot.note ? " — " + foot.note : "")
 	);
