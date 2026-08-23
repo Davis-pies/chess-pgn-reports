@@ -135,7 +135,7 @@ test("renderInline turns newlines into <br> elements", () => {
   off();
 });
 
-test("notesFootnotesPanel lists numbered notes and lettered footnotes", () => {
+test("notesFootnotesPanel lists notes and footnotes in one numbered sequence", () => {
   const off = installDom();
   const s = loadState("1. e4 {solid} e5 (1... c5 2. Nf3 Nc6) 2. Nf3 Nc6", {
     name: "Book",
@@ -144,10 +144,10 @@ test("notesFootnotesPanel lists numbered notes and lettered footnotes", () => {
   s.lines[1].meta.note = "the **Sicilian**";
   const box = notesFootnotesPanel();
   const heads = [...box.querySelectorAll("h3")].map((h) => h.textContent);
-  assert.deepStrictEqual(heads, ["Notes", "Footnotes"]);
+  assert.deepStrictEqual(heads, ["Notes"]);
   const sups = [...box.querySelectorAll("sup")].map((s) => s.textContent);
   assert.ok(sups.includes("[1]"), "note numbered [1]");
-  assert.ok(sups.includes("a"), "footnote lettered a");
+  assert.ok(sups.includes("[2]"), "footnote numbered [2]");
   // footnote note text goes through renderInline, so markdown becomes elements
   assert.strictEqual(box.querySelector("strong").textContent, "Sicilian");
   off();
@@ -320,5 +320,28 @@ test("Copy report falls back to execCommand when the clipboard API is unavailabl
   assert.strictEqual(copy.textContent, "Copied ✓");
   // the scratch textarea is removed again
   assert.strictEqual(document.querySelector("textarea"), null);
+  off();
+});
+
+test("the notes panel renders footnotes as numbered notes with no separate section", () => {
+  const off = installDom();
+  const s = loadState("1. e4 e5 (1... c5 2. Nf3) 2. Nf3 {develops}", {
+    tags: { 1: "foot" },
+  });
+  s.lines.find((l) => l.moves.some((m) => m.san === "c5")).name = "Sicilian";
+  const box = notesFootnotesPanel();
+  const headings = [...box.querySelectorAll("h3")].map((h) => h.textContent);
+  assert.deepStrictEqual(headings, ["Notes"], "no Footnotes heading");
+  const rows = [...box.querySelectorAll(".nt")];
+  assert.strictEqual(rows.length, 2, "the footnote and the mainline note");
+  const marks = rows.map((r) => r.querySelector("sup").textContent);
+  assert.deepStrictEqual(marks, ["[1]", "[2]"], "one numbered sequence");
+  // numberNotes numbers by line-traversal order (the mainline's own comments
+  // before a tagged line's turn), so which entry lands first isn't fixed by
+  // ply — just confirm the footnote shows up as one of the numbered rows.
+  assert.ok(
+    rows.some((r) => /Sicilian/.test(r.textContent)),
+    "the footnote renders inline as a numbered note",
+  );
   off();
 });
