@@ -1,12 +1,12 @@
 // Print/PDF horizontal table. The mainline is always shown as the reference
 // column; the side lines are split into vertical slices of ~16 columns so the
 // table wraps across pages instead of being cut off or scaled.
-import { renderTable } from "./render.js";
-import { el } from "./dom.js";
+import { renderTable, appendFootnote } from "./render.js";
+import { el, renderInline } from "./dom.js";
 import { getCurrent } from "./state.js";
 import { allNotes } from "./notes.js";
 import { buildTrie, leavesOf } from "./trie-view.js";
-import { moveRef, renderInline } from "./export.js";
+import { moveRef } from "./export.js";
 
 // Highest ply present in a subset of table vars — so a per-branch print table
 // doesn't render empty rows down to the notebook's global max.
@@ -61,17 +61,24 @@ export function appendPrintTables(box, g) {
 
 // The numbered notes belonging to a table's var (matched back to its source
 // line by move-array identity). Numbers match the superscripts in the cells.
+// Footnote-derived entries have no comment behind them, so they are collected
+// by owner: they belong to the line their anchor marker sits on.
 function notesForVar(v) {
   const line = getCurrent().lines.find((l) => l.moves === v.moves);
   if (!line) return [];
   const all = allNotes();
   const out = [];
   const seen = new Set();
-  (line.comments || []).forEach((c) => {
-    const n = all.find((x) => x.ply === c.ply && x.text === c.text);
+  const take = (n) => {
     if (!n || seen.has(n.n)) return;
     seen.add(n.n);
     out.push(n);
+  };
+  all.forEach((n) => {
+    if (n.foot && n.owner === line) take(n);
+  });
+  (line.comments || []).forEach((c) => {
+    take(all.find((x) => x.ply === c.ply && x.text === c.text));
   });
   return out;
 }
@@ -118,8 +125,12 @@ function renderTableNotes(wrap, vars, showMain) {
     const row = el("div", { className: "nt" });
     row.appendChild(el("sup", { textContent: "[" + n.n + "]" }));
     const span = document.createElement("span");
-    span.appendChild(document.createTextNode(moveRef(n.ply, n.owner) + " — "));
-    renderInline(span, n.text);
+    if (n.foot) {
+      appendFootnote(span, n.foot);
+    } else {
+      span.appendChild(document.createTextNode(moveRef(n.ply, n.owner) + " — "));
+      renderInline(span, n.text);
+    }
     row.appendChild(span);
     box.appendChild(row);
   });

@@ -5,6 +5,7 @@
 // light and dark page themes.
 
 import { fenAt } from "./pgn.js";
+import { renderInline } from "./dom.js";
 
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -200,11 +201,6 @@ export function renderTable(container, grid, orientation) {
 			c.appendChild(tag);
 		}
 		c.appendChild(document.createTextNode(" " + (v.name || "")));
-		if (v.letter) {
-			const s = document.createElement("sup");
-			s.textContent = "[" + v.letter + "]";
-			c.appendChild(s);
-		}
 		return c;
 	};
 
@@ -340,7 +336,9 @@ export function renderCards(container, grid, opts = {}) {
 		s.replace(/\*\*/g, "").replace(/`/g, "").replace(/\*/g, "").trim();
 	const wrap = document.createElement("div");
 	wrap.className = "cards";
-	const all = [...grid.vars, ...grid.footNotes];
+	// Footnote lines are notes, not cards — they render in the notes block of
+	// whichever card carries their anchor.
+	const all = grid.vars;
 	for (const v of all) {
 		const card = document.createElement("section");
 		card.className = "card";
@@ -355,11 +353,6 @@ export function renderCards(container, grid, opts = {}) {
 		name.className = "card-name";
 		name.textContent = v.name;
 		head.appendChild(name);
-		if (v.letter) {
-			const s = document.createElement("sup");
-			s.textContent = "[" + v.letter + "]";
-			head.appendChild(s);
-		}
 		const ev = document.createElement("span");
 		ev.className = "card-eval";
 		ev.textContent = v.eval;
@@ -410,7 +403,12 @@ export function renderCards(container, grid, opts = {}) {
 		for (const ply in v.noteByPly || {}) {
 			v.noteByPly[ply].forEach((n) => {
 				const note = notes[n - 1];
-				if (note) owned.push({ n, ply: Number(ply), text: strip(note.text) });
+				if (!note) return;
+				owned.push({
+					n,
+					ply: Number(ply),
+					text: note.foot ? footnoteText(note.foot) : strip(note.text),
+				});
 			});
 		}
 		if (owned.length) {
@@ -451,4 +449,53 @@ export function fullMovesText(moves, marks) {
 				(marks && marks[m.ply] ? " " + marks[m.ply] : ""),
 		)
 		.join(" ");
+}
+
+// A footnote-derived note: "Sicilian: ⋯ 1.e4 1...c5 = — commentary". The moves
+// shown are the footnote's own tail, prefixed with the last shared move for
+// context, and any notes on those moves render as inline superscripts.
+export function appendFootnote(container, foot) {
+	const t = (s) => container.appendChild(document.createTextNode(s));
+	if (foot.name) t(foot.name + ": ");
+	const pm = foot.d > 0 ? foot.moves[foot.d - 1] : null;
+	if (pm) t("⋯ " + fullmoveLabel(pm.ply) + pm.san);
+	foot.moves.slice(foot.d).forEach((m, i) => {
+		if (i || pm) t(" ");
+		const mark = foot.marks && foot.marks[m.ply] ? " " + foot.marks[m.ply] : "";
+		t(fullmoveLabel(m.ply) + m.san + mark);
+		const refs = (foot.noteByPly && foot.noteByPly[m.ply]) || [];
+		if (refs.length) {
+			const sup = document.createElement("sup");
+			sup.textContent = refs.join(",");
+			container.appendChild(sup);
+		}
+	});
+	if (foot.eval) t(" " + foot.eval);
+	if (foot.note) {
+		t(" — ");
+		renderInline(container, foot.note);
+	}
+}
+
+// Same footnote, as plain text for exports that have no DOM. Inline note
+// markers are dropped: a text export has no superscripts to render them as.
+export function footnoteText(foot) {
+	const pm = foot.d > 0 ? foot.moves[foot.d - 1] : null;
+	const ctx = pm ? "⋯ " + fullmoveLabel(pm.ply) + pm.san : "";
+	const tail = foot.moves
+		.slice(foot.d)
+		.map(
+			(m) =>
+				fullmoveLabel(m.ply) +
+				m.san +
+				(foot.marks && foot.marks[m.ply] ? " " + foot.marks[m.ply] : ""),
+		)
+		.join(" ");
+	const moves = [ctx, tail].filter(Boolean).join(" ");
+	return (
+		(foot.name ? foot.name + ": " : "") +
+		moves +
+		(foot.eval ? " " + foot.eval : "") +
+		(foot.note ? " — " + foot.note : "")
+	);
 }

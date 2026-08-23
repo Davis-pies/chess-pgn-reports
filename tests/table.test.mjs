@@ -2,21 +2,11 @@ import { test } from "node:test";
 import assert from "node:assert";
 import { parsePgn } from "../src/pgn.js";
 import { collectLines } from "../src/tree.js";
-import { grid, divergence } from "../src/table.js";
+import { grid } from "../src/table.js";
 
 function linesFrom(pgn) {
 	return collectLines(parsePgn(pgn).nodes);
 }
-
-// A variation line carries the full root-to-leaf path INCLUDING the shared
-// prefix. So finding a specific variation matches on any contained move.
-test("divergence finds where a variation splits from mainline", () => {
-	const lines = linesFrom("1. e4 c5 (1... e5 2. Nf3) 2. Nf3 d6");
-	const main = lines[0];
-	const e5var = lines.find((l) => l.moves.some((m) => m.san === "e5"));
-	// main: e4 c5 Nf3 d6 ; var: e4 e5 Nf3  -> differ at index 1
-	assert.strictEqual(divergence(e5var, main), 1);
-});
 
 test("grid marks shared prefix as ellipsis and diverging moves with tag class", () => {
 	const lines = linesFrom("1. e4 c5 (1... e5 2. Nf3 Nc6) 2. Nf3");
@@ -62,7 +52,6 @@ test("footnote lines are pulled out of the table rows into footNotes", () => {
 	// only mainline + c6 sideline remain as rows
 	assert.strictEqual(vars.length, 2);
 	assert.strictEqual(footNotes.length, 1);
-	assert.strictEqual(footNotes[0].letter, "a");
 	assert.ok(footNotes[0].moves.some((m) => m.san === "c5"));
 	// the footnote move must not appear as a table row
 	assert.strictEqual(
@@ -71,20 +60,12 @@ test("footnote lines are pulled out of the table rows into footNotes", () => {
 	);
 });
 
-test("footnote letters fall back to a double-letter scheme past z", () => {
-	const main = { isMain: true, moves: [], comments: [] };
-	const feet = Array.from({ length: 28 }, (_, i) => ({
-		tag: "foot",
-		moves: [],
-		comments: [],
-		name: "f" + i,
-	}));
-	const { footNotes } = grid([main, ...feet]);
-	assert.strictEqual(footNotes.length, 28);
-	assert.strictEqual(footNotes[0].letter, "a");
-	assert.strictEqual(footNotes[25].letter, "z");
-	assert.strictEqual(footNotes[26].letter, "aa");
-	assert.strictEqual(footNotes[27].letter, "ab");
+test("footnote lines carry no letter", () => {
+	const lines = linesFrom("1. e4 e5 (1... c5 2. Nf3) 2. Nf3");
+	lines[1].tag = "foot";
+	const { footNotes } = grid(lines);
+	assert.strictEqual(footNotes.length, 1);
+	assert.strictEqual(footNotes[0].letter, undefined);
 });
 
 test("a comment's note marker appears only on the line that owns it", () => {

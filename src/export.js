@@ -1,6 +1,11 @@
-import { grid, divergence } from "./table.js";
-import { fullmoveLabel, fullMovesText, cardMovesText } from "./render.js";
-import { el } from "./dom.js";
+import { grid } from "./table.js";
+import {
+  fullmoveLabel,
+  cardMovesText,
+  appendFootnote,
+  footnoteText,
+} from "./render.js";
+import { el, renderInline } from "./dom.js";
 import { getCurrent, getRenderHooks } from "./state.js";
 import { allNotes } from "./notes.js";
 
@@ -39,82 +44,28 @@ export function branchContext(l) {
   );
 }
 
-// Safely render a small markdown subset (bold/italic/code + newlines) into DOM
-// nodes (no innerHTML, so note text can't inject markup).
-export function renderInline(container, text) {
-  const lines = text.split("\n");
-  lines.forEach((line, li) => {
-    if (li) container.appendChild(document.createElement("br"));
-    const re = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g;
-    let last = 0;
-    let m;
-    while ((m = re.exec(line))) {
-      if (m.index > last)
-        container.appendChild(
-          document.createTextNode(line.slice(last, m.index)),
-        );
-      const tok = m[0];
-      const bold = tok.startsWith("**");
-      const code = tok.startsWith("`");
-      const node = document.createElement(
-        bold ? "strong" : code ? "code" : "em",
-      );
-      node.textContent = tok.slice(bold ? 2 : 1, tok.length - (bold ? 2 : 1));
-      container.appendChild(node);
-      last = m.index + tok.length;
-    }
-    if (last < line.length)
-      container.appendChild(document.createTextNode(line.slice(last)));
-  });
-}
-
-// Notes are numbered (PGN {comments}); tagged-Footnote lines are lettered.
-export function notesFootnotesPanel() {
+// The read-only reference list that prints and exports. Notes are numbered
+// (PGN {comments}); a Footnote-tagged line derives an entry in the same
+// sequence, anchored on the mainline move it replaces.
+export function notesPanel() {
   const box = el("div", { className: "notes" });
   const notes = allNotes();
   box.appendChild(el("h3", { textContent: "Notes" }));
-  if (notes.length) {
-    notes.forEach((note) => {
-      const row = el("div", { className: "nt" });
-      row.appendChild(el("sup", { textContent: "[" + note.n + "]" }));
-      const span = document.createElement("span");
+  notes.forEach((note) => {
+    const row = el("div", { className: "nt" });
+    row.appendChild(el("sup", { textContent: "[" + note.n + "]" }));
+    const span = document.createElement("span");
+    if (note.foot) {
+      appendFootnote(span, note.foot);
+    } else {
       span.appendChild(
         document.createTextNode(moveRef(note.ply, note.owner) + " — "),
       );
       renderInline(span, note.text);
-      row.appendChild(span);
-      box.appendChild(row);
-    });
-  }
-  // Notes are edited per-move from the line editors above; this section is the
-  // read-only reference (and what prints/exports).
-  const footLines = getCurrent().lines.filter((l) => l.tag === "foot");
-  const mainL =
-    getCurrent().lines.find((l) => l.isMain) || getCurrent().lines[0];
-  if (footLines.length) {
-    box.appendChild(el("h3", { textContent: "Footnotes" }));
-    footLines.forEach((l, i) => {
-      const row = el("div", { className: "nt" });
-      row.appendChild(el("sup", { textContent: String.fromCharCode(97 + i) }));
-      const note = (l.meta && l.meta.note) || "";
-      const d = divergence(l, mainL);
-      const ctx = branchContext(l);
-      const span = document.createElement("span");
-      span.appendChild(
-        document.createTextNode(
-          (l.name ? l.name + ": " : "") +
-            (ctx ? ctx + " " : "") +
-            fullMovesText(l.moves.slice(d), l.marks),
-        ),
-      );
-      if (note) {
-        span.appendChild(document.createTextNode(" — "));
-        renderInline(span, note);
-      }
-      row.appendChild(span);
-      box.appendChild(row);
-    });
-  }
+    }
+    row.appendChild(span);
+    box.appendChild(row);
+  });
   return box;
 }
 
@@ -254,28 +205,15 @@ export function buildMarkdown() {
       `${lead}${v.name ? " (" + v.name + ")" : ""}${v.eval ? " " + v.eval : ""}: ${moves}`,
     );
   }
-  if (g.footNotes.length) {
-    L.push("", "## Footnotes", "");
-    g.footNotes.forEach((f) => {
-      const prec =
-        f.d > 0
-          ? "→ " +
-            (f.moves[f.d - 1].ply % 2 === 0
-              ? Math.floor(f.moves[f.d - 1].ply / 2) + 1 + ". "
-              : "") +
-            f.moves[f.d - 1].san +
-            " "
-          : "";
-      L.push(
-        `- ${f.letter}${f.name ? " " + f.name : ""}${f.eval ? " " + f.eval : ""}: ${prec}${fullMovesText(f.moves.slice(f.d), f.marks)}${f.note ? " — " + f.note : ""}`,
-      );
-    });
-  }
   const notes = allNotes();
   if (notes.length) {
     L.push("", "## Notes", "");
     notes.forEach((note) =>
-      L.push(`${note.n}. ${moveRef(note.ply, note.owner)} — ${note.text}`),
+      L.push(
+        note.foot
+          ? `${note.n}. ${footnoteText(note.foot)}`
+          : `${note.n}. ${moveRef(note.ply, note.owner)} — ${note.text}`,
+      ),
     );
   }
   return L.join("\n") + "\n";

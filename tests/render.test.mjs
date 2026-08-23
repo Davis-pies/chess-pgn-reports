@@ -4,11 +4,15 @@ import { JSDOM } from "jsdom";
 import { parsePgn } from "../src/pgn.js";
 import { collectLines } from "../src/tree.js";
 import { grid } from "../src/table.js";
+import { allNotes } from "../src/notes.js";
+import { installDom, loadState } from "./helpers.mjs";
 import {
 	renderTable,
 	renderCards,
 	boardSvg,
 	fullMovesText,
+	appendFootnote,
+	footnoteText,
 } from "../src/render.js";
 
 function dom() {
@@ -198,4 +202,138 @@ test("horizontal layout transposes to one row per ply", () => {
 	// header + maxPly+1 rows (ply 0..2) = 4 rows (e4,c5,e5,Nf3 -> maxPly 2)
 	assert.ok(rows.length >= 3, "horizontal has ply rows");
 	delete global.document;
+});
+
+test("appendFootnote renders name, context, moves, eval and commentary", () => {
+	const off = installDom();
+	const span = document.createElement("span");
+	appendFootnote(span, {
+		name: "Sicilian",
+		eval: "=",
+		note: "sharp and **double-edged**",
+		moves: [
+			{ san: "e4", ply: 0 },
+			{ san: "c5", ply: 1 },
+			{ san: "Nf3", ply: 2 },
+		],
+		marks: { 2: "!" },
+		noteByPly: { 2: [3] },
+		d: 1,
+	});
+	const text = span.textContent;
+	assert.match(text, /^Sicilian: /);
+	assert.match(text, /1\.e4/, "context move precedes the divergent tail");
+	assert.match(text, /1\.\.\.c5/);
+	assert.match(text, /2\.Nf3 !/, "per-move marks are kept");
+	assert.match(text, /—/);
+	assert.strictEqual(
+		span.querySelector("sup").textContent,
+		"3",
+		"the footnote's own notes render as inline superscripts",
+	);
+	assert.ok(
+		span.querySelector("strong"),
+		"commentary goes through renderInline",
+	);
+	off();
+});
+
+test("appendFootnote omits the parts a footnote does not have", () => {
+	const off = installDom();
+	const span = document.createElement("span");
+	appendFootnote(span, {
+		name: "",
+		eval: "",
+		note: "",
+		moves: [
+			{ san: "e4", ply: 0 },
+			{ san: "c5", ply: 1 },
+		],
+		marks: {},
+		noteByPly: {},
+		d: 1,
+	});
+	assert.strictEqual(span.textContent.trim(), "⋯ 1.e4 1...c5");
+	assert.strictEqual(span.querySelector("sup"), null);
+	off();
+});
+
+test("appendFootnote with no divergent tail renders name and commentary alone", () => {
+	const off = installDom();
+	const span = document.createElement("span");
+	appendFootnote(span, {
+		name: "Transposes",
+		eval: "",
+		note: "same position",
+		moves: [{ san: "e4", ply: 0 }],
+		marks: {},
+		noteByPly: {},
+		d: 1,
+	});
+	// a footnote that shares everything it has with the mainline has no tail to
+	// show, so it is just its name, the anchor move, and its commentary
+	assert.strictEqual(span.textContent, "Transposes: ⋯ 1.e4 — same position");
+	off();
+});
+
+test("footnoteText with no divergent tail renders name and commentary alone", () => {
+	assert.strictEqual(
+		footnoteText({
+			name: "Transposes",
+			eval: "",
+			note: "same position",
+			moves: [{ san: "e4", ply: 0 }],
+			marks: {},
+			noteByPly: {},
+			d: 1,
+		}),
+		"Transposes: ⋯ 1.e4 — same position",
+	);
+});
+
+test("footnoteText renders the same footnote as plain text", () => {
+	assert.strictEqual(
+		footnoteText({
+			name: "Sicilian",
+			eval: "=",
+			note: "sharp",
+			moves: [
+				{ san: "e4", ply: 0 },
+				{ san: "c5", ply: 1 },
+			],
+			marks: {},
+			noteByPly: {},
+			d: 1,
+		}),
+		"Sicilian: ⋯ 1.e4 1...c5 = — sharp",
+	);
+});
+
+test("renderCards renders no card for a footnote line", () => {
+	const off = installDom();
+	const s = loadState("1. e4 e5 (1... c5 2. Nf3) 2. Nf3", {
+		tags: { 1: "foot" },
+	});
+	const g = grid(s.lines);
+	const box = document.createElement("div");
+	renderCards(box, g, { notes: allNotes() });
+	const names = [...box.querySelectorAll(".card")].map(
+		(c) => c.querySelector(".tag").textContent,
+	);
+	assert.ok(!names.includes("Footnote"), `no footnote cards (got ${names})`);
+	off();
+});
+
+test("a card lists a footnote anchored on its own line", () => {
+	const off = installDom();
+	const s = loadState("1. e4 e5 (1... c5 2. Nf3) 2. Nf3", {
+		tags: { 1: "foot" },
+	});
+	s.lines.find((l) => l.moves.some((m) => m.san === "c5")).name = "Sicilian";
+	const g = grid(s.lines);
+	const box = document.createElement("div");
+	renderCards(box, g, { notes: allNotes() });
+	const mainCard = box.querySelector(".card");
+	assert.match(mainCard.querySelector(".card-notes").textContent, /Sicilian/);
+	off();
 });

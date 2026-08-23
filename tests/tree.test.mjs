@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert";
 import { parsePgn } from "../src/pgn.js";
-import { collectLines } from "../src/tree.js";
+import { collectLines, divergence } from "../src/tree.js";
 
 test("collects mainline plus each variation as a line", () => {
 	const { nodes } = parsePgn(
@@ -38,4 +38,14 @@ test("recurses through nested variations into distinct lines", () => {
 test("returns no lines for movetext with no moves (empty or result-only)", () => {
 	assert.deepStrictEqual(collectLines(parsePgn("").nodes), []);
 	assert.deepStrictEqual(collectLines(parsePgn("*").nodes), []);
+});
+
+test("divergence finds where a variation splits from mainline", () => {
+	const lines = collectLines(
+		parsePgn("1. e4 c5 (1... e5 2. Nf3) 2. Nf3 d6").nodes,
+	);
+	const main = lines[0];
+	const e5var = lines.find((l) => l.moves.some((m) => m.san === "e5"));
+	// main: e4 c5 Nf3 d6 ; var: e4 e5 Nf3  -> differ at index 1
+	assert.strictEqual(divergence(e5var, main), 1);
 });

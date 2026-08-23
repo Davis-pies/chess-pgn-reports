@@ -14,16 +14,20 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
 2. **Tag** — the mainline is the reference row. For each other line choose
    **Sideline** or **Footnote** (optionally add a name, evaluation symbol, and a
    note), or use **★ Make mainline** to promote a sideline to the mainline.
-   Footnotes are pulled out of the table into the prose **Footnotes** section.
+   A Footnote line is pulled out of the table; it renders as a numbered entry
+   in the **Notes** list instead, anchored by an `[n]` marker on the mainline
+   move it replaces.
 3. **Render** — a table in **vertical** or **horizontal** layout, or a linear
-   **card** view (each line with a board diagram of its end position) for print.
+   **card** view (each table row with a board diagram of its end position) for
+   print — footnotes don't get their own card, since they're not a table row.
    Boards use the open-source **cburnett** piece set (white + black) with
    coordinates and spacing, fixed colors so they read on both light and dark
-   themes (toggle in the toolbar). Sidelines/footnotes show only their divergent
-   tail. Comment moves carry numbered `[n]` markers on the owning line only.
-   Lines get an **evaluation/quality symbol** picker (=, ±, ∓, +=, =+, ∞, !, ?, …).
-   The **Notes** section is editable — add a note at any move, or edit/delete
-   existing ones.
+   themes (toggle in the toolbar). Sidelines show only their divergent tail.
+   Comment moves carry numbered `[n]` markers on the owning line only; a
+   footnote's own notes stay separate numbered entries, marked inside its
+   move text. Lines get an **evaluation/quality symbol** picker (=, ±, ∓, +=,
+   =+, ∞, !, ?, …). The **Notes** section is editable — add a note at any
+   move, or edit/delete existing ones.
 4. **Export** — **Export PGN** (editable chess notation for any chess app),
    **Export Markdown** (paste into Google Docs/Word), or **Print → Save as
    PDF** (always the linear card view). Saved workbooks (`localStorage`) are

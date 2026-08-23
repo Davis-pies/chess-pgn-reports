@@ -6,25 +6,8 @@
 // and returned as `footNotes` for the prose footnotes section. Comments render
 // as per-line note markers (no row duplication).
 
-export function divergence(line, main) {
-	let i = 0;
-	const a = line.moves;
-	const b = main.moves;
-	while (i < a.length && i < b.length && a[i].san === b[i].san) i++;
-	return i;
-}
-
-// Footnote letter for index i (0-based): a..z, then aa, ab, ... az, ba, ...
-function footLetter(i) {
-	let n = i + 1;
-	let s = "";
-	while (n > 0) {
-		n--;
-		s = String.fromCharCode(97 + (n % 26)) + s;
-		n = Math.floor(n / 26);
-	}
-	return s;
-}
+import { divergence } from "./tree.js";
+import { numberNotes } from "./notes.js";
 
 const TAG_META = {
 	mainline: { label: "Mainline" },
@@ -34,12 +17,15 @@ const TAG_META = {
 
 export function grid(lines) {
 	const main = lines.find((l) => l.isMain) || lines[0];
-	// number the notes in line order (matches allNotes()); each line carries its
-	// own comments, so ownership is structural rather than inferred from ply
-	let noteNum = 0;
-	const seen = new Map(); // identical (ply,text) key -> the number first assigned to it
+	// Numbering lives in notes.js so the table's [n] superscripts and the Notes
+	// list cannot drift apart. byLine gives each line its own ply -> [numbers].
+	const { byLine } = numberNotes(lines);
 	const vars = []; // mainline + sidelines (table rows)
-	const footNotes = []; // footnote lines (prose section)
+	// footnote lines, pulled out of the table. Nothing in src/ reads this today —
+	// every renderer gets footnote content from allNotes() instead — but it's kept
+	// as the structural output of the foot/sideline split for the group-footnote
+	// follow-up, which will need exactly this: the set of lines pulled out of the table.
+	const footNotes = [];
 	lines.forEach((l) => {
 		const isMain = !!l.isMain;
 		const tag = isMain ? "mainline" : l.tag === "foot" ? "foot" : "sideline";
@@ -60,24 +46,7 @@ export function grid(lines) {
 			}
 			cells[m.ply] = { text, cls, mark: marks[m.ply] || "" };
 		});
-		// note markers keyed by ply; identical (ply,text) notes shared across
-		// lines get one number, matching allNotes(). A line that carries the
-		// same note text twice at one ply still gets the number only once.
-		const noteByPly = {};
-		const lineSeen = new Set();
-		(l.comments || []).forEach((c) => {
-			const k = c.ply + "|" + c.text;
-			let num = seen.get(k);
-			if (num === undefined) {
-				noteNum++;
-				num = noteNum;
-				seen.set(k, num);
-			}
-			const lk = c.ply + "|" + num;
-			if (lineSeen.has(lk)) return;
-			lineSeen.add(lk);
-			(noteByPly[c.ply] = noteByPly[c.ply] || []).push(num);
-		});
+		const noteByPly = byLine.get(l);
 		const base = {
 			tag,
 			label: TAG_META[tag].label,
@@ -97,10 +66,6 @@ export function grid(lines) {
 		(a, b) => (a.tag === "mainline" ? -1 : 1) - (b.tag === "mainline" ? -1 : 1),
 	);
 
-	// letter the footnote lines: a, b, ..., z, aa, ab, ... (spreadsheet-column
-	// style bijective base-26) so a 27th+ footnote doesn't overflow into
-	// punctuation/non-printable code points past 'z'.
-	footNotes.forEach((f, i) => (f.letter = footLetter(i)));
 
 	const maxPly = vars.reduce(
 		(m, v) => Math.max(m, ...Object.keys(v.cells).map(Number)),
