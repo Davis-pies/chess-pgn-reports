@@ -1,5 +1,6 @@
-// Minimal DOM-construction helper shared across app.js and the extracted
-// view modules.
+// DOM-construction helpers shared across app.js and the extracted view
+// modules: a minimal element builder (el) and a markdown-subset-to-DOM
+// renderer (renderInline).
 export function el(tag, props, children = []) {
 	const e = document.createElement(tag);
 	Object.assign(e, props);
