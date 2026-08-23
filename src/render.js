@@ -5,6 +5,7 @@
 // light and dark page themes.
 
 import { fenAt } from "./pgn.js";
+import { renderInline } from "./dom.js";
 
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -451,4 +452,55 @@ export function fullMovesText(moves, marks) {
 				(marks && marks[m.ply] ? " " + marks[m.ply] : ""),
 		)
 		.join(" ");
+}
+
+// A footnote-derived note: "Sicilian: ⋯ 1.e4 1...c5 = — commentary". The moves
+// shown are the footnote's own tail, prefixed with the last shared move for
+// context, and any notes on those moves render as inline superscripts.
+export function appendFootnote(container, foot) {
+	const t = (s) => container.appendChild(document.createTextNode(s));
+	if (foot.name) t(foot.name + ": ");
+	if (foot.d > 0) {
+		const pm = foot.moves[foot.d - 1];
+		t("⋯ " + fullmoveLabel(pm.ply) + pm.san + " ");
+	}
+	foot.moves.slice(foot.d).forEach((m, i) => {
+		if (i) t(" ");
+		const mark = foot.marks && foot.marks[m.ply] ? " " + foot.marks[m.ply] : "";
+		t(fullmoveLabel(m.ply) + m.san + mark);
+		const refs = (foot.noteByPly && foot.noteByPly[m.ply]) || [];
+		if (refs.length) {
+			const sup = document.createElement("sup");
+			sup.textContent = refs.join(",");
+			container.appendChild(sup);
+		}
+	});
+	if (foot.eval) t(" " + foot.eval);
+	if (foot.note) {
+		t(" — ");
+		renderInline(container, foot.note);
+	}
+}
+
+// Same footnote, as plain text for exports that have no DOM. Inline note
+// markers are dropped: a text export has no superscripts to render them as.
+export function footnoteText(foot) {
+	const pm = foot.d > 0 ? foot.moves[foot.d - 1] : null;
+	const ctx = pm ? "⋯ " + fullmoveLabel(pm.ply) + pm.san + " " : "";
+	const tail = foot.moves
+		.slice(foot.d)
+		.map(
+			(m) =>
+				fullmoveLabel(m.ply) +
+				m.san +
+				(foot.marks && foot.marks[m.ply] ? " " + foot.marks[m.ply] : ""),
+		)
+		.join(" ");
+	return (
+		(foot.name ? foot.name + ": " : "") +
+		ctx +
+		tail +
+		(foot.eval ? " " + foot.eval : "") +
+		(foot.note ? " — " + foot.note : "")
+	);
 }
