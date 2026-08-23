@@ -43,6 +43,9 @@ export function numberNotes(lines) {
 	// replaced when it does.
 	const byLine = new Map(lines.map((l) => [l, {}]));
 	const seen = new Map(); // "ply|text" -> the number first assigned to it
+	// Parent-generalization seam: every footnote anchors on the mainline, even one
+	// that actually branches off a sideline. Group footnotes will need this to be a
+	// per-line parent (a trie node) instead — here, in anchorPly, and at owner: main below.
 	const main = lines.find((l) => l.isMain) || lines[0];
 	const footEntries = []; // [entry, line] — noteByPly filled in after the loop
 	lines.forEach((l) => {
