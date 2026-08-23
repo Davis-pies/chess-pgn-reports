@@ -83,3 +83,22 @@ test("every table is followed by a notes block, empty when it has no notes", () 
     .forEach((b) => assert.strictEqual(b.childNodes.length, 0));
   off();
 });
+
+test("a footnote prints in the notes block under the first table", () => {
+  const off = installDom();
+  const s = loadState("1. e4 e5 (1... c5 2. Nf3 Nc6) 2. Nf3 Nc6", {
+    tags: { 1: "foot" },
+  });
+  s.lines.find((l) => l.moves.some((m) => m.san === "c5")).name = "Sicilian";
+  const box = document.createElement("div");
+  appendPrintTables(box, grid(s.lines));
+  const blocks = [...box.querySelectorAll(".print-notes")];
+  assert.ok(blocks.length, "a notes block is emitted");
+  assert.match(blocks[0].textContent, /Sicilian/, "the footnote prints");
+  assert.strictEqual(
+    blocks[0].querySelector(".nt sup").textContent,
+    "[1]",
+    "numbered, not lettered",
+  );
+  off();
+});
