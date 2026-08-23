@@ -52,7 +52,6 @@ test("footnote lines are pulled out of the table rows into footNotes", () => {
 	// only mainline + c6 sideline remain as rows
 	assert.strictEqual(vars.length, 2);
 	assert.strictEqual(footNotes.length, 1);
-	assert.strictEqual(footNotes[0].letter, "a");
 	assert.ok(footNotes[0].moves.some((m) => m.san === "c5"));
 	// the footnote move must not appear as a table row
 	assert.strictEqual(
@@ -61,20 +60,12 @@ test("footnote lines are pulled out of the table rows into footNotes", () => {
 	);
 });
 
-test("footnote letters fall back to a double-letter scheme past z", () => {
-	const main = { isMain: true, moves: [], comments: [] };
-	const feet = Array.from({ length: 28 }, (_, i) => ({
-		tag: "foot",
-		moves: [],
-		comments: [],
-		name: "f" + i,
-	}));
-	const { footNotes } = grid([main, ...feet]);
-	assert.strictEqual(footNotes.length, 28);
-	assert.strictEqual(footNotes[0].letter, "a");
-	assert.strictEqual(footNotes[25].letter, "z");
-	assert.strictEqual(footNotes[26].letter, "aa");
-	assert.strictEqual(footNotes[27].letter, "ab");
+test("footnote lines carry no letter", () => {
+	const lines = linesFrom("1. e4 e5 (1... c5 2. Nf3) 2. Nf3");
+	lines[1].tag = "foot";
+	const { footNotes } = grid(lines);
+	assert.strictEqual(footNotes.length, 1);
+	assert.strictEqual(footNotes[0].letter, undefined);
 });
 
 test("a comment's note marker appears only on the line that owns it", () => {

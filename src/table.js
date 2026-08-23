@@ -9,18 +9,6 @@
 import { divergence } from "./tree.js";
 import { numberNotes } from "./notes.js";
 
-// Footnote letter for index i (0-based): a..z, then aa, ab, ... az, ba, ...
-function footLetter(i) {
-	let n = i + 1;
-	let s = "";
-	while (n > 0) {
-		n--;
-		s = String.fromCharCode(97 + (n % 26)) + s;
-		n = Math.floor(n / 26);
-	}
-	return s;
-}
-
 const TAG_META = {
 	mainline: { label: "Mainline" },
 	sideline: { label: "Sideline" },
@@ -74,10 +62,6 @@ export function grid(lines) {
 		(a, b) => (a.tag === "mainline" ? -1 : 1) - (b.tag === "mainline" ? -1 : 1),
 	);
 
-	// letter the footnote lines: a, b, ..., z, aa, ab, ... (spreadsheet-column
-	// style bijective base-26) so a 27th+ footnote doesn't overflow into
-	// punctuation/non-printable code points past 'z'.
-	footNotes.forEach((f, i) => (f.letter = footLetter(i)));
 
 	const maxPly = vars.reduce(
 		(m, v) => Math.max(m, ...Object.keys(v.cells).map(Number)),

@@ -201,11 +201,6 @@ export function renderTable(container, grid, orientation) {
 			c.appendChild(tag);
 		}
 		c.appendChild(document.createTextNode(" " + (v.name || "")));
-		if (v.letter) {
-			const s = document.createElement("sup");
-			s.textContent = "[" + v.letter + "]";
-			c.appendChild(s);
-		}
 		return c;
 	};
 
@@ -358,11 +353,6 @@ export function renderCards(container, grid, opts = {}) {
 		name.className = "card-name";
 		name.textContent = v.name;
 		head.appendChild(name);
-		if (v.letter) {
-			const s = document.createElement("sup");
-			s.textContent = "[" + v.letter + "]";
-			head.appendChild(s);
-		}
 		const ev = document.createElement("span");
 		ev.className = "card-eval";
 		ev.textContent = v.eval;
