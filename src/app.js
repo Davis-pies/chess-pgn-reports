@@ -575,18 +575,6 @@ function markupPanel() {
   } else {
     trie.children.forEach((c) => renderTrieNode(box, c, counter, "", true));
   }
-  box.appendChild(
-    el("button", {
-      className: "chip",
-      textContent: "Tag remaining as sideline",
-      onclick: () => {
-        getCurrent().lines.forEach((l) => {
-          if (!l.tag && !l.isMain) l.tag = "sideline";
-        });
-        renderApp();
-      },
-    }),
-  );
   return box;
 }
 

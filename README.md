@@ -1,5 +1,7 @@
 # Chess Opening Theory Table Builder
 
+**[Open the app →](https://davis-pies.github.io/chess-pgn-reports/)**
+
 Turn a chess PGN into a printable **opening theory table** in the style of
 ECO / MCO / Nunn's Chess Openings. This is a static site (no backend, no
 accounts). Your notebooks are saved in your own browser's `localStorage`.
