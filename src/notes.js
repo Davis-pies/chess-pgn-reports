@@ -6,7 +6,12 @@ import { divergence } from "./tree.js";
 // on the mainline's last move instead.
 function anchorPly(main, d) {
 	const m = main.moves[d] || main.moves[main.moves.length - 1];
-	return m ? m.ply : 0;
+	// Unreachable: collectLines() never builds a mainline with zero moves (it
+	// returns [] for empty movetext instead), and callers only reach here after
+	// confirming `main` exists. A missing move here means an invariant broke
+	// upstream, so fail loudly rather than anchoring at a fake ply 0.
+	if (!m) throw new Error("anchorPly: mainline has no moves");
+	return m.ply;
 }
 
 // The single owner of note numbering. One pass over the lines produces both
@@ -39,19 +44,20 @@ export function numberNotes(lines) {
 	const byLine = new Map(lines.map((l) => [l, {}]));
 	const seen = new Map(); // "ply|text" -> the number first assigned to it
 	const main = lines.find((l) => l.isMain) || lines[0];
+	const footEntries = []; // [entry, line] — noteByPly filled in after the loop
 	lines.forEach((l) => {
 		const map = byLine.get(l);
 		// A footnote line is pulled out of the table and rendered as a note
 		// anchored on the mainline move it replaces. Derived here rather than
 		// written into l.comments so renaming or re-tagging the line can never
-		// leave a stale note behind. `noteByPly: map` is this line's own map,
-		// filled in by the comment loop just below — the reference is shared, so
-		// the footnote's inner markers are present by the time anything renders.
+		// leave a stale note behind. Its own noteByPly isn't filled in until this
+		// line's comments are processed below, so the entry gets it after the loop
+		// instead of aliasing the still-empty map in.
 		if (!l.isMain && l.tag === "foot" && main) {
 			const d = divergence(l, main);
 			const ply = anchorPly(main, d);
 			const n = entries.length + 1;
-			entries.push({
+			const entry = {
 				ply,
 				owner: main,
 				n,
@@ -61,10 +67,11 @@ export function numberNotes(lines) {
 					note: (l.meta && l.meta.note) || "",
 					moves: l.moves,
 					marks: l.marks || {},
-					noteByPly: map,
 					d,
 				},
-			});
+			};
+			entries.push(entry);
+			footEntries.push([entry, l]);
 			const mainMap = byLine.get(main);
 			(mainMap[ply] = mainMap[ply] || []).push(n);
 		}
@@ -80,6 +87,7 @@ export function numberNotes(lines) {
 			if (!at.includes(n)) at.push(n);
 		});
 	});
+	footEntries.forEach(([e, l]) => (e.foot.noteByPly = byLine.get(l)));
 	return { entries, byLine };
 }
 

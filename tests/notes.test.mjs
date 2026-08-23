@@ -168,3 +168,16 @@ test("a footnote before the mainline in the lines array still marks the mainline
 		"the mainline's own map must not be overwritten after the footnote already wrote into it",
 	);
 });
+
+test("a footnote entry's noteByPly is populated by the time numberNotes returns", () => {
+	// pins the contract consumers depend on, independent of how it's wired
+	// internally (the footnote entry is pushed before its own comments are
+	// processed, so its noteByPly can't just alias the line's still-empty map)
+	const s = loadState("1. e4 e5 (1... c5 2. Nf3 {knight move}) 2. Nf3", {
+		tags: { 1: "foot" },
+	});
+	const { entries } = numberNotes(s.lines);
+	const footEntry = entries.find((e) => e.foot);
+	const innerEntry = entries.find((e) => e.text === "knight move");
+	assert.deepStrictEqual(footEntry.foot.noteByPly[innerEntry.ply], [innerEntry.n]);
+});
