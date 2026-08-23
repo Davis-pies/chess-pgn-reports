@@ -1,4 +1,13 @@
 import { getCurrent } from "./state.js";
+import { divergence } from "./tree.js";
+
+// The mainline move a footnote replaces: the one at the divergence index. A
+// footnote that runs past the mainline's end has no such move, so it anchors
+// on the mainline's last move instead.
+function anchorPly(main, d) {
+	const m = main.moves[d] || main.moves[main.moves.length - 1];
+	return m ? m.ply : 0;
+}
 
 // The single owner of note numbering. One pass over the lines produces both
 // the numbered entries (the Notes list) and, per line, a map of
@@ -20,9 +29,38 @@ export function numberNotes(lines) {
 	const entries = [];
 	const byLine = new Map();
 	const seen = new Map(); // "ply|text" -> the number first assigned to it
+	const main = lines.find((l) => l.isMain) || lines[0];
 	lines.forEach((l) => {
 		const map = {};
 		byLine.set(l, map);
+		// A footnote line is pulled out of the table and rendered as a note
+		// anchored on the mainline move it replaces. Derived here rather than
+		// written into l.comments so renaming or re-tagging the line can never
+		// leave a stale note behind. `noteByPly: map` is this line's own map,
+		// filled in by the comment loop just below — the reference is shared, so
+		// the footnote's inner markers are present by the time anything renders.
+		if (!l.isMain && l.tag === "foot" && main) {
+			const d = divergence(l, main);
+			const ply = anchorPly(main, d);
+			const n = entries.length + 1;
+			entries.push({
+				ply,
+				owner: main,
+				n,
+				foot: {
+					name: l.name || "",
+					eval: (l.meta && l.meta.eval) || "",
+					note: (l.meta && l.meta.note) || "",
+					moves: l.moves,
+					marks: l.marks || {},
+					noteByPly: map,
+					d,
+				},
+			});
+			const mainMap = byLine.get(main) || {};
+			byLine.set(main, mainMap);
+			(mainMap[ply] = mainMap[ply] || []).push(n);
+		}
 		(l.comments || []).forEach((c) => {
 			const k = c.ply + "|" + c.text;
 			let n = seen.get(k);
