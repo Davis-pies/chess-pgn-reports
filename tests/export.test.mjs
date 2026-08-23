@@ -1,10 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert";
 import { installDom, loadState } from "./helpers.mjs";
+import { renderInline } from "../src/dom.js";
 import {
   buildMarkdown,
   notesFootnotesPanel,
-  renderInline,
   moveRef,
   branchContext,
   exportBar,

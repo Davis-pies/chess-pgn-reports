@@ -2,11 +2,11 @@
 // column; the side lines are split into vertical slices of ~16 columns so the
 // table wraps across pages instead of being cut off or scaled.
 import { renderTable } from "./render.js";
-import { el } from "./dom.js";
+import { el, renderInline } from "./dom.js";
 import { getCurrent } from "./state.js";
 import { allNotes } from "./notes.js";
 import { buildTrie, leavesOf } from "./trie-view.js";
-import { moveRef, renderInline } from "./export.js";
+import { moveRef } from "./export.js";
 
 // Highest ply present in a subset of table vars — so a per-branch print table
 // doesn't render empty rows down to the notebook's global max.
