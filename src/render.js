@@ -341,7 +341,9 @@ export function renderCards(container, grid, opts = {}) {
 		s.replace(/\*\*/g, "").replace(/`/g, "").replace(/\*/g, "").trim();
 	const wrap = document.createElement("div");
 	wrap.className = "cards";
-	const all = [...grid.vars, ...grid.footNotes];
+	// Footnote lines are notes, not cards — they render in the notes block of
+	// whichever card carries their anchor.
+	const all = grid.vars;
 	for (const v of all) {
 		const card = document.createElement("section");
 		card.className = "card";
@@ -411,7 +413,12 @@ export function renderCards(container, grid, opts = {}) {
 		for (const ply in v.noteByPly || {}) {
 			v.noteByPly[ply].forEach((n) => {
 				const note = notes[n - 1];
-				if (note) owned.push({ n, ply: Number(ply), text: strip(note.text) });
+				if (!note) return;
+				owned.push({
+					n,
+					ply: Number(ply),
+					text: note.foot ? footnoteText(note.foot) : strip(note.text),
+				});
 			});
 		}
 		if (owned.length) {
