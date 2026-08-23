@@ -117,14 +117,35 @@ where this is fixed.
 
 ## 4. A footnote's own notes
 
-A footnote line's moves can carry their own notes. These remain **separate numbered
-entries** in the same flat list, and the footnote's rendered move text carries inline
-`[n]` superscripts pointing at them.
+**Amended 2026-08-22, after the original was built and reviewed in use.** The
+decision below replaces the original one, which made a footnote's own notes peers of
+top-level notes in the same flat numbered list. In practice that read badly: a
+top-level entry like `[3]` turned out to be commentary on a move that exists only
+inside `[2]`'s move text, so the reader had to leave the list to find what it was
+talking about.
 
-No new rendering is needed: `cardMovesText` and `buildCardMoves` already emit `[n]`
-markers inside move text from `noteByPly` (`src/render.js:301,328`). The consequence
-— a note that points at a move which only appears inside another note — is accepted
-in exchange for one flat numbering scheme and no duplicated content.
+A footnote's own notes are now **lettered sub-notes nested under their footnote**,
+and they no longer appear in the global numbered list at all.
+
+- **Letters restart per footnote.** Each footnote's notes are `a`, `b`, `c` from
+  scratch. A letter is only ever meaningful beside its own footnote, so scoping it
+  globally would buy nothing.
+- **Only footnote-exclusive notes are lettered.** The editor shares a note across
+  every line in an equal-position group, so the same `(ply, text)` can sit on a
+  footnote *and* on a sideline. When it does, it stays a global numbered note and the
+  footnote's move text references it by number — nothing is duplicated.
+- **Mixed markers are allowed.** A footnote's moves can therefore carry both `[3]`
+  and `[a]`. This is rare: a shared note normally sits before the divergence, and a
+  footnote only renders markers on its divergent tail. It is reachable through
+  transposition, where a footnote's post-divergence move reaches the same position
+  and SAN as a move on a non-footnote line. Referencing the global note from inside
+  the footnote is the correct outcome there, and costs nothing — marker values are
+  strings and renderers emit whatever the array holds.
+- **No table cell can show a letter.** Letters are only assigned to notes exclusive
+  to footnote lines, and footnote lines are never table rows.
+
+The footnote entry carries `foot.subNotes = [{label, ply, text}]`, and
+`foot.noteByPly` maps a ply to the markers on that move.
 
 ## 5. Rendering changes
 
