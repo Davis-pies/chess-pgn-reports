@@ -21,7 +21,11 @@ export function grid(lines) {
 	// list cannot drift apart. byLine gives each line its own ply -> [numbers].
 	const { byLine } = numberNotes(lines);
 	const vars = []; // mainline + sidelines (table rows)
-	const footNotes = []; // footnote lines (prose section)
+	// footnote lines, pulled out of the table. Nothing in src/ reads this today —
+	// every renderer gets footnote content from allNotes() instead — but it's kept
+	// as the structural output of the foot/sideline split for the group-footnote
+	// follow-up, which will need exactly this: the set of lines pulled out of the table.
+	const footNotes = [];
 	lines.forEach((l) => {
 		const isMain = !!l.isMain;
 		const tag = isMain ? "mainline" : l.tag === "foot" ? "foot" : "sideline";
