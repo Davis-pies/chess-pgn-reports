@@ -54,7 +54,7 @@ export function grid(lines) {
 			}
 			cells[m.ply] = { text, cls, mark: marks[m.ply] || "" };
 		});
-		const noteByPly = byLine.get(l) || {};
+		const noteByPly = byLine.get(l);
 		const base = {
 			tag,
 			label: TAG_META[tag].label,

@@ -137,3 +137,34 @@ test("a footnote's own notes stay separate numbered entries", () => {
 	assert.deepStrictEqual(byLine.get(c5)[innerPly], [2]);
 	assert.deepStrictEqual(entries[0].foot.noteByPly[innerPly], [2]);
 });
+
+test("a footnote before the mainline in the lines array still marks the mainline", () => {
+	// mirrors the state after promoteMainline flips isMain in place without
+	// reordering lines: the mainline can end up anywhere in the array, so a
+	// footnote line may be visited before it.
+	const main = {
+		isMain: true,
+		comments: [],
+		moves: [
+			{ san: "e4", ply: 0 },
+			{ san: "e5", ply: 1 },
+		],
+	};
+	const foot = {
+		tag: "foot",
+		isMain: false,
+		comments: [],
+		marks: {},
+		meta: {},
+		moves: [
+			{ san: "e4", ply: 0 },
+			{ san: "c5", ply: 1 },
+		],
+	};
+	const { byLine } = numberNotes([foot, main]);
+	assert.deepStrictEqual(
+		byLine.get(main)[1],
+		[1],
+		"the mainline's own map must not be overwritten after the footnote already wrote into it",
+	);
+});

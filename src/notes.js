@@ -25,14 +25,22 @@ function anchorPly(main, d) {
 // line-editor.js, export.js, and app.js all need the notes list and it only
 // depends on the lines — putting it in app.js would force those other
 // modules to import it back from app.js.
+//
+// Each returned `byLine` is keyed by line object identity and is only valid
+// for the exact `lines` array it was computed from — recompute per render
+// rather than caching it across mutations (a promoted or re-tagged line is a
+// different key set).
 export function numberNotes(lines) {
 	const entries = [];
-	const byLine = new Map();
+	// Pre-seeded so every line's map is created exactly once, up front: a
+	// footnote can write into the mainline's map before the mainline's own
+	// turn in the loop below comes around, and that map must not then be
+	// replaced when it does.
+	const byLine = new Map(lines.map((l) => [l, {}]));
 	const seen = new Map(); // "ply|text" -> the number first assigned to it
 	const main = lines.find((l) => l.isMain) || lines[0];
 	lines.forEach((l) => {
-		const map = {};
-		byLine.set(l, map);
+		const map = byLine.get(l);
 		// A footnote line is pulled out of the table and rendered as a note
 		// anchored on the mainline move it replaces. Derived here rather than
 		// written into l.comments so renaming or re-tagging the line can never
@@ -57,8 +65,7 @@ export function numberNotes(lines) {
 					d,
 				},
 			});
-			const mainMap = byLine.get(main) || {};
-			byLine.set(main, mainMap);
+			const mainMap = byLine.get(main);
 			(mainMap[ply] = mainMap[ply] || []).push(n);
 		}
 		(l.comments || []).forEach((c) => {
