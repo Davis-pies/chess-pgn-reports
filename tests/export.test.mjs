@@ -33,7 +33,7 @@ test("buildMarkdown omits the title heading when the workbook is unnamed", () =>
   off();
 });
 
-test("buildMarkdown renders a Footnotes section with letter, name, eval and note", () => {
+test("buildMarkdown renders a footnote as a numbered note, not a Footnotes section", () => {
   const off = installDom();
   const s = loadState("1. e4 e5 (1... c5 2. Nf3 Nc6) 2. Nf3 Nc6", {
     name: "Book",
@@ -43,9 +43,10 @@ test("buildMarkdown renders a Footnotes section with letter, name, eval and note
   s.lines[1].meta.note = "sharp";
   s.lines[1].meta.eval = "=";
   const md = buildMarkdown();
-  assert.match(md, /## Footnotes/);
-  // letter, name, eval, the "→ preceding move" context, then the note
-  assert.match(md, /- a Sicilian =: → 1\. e4 c5 .*— sharp/);
+  assert.ok(!md.includes("## Footnotes"), "no Footnotes section");
+  assert.match(md, /## Notes/);
+  // name, the "⋯ preceding move" context, the tail moves, eval, then the note
+  assert.match(md, /1\. Sicilian: ⋯ 1\.e4 1\.\.\.c5 2\.Nf3 2\.\.\.Nc6 = — sharp/);
   off();
 });
 
@@ -343,5 +344,18 @@ test("the notes panel renders footnotes as numbered notes with no separate secti
     rows.some((r) => /Sicilian/.test(r.textContent)),
     "the footnote renders inline as a numbered note",
   );
+  off();
+});
+
+test("Markdown emits footnotes as notes with no Footnotes section", () => {
+  const off = installDom();
+  const s = loadState("1. e4 e5 (1... c5 2. Nf3) 2. Nf3", {
+    tags: { 1: "foot" },
+  });
+  s.lines.find((l) => l.moves.some((m) => m.san === "c5")).name = "Sicilian";
+  const md = buildMarkdown();
+  assert.ok(!md.includes("## Footnotes"), "no Footnotes section");
+  assert.match(md, /## Notes/);
+  assert.match(md, /1\. Sicilian: /, "the footnote is note 1");
   off();
 });

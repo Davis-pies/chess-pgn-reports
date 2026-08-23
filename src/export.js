@@ -1,9 +1,9 @@
 import { grid } from "./table.js";
 import {
   fullmoveLabel,
-  fullMovesText,
   cardMovesText,
   appendFootnote,
+  footnoteText,
 } from "./render.js";
 import { el, renderInline } from "./dom.js";
 import { getCurrent, getRenderHooks } from "./state.js";
@@ -205,28 +205,15 @@ export function buildMarkdown() {
       `${lead}${v.name ? " (" + v.name + ")" : ""}${v.eval ? " " + v.eval : ""}: ${moves}`,
     );
   }
-  if (g.footNotes.length) {
-    L.push("", "## Footnotes", "");
-    g.footNotes.forEach((f) => {
-      const prec =
-        f.d > 0
-          ? "→ " +
-            (f.moves[f.d - 1].ply % 2 === 0
-              ? Math.floor(f.moves[f.d - 1].ply / 2) + 1 + ". "
-              : "") +
-            f.moves[f.d - 1].san +
-            " "
-          : "";
-      L.push(
-        `- ${f.letter}${f.name ? " " + f.name : ""}${f.eval ? " " + f.eval : ""}: ${prec}${fullMovesText(f.moves.slice(f.d), f.marks)}${f.note ? " — " + f.note : ""}`,
-      );
-    });
-  }
   const notes = allNotes();
   if (notes.length) {
     L.push("", "## Notes", "");
     notes.forEach((note) =>
-      L.push(`${note.n}. ${moveRef(note.ply, note.owner)} — ${note.text}`),
+      L.push(
+        note.foot
+          ? `${note.n}. ${footnoteText(note.foot)}`
+          : `${note.n}. ${moveRef(note.ply, note.owner)} — ${note.text}`,
+      ),
     );
   }
   return L.join("\n") + "\n";
