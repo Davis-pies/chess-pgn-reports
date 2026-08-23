@@ -181,3 +181,59 @@ test("a footnote entry's noteByPly is populated by the time numberNotes returns"
 	const innerEntry = entries.find((e) => e.text === "knight move");
 	assert.deepStrictEqual(footEntry.foot.noteByPly[innerEntry.ply], [innerEntry.n]);
 });
+
+test("table markers and the notes list agree with footnotes in the mix", () => {
+	// The footnote variation carries a single inner comment ("knight"), not
+	// two: src/pgn.js merges consecutive fragment comments inside one flat
+	// (non-nested) variation into a single narrative note attached to the
+	// next move (see "Auto-merge if/then comment fragments within
+	// variations into one note") — a pre-existing, unrelated parsing
+	// feature. Two comments here would always collapse into one note
+	// regardless of numbering correctness, so they wouldn't exercise the
+	// invariant this test is for.
+	const s = loadState(
+		"1. e4 {opening} e5 (1... c5 2. Nf3 {knight}) (1... e6 2. d4) 2. Nf3 {develops} Nc6",
+		{ tags: { 1: "foot", 2: "foot" } },
+	);
+	const { vars, footNotes } = grid(s.lines);
+	const notes = allNotes();
+	const byNumber = new Map(notes.map((n) => [n.n, n]));
+	// every number is dense, 1..N, with no gaps left by a diverted footnote
+	assert.deepStrictEqual(
+		notes.map((n) => n.n),
+		notes.map((_, i) => i + 1),
+	);
+	// two footnote entries, both owned by the mainline
+	const feet = notes.filter((n) => n.foot);
+	assert.strictEqual(feet.length, 2);
+	feet.forEach((f) => assert.strictEqual(f.owner, s.lines[0]));
+	// every marker in the table resolves to a note anchored at the same ply
+	[...vars, ...footNotes].forEach((v) => {
+		Object.entries(v.noteByPly).forEach(([ply, nums]) => {
+			nums.forEach((n) => {
+				assert.ok(byNumber.has(n), `marker ${n} resolves`);
+				assert.strictEqual(byNumber.get(n).ply, Number(ply));
+			});
+		});
+	});
+	// no marker VANISHED: every number in the list is rendered somewhere. The
+	// Task 4 parity test only checks that markers resolve to real notes, which
+	// cannot catch a note that stopped being marked at all.
+	const marked = new Set();
+	[...vars, ...footNotes].forEach((v) =>
+		Object.values(v.noteByPly).forEach((nums) =>
+			nums.forEach((n) => marked.add(n)),
+		),
+	);
+	assert.deepStrictEqual(
+		[...marked].sort((a, b) => a - b),
+		notes.map((n) => n.n),
+		"every numbered note is marked somewhere",
+	);
+	// the footnote's inner note is its own entry, marked inside the footnote text
+	const inner = notes.find((n) => n.text === "knight");
+	assert.ok(inner, "the inner note survives as its own entry");
+	const withInner = feet.find((f) => f.foot.noteByPly[inner.ply]);
+	assert.ok(withInner, "and is marked inside its footnote's move text");
+	assert.deepStrictEqual(withInner.foot.noteByPly[inner.ply], [inner.n]);
+});
