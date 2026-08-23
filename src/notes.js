@@ -11,6 +11,11 @@ import { getCurrent } from "./state.js";
 // Dedupe rules: identical (ply, text) notes carried by several lines are one
 // note with one number, and a line that repeats a note at one ply lists that
 // number once.
+//
+// This lives in its own module rather than app.js because print.js,
+// line-editor.js, export.js, and app.js all need the notes list and it only
+// depends on the lines — putting it in app.js would force those other
+// modules to import it back from app.js.
 export function numberNotes(lines) {
 	const entries = [];
 	const byLine = new Map();
