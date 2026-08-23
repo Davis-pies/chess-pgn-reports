@@ -1,4 +1,4 @@
-import { divergence } from "./table.js";
+import { divergence } from "./tree.js";
 import { renderTable, fullmoveLabel } from "./render.js";
 import { el } from "./dom.js";
 import {

@@ -1,4 +1,5 @@
-import { grid, divergence } from "./table.js";
+import { grid } from "./table.js";
+import { divergence } from "./tree.js";
 import { fullmoveLabel, fullMovesText, cardMovesText } from "./render.js";
 import { el } from "./dom.js";
 import { getCurrent, getRenderHooks } from "./state.js";

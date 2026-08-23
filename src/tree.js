@@ -64,3 +64,15 @@ export function collectLines(nodes) {
 	};
 	return [main, ...lines];
 }
+
+// How many leading moves a line shares with the mainline. The line's own tail
+// starts at this index; everything before it is the shared prefix. Lives here
+// rather than in table.js so notes.js can use it without the two modules
+// importing each other.
+export function divergence(line, main) {
+	let i = 0;
+	const a = line.moves;
+	const b = main.moves;
+	while (i < a.length && i < b.length && a[i].san === b[i].san) i++;
+	return i;
+}

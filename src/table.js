@@ -6,13 +6,7 @@
 // and returned as `footNotes` for the prose footnotes section. Comments render
 // as per-line note markers (no row duplication).
 
-export function divergence(line, main) {
-	let i = 0;
-	const a = line.moves;
-	const b = main.moves;
-	while (i < a.length && i < b.length && a[i].san === b[i].san) i++;
-	return i;
-}
+import { divergence } from "./tree.js";
 
 // Footnote letter for index i (0-based): a..z, then aa, ab, ... az, ba, ...
 function footLetter(i) {
