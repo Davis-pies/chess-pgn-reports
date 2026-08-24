@@ -14,6 +14,21 @@ function anchorPly(main, d) {
 	return m.ply;
 }
 
+// Sub-note labels within one footnote: a, b, ... z, aa, ab, ... Bijective
+// base-26, so a 27th sub-note doesn't run past 'z' into punctuation. This is
+// the lettering the top-level Footnotes section used to have, reintroduced at
+// a much smaller scope: it labels one footnote's own notes, not footnotes.
+function subLabel(i) {
+	let n = i + 1;
+	let s = "";
+	while (n > 0) {
+		n--;
+		s = String.fromCharCode(97 + (n % 26)) + s;
+		n = Math.floor(n / 26);
+	}
+	return s;
+}
+
 // The single owner of note numbering. One pass over the lines produces both
 // the numbered entries (the Notes list) and, per line, a map of
 // `ply -> [numbers]` for the markers that render on that line's moves.
@@ -48,8 +63,19 @@ export function numberNotes(lines) {
 	// per-line parent (a trie node) instead — here, in anchorPly, and at owner: main below.
 	const main = lines.find((l) => l.isMain) || lines[0];
 	const footEntries = []; // [entry, line] — noteByPly filled in after the loop
+	// A note the editor shared onto a non-footnote line stays a global numbered
+	// note; only notes living exclusively on footnote lines become a footnote's
+	// own lettered sub-notes. Computed up front because a footnote line can be
+	// visited before the sideline that shares its note.
+	const isFoot = (l) => !l.isMain && l.tag === "foot";
+	const globalKeys = new Set();
+	lines.forEach((l) => {
+		if (isFoot(l)) return;
+		(l.comments || []).forEach((c) => globalKeys.add(c.ply + "|" + c.text));
+	});
 	lines.forEach((l) => {
 		const map = byLine.get(l);
+		let entry = null;
 		// A footnote line is pulled out of the table and rendered as a note
 		// anchored on the mainline move it replaces. Derived here rather than
 		// written into l.comments so renaming or re-tagging the line can never
@@ -60,7 +86,7 @@ export function numberNotes(lines) {
 			const d = divergence(l, main);
 			const ply = anchorPly(main, d);
 			const n = entries.length + 1;
-			const entry = {
+			entry = {
 				ply,
 				owner: main,
 				n,
@@ -70,6 +96,7 @@ export function numberNotes(lines) {
 					note: (l.meta && l.meta.note) || "",
 					moves: l.moves,
 					marks: l.marks || {},
+					subNotes: [],
 					d,
 				},
 			};
@@ -80,6 +107,18 @@ export function numberNotes(lines) {
 		}
 		(l.comments || []).forEach((c) => {
 			const k = c.ply + "|" + c.text;
+			// exclusive to footnote lines: it belongs under this footnote, lettered
+			if (isFoot(l) && !globalKeys.has(k)) {
+				const sub = entry.foot.subNotes;
+				let at = sub.find((x) => x.ply === c.ply && x.text === c.text);
+				if (!at) {
+					at = { label: subLabel(sub.length), ply: c.ply, text: c.text };
+					sub.push(at);
+				}
+				const marks = (map[c.ply] = map[c.ply] || []);
+				if (!marks.includes(at.label)) marks.push(at.label);
+				return;
+			}
 			let n = seen.get(k);
 			if (n === undefined) {
 				n = entries.length + 1;

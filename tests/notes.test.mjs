@@ -123,21 +123,6 @@ test("a footnote past the end of the mainline anchors on its last move", () => {
 	assert.strictEqual(entries[0].foot.d, 2);
 });
 
-test("a footnote's own notes stay separate numbered entries", () => {
-	const s = loadState("1. e4 e5 (1... c5 2. Nf3 {knight move}) 2. Nf3", {
-		tags: { 1: "foot" },
-	});
-	const c5 = s.lines.find((l) => l.moves.some((m) => m.san === "c5"));
-	const { entries, byLine } = numberNotes(s.lines);
-	assert.strictEqual(entries.length, 2, "the footnote plus its inner note");
-	assert.ok(entries[0].foot, "the footnote comes first");
-	assert.strictEqual(entries[1].text, "knight move");
-	// the inner note's marker renders inside the footnote's own move text
-	const innerPly = entries[1].ply;
-	assert.deepStrictEqual(byLine.get(c5)[innerPly], [2]);
-	assert.deepStrictEqual(entries[0].foot.noteByPly[innerPly], [2]);
-});
-
 test("a footnote before the mainline in the lines array still marks the mainline", () => {
 	// mirrors the state after promoteMainline flips isMain in place without
 	// reordering lines: the mainline can end up anywhere in the array, so a
@@ -173,12 +158,17 @@ test("a footnote entry's noteByPly is populated by the time numberNotes returns"
 	// pins the contract consumers depend on, independent of how it's wired
 	// internally (the footnote entry is pushed before its own comments are
 	// processed, so its noteByPly can't just alias the line's still-empty map)
-	const s = loadState("1. e4 e5 (1... c5 2. Nf3 {knight move}) 2. Nf3", {
+	const s = loadState("1. e4 e5 (1... c5 2. Nf3) 2. Nf3", {
 		tags: { 1: "foot" },
 	});
+	const foot = s.lines.find((l) => l.moves.some((m) => m.san === "c5"));
+	// shared with the mainline, so it stays a global numbered note the footnote
+	// references by number
+	s.lines[0].comments = [{ ply: 2, text: "shared" }];
+	foot.comments = [{ ply: 2, text: "shared" }];
 	const { entries } = numberNotes(s.lines);
 	const footEntry = entries.find((e) => e.foot);
-	const innerEntry = entries.find((e) => e.text === "knight move");
+	const innerEntry = entries.find((e) => e.text === "shared");
 	assert.deepStrictEqual(footEntry.foot.noteByPly[innerEntry.ply], [innerEntry.n]);
 });
 
@@ -236,4 +226,78 @@ test("table markers and the notes list agree with footnotes in the mix", () => {
 	const withInner = feet.find((f) => f.foot.noteByPly[inner.ply]);
 	assert.ok(withInner, "and is marked inside its footnote's move text");
 	assert.deepStrictEqual(withInner.foot.noteByPly[inner.ply], [inner.n]);
+});
+
+test("a footnote's own note becomes a lettered sub-note, not a global entry", () => {
+	const s = loadState("1. e4 e5 (1... c5 2. Nf3 {knight move}) 2. Nf3", {
+		tags: { 1: "foot" },
+	});
+	const { entries } = numberNotes(s.lines);
+	assert.strictEqual(entries.length, 1, "only the footnote is a global entry");
+	const foot = entries[0].foot;
+	assert.deepStrictEqual(
+		foot.subNotes.map((x) => [x.label, x.text]),
+		[["a", "knight move"]],
+	);
+	// and the marker inside the footnote's move text is the letter
+	const ply = foot.subNotes[0].ply;
+	assert.deepStrictEqual(foot.noteByPly[ply], ["a"]);
+});
+
+test("sub-note letters restart per footnote", () => {
+	const s = loadState(
+		"1. e4 e5 (1... c5 2. Nf3 {sicilian note}) (1... e6 2. d4 {french note}) 2. Nf3",
+		{ tags: { 1: "foot", 2: "foot" } },
+	);
+	const feet = numberNotes(s.lines).entries.filter((e) => e.foot);
+	assert.strictEqual(feet.length, 2);
+	feet.forEach((f) =>
+		assert.deepStrictEqual(
+			f.foot.subNotes.map((x) => x.label),
+			["a"],
+			"each footnote starts its own lettering at a",
+		),
+	);
+});
+
+test("a note shared with a non-footnote line stays global", () => {
+	const s = loadState("1. e4 e5 (1... c5 2. Nf3) 2. Nf3", {
+		tags: { 1: "foot" },
+	});
+	const foot = s.lines.find((l) => l.moves.some((m) => m.san === "c5"));
+	// the editor writes one note onto every line in an equal-position group, so
+	// the same (ply,text) can sit on a footnote AND a sideline
+	s.lines[0].comments = [{ ply: 2, text: "shared" }];
+	foot.comments = [{ ply: 2, text: "shared" }];
+	const { entries } = numberNotes(s.lines);
+	const global = entries.filter((e) => !e.foot);
+	assert.deepStrictEqual(
+		global.map((e) => e.text),
+		["shared"],
+		"kept as one global numbered note",
+	);
+	const footEntry = entries.find((e) => e.foot);
+	assert.deepStrictEqual(footEntry.foot.subNotes, [], "not lettered as well");
+	assert.deepStrictEqual(
+		footEntry.foot.noteByPly[2],
+		[global[0].n],
+		"the footnote references it by number",
+	);
+});
+
+test("sub-notes leave the global list shorter and densely numbered", () => {
+	const s = loadState(
+		"1. e4 {opening} e5 (1... c5 2. Nf3 {inner}) 2. Nf3 {develops}",
+		{ tags: { 1: "foot" } },
+	);
+	const { entries } = numberNotes(s.lines);
+	// opening, develops, and the footnote itself — the inner note is NOT here
+	assert.deepStrictEqual(
+		entries.map((e) => e.n),
+		[1, 2, 3],
+	);
+	assert.ok(
+		!entries.some((e) => e.text === "inner"),
+		"the footnote's own note left the global list",
+	);
 });
