@@ -16,7 +16,7 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    note), or use **★ Make mainline** to promote a sideline to the mainline.
    A Footnote line is pulled out of the table; it renders as a numbered entry
    in the **Notes** list instead, anchored by an `[n]` marker on the mainline
-   move it replaces.
+   move it replaces, with its own notes nested under it as lettered sub-notes.
 3. **Render** — a table in **vertical** or **horizontal** layout, or a linear
    **card** view (each table row with a board diagram of its end position) for
    print — footnotes don't get their own card, since they're not a table row.
@@ -24,10 +24,13 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    coordinates and spacing, fixed colors so they read on both light and dark
    themes (toggle in the toolbar). Sidelines show only their divergent tail.
    Comment moves carry numbered `[n]` markers on the owning line only; a
-   footnote's own notes stay separate numbered entries, marked inside its
-   move text. Lines get an **evaluation/quality symbol** picker (=, ±, ∓, +=,
-   =+, ∞, !, ?, …). The **Notes** section is editable — add a note at any
-   move, or edit/delete existing ones.
+   footnote's own notes become lettered sub-notes (a, b, c …) under its entry,
+   restarting at `a` for each footnote and marked inside its move text — unless
+   the note is shared with a non-footnote line, in which case it stays a global
+   numbered note the footnote references by its `[n]`. Lines get an
+   **evaluation/quality symbol** picker (=, ±, ∓, +=, =+, ∞, !, ?, …). The
+   **Notes** section is editable — add a note at any move, or edit/delete
+   existing ones.
 4. **Export** — **Export PGN** (editable chess notation for any chess app),
    **Export Markdown** (paste into Google Docs/Word), or **Print → Save as
    PDF** (always the linear card view). Saved workbooks (`localStorage`) are

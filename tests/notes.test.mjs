@@ -197,10 +197,12 @@ test("table markers and the notes list agree with footnotes in the mix", () => {
 	const feet = notes.filter((n) => n.foot);
 	assert.strictEqual(feet.length, 2);
 	feet.forEach((f) => assert.strictEqual(f.owner, s.lines[0]));
-	// every marker in the table resolves to a note anchored at the same ply
+	// Invariant 1 (numbers): every NUMERIC marker resolves to a global note
+	// anchored at the same ply, and nothing numbered goes unmarked.
+	const numeric = (x) => typeof x === "number";
 	[...vars, ...footNotes].forEach((v) => {
-		Object.entries(v.noteByPly).forEach(([ply, nums]) => {
-			nums.forEach((n) => {
+		Object.entries(v.noteByPly).forEach(([ply, marks]) => {
+			marks.filter(numeric).forEach((n) => {
 				assert.ok(byNumber.has(n), `marker ${n} resolves`);
 				assert.strictEqual(byNumber.get(n).ply, Number(ply));
 			});
@@ -211,8 +213,8 @@ test("table markers and the notes list agree with footnotes in the mix", () => {
 	// cannot catch a note that stopped being marked at all.
 	const marked = new Set();
 	[...vars, ...footNotes].forEach((v) =>
-		Object.values(v.noteByPly).forEach((nums) =>
-			nums.forEach((n) => marked.add(n)),
+		Object.values(v.noteByPly).forEach((marks) =>
+			marks.filter(numeric).forEach((n) => marked.add(n)),
 		),
 	);
 	assert.deepStrictEqual(
@@ -220,12 +222,39 @@ test("table markers and the notes list agree with footnotes in the mix", () => {
 		notes.map((n) => n.n),
 		"every numbered note is marked somewhere",
 	);
-	// the footnote's inner note is its own entry, marked inside the footnote text
-	const inner = notes.find((n) => n.text === "knight");
-	assert.ok(inner, "the inner note survives as its own entry");
-	const withInner = feet.find((f) => f.foot.noteByPly[inner.ply]);
-	assert.ok(withInner, "and is marked inside its footnote's move text");
-	assert.deepStrictEqual(withInner.foot.noteByPly[inner.ply], [inner.n]);
+	// Invariant 2 (letters): every LETTER marker inside a footnote matches a
+	// sub-note label of that same footnote, and every sub-note is marked on
+	// exactly the ply it belongs to — so a sub-note can neither go unmarked nor
+	// point at the wrong move.
+	feet.forEach((f) => {
+		const byLabel = new Map(f.foot.subNotes.map((x) => [x.label, x]));
+		Object.entries(f.foot.noteByPly).forEach(([ply, marks]) => {
+			marks
+				.filter((x) => !numeric(x))
+				.forEach((label) => {
+					assert.ok(byLabel.has(label), `sub-note ${label} resolves`);
+					assert.strictEqual(byLabel.get(label).ply, Number(ply));
+				});
+		});
+		f.foot.subNotes.forEach((sub) =>
+			assert.ok(
+				(f.foot.noteByPly[sub.ply] || []).includes(sub.label),
+				`sub-note ${sub.label} is marked on ply ${sub.ply}`,
+			),
+		);
+	});
+	// the footnote's inner note is a lettered sub-note of its own footnote,
+	// and is nowhere in the global list
+	assert.ok(
+		!notes.some((n) => n.text === "knight"),
+		"the inner note left the global list",
+	);
+	const withInner = feet.find((f) =>
+		f.foot.subNotes.some((x) => x.text === "knight"),
+	);
+	assert.ok(withInner, "it is a sub-note of the footnote that owns it");
+	const inner = withInner.foot.subNotes.find((x) => x.text === "knight");
+	assert.deepStrictEqual(withInner.foot.noteByPly[inner.ply], [inner.label]);
 });
 
 test("a footnote's own note becomes a lettered sub-note, not a global entry", () => {
