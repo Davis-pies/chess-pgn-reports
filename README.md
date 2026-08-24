@@ -17,6 +17,11 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    A Footnote line is pulled out of the table; it renders as a numbered entry
    in the **Notes** list instead, anchored by an `[n]` marker on the mainline
    move it replaces, with its own notes nested under it as lettered sub-notes.
+   A whole **group** of lines can be one footnote: each group header in the
+   editor carries its own **Footnote** chip, and tagging every line under a
+   group turns it into a single note — one `[n]` on the parent at the move the
+   group replaces, the moves they share stated once, and their branches listed
+   inside it. The chip dims when only some of the group's lines are tagged.
 3. **Render** — a table in **vertical** or **horizontal** layout, or a linear
    **card** view (each table row with a board diagram of its end position) for
    print — footnotes don't get their own card, since they're not a table row.
@@ -27,7 +32,11 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    footnote's own notes become lettered sub-notes (a, b, c …) under its entry,
    restarting at `a` for each footnote and marked inside its move text — unless
    the note is shared with a non-footnote line, in which case it stays a global
-   numbered note the footnote references by its `[n]`. Lines get an
+   numbered note the footnote references by its `[n]`. A group footnote nests
+   its branches inside the note, indented a level at a time, with labels
+   alternating by depth — `[n]`, then letters, then numbers, and so on — and a
+   node's own notes taking the first labels before its branches continue the
+   sequence. Lines get an
    **evaluation/quality symbol** picker (=, ±, ∓, +=, =+, ∞, !, ?, …). The
    **Notes** section is editable — add a note at any move, or edit/delete
    existing ones.
