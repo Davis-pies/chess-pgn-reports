@@ -5,7 +5,7 @@
 // light and dark page themes.
 
 import { fenAt } from "./pgn.js";
-import { renderInline } from "./dom.js";
+import { el, renderInline } from "./dom.js";
 
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -434,7 +434,7 @@ export function renderCards(container, grid, opts = {}) {
 					ply: Number(ply),
 					foot: !!note.foot,
 					text: note.foot ? footnoteText(note.foot) : strip(note.text),
-					subNotes: note.foot ? note.foot.subNotes || [] : [],
+					subNotes: note.foot ? subNoteLines(note.foot) : [],
 				});
 			});
 		}
@@ -456,14 +456,16 @@ export function renderCards(container, grid, opts = {}) {
 					? `[${o.n}] ${o.text}`
 					: `[${o.n}] ${ref} \u2014 ${o.text}`;
 				notesBox.appendChild(row);
-				// A footnote's own notes get their own indented rows beneath it,
-				// the same shape they have on screen and in the print block. A
-				// card row is plain text, so the label is bracketed inline rather
-				// than set as a <sup>.
-				o.subNotes.forEach((sub) => {
+				// A footnote's nested content gets its own indented rows beneath it,
+				// the same shape it has on screen and in the print block. A card row
+				// is plain text, so the label is already inline in the line.
+				o.subNotes.forEach((line) => {
 					const s = document.createElement("div");
 					s.className = "nt subnote";
-					s.textContent = `[${sub.label}] ${strip(sub.text)}`;
+					// Cards bracket the label ("[a] …") where the text exports write
+					// "a. …": a card row sits under note rows that carry bracketed [n]
+					// markers, so the labels below it read as the same kind of marker.
+					s.textContent = strip(line.trim().replace(/^(\S+)\.\s/, "[$1] "));
 					notesBox.appendChild(s);
 				});
 			});
@@ -505,6 +507,29 @@ export function fullMovesText(moves, marks) {
 export function appendFootnote(container, foot) {
 	const t = (s) => container.appendChild(document.createTextNode(s));
 	if (foot.name) t(foot.name + ": ");
+	const tail = appendFootMoves(container, foot);
+	if (foot.eval) t((tail.length ? " " : "") + foot.eval);
+	if (foot.note) {
+		// The dash separates moves from commentary. A footnote that shares
+		// everything it has with its parent has no moves to separate, so the
+		// commentary follows the name directly instead of a dangling dash.
+		if (tail.length || foot.eval) t(" — ");
+		renderInline(container, foot.note);
+	}
+	// A group's members hang below it as nested labelled rows, one level of
+	// indentation per depth (the nesting does the indenting; see .fnode in
+	// style.css). A lone footnote has no children and stops here, leaving its
+	// own sub-notes to the caller's own appendSubNotes — only a group renders
+	// them here, because its branches have to follow them.
+	if (!foot.children || !foot.children.length) return;
+	renderSubNotes(container, foot);
+	foot.children.forEach((c) => appendFootNode(container, c));
+}
+
+// One node's move run, with its per-move symbol marks and note markers. Shared
+// by a footnote's stem and by every nested group member below it.
+function appendFootMoves(container, foot) {
+	const t = (s) => container.appendChild(document.createTextNode(s));
 	const tail = foot.moves.slice(foot.d);
 	tail.forEach((m, i) => {
 		if (i) t(" ");
@@ -518,20 +543,43 @@ export function appendFootnote(container, foot) {
 			container.appendChild(sup);
 		}
 	});
-	if (foot.eval) t((tail.length ? " " : "") + foot.eval);
-	if (foot.note) {
-		// The dash separates moves from commentary. A footnote that shares
-		// everything it has with its parent has no moves to separate, so the
-		// commentary follows the name directly instead of a dangling dash.
-		if (tail.length || foot.eval) t(" — ");
-		renderInline(container, foot.note);
+	return tail;
+}
+
+// One member (or inner fork) of a group footnote: its label, its moves, its own
+// commentary, then its own notes and its own children, recursively.
+function appendFootNode(container, node) {
+	const row = el("div", { className: "fnode" });
+	row.appendChild(el("sup", { textContent: "[" + node.label + "]" }));
+	const span = document.createElement("span");
+	const t = (s) => span.appendChild(document.createTextNode(s));
+	if (node.name) t(node.name + ": ");
+	const tail = appendFootMoves(span, node);
+	if (node.eval) t((tail.length ? " " : "") + node.eval);
+	if (node.note) {
+		if (tail.length || node.eval) t(" — ");
+		renderInline(span, node.note);
 	}
+	row.appendChild(span);
+	renderSubNotes(row, node);
+	(node.children || []).forEach((c) => appendFootNode(row, c));
+	container.appendChild(row);
 }
 
 // A footnote's own notes, as labelled rows nested under it. Rendered as a
 // sibling block rather than inside appendFootnote so each consumer can place
 // and indent it — the panel and the print block both style .subnote.
+//
+// A GROUP is the exception: its own notes have to sit above its branches, which
+// only appendFootnote can place, so it renders them itself and this is a no-op.
+// Callers can go on pairing appendFootnote with appendSubNotes unconditionally
+// without a group's notes appearing twice.
 export function appendSubNotes(container, foot) {
+	if (foot.children && foot.children.length) return;
+	renderSubNotes(container, foot);
+}
+
+function renderSubNotes(container, foot) {
 	(foot.subNotes || []).forEach((s) => {
 		const row = document.createElement("div");
 		row.className = "subnote";
@@ -545,9 +593,18 @@ export function appendSubNotes(container, foot) {
 	});
 }
 
-// Same sub-notes for exports with no DOM, one indented line each.
-export function subNoteLines(foot) {
-	return (foot.subNotes || []).map((s) => "   " + s.label + ". " + s.text);
+// A footnote's nested content as plain indented lines, for exports with no DOM:
+// its own notes, and — for a group — each member with its moves, commentary and
+// notes beneath it. Three spaces per level, matching the on-screen indent.
+export function subNoteLines(foot, depth = 1) {
+	const pad = "   ".repeat(depth);
+	const out = [];
+	(foot.subNotes || []).forEach((s) => out.push(pad + s.label + ". " + s.text));
+	(foot.children || []).forEach((c) => {
+		out.push(pad + c.label + ". " + footnoteText(c));
+		out.push(...subNoteLines(c, depth + 1));
+	});
+	return out;
 }
 
 // Same footnote, as plain text for exports that have no DOM. Inline note

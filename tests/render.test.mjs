@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { parsePgn } from "../src/pgn.js";
 import { collectLines } from "../src/tree.js";
 import { grid } from "../src/table.js";
-import { allNotes } from "../src/notes.js";
+import { allNotes, numberNotes } from "../src/notes.js";
 import { installDom, loadState } from "./helpers.mjs";
 import {
 	renderTable,
@@ -598,4 +598,108 @@ test("plain-text exports keep a real space before the symbol", () => {
 	const s = loadState("1. e4 e5 2. Nf3 Nc6");
 	s.lines[0].marks = { 3: "∞" };
 	assert.match(cardMovesText(grid(s.lines).vars[0]), /Nc6 ∞/);
+});
+
+test("appendFootnote renders a group's members as nested labelled rows", () => {
+	const off = installDom();
+	// 2.Nf3 is shared by two members, so it becomes an inner fork below the
+	// stem; 2.Nc3 is a leaf beside it.
+	const s = loadState(
+		"1. e4 e5 (1... c5 2. Nf3 d6) (1... c5 2. Nf3 Nc6) (1... c5 2. Nc3) 2. Nf3",
+		{ tags: { 1: "foot", 2: "foot", 3: "foot" } },
+	);
+	const [e] = numberNotes(s.lines).entries.filter((x) => x.foot);
+	const box = document.createElement("div");
+	appendFootnote(box, e.foot);
+	assert.match(box.textContent, /1\.\.\.c5/, "stem rendered inline");
+	const top = [...box.children].filter((c) => c.className.includes("fnode"));
+	assert.deepStrictEqual(
+		top.map((r) => r.querySelector("sup").textContent),
+		["[a]", "[b]"],
+		"the 2.Nf3 fork and the 2.Nc3 leaf",
+	);
+	assert.match(top[1].textContent, /2\.Nc3/);
+	const inner = [...top[0].children].filter((c) =>
+		c.className.includes("fnode"),
+	);
+	assert.deepStrictEqual(
+		inner.map((r) => r.querySelector("sup").textContent),
+		["[1]", "[2]"],
+		"depth 2 is numbered",
+	);
+	assert.match(inner[0].textContent, /d6/);
+	assert.match(inner[1].textContent, /Nc6/);
+	off();
+});
+
+test("a group member shows its name, eval and note", () => {
+	const off = installDom();
+	const s = loadState("1. e4 e5 (1... c5 2. Nf3) (1... c5 2. Nc3) 2. Nf3", {
+		tags: { 1: "foot", 2: "foot" },
+	});
+	const m1 = s.lines.filter((l) => !l.isMain)[0];
+	m1.name = "Open";
+	m1.meta = { eval: "±", note: "critical" };
+	const [e] = numberNotes(s.lines).entries.filter((x) => x.foot);
+	const box = document.createElement("div");
+	appendFootnote(box, e.foot);
+	const row = box.querySelector(".fnode");
+	assert.match(row.textContent, /Open: /);
+	assert.match(row.textContent, /±/);
+	assert.match(row.textContent, /— critical/);
+	off();
+});
+
+test("a group's own note renders above its branches with a marker on the stem", () => {
+	const off = installDom();
+	const s = loadState("1. e4 e5 (1... c5 2. Nf3) (1... c5 2. Nc3) 2. Nf3", {
+		tags: { 1: "foot", 2: "foot" },
+	});
+	s.lines.filter((l) => !l.isMain)[0].comments = [
+		{ ply: 1, text: "sharp gambit line" },
+	];
+	const [e] = numberNotes(s.lines).entries.filter((x) => x.foot);
+	const box = document.createElement("div");
+	appendFootnote(box, e.foot);
+	// the stem move carries the sub-note's label as a superscript
+	assert.match(box.textContent, /1\.\.\.c5a/, "marker on the stem move");
+	const sub = box.querySelector(".subnote");
+	assert.ok(sub, "the group's own note is rendered");
+	assert.match(sub.textContent, /sharp gambit line/);
+	assert.deepStrictEqual(
+		[...box.querySelectorAll(":scope > .fnode > sup")].map((x) => x.textContent),
+		["[b]", "[c]"],
+		"branches continue the label sequence",
+	);
+	off();
+});
+
+test("footnoteText and subNoteLines flatten a group for text exports", () => {
+	const off = installDom();
+	const s = loadState(
+		"1. e4 e5 (1... c5 2. Nf3 {sharp}) (1... c5 2. Nc3) 2. Nf3",
+		{ tags: { 1: "foot", 2: "foot" } },
+	);
+	const [e] = numberNotes(s.lines).entries.filter((x) => x.foot);
+	assert.strictEqual(footnoteText(e.foot), "1...c5", "stem only");
+	assert.deepStrictEqual(subNoteLines(e.foot), [
+		"   a. 2.Nf3",
+		"      1. sharp",
+		"   b. 2.Nc3",
+	]);
+	off();
+});
+
+test("a lone footnote still renders exactly as before", () => {
+	const off = installDom();
+	const s = loadState("1. e4 e5 (1... c5 2. Nf3 {sharp}) 2. Nf3", {
+		tags: { 1: "foot" },
+	});
+	const [e] = numberNotes(s.lines).entries.filter((x) => x.foot);
+	const box = document.createElement("div");
+	appendFootnote(box, e.foot);
+	assert.strictEqual(box.querySelectorAll(".fnode").length, 0, "no group rows");
+	assert.match(box.textContent, /1\.\.\.c5 2\.Nf3/);
+	assert.deepStrictEqual(subNoteLines(e.foot), ["   a. sharp"]);
+	off();
 });
