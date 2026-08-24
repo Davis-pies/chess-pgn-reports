@@ -392,3 +392,51 @@ test("a card's footnote note carries its sub-notes", () => {
 	assert.match(text, /\[a\] knight move/, "the sub-note travels with it");
 	off();
 });
+
+test("a card lists its notes in ascending number order", () => {
+	const off = installDom();
+	const s = loadState("1. e4 c5 (1... e6 2. d4) 2. Nf3 d6 3. d4 {late}", {
+		tags: { 1: "foot" },
+	});
+	s.lines.find((l) => l.moves.some((m) => m.san === "e6")).name = "French";
+	const box = document.createElement("div");
+	renderCards(box, grid(s.lines), { notes: allNotes() });
+	const nums = [...box.querySelectorAll(".card-notes .nt")]
+		.map((r) => r.textContent.match(/^\[(\d+)\]/))
+		.filter(Boolean)
+		.map((m) => Number(m[1]));
+	assert.deepStrictEqual(
+		nums,
+		[...nums].sort((a, b) => a - b),
+		`card notes read in order (got ${JSON.stringify(nums)})`,
+	);
+	off();
+});
+
+test("a card's sub-notes render as their own indented rows", () => {
+	const off = installDom();
+	const s = loadState("1. e4 e5 (1... c5 2. Nf3 {knight move}) 2. Nf3", {
+		tags: { 1: "foot" },
+	});
+	s.lines.find((l) => l.moves.some((m) => m.san === "c5")).name = "Sicilian";
+	const box = document.createElement("div");
+	renderCards(box, grid(s.lines), { notes: allNotes() });
+	const notesBox = box.querySelector(".card .card-notes");
+	const foot = [...notesBox.querySelectorAll(".nt")].find((r) =>
+		/Sicilian/.test(r.textContent),
+	);
+	assert.ok(foot, "the footnote row is there");
+	assert.ok(
+		!/knight move/.test(foot.textContent),
+		"its sub-note is NOT inline in the footnote row",
+	);
+	const subs = [...notesBox.querySelectorAll(".subnote")];
+	assert.strictEqual(subs.length, 1, "it is its own row");
+	assert.strictEqual(subs[0].textContent, "[a] knight move");
+	assert.strictEqual(
+		subs[0].previousSibling,
+		foot,
+		"placed directly below its footnote",
+	);
+	off();
+});

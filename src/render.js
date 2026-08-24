@@ -407,14 +407,8 @@ export function renderCards(container, grid, opts = {}) {
 				owned.push({
 					n,
 					ply: Number(ply),
-					text: note.foot
-						? [
-								footnoteText(note.foot),
-								...(note.foot.subNotes || []).map(
-									(x) => "[" + x.label + "] " + x.text,
-								),
-							].join("  ")
-						: strip(note.text),
+					text: note.foot ? footnoteText(note.foot) : strip(note.text),
+					subNotes: note.foot ? note.foot.subNotes || [] : [],
 				});
 			});
 		}
@@ -430,6 +424,16 @@ export function renderCards(container, grid, opts = {}) {
 				row.className = "nt";
 				row.textContent = `[${o.n}] ${ref} \u2014 ${o.text}`;
 				notesBox.appendChild(row);
+				// A footnote's own notes get their own indented rows beneath it,
+				// the same shape they have on screen and in the print block. A
+				// card row is plain text, so the label is bracketed inline rather
+				// than set as a <sup>.
+				o.subNotes.forEach((sub) => {
+					const s = document.createElement("div");
+					s.className = "nt subnote";
+					s.textContent = `[${sub.label}] ${strip(sub.text)}`;
+					notesBox.appendChild(s);
+				});
 			});
 		}
 		if (v.note) {
