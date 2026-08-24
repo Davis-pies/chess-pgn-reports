@@ -496,3 +496,66 @@ test("a card's ordinary note keeps its move reference", () => {
 	assert.match(row.textContent, /^\[1\] 1\.e4 — opening$/, row.textContent);
 	off();
 });
+
+test("a move run starting on Black carries its move number", () => {
+	// A bare "Nc6" gives the reader no move to hang the line on. Standard
+	// notation writes the first half-move in full, "2...Nc6", and only then
+	// falls back to numbering White alone.
+	assert.strictEqual(
+		fullMovesText(
+			[
+				{ san: "Nc6", ply: 3 },
+				{ san: "Bb5", ply: 4 },
+			],
+			{},
+		),
+		"2... Nc6 3. Bb5",
+	);
+	// a run starting on White is unchanged
+	assert.strictEqual(
+		fullMovesText(
+			[
+				{ san: "e4", ply: 0 },
+				{ san: "c5", ply: 1 },
+			],
+			{},
+		),
+		"1. e4 c5",
+	);
+});
+
+test("a card's ellipsis context move carries its number on Black", () => {
+	const off = installDom();
+	// diverges on White's 2nd, so the shared move before it is Black's 1...e5 —
+	// which used to render as a bare "⋯ e5"
+	const s = loadState("1. e4 e5 2. Bc4 (2. Nf3 Nc6) Nf6");
+	const box = document.createElement("div");
+	renderCards(box, grid(s.lines), { notes: allNotes() });
+	const text = [...box.querySelectorAll(".card-moves")]
+		.map((m) => m.textContent)
+		.find((t) => /Nc6/.test(t));
+	assert.match(text, /⋯ 1\.\.\. e5/, `context move numbered (got ${text})`);
+	off();
+});
+
+test("a footnote's moves pair after the first", () => {
+	// the first half-move is written in full; Black's later moves do not repeat
+	// the number, matching the card move text
+	assert.strictEqual(
+		footnoteText({
+			name: "Line 264",
+			eval: "",
+			note: "",
+			moves: [
+				{ san: "f6", ply: 26 },
+				{ san: "gxf6", ply: 27 },
+				{ san: "gxf6", ply: 28 },
+				{ san: "Nxf6", ply: 29 },
+			],
+			marks: {},
+			noteByPly: {},
+			d: 0,
+		}),
+		"Line 264: 14.f6 gxf6 15.gxf6 Nxf6",
+	);
+});

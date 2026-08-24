@@ -283,16 +283,28 @@ export function renderTable(container, grid, orientation) {
 // Moves text for a card: sidelines get a leading ellipsis + the preceding
 // (shared) move for divergence context, and every move that has notes gets its
 // [n] references appended inline so the moves point at the notes below.
+// Standard algebraic pairing: a move number on White's half-move, none on
+// Black's ("1. e4 e5 2. Nf3"). The FIRST move of a run is the exception — it
+// always carries its own number, "2...Nc6" for Black, because a bare "Nc6"
+// gives the reader no move to hang the line on. Sidelines, footnotes and the
+// ellipsis context move all start mid-game, so they hit this constantly.
+function moveNum(ply, first) {
+	return ply % 2 === 0 || first ? fullmoveLabel(ply) : "";
+}
+
 export function cardMovesText(v) {
 	const parts = [];
-	if (v.tag !== "mainline" && v.d > 0) {
-		const pm = v.moves[v.d - 1];
-		const num = pm.ply % 2 === 0 ? Math.floor(pm.ply / 2) + 1 + ". " : "";
-		parts.push("\u22ef " + num + pm.san);
+	const ctx = v.tag !== "mainline" && v.d > 0 ? v.moves[v.d - 1] : null;
+	if (ctx) {
+		const num = moveNum(ctx.ply, true);
+		parts.push("\u22ef " + (num ? num + " " : "") + ctx.san);
 	}
 	const range = v.tag === "mainline" ? v.moves : v.moves.slice(v.d);
-	range.forEach((m) => {
-		const num = m.ply % 2 === 0 ? Math.floor(m.ply / 2) + 1 + ". " : "";
+	range.forEach((m, i) => {
+		// the context move is the ply right before the range, so the range's
+		// first move reads as its natural pair and needs no forced number
+		const n = moveNum(m.ply, i === 0 && !ctx);
+		const num = n ? n + " " : "";
 		const mark = v.marks && v.marks[m.ply] ? " " + v.marks[m.ply] : "";
 		const refs = ((v.noteByPly && v.noteByPly[m.ply]) || [])
 			.map((n) => "[" + n + "]")
@@ -311,14 +323,15 @@ function buildCardMoves(container, v) {
 		first = false;
 		container.appendChild(document.createTextNode(text));
 	};
-	if (v.tag !== "mainline" && v.d > 0) {
-		const pm = v.moves[v.d - 1];
-		const num = pm.ply % 2 === 0 ? Math.floor(pm.ply / 2) + 1 + ". " : "";
-		seg("\u22ef " + num + pm.san);
+	const ctx = v.tag !== "mainline" && v.d > 0 ? v.moves[v.d - 1] : null;
+	if (ctx) {
+		const num = moveNum(ctx.ply, true);
+		seg("\u22ef " + (num ? num + " " : "") + ctx.san);
 	}
 	const range = v.tag === "mainline" ? v.moves : v.moves.slice(v.d);
-	range.forEach((m) => {
-		const num = m.ply % 2 === 0 ? Math.floor(m.ply / 2) + 1 + ". " : "";
+	range.forEach((m, i) => {
+		const n = moveNum(m.ply, i === 0 && !ctx);
+		const num = n ? n + " " : "";
 		const mark = v.marks && v.marks[m.ply] ? " " + v.marks[m.ply] : "";
 		seg(num + m.san + mark);
 		const refs = (v.noteByPly && v.noteByPly[m.ply]) || [];
@@ -460,12 +473,14 @@ export function renderCards(container, grid, opts = {}) {
 // appended to the move they annotate.
 export function fullMovesText(moves, marks) {
 	return moves
-		.map(
-			(m) =>
-				(m.ply % 2 === 0 ? Math.floor(m.ply / 2) + 1 + ". " : "") +
+		.map((m, i) => {
+			const n = moveNum(m.ply, i === 0);
+			return (
+				(n ? n + " " : "") +
 				m.san +
-				(marks && marks[m.ply] ? " " + marks[m.ply] : ""),
-		)
+				(marks && marks[m.ply] ? " " + marks[m.ply] : "")
+			);
+		})
 		.join(" ");
 }
 
@@ -482,7 +497,7 @@ export function appendFootnote(container, foot) {
 	tail.forEach((m, i) => {
 		if (i) t(" ");
 		const mark = foot.marks && foot.marks[m.ply] ? " " + foot.marks[m.ply] : "";
-		t(fullmoveLabel(m.ply) + m.san + mark);
+		t(moveNum(m.ply, i === 0) + m.san + mark);
 		const refs = (foot.noteByPly && foot.noteByPly[m.ply]) || [];
 		if (refs.length) {
 			const sup = document.createElement("sup");
@@ -528,8 +543,8 @@ export function footnoteText(foot) {
 	const moves = foot.moves
 		.slice(foot.d)
 		.map(
-			(m) =>
-				fullmoveLabel(m.ply) +
+			(m, i) =>
+				moveNum(m.ply, i === 0) +
 				m.san +
 				(foot.marks && foot.marks[m.ply] ? " " + foot.marks[m.ply] : ""),
 		)
