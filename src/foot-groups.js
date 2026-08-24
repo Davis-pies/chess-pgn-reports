@@ -1,4 +1,4 @@
-import { buildTrie, leavesOf, countLeaves } from "./tree.js";
+import { buildTrie, leavesOf, countLeaves, divergence } from "./tree.js";
 
 // Marking a whole trie node as one footnote is derived from the hierarchy, not
 // stored: a node is a group when every line under it is tagged "foot". Building
@@ -35,14 +35,25 @@ function subtree(node) {
 	return { moves, line: children.length ? null : end.leaf, children };
 }
 
-function buildGroup(node) {
+function buildGroup(node, main) {
 	// The stem has no line field of its own — the group's entry owns it — so a
 	// member ending on the stem surfaces as a child exactly like the fork case.
 	const branch = subtree(node);
 	const tree = branch.line
 		? [{ moves: [], line: branch.line, children: [] }, ...branch.children]
 		: branch.children;
-	return { members: leavesOf(node), stem: branch.moves, tree };
+	const members = leavesOf(node);
+	// `stem` is relative to the trie's rooting (top-level children are rooted at
+	// each line's divergence from `main`); `stemMoves` is the same run stated
+	// absolutely — the member's own move array from move 1 up to and including the
+	// last stem move. Callers that need to compare the group against whole lines
+	// (parenting, divergence) want the absolute form, and re-deriving it from
+	// `stem` means re-deriving buildTrie's rooting rule out here.
+	const stemMoves = members[0].moves.slice(
+		0,
+		divergence(members[0], main) + branch.moves.length,
+	);
+	return { members, stem: branch.moves, stemMoves, tree };
 }
 
 // Groups of foot-tagged lines, plus the set of lines they account for. A lone
@@ -55,7 +66,7 @@ export function footGroups(lines, main) {
 	const root = buildTrie(foots, main);
 	root.children.forEach((child) => {
 		if (countLeaves(child) < 2) return;
-		const g = buildGroup(child);
+		const g = buildGroup(child, main);
 		groups.push(g);
 		g.members.forEach((l) => grouped.add(l));
 	});

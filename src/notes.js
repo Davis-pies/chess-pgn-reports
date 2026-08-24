@@ -115,11 +115,9 @@ export function numberNotes(lines) {
 	const chainOfLine = new Map(); // member line -> [group foot, ...ancestors, own]
 	const pliesOf = new Map(); // node -> the set of plies that node renders
 	// The stem as a pseudo-line, so parentOf/divergence — which compare whole
-	// move arrays from move 0 — can be run on the group as a unit.
-	const stemLine = (g) => {
-		const k = divergence(g.members[0], main) + g.stem.length;
-		return { moves: g.members[0].moves.slice(0, k) };
-	};
+	// move arrays from move 0 — can be run on the group as a unit. footGroups
+	// states the stem absolutely for exactly this.
+	const stemLine = (g) => ({ moves: g.stemMoves });
 	// Every member line below a node, in reading order — the lines whose symbols
 	// the node's own moves may carry.
 	const linesUnder = (node) => {

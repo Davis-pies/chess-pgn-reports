@@ -124,3 +124,28 @@ test("a member ending at an inner fork becomes a moveless child there too", () =
 		"the line ending at the fork is demoted to a moveless first child",
 	);
 });
+
+test("a group off a sideline reports its stem in absolute terms", () => {
+	// Lines 1 and 2 are the two foot branches of the untagged sideline
+	// 1... c5 2. Nf3 d6 (line 3) — collectLines emits a node's variations before
+	// the node itself, so the sideline comes last.
+	const s = loadState(
+		"1. e4 e5 (1... c5 2. Nf3 d6 (2... Nc6) (2... e6)) 2. Nf3",
+		{
+			tags: { 1: "foot", 2: "foot" },
+		},
+	);
+	const { groups } = footGroups(s.lines, s.lines[0]);
+	assert.strictEqual(groups.length, 1);
+	const g = groups[0];
+	assert.deepStrictEqual(
+		sans(g.stem),
+		["c5", "Nf3"],
+		"relative to the trie root",
+	);
+	assert.deepStrictEqual(
+		sans(g.stemMoves),
+		["e4", "c5", "Nf3"],
+		"the whole path from move 1 through the last stem move",
+	);
+});
