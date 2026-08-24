@@ -7,8 +7,9 @@
 // module has to number the table's superscripts and the notes list in ONE
 // pass, or the two could drift; decoration is a separate job that only shapes
 // what sits under a single already-numbered entry, and keeping it here keeps
-// each piece testable on its own. notes.js still owns the entry itself: the
-// anchor, the number, and which node a comment ends up on.
+// each piece testable on its own. notes.js still owns the entry itself — the
+// anchor and the number — and drives the comment pass; this module only tells
+// it which node hosts a given note.
 
 // Bijective base-26: a, b, ... z, aa, ab, ... so a 27th sibling doesn't run
 // past 'z' into punctuation.

@@ -47,7 +47,8 @@ export function numberNotes(lines) {
 	// Pre-seeded so every line's map is created exactly once, up front: a
 	// footnote can write into the mainline's map before the mainline's own
 	// turn in the loop below comes around, and that map must not then be
-	// replaced when it does.
+	// replaced when it does. A group member's node aliases its line's map from
+	// birth (see foot-nodes.js), which also needs every map to exist by then.
 	const byLine = new Map(lines.map((l) => [l, {}]));
 	const seen = new Map(); // "ply|text" -> the number first assigned to it
 	// Fallback parent, and the tie-break winner in parentOf below.
@@ -132,7 +133,11 @@ export function numberNotes(lines) {
 				ply,
 				owner: parent,
 				n,
+				// A lone footnote: no `children`, which is exactly what distinguishes
+				// it from a group's entry — `children` present ⇔ group, and every
+				// renderer branches on that.
 				foot: {
+					depth: 0,
 					name: l.name || "",
 					eval: (l.meta && l.meta.eval) || "",
 					note: (l.meta && l.meta.note) || "",
@@ -156,9 +161,13 @@ export function numberNotes(lines) {
 				// own entry at depth 1. A note hosted by an ancestor writes its
 				// marker onto that node; a note on the member's own move keeps going
 				// through the line's map, which the node aliases.
+				// Every grouped line has a node: a member whose moves are a prefix of
+				// its siblings' is demoted to a moveless child, which still carries
+				// `line`. So no node here means this is a lone footnote, not a group
+				// member footGroups forgot.
 				const own = nodeOfLine.get(l);
 				const host = own ? index.hostFor(l, c.ply) : entry.foot;
-				const depth = (host.depth || 0) + 1; // a lone footnote's entry has none
+				const depth = host.depth + 1;
 				const sub = host.subNotes;
 				let at = sub.find((x) => x.ply === c.ply && x.text === c.text);
 				if (!at) {
