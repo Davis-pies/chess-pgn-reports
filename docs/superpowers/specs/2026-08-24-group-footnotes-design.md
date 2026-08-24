@@ -127,6 +127,28 @@ Renderers branch once more, on `children`.
 Structured data, not a pre-rendered string, for the same reason the previous design
 gave: four renderers consume notes and each formats moves in its own medium.
 
+### 2.1 Which node hosts a note
+
+**Added 2026-08-24**, after review found notes and symbols on shared moves disappearing.
+
+A member line's moves are split across the nodes above it: the stem holds the moves the
+whole group shares, an inner fork holds the moves its branches share, and only the
+remainder belongs to the member's own node. A note or symbol therefore cannot simply
+travel with the line that carries it — at a stem ply it would print a label whose
+superscript has no move to sit on, because the member's node never renders that move.
+
+A note is hosted by the **deepest node whose own `moves` contain its ply**, walking the
+path from the group's stem down to the member. Its marker goes into that node's
+`noteByPly`, so the superscript lands on the move it is about. Two members carrying the
+same note at a shared ply collapse onto one host, so it is stated once.
+
+Per-move symbols follow the same path: a node's `marks` are merged from the lines
+beneath it, at the plies that node actually renders.
+
+Labels then run in one sequence per level: a node's own notes take the first labels at
+`depth + 1`, and its child branches continue that same sequence. Everything one level
+inside a note gets the next label, so a note and a branch can never share one.
+
 ## 3. Anchoring
 
 A group anchors the way a single footnote does, with `parentOf` run on the group's
