@@ -364,3 +364,19 @@ test("a sibling sharing the selection keeps its own end-position board", () => {
 	assert.ok(box.querySelector(".ledge-board"), "sibling keeps its board");
 	off();
 });
+
+test("a footnote line's move chip shows its sub-note letter", () => {
+	const off = installDom();
+	const s = loadState("1. e4 e5 (1... c5 2. Nf3 {knight move}) 2. Nf3", {
+		tags: { 1: "foot" },
+	});
+	const foot = s.lines.find((l) => l.moves.some((m) => m.san === "c5"));
+	const sups = [...moveStrip(foot).querySelectorAll("sup")].map(
+		(x) => x.textContent,
+	);
+	assert.ok(
+		sups.includes("a"),
+		`the sub-note letter marks the chip (got ${JSON.stringify(sups)})`,
+	);
+	off();
+});

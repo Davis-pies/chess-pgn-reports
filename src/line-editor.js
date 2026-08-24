@@ -2,7 +2,7 @@ import { fenAt } from "./pgn.js";
 import { appendBoard, fullmoveLabel } from "./render.js";
 import { el } from "./dom.js";
 import { getCurrent, getSharedInfo, getRenderHooks } from "./state.js";
-import { allNotes } from "./notes.js";
+import { numberNotes } from "./notes.js";
 import { branchContext } from "./export.js";
 
 export function lineEditor(l, idx, showBoard = false) {
@@ -148,6 +148,13 @@ export function moveStrip(l) {
 			wrap.appendChild(el("span", { className: "ctxchip", textContent: ctx }));
 	}
 	const owned = l.isMain ? mv : mv.slice(d);
+	// markers for this line's moves: numbers for ordinary notes, letters for a
+	// footnote's own sub-notes. byLine already has them keyed by ply, so this
+	// replaces a per-move scan of the whole notes list.
+	//
+	// The `|| {}` is not the dead-fallback pattern removed elsewhere here:
+	// moveStrip can be called with a line that is not in getCurrent().lines.
+	const marksByPly = numberNotes(getCurrent().lines).byLine.get(l) || {};
 	owned.forEach((m) => {
 		const num = m.ply % 2 === 0 ? Math.floor(m.ply / 2) + 1 + ". " : "";
 		const mark = (l.marks || {})[m.ply];
@@ -159,13 +166,7 @@ export function moveStrip(l) {
 			(x.comments || []).some((c) => c.ply === m.ply),
 		);
 		// numbered note references for this move's chip (superscript numbers, no brackets)
-		const noteNums = allNotes()
-			.filter(
-				(n) =>
-					n.ply === m.ply &&
-					(l.comments || []).some((c) => c.ply === n.ply && c.text === n.text),
-			)
-			.map((n) => n.n);
+		const noteNums = marksByPly[m.ply] || [];
 		const sel =
 			getCurrent().sel &&
 			getCurrent().sel.ply === m.ply &&
