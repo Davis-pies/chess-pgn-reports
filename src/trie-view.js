@@ -96,6 +96,30 @@ function collapsedVar(node) {
 	};
 }
 
+// The group-level Footnote chip. Its state is read back off the lines rather
+// than stored: all tagged reads "on", some reads "partial" (dimmed), none reads
+// off. Clicking sets every line unless they are all already set, in which case
+// it clears them — so one click always changes something.
+function groupFootChip(node) {
+	const leaves = leavesOf(node);
+	const all = leaves.every((l) => l.tag === "foot");
+	const some = !all && leaves.some((l) => l.tag === "foot");
+	const chip = el("button", {
+		className:
+			"chip tag foot groupfoot" + (all ? " on" : some ? " partial" : ""),
+		textContent: "Footnote",
+	});
+	chip.onclick = (e) => {
+		// the chip lives in the <summary>, where a click would otherwise toggle
+		// the <details> open/closed as well
+		e.preventDefault();
+		e.stopPropagation();
+		leaves.forEach((l) => (l.tag = all ? null : "foot"));
+		getRenderHooks().renderApp();
+	};
+	return chip;
+}
+
 // The moves a branch's lines share, from the branch's root child down its
 // single-child chain to the first fork (or the leaf).
 function sharedMoves(node) {
@@ -151,12 +175,15 @@ export function renderTrieNode(container, node, nameCounter, path, allOpen) {
 		// scope the rebuild to the markup panel only
 	});
 	const count = countLeaves(node);
-	det.appendChild(
-		el("summary", {
-			className: "lg-head",
-			textContent: `${nextPath} · ${count} line${count === 1 ? "" : "s"}`,
-		}),
-	);
+	const summary = el("summary", {
+		className: "lg-head",
+		textContent: `${nextPath} · ${count} line${count === 1 ? "" : "s"}`,
+	});
+	// Marking a group as a footnote is marking all its lines: the group IS one
+	// footnote precisely when every line under it is tagged (see foot-groups.js).
+	// A group of one is just a line, and its own editor row already has the chip.
+	if (count > 1) summary.appendChild(groupFootChip(node));
+	det.appendChild(summary);
 	const body = el("div", { className: "lgroup-body" });
 	const open = det.open;
 	if (node.leaf)

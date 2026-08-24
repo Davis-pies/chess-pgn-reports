@@ -2,6 +2,7 @@ import { test, after } from "node:test";
 import assert from "node:assert";
 import { saveNotebook } from "../src/store.js";
 import { bootApp } from "./helpers.mjs";
+import { getCurrent, getRenderHooks } from "../src/state.js";
 
 // One app.js instance for the whole file. Each test calls app.reset() to get
 // back to the import panel with clean storage. See bootApp's note on why the
@@ -513,6 +514,94 @@ test("print notes: a note shared by several lines is listed once", async () => {
 			`texts=${JSON.stringify(rows.map((r) => r.textContent))}`,
 	);
 
+});
+
+const GROUP_PGN = "1. e4 e5 (1... c5 2. Nf3) (1... c5 2. Nc3) 2. Nf3";
+
+async function loadGroupPgn() {
+	app.reset();
+	const view = doc("view");
+	view.querySelector("textarea.pgnin").value = GROUP_PGN;
+	[...view.querySelectorAll("button")]
+		.find((b) => b.textContent.includes("Load"))
+		.click();
+	await tick();
+}
+
+test("the group Footnote chip tags every line under the group", async () => {
+	await loadGroupPgn();
+
+	const group = doc("view").querySelector(".markup details.lgroup");
+	const chip = group.querySelector("summary .chip.groupfoot");
+	assert.ok(chip, "group summary carries a Footnote chip");
+	assert.ok(!chip.className.includes("on"), "off to start");
+
+	chip.click();
+	await tick();
+	const after = doc("view").querySelector(".markup details.lgroup");
+	assert.ok(
+		after.querySelector("summary .chip.groupfoot").className.includes("on"),
+		"chip reads on once every line is tagged",
+	);
+	assert.strictEqual(
+		doc("view").querySelectorAll(".notes .nt").length,
+		1,
+		"the group renders as one note",
+	);
+
+	after.querySelector("summary .chip.groupfoot").click();
+	await tick();
+	assert.ok(
+		!doc("view")
+			.querySelector(".markup details.lgroup summary .chip.groupfoot")
+			.className.includes("on"),
+		"clicking again clears the whole group",
+	);
+});
+
+test("the group chip reads partial when only some lines are footnotes", async () => {
+	await loadGroupPgn();
+	const lines = getCurrent().lines.filter((l) => !l.isMain);
+	lines[0].tag = "foot";
+	getRenderHooks().renderApp();
+	await tick();
+	const chip = doc("view").querySelector(
+		".markup details.lgroup summary .chip.groupfoot",
+	);
+	assert.ok(chip.className.includes("partial"), "dimmed, not on");
+	assert.ok(!chip.className.includes("on"));
+});
+
+test("clicking the group chip does not toggle the group open or shut", async () => {
+	await loadGroupPgn();
+	const before = doc("view").querySelector(".markup details.lgroup").open;
+	doc("view").querySelector(".markup summary .chip.groupfoot").click();
+	await tick();
+	assert.strictEqual(
+		doc("view").querySelector(".markup details.lgroup").open,
+		before,
+		"the summary's default toggle is suppressed",
+	);
+});
+
+test("a one-line group carries no group chip -- its line editor has one", async () => {
+	app.reset();
+	const view = doc("view");
+	view.querySelector("textarea.pgnin").value =
+		"1. e4 e5 (1... c5 2. Nf3) 2. Nf3";
+	[...view.querySelectorAll("button")]
+		.find((b) => b.textContent.includes("Load"))
+		.click();
+	await tick();
+	const groups = [...doc("view").querySelectorAll(".markup details.lgroup")];
+	assert.ok(groups.length, "a group is rendered for the lone line");
+	groups.forEach((g) =>
+		assert.strictEqual(
+			g.querySelector("summary .chip.groupfoot"),
+			null,
+			"a group of one is just a line",
+		),
+	);
 });
 
 function doc(id) {

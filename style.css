@@ -221,6 +221,12 @@ h3 {
   border-color: var(--foot);
   color: #fff;
 }
+.chip.groupfoot {
+  margin-left: 0.6em;
+}
+.chip.partial {
+  opacity: 0.55;
+}
 .maintag {
   font-size: 0.8rem;
   font-weight: 600;
