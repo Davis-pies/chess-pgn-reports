@@ -101,19 +101,28 @@ left-to-right, which is already true today.
 
 ## 3. Anchoring
 
-A footnote's `[n]` marker attaches to the **mainline row at the divergence ply** —
+A footnote's `[n]` marker attaches to the **parent row at the divergence ply** —
 the move the footnote replaces. Mainline plays `7.Nbd2`, footnote is `7.Bg5`, marker
 lands on `7.Nbd2`. This is the ECO convention: "at this move, there is an
 alternative."
 
-If the footnote runs past the mainline's last move (no mainline cell exists at the
-divergence ply), the marker falls back to the last mainline ply.
+If the footnote runs past the parent's last move (no parent cell exists at the
+divergence ply), the marker falls back to the last parent ply.
 
-**Known limitation:** `divergence()` compares only against the mainline
-(`src/table.js:8`), so a footnote that genuinely branches off a *sideline* still gets
-its marker on the mainline row. Accepted for this sub-project. The group-footnote
-sub-project generalizes "parent" from "always the mainline" to a trie node, which is
-where this is fixed.
+**Amended 2026-08-24.** This originally recorded a known limitation: anchoring
+compared only against the mainline, so a footnote branching off a *sideline* still
+got its marker on the mainline row, and fixing it was deferred to the group-footnote
+sub-project. It was fixed early instead, because in use the note landed on the card
+of a line the footnote never touches.
+
+A footnote now anchors on its **parent line**: the line it shares the longest move
+prefix with. Foot-tagged lines are excluded as candidates — `grid()` pulls them out
+of the table, so a note anchored on one would have no row or card to render on — and
+the mainline wins ties, so a footnote off the trunk is unaffected. Everything above
+holds with "mainline" read as "parent line".
+
+The group-footnote sub-project still generalizes the parent further, from a single
+line to the trie node a set of sibling lines shares.
 
 ## 4. A footnote's own notes
 
