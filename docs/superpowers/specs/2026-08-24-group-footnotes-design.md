@@ -81,6 +81,13 @@ not know the parent. `notes.js` computes that after `parentOf` (§3).
 `grouped` is a `Set` of member lines, so `notes.js` can tell which foot lines a group
 already speaks for and leave the rest as today's lone footnotes.
 
+A line that ends where others continue past it — its moves are a prefix of its
+siblings' — is demoted to a moveless child (`moves: []`) of the node it ends on, so
+that a node is strictly one of two things: a leaf carrying a line, or a fork carrying
+children. A node that was both would silently lose either its line's name and
+commentary or its children, since `notes.js` and the renderers branch on exactly that
+dichotomy. This applies at every depth, the stem included.
+
 A node with one leaf is never a group. Such a line stays exactly the footnote it is
 today, lettered sub-notes and all.
 

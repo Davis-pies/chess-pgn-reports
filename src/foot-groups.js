@@ -38,11 +38,11 @@ function subtree(node) {
 function buildGroup(node) {
 	// The stem has no line field of its own — the group's entry owns it — so a
 	// member ending on the stem surfaces as a child exactly like the fork case.
-	const t = subtree(node);
-	const tree = t.line
-		? [{ moves: [], line: t.line, children: [] }, ...t.children]
-		: t.children;
-	return { members: leavesOf(node), stem: t.moves, tree };
+	const branch = subtree(node);
+	const tree = branch.line
+		? [{ moves: [], line: branch.line, children: [] }, ...branch.children]
+		: branch.children;
+	return { members: leavesOf(node), stem: branch.moves, tree };
 }
 
 // Groups of foot-tagged lines, plus the set of lines they account for. A lone
