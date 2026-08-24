@@ -456,3 +456,139 @@ test("labelFor alternates letters and numbers by depth", () => {
 test("labelFor refuses depth 0, which is the global note number", () => {
 	assert.throws(() => labelFor(0, 0), /global note number/);
 });
+
+test("a group of foot lines becomes one entry with one marker", () => {
+	const s = loadState("1. e4 e5 (1... c5 2. Nf3) (1... c5 2. Nc3) 2. Nf3", {
+		tags: { 1: "foot", 2: "foot" },
+	});
+	const { entries, byLine } = numberNotes(s.lines);
+	assert.strictEqual(entries.length, 1, "one entry for the whole group");
+	const e = entries[0];
+	assert.strictEqual(e.owner, s.lines[0], "anchored on the mainline");
+	assert.strictEqual(e.ply, 1, "on the move the group replaces (1...e5)");
+	assert.deepStrictEqual(e.foot.moves.map((m) => m.san), ["e4", "c5"]);
+	assert.strictEqual(e.foot.d, 1, "tail starts at the divergence");
+	assert.deepStrictEqual(
+		e.foot.children.map((c) => [c.label, c.depth, c.moves.map((m) => m.san)]),
+		[
+			["a", 1, ["Nf3"]],
+			["b", 1, ["Nc3"]],
+		],
+	);
+	assert.deepStrictEqual(byLine.get(s.lines[0])[1], [1]);
+});
+
+test("a nested fork inside a group nests its labels", () => {
+	const s = loadState(
+		"1. e4 e5 (1... c5 2. Nf3 d6) (1... c5 2. Nf3 Nc6) (1... c5 2. Nc3) 2. Nf3",
+		{ tags: { 1: "foot", 2: "foot", 3: "foot" } },
+	);
+	const [e] = numberNotes(s.lines).entries;
+	const nf3 = e.foot.children[0];
+	assert.deepStrictEqual([nf3.label, nf3.depth], ["a", 1]);
+	assert.deepStrictEqual(
+		nf3.children.map((c) => [c.label, c.depth, c.moves.map((m) => m.san)]),
+		[
+			["1", 2, ["d6"]],
+			["2", 2, ["Nc6"]],
+		],
+	);
+	assert.strictEqual(e.foot.children[1].label, "b");
+});
+
+test("a group carries each member's name, eval and note", () => {
+	const s = loadState("1. e4 e5 (1... c5 2. Nf3) (1... c5 2. Nc3) 2. Nf3", {
+		tags: { 1: "foot", 2: "foot" },
+	});
+	const [m1, m2] = s.lines.filter((l) => !l.isMain);
+	m1.name = "Open Sicilian";
+	m1.meta = { eval: "±", note: "main try" };
+	m2.meta = { eval: "=" };
+	const [e] = numberNotes(s.lines).entries;
+	assert.deepStrictEqual(
+		e.foot.children.map((c) => [c.name, c.eval, c.note]),
+		[
+			["Open Sicilian", "±", "main try"],
+			["", "=", ""],
+		],
+	);
+});
+
+test("a member's own note is a numbered sub-note, not a global one", () => {
+	const s = loadState(
+		"1. e4 e5 (1... c5 2. Nf3 {pressure}) (1... c5 2. Nc3) 2. Nf3 {develops}",
+		{ tags: { 1: "foot", 2: "foot" } },
+	);
+	const { entries } = numberNotes(s.lines);
+	assert.deepStrictEqual(
+		entries.map((x) => x.text || "[group]"),
+		["[group]", "develops"],
+		"only the mainline comment joins the global list",
+	);
+	const member = entries.find((x) => x.foot).foot.children[0];
+	assert.deepStrictEqual(
+		member.subNotes.map((sn) => [sn.label, sn.text]),
+		[["1", "pressure"]],
+		"depth 2: numbers",
+	);
+	assert.deepStrictEqual(member.noteByPly[2], ["1"]);
+});
+
+test("a note a group member shares with a sideline stays global", () => {
+	const s = loadState(
+		"1. e4 e5 (1... c5 2. Nf3) (1... c5 2. Nc3) (1... e6) 2. Nf3",
+		{ tags: { 1: "foot", 2: "foot", 3: "sideline" } },
+	);
+	const nonFoot = s.lines.filter((l) => !l.isMain)[2];
+	const member = s.lines.filter((l) => !l.isMain)[0];
+	nonFoot.comments = [{ ply: 1, text: "shared" }];
+	member.comments = [{ ply: 1, text: "shared" }];
+	const { entries } = numberNotes(s.lines);
+	const global = entries.filter((x) => x.text === "shared");
+	assert.strictEqual(global.length, 1, "still one global note");
+	const grp = entries.find((x) => x.foot);
+	assert.deepStrictEqual(grp.foot.children[0].subNotes, [], "not a sub-note");
+});
+
+test("a group anchors on the sideline it branches from", () => {
+	const s = loadState(
+		"1. e4 e5 (1... c5 2. Nf3 d6 (2... Nc6) (2... e6)) 2. Nf3",
+		{ tags: { 2: "foot", 3: "foot" } },
+	);
+	const sideline = s.lines.find((l) => l.moves.some((m) => m.san === "d6"));
+	const [e] = numberNotes(s.lines).entries.filter((x) => x.foot);
+	assert.strictEqual(e.owner, sideline, "parent is the line it diverges from");
+	assert.strictEqual(e.ply, 3, "on 2...d6, the move the group replaces");
+});
+
+test("a deeply nested note never renumbers the global notes", () => {
+	const pgn = "1. e4 {first} e5 (1... c5 2. Nf3) (1... c5 2. Nc3) 2. Nf3 {last}";
+	const before = numberNotes(loadState(pgn, { tags: { 1: "foot", 2: "foot" } }).lines);
+	assert.deepStrictEqual(
+		before.entries.map((e) => e.n),
+		[1, 2, 3],
+	);
+	const s = loadState(pgn, { tags: { 1: "foot", 2: "foot" } });
+	const member = s.lines.filter((l) => !l.isMain)[0];
+	member.comments = [{ ply: 2, text: "deep" }];
+	const after = numberNotes(s.lines);
+	assert.deepStrictEqual(
+		after.entries.map((e) => [e.n, e.text || "[group]"]),
+		before.entries.map((e) => [e.n, e.text || "[group]"]),
+		"the global sequence is untouched",
+	);
+});
+
+test("a lone foot line alongside a group is still its own footnote", () => {
+	const s = loadState(
+		"1. e4 e5 (1... c5 2. Nf3) (1... c5 2. Nc3) (1... e6) 2. Nf3",
+		{ tags: { 1: "foot", 2: "foot", 3: "foot" } },
+	);
+	const { entries } = numberNotes(s.lines);
+	assert.strictEqual(entries.length, 2);
+	assert.ok(entries.some((e) => e.foot && e.foot.children), "the group");
+	assert.ok(
+		entries.some((e) => e.foot && !e.foot.children),
+		"the lone footnote keeps its existing shape",
+	);
+});

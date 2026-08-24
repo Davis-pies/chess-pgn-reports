@@ -1,5 +1,6 @@
 import { getCurrent } from "./state.js";
 import { divergence } from "./tree.js";
+import { footGroups } from "./foot-groups.js";
 
 // The parent-line move a footnote replaces: the one at the divergence index. A
 // footnote that runs past its parent's end has no such move, so it anchors on
@@ -90,9 +91,8 @@ export function numberNotes(lines) {
 	// to render on. The mainline wins ties, leaving a footnote off the trunk
 	// exactly where it was.
 	//
-	// Group-footnote seam: a group marks a SET of sibling lines as one footnote,
-	// which needs the parent to be the trie node they share rather than a single
-	// line. This lookup is where that generalization goes.
+	// A group reaches this lookup through `stemLine`, which presents the group's
+	// shared moves as a pseudo-line so the whole group is parented as a unit.
 	const parentOf = (l) => {
 		let best = null;
 		let bestD = -1;
@@ -106,6 +106,59 @@ export function numberNotes(lines) {
 		});
 		return best || main;
 	};
+	// Group footnotes. A whole all-foot trie node is ONE entry: its members are
+	// nested children of that entry instead of separate notes, and the parent
+	// line gets a single [n]. Built before the per-line pass so that pass can
+	// route a member's comments into its node rather than into the global list.
+	const { groups, grouped } = footGroups(lines, main);
+	const nodeOfLine = new Map(); // member line -> its decorated node
+	// The stem as a pseudo-line, so parentOf/divergence — which compare whole
+	// move arrays from move 0 — can be run on the group as a unit.
+	const stemLine = (g) => {
+		const k = divergence(g.members[0], main) + g.stem.length;
+		return { moves: g.members[0].moves.slice(0, k) };
+	};
+	const decorate = (nodes, depth) =>
+		nodes.map((t, i) => {
+			const node = {
+				label: labelFor(depth, i),
+				depth,
+				moves: t.moves,
+				d: 0, // `moves` is already only this node's tail
+				marks: (t.line && t.line.marks) || {},
+				noteByPly: {},
+				name: (t.line && t.line.name) || "",
+				eval: (t.line && t.line.meta && t.line.meta.eval) || "",
+				note: (t.line && t.line.meta && t.line.meta.note) || "",
+				subNotes: [],
+				line: t.line,
+				children: decorate(t.children, depth + 1),
+			};
+			if (t.line) nodeOfLine.set(t.line, node);
+			return node;
+		});
+	groups.forEach((g) => {
+		const pseudo = stemLine(g);
+		const parent = parentOf(pseudo);
+		const d = divergence(pseudo, parent);
+		const ply = anchorPly(parent, d);
+		const n = entries.length + 1;
+		entries.push({
+			ply,
+			owner: parent,
+			n,
+			foot: {
+				moves: pseudo.moves,
+				d,
+				marks: {},
+				noteByPly: {},
+				depth: 0,
+				children: decorate(g.tree, 1),
+			},
+		});
+		const parentMap = byLine.get(parent);
+		(parentMap[ply] = parentMap[ply] || []).push(n);
+	});
 	lines.forEach((l) => {
 		const map = byLine.get(l);
 		let entry = null;
@@ -115,7 +168,9 @@ export function numberNotes(lines) {
 		// leave a stale note behind. Its own noteByPly isn't filled in until this
 		// line's comments are processed below, so the entry gets it after the loop
 		// instead of aliasing the still-empty map in.
-		if (!l.isMain && l.tag === "foot" && main) {
+		// A group member is already a child of the group's entry, so it must not
+		// also build a footnote of its own.
+		if (!l.isMain && l.tag === "foot" && main && !grouped.has(l)) {
 			const parent = parentOf(l);
 			const d = divergence(l, parent);
 			const ply = anchorPly(parent, d);
@@ -143,10 +198,14 @@ export function numberNotes(lines) {
 			const k = c.ply + "|" + c.text;
 			// exclusive to footnote lines: it belongs under this footnote, lettered
 			if (isFoot(l) && !globalKeys.has(k)) {
-				const sub = entry.foot.subNotes;
+				// A grouped member's notes hang off its node in the group tree, one
+				// level below it; a lone footnote's hang off its own entry at depth 1.
+				const host = nodeOfLine.get(l) || entry.foot;
+				const depth = (host.depth || 0) + 1;
+				const sub = host.subNotes;
 				let at = sub.find((x) => x.ply === c.ply && x.text === c.text);
 				if (!at) {
-					at = { label: labelFor(1, sub.length), ply: c.ply, text: c.text };
+					at = { label: labelFor(depth, sub.length), ply: c.ply, text: c.text };
 					sub.push(at);
 				}
 				const marks = (map[c.ply] = map[c.ply] || []);
@@ -164,6 +223,7 @@ export function numberNotes(lines) {
 		});
 	});
 	footEntries.forEach(([e, l]) => (e.foot.noteByPly = byLine.get(l)));
+	nodeOfLine.forEach((node, l) => (node.noteByPly = byLine.get(l)));
 	// Reading order. Numbers are handed out above in lines order — a whole line
 	// at a time — which is not the order a reader meets the markers in: a
 	// footnote anchored on an early mainline move is created only when its own
