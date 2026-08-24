@@ -374,3 +374,21 @@ test("the notes panel nests a footnote's own notes under it", () => {
   assert.strictEqual(subs[0].querySelector("sup").textContent, "[a]");
   off();
 });
+
+test("Markdown indents a footnote's own notes under it", () => {
+  const off = installDom();
+  const s = loadState("1. e4 e5 (1... c5 2. Nf3 {knight move}) 2. Nf3", {
+    tags: { 1: "foot" },
+  });
+  s.lines.find((l) => l.moves.some((m) => m.san === "c5")).name = "Sicilian";
+  const md = buildMarkdown();
+  const lines = md.split("\n");
+  const i = lines.findIndex((l) => /^1\. Sicilian: /.test(l));
+  assert.ok(i > -1, "the footnote is note 1");
+  assert.strictEqual(
+    lines[i + 1],
+    "   a. knight move",
+    "its own note follows, indented",
+  );
+  off();
+});

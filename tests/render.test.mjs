@@ -377,3 +377,18 @@ test("subNoteLines renders the same sub-notes as indented text", () => {
 	);
 	assert.deepStrictEqual(subNoteLines({ subNotes: [] }), []);
 });
+
+test("a card's footnote note carries its sub-notes", () => {
+	const off = installDom();
+	const s = loadState("1. e4 e5 (1... c5 2. Nf3 {knight move}) 2. Nf3", {
+		tags: { 1: "foot" },
+	});
+	s.lines.find((l) => l.moves.some((m) => m.san === "c5")).name = "Sicilian";
+	const g = grid(s.lines);
+	const box = document.createElement("div");
+	renderCards(box, g, { notes: allNotes() });
+	const text = box.querySelector(".card .card-notes").textContent;
+	assert.match(text, /Sicilian/);
+	assert.match(text, /\[a\] knight move/, "the sub-note travels with it");
+	off();
+});

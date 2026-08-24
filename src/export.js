@@ -5,6 +5,7 @@ import {
   appendFootnote,
   footnoteText,
   appendSubNotes,
+  subNoteLines,
 } from "./render.js";
 import { el, renderInline } from "./dom.js";
 import { getCurrent, getRenderHooks } from "./state.js";
@@ -210,13 +211,16 @@ export function buildMarkdown() {
   const notes = allNotes();
   if (notes.length) {
     L.push("", "## Notes", "");
-    notes.forEach((note) =>
-      L.push(
-        note.foot
-          ? `${note.n}. ${footnoteText(note.foot)}`
-          : `${note.n}. ${moveRef(note.ply, note.owner)} — ${note.text}`,
-      ),
-    );
+    notes.forEach((note) => {
+      if (note.foot) {
+        L.push(
+          `${note.n}. ${footnoteText(note.foot)}`,
+          ...subNoteLines(note.foot),
+        );
+      } else {
+        L.push(`${note.n}. ${moveRef(note.ply, note.owner)} — ${note.text}`);
+      }
+    });
   }
   return L.join("\n") + "\n";
 }

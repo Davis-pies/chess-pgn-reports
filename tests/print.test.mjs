@@ -102,3 +102,19 @@ test("a footnote prints in the notes block under the first table", () => {
   );
   off();
 });
+
+test("a footnote's own notes print nested under it", () => {
+  const off = installDom();
+  const s = loadState("1. e4 e5 (1... c5 2. Nf3 Nc6 {knight move}) 2. Nf3 Nc6", {
+    tags: { 1: "foot" },
+  });
+  s.lines.find((l) => l.moves.some((m) => m.san === "c5")).name = "Sicilian";
+  const box = document.createElement("div");
+  appendPrintTables(box, grid(s.lines));
+  const block = box.querySelector(".print-notes");
+  assert.match(block.textContent, /Sicilian/);
+  const subs = [...block.querySelectorAll(".subnote")];
+  assert.strictEqual(subs.length, 1);
+  assert.strictEqual(subs[0].querySelector("sup").textContent, "[a]");
+  off();
+});

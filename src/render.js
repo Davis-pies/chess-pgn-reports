@@ -407,7 +407,14 @@ export function renderCards(container, grid, opts = {}) {
 				owned.push({
 					n,
 					ply: Number(ply),
-					text: note.foot ? footnoteText(note.foot) : strip(note.text),
+					text: note.foot
+						? [
+								footnoteText(note.foot),
+								...(note.foot.subNotes || []).map(
+									(x) => "[" + x.label + "] " + x.text,
+								),
+							].join("  ")
+						: strip(note.text),
 				});
 			});
 		}
