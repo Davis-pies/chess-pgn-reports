@@ -14,11 +14,9 @@ function anchorPly(parent, d) {
 	return m.ply;
 }
 
-// Sub-note labels within one footnote: a, b, ... z, aa, ab, ... Bijective
-// base-26, so a 27th sub-note doesn't run past 'z' into punctuation. This is
-// the lettering the top-level Footnotes section used to have, reintroduced at
-// a much smaller scope: it labels one footnote's own notes, not footnotes.
-function subLabel(i) {
+// Bijective base-26: a, b, ... z, aa, ab, ... so a 27th sibling doesn't run
+// past 'z' into punctuation.
+function letters(i) {
 	let n = i + 1;
 	let s = "";
 	while (n > 0) {
@@ -27,6 +25,14 @@ function subLabel(i) {
 		n = Math.floor(n / 26);
 	}
 	return s;
+}
+
+// Labels alternate by nesting depth: depth 0 is the note's own global [n],
+// odd depths are letters, even depths below that are numbers — [3] a) 1. a) 1.
+// and so on for as deep as a group nests. Only depth 0 takes part in global
+// numbering, so a label anywhere below it can never renumber a table marker.
+export function labelFor(depth, i) {
+	return depth % 2 === 1 ? letters(i) : String(i + 1);
 }
 
 // The single owner of note numbering. One pass over the lines produces both
@@ -135,7 +141,7 @@ export function numberNotes(lines) {
 				const sub = entry.foot.subNotes;
 				let at = sub.find((x) => x.ply === c.ply && x.text === c.text);
 				if (!at) {
-					at = { label: subLabel(sub.length), ply: c.ply, text: c.text };
+					at = { label: labelFor(1, sub.length), ply: c.ply, text: c.text };
 					sub.push(at);
 				}
 				const marks = (map[c.ply] = map[c.ply] || []);
