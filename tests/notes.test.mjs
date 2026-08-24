@@ -330,3 +330,39 @@ test("sub-notes leave the global list shorter and densely numbered", () => {
 		"the footnote's own note left the global list",
 	);
 });
+
+test("notes are numbered in reading order, not line order", () => {
+	// The lines array visits whole lines at a time, which is NOT the order a
+	// reader meets the markers in: the mainline's late comment used to take [1]
+	// while a footnote anchored on an early mainline move took a higher number,
+	// so the table's markers read out of sequence.
+	const s = loadState("1. e4 c5 (1... e6 2. d4) 2. Nf3 d6 3. d4 {late}", {
+		tags: { 1: "foot" },
+	});
+	const { entries, byLine } = numberNotes(s.lines);
+	assert.deepStrictEqual(
+		entries.map((e) => [e.n, e.ply]),
+		[
+			[1, 1],
+			[2, 4],
+		],
+		"the earlier anchor gets the lower number",
+	);
+	// the markers rendered on the mainline are renumbered to match
+	const main = byLine.get(s.lines[0]);
+	assert.deepStrictEqual(main[1], [1], "the footnote's anchor marker");
+	assert.deepStrictEqual(main[4], [2], "the late comment's marker");
+});
+
+test("ties at one ply keep first-seen order", () => {
+	const s = loadState("1. e4 c5 (1... e6 2. d4) (1... g6 2. d4) 2. Nf3", {
+		tags: { 1: "foot", 2: "foot" },
+	});
+	const { entries } = numberNotes(s.lines);
+	assert.deepStrictEqual(
+		entries.map((e) => e.n),
+		[1, 2],
+	);
+	assert.strictEqual(entries[0].foot.moves.some((m) => m.san === "e6"), true);
+	assert.strictEqual(entries[1].foot.moves.some((m) => m.san === "g6"), true);
+});

@@ -130,7 +130,33 @@ export function numberNotes(lines) {
 		});
 	});
 	footEntries.forEach(([e, l]) => (e.foot.noteByPly = byLine.get(l)));
-	return { entries, byLine };
+	// Reading order. Numbers are handed out above in lines order — a whole line
+	// at a time — which is not the order a reader meets the markers in: a
+	// footnote anchored on an early mainline move is created only when its own
+	// line comes around, so it used to outnumber a comment on a later move and
+	// the table's markers read out of sequence. Renumber by anchor ply, keeping
+	// first-seen order within one ply, then rewrite the markers to match.
+	const ordered = entries
+		.map((e, i) => [e, i])
+		.sort((a, b) => a[0].ply - b[0].ply || a[1] - b[1])
+		.map(([e]) => e);
+	const remap = new Map();
+	ordered.forEach((e, i) => {
+		remap.set(e.n, i + 1);
+		e.n = i + 1;
+	});
+	// In place, because a footnote's noteByPly aliases its line's map above and
+	// both have to see the new numbers. Letters are a footnote's own sub-notes
+	// and are never remapped. Relative order within a ply is preserved by the
+	// stable tie-break, so each marker array stays ascending.
+	byLine.forEach((map) =>
+		Object.values(map).forEach((marks) =>
+			marks.forEach((m, i) => {
+				if (typeof m === "number") marks[i] = remap.get(m);
+			}),
+		),
+	);
+	return { entries: ordered, byLine };
 }
 
 // The numbered Notes list for the open notebook.
