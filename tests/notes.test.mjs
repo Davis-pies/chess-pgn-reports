@@ -553,7 +553,10 @@ test("a note a group member shares with a sideline stays global", () => {
 test("a group anchors on the sideline it branches from", () => {
 	const s = loadState(
 		"1. e4 e5 (1... c5 2. Nf3 d6 (2... Nc6) (2... e6)) 2. Nf3",
-		{ tags: { 2: "foot", 3: "foot" } },
+		// collectLines emits a node's variations BEFORE the node itself, so the
+		// d6 line is index 3 and its two sub-variations are 1 and 2: those are
+		// the group, and d6 is the sideline it hangs off.
+		{ tags: { 1: "foot", 2: "foot" } },
 	);
 	const sideline = s.lines.find((l) => l.moves.some((m) => m.san === "d6"));
 	const [e] = numberNotes(s.lines).entries.filter((x) => x.foot);
