@@ -461,7 +461,15 @@ export function renderCards(container, grid, opts = {}) {
 				// is plain text, so the label is already inline in the line.
 				o.subNotes.forEach((line) => {
 					const s = document.createElement("div");
-					s.className = "nt subnote";
+					// subNoteLines pads three spaces per depth level; recover that
+					// depth before trimming it away so each level can be indented
+					// independently, the same as the nested .fnode rows elsewhere.
+					const lead = line.match(/^ */)[0].length;
+					// Clamped to style.css's deepest .card-notes .dN rule (d4) — a
+					// group nesting past that stays at its indent rather than
+					// collapsing flush left.
+					const depth = Math.min(4, Math.max(1, Math.round(lead / 3)));
+					s.className = "nt subnote d" + depth;
 					// Cards bracket the label ("[a] …") where the text exports write
 					// "a. …": a card row sits under note rows that carry bracketed [n]
 					// markers, so the labels below it read as the same kind of marker.
@@ -549,7 +557,7 @@ function appendFootMoves(container, foot) {
 // One member (or inner fork) of a group footnote: its label, its moves, its own
 // commentary, then its own notes and its own children, recursively.
 function appendFootNode(container, node) {
-	const row = el("div", { className: "fnode" });
+	const row = el("div", { className: "fnode d" + node.depth });
 	row.appendChild(el("sup", { textContent: "[" + node.label + "]" }));
 	const span = document.createElement("span");
 	const t = (s) => span.appendChild(document.createTextNode(s));

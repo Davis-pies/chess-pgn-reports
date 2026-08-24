@@ -392,3 +392,26 @@ test("Markdown indents a footnote's own notes under it", () => {
   );
   off();
 });
+
+test("Markdown lists a group's members under one numbered note", () => {
+  const off = installDom();
+  loadState("1. e4 e5 (1... c5 2. Nf3) (1... c5 2. Nc3) 2. Nf3", {
+    tags: { 1: "foot", 2: "foot" },
+  });
+  const md = buildMarkdown();
+  const notes = md.slice(md.indexOf("## Notes"));
+  assert.match(notes, /^1\. 1\.\.\.c5$/m);
+  assert.match(notes, /^ {3}a\. 2\.Nf3$/m);
+  assert.match(notes, /^ {3}b\. 2\.Nc3$/m);
+  assert.strictEqual(notes.match(/^\d+\. /gm).length, 1, "one numbered note");
+  off();
+});
+
+test("the screen notes panel renders a group's members", () => {
+  const off = installDom();
+  loadState("1. e4 e5 (1... c5 2. Nf3) (1... c5 2. Nc3) 2. Nf3", {
+    tags: { 1: "foot", 2: "foot" },
+  });
+  assert.strictEqual(notesPanel().querySelectorAll(".fnode").length, 2);
+  off();
+});

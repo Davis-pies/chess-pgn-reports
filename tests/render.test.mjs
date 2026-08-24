@@ -703,3 +703,38 @@ test("a lone footnote still renders exactly as before", () => {
 	assert.deepStrictEqual(subNoteLines(e.foot), ["   a. sharp"]);
 	off();
 });
+
+test("nested group rows carry their depth so each level can indent", () => {
+	const off = installDom();
+	const s = loadState(
+		"1. e4 e5 (1... c5 2. Nf3 d6) (1... c5 2. Nf3 Nc6) (1... c5 2. Nc3) 2. Nf3",
+		{ tags: { 1: "foot", 2: "foot", 3: "foot" } },
+	);
+	const [e] = numberNotes(s.lines).entries.filter((x) => x.foot);
+	const box = document.createElement("div");
+	appendFootnote(box, e.foot);
+	const top = box.querySelector(".fnode");
+	assert.ok(top.className.includes("d1"), "a top-level branch is depth 1");
+	const inner = top.querySelector(".fnode");
+	assert.ok(inner.className.includes("d2"), "its child is depth 2");
+	off();
+});
+
+test("a card's group rows keep one indent step per depth", () => {
+	const off = installDom();
+	const s = loadState(
+		"1. e4 e5 (1... c5 2. Nf3 d6) (1... c5 2. Nf3 Nc6) (1... c5 2. Nc3) 2. Nf3",
+		{ tags: { 1: "foot", 2: "foot", 3: "foot" } },
+	);
+	const box = document.createElement("div");
+	renderCards(box, grid(s.lines), { notes: allNotes() });
+	const rows = [...box.querySelectorAll(".card-notes .subnote")];
+	const byLabel = new Map(rows.map((r) => [r.textContent.trim(), r]));
+	const b = byLabel.get("[a] 2.Nf3");
+	const inner = byLabel.get("[1] 2...d6");
+	assert.ok(b, "the depth-1 branch row is present");
+	assert.ok(b.className.includes("d1"));
+	assert.ok(inner, "a depth-2 row is present");
+	assert.ok(inner.className.includes("d2"));
+	off();
+});

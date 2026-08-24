@@ -497,6 +497,16 @@ select:focus {
 .subnote sup {
   margin-right: 0.3em;
 }
+
+/* A group footnote's branches. On screen and in print the rows nest, so one
+   margin indents every depth cumulatively. */
+.fnode {
+  margin-left: 1.6em;
+  font-size: 0.95em;
+}
+.fnode sup {
+  margin-right: 0.3em;
+}
 sup {
   font-size: 0.7em;
 }
@@ -641,6 +651,23 @@ sup {
    margin shorthand there resets margin-left. Restate it at that weight. */
 .card-notes .subnote {
   margin-left: 1.6em;
+}
+/* Card rows are flat siblings (subNoteLines flattens a group to plain lines),
+   not the nested .fnode elements screen/print use, so each depth needs its
+   own explicit offset instead of one cumulative margin. Same weight fight as
+   .card-notes .subnote above. Depths past d4 keep reusing d4's indent rather
+   than going flush left. */
+.card-notes .d1 {
+  margin-left: 1.6em;
+}
+.card-notes .d2 {
+  margin-left: 3.2em;
+}
+.card-notes .d3 {
+  margin-left: 4.8em;
+}
+.card-notes .d4 {
+  margin-left: 6.4em;
 }
 .card-board .board-svg {
   margin: 8px 0 0;

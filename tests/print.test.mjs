@@ -118,3 +118,20 @@ test("a footnote's own notes print nested under it", () => {
   assert.strictEqual(subs[0].querySelector("sup").textContent, "[a]");
   off();
 });
+
+test("the print notes block renders a group's nested members", () => {
+  const off = installDom();
+  const s = loadState("1. e4 e5 (1... c5 2. Nf3) (1... c5 2. Nc3) 2. Nf3", {
+    tags: { 1: "foot", 2: "foot" },
+  });
+  const box = document.createElement("div");
+  appendPrintTables(box, grid(s.lines));
+  const rows = box.querySelectorAll(".print-notes .fnode");
+  assert.strictEqual(rows.length, 2, "both members appear under one note");
+  assert.strictEqual(
+    box.querySelectorAll(".print-notes > .nt > sup").length,
+    1,
+    "one [n] marker for the whole group",
+  );
+  off();
+});
