@@ -457,3 +457,37 @@ test("a card's sub-note row is actually indented by the stylesheet", () => {
 	assert.strictEqual(px("plain"), 0, "an ordinary card note is flush left");
 	assert.ok(px("sub") > 0, `a sub-note is indented (got ${px("sub")}px)`);
 });
+
+test("a card's footnote row carries no anchor-move prefix", () => {
+	// Spec §6: a footnote note reads "Name: ⋯ moves — commentary". The anchor
+	// move is not part of it — the panel, print block and Markdown all omit it,
+	// and with commentary present a prefix would put two em dashes in one row.
+	const off = installDom();
+	const s = loadState("1. e4 e5 (1... c5 2. Nf3) 2. Nf3", { tags: { 1: "foot" } });
+	const foot = s.lines.find((l) => l.moves.some((m) => m.san === "c5"));
+	foot.name = "Sicilian";
+	foot.meta = { note: "commentary" };
+	const box = document.createElement("div");
+	renderCards(box, grid(s.lines), { notes: allNotes() });
+	const row = [...box.querySelectorAll(".card-notes .nt")].find((r) =>
+		/Sicilian/.test(r.textContent),
+	);
+	assert.ok(row, "the footnote row is on the parent's card");
+	assert.match(row.textContent, /^\[\d+\] Sicilian: /, row.textContent);
+	assert.strictEqual(
+		(row.textContent.match(/—/g) || []).length,
+		1,
+		"only the commentary dash, not an anchor-ref dash",
+	);
+	off();
+});
+
+test("a card's ordinary note keeps its move reference", () => {
+	const off = installDom();
+	const s = loadState("1. e4 {opening} e5 2. Nf3");
+	const box = document.createElement("div");
+	renderCards(box, grid(s.lines), { notes: allNotes() });
+	const row = box.querySelector(".card-notes .nt");
+	assert.match(row.textContent, /^\[1\] 1\.e4 — opening$/, row.textContent);
+	off();
+});

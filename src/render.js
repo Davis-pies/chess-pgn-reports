@@ -407,6 +407,7 @@ export function renderCards(container, grid, opts = {}) {
 				owned.push({
 					n,
 					ply: Number(ply),
+					foot: !!note.foot,
 					text: note.foot ? footnoteText(note.foot) : strip(note.text),
 					subNotes: note.foot ? note.foot.subNotes || [] : [],
 				});
@@ -422,7 +423,13 @@ export function renderCards(container, grid, opts = {}) {
 				const ref = mv ? fullmoveLabel(mv.ply) + mv.san : fullmoveLabel(o.ply);
 				const row = document.createElement("div");
 				row.className = "nt";
-				row.textContent = `[${o.n}] ${ref} \u2014 ${o.text}`;
+				// A footnote's text already names itself and shows its own branch
+				// (spec §6: "Name: ⋯ moves — commentary"); the move it replaces is
+				// not part of it, and the panel, print block and Markdown all omit
+				// it too. Only an ordinary note needs saying which move it is on.
+				row.textContent = o.foot
+					? `[${o.n}] ${o.text}`
+					: `[${o.n}] ${ref} \u2014 ${o.text}`;
 				notesBox.appendChild(row);
 				// A footnote's own notes get their own indented rows beneath it,
 				// the same shape they have on screen and in the print block. A
