@@ -956,7 +956,7 @@ test("the print notes block renders a group's nested members", () => {
 		tags: { 1: "foot", 2: "foot" },
 	});
 	const box = document.createElement("div");
-	appendPrintReport(box); // whatever entry point this file already uses
+	appendPrintTables(box, grid(s.lines));
 	const rows = box.querySelectorAll(".print-notes .fnode");
 	assert.strictEqual(rows.length, 2, "both members appear under one note");
 	assert.strictEqual(box.querySelectorAll(".print-notes .nt sup").length, 1,
@@ -964,7 +964,7 @@ test("the print notes block renders a group's nested members", () => {
 });
 ```
 
-Match the existing entry point and setup in `tests/print.test.mjs` — read the file's other tests first and mirror them rather than inventing a new harness.
+`appendPrintTables` and `grid` are already imported at the top of `tests/print.test.mjs` (`:4`), and the file's other tests use exactly this `appendPrintTables(box, grid(s.lines))` shape.
 
 Append to `tests/export.test.mjs`:
 
@@ -985,7 +985,7 @@ test("the screen notes panel renders a group's members", () => {
 	const s = loadState("1. e4 e5 (1... c5 2. Nf3) (1... c5 2. Nc3) 2. Nf3", {
 		tags: { 1: "foot", 2: "foot" },
 	});
-	const box = notesPanel(); // the exported builder used by the other tests
+	const box = notesPanel(); // already imported at tests/export.test.mjs:7
 	assert.strictEqual(box.querySelectorAll(".fnode").length, 2);
 });
 ```
