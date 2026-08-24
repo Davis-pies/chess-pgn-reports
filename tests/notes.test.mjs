@@ -408,3 +408,33 @@ test("a footnote never anchors on another footnote", () => {
 		.filter((x) => x.foot)
 		.forEach((e) => assert.strictEqual(e.owner.tag === "foot", false));
 });
+
+test("the anchor is the divergence move, not the parent's last move", () => {
+	// Discriminates the two: the parent runs on past the branch, so anchoring at
+	// the divergence (Nf6) and falling back to its last move (Bc5) differ. Most
+	// footnotes branch at the end of their parent, where both coincide.
+	const s = loadState("1. e4 e5 2. Bc4 Nf6 (2... Bc5 3. Qh5) 3. Nc3 Bc5", {
+		tags: { 1: "foot" },
+	});
+	const [main] = s.lines;
+	const e = numberNotes(s.lines).entries.find((x) => x.foot);
+	const nf6 = main.moves.find((m) => m.san === "Nf6");
+	assert.strictEqual(e.foot.d, 3, "diverges at index 3");
+	assert.strictEqual(e.ply, nf6.ply, "anchored on the move it replaces");
+	assert.notStrictEqual(
+		e.ply,
+		main.moves[main.moves.length - 1].ply,
+		"not on the parent's last move",
+	);
+});
+
+test("a footnote extending past its parent falls back to the last move", () => {
+	// the documented fallback: no parent move exists at the divergence index
+	const s = loadState("1. e4 e5 2. Bc4 Nf6 (2... Nf6 3. Nc3)", {
+		tags: { 1: "foot" },
+	});
+	const [main] = s.lines;
+	const e = numberNotes(s.lines).entries.find((x) => x.foot);
+	assert.strictEqual(e.foot.d, main.moves.length, "shares the parent entirely");
+	assert.strictEqual(e.ply, main.moves[main.moves.length - 1].ply);
+});
