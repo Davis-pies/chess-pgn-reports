@@ -489,6 +489,14 @@ select:focus {
   color: var(--foot);
   font-weight: 700;
 }
+.subnote {
+  margin-left: 1.6em;
+  font-size: 0.95em;
+  opacity: 0.85;
+}
+.subnote sup {
+  margin-right: 0.3em;
+}
 sup {
   font-size: 0.7em;
 }

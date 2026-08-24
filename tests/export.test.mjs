@@ -359,3 +359,18 @@ test("Markdown emits footnotes as notes with no Footnotes section", () => {
   assert.match(md, /1\. Sicilian: /, "the footnote is note 1");
   off();
 });
+
+test("the notes panel nests a footnote's own notes under it", () => {
+  const off = installDom();
+  const s = loadState("1. e4 e5 (1... c5 2. Nf3 {knight move}) 2. Nf3", {
+    tags: { 1: "foot" },
+  });
+  s.lines.find((l) => l.moves.some((m) => m.san === "c5")).name = "Sicilian";
+  const box = notesPanel();
+  const rows = [...box.querySelectorAll(".nt")];
+  assert.strictEqual(rows.length, 1, "one top-level row: the footnote");
+  const subs = [...box.querySelectorAll(".subnote")];
+  assert.strictEqual(subs.length, 1, "its own note is nested, not top-level");
+  assert.strictEqual(subs[0].querySelector("sup").textContent, "[a]");
+  off();
+});

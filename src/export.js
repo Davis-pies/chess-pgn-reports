@@ -4,6 +4,7 @@ import {
   cardMovesText,
   appendFootnote,
   footnoteText,
+  appendSubNotes,
 } from "./render.js";
 import { el, renderInline } from "./dom.js";
 import { getCurrent, getRenderHooks } from "./state.js";
@@ -64,6 +65,7 @@ export function notesPanel() {
       renderInline(span, note.text);
     }
     row.appendChild(span);
+    if (note.foot) appendSubNotes(row, note.foot);
     box.appendChild(row);
   });
   return box;
