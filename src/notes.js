@@ -1,16 +1,16 @@
 import { getCurrent } from "./state.js";
 import { divergence } from "./tree.js";
 
-// The mainline move a footnote replaces: the one at the divergence index. A
-// footnote that runs past the mainline's end has no such move, so it anchors
-// on the mainline's last move instead.
-function anchorPly(main, d) {
-	const m = main.moves[d] || main.moves[main.moves.length - 1];
+// The parent-line move a footnote replaces: the one at the divergence index. A
+// footnote that runs past its parent's end has no such move, so it anchors on
+// the parent's last move instead.
+function anchorPly(parent, d) {
+	const m = parent.moves[d] || parent.moves[parent.moves.length - 1];
 	// Unreachable: collectLines() never builds a mainline with zero moves (it
 	// returns [] for empty movetext instead), and callers only reach here after
 	// confirming `main` exists. A missing move here means an invariant broke
 	// upstream, so fail loudly rather than anchoring at a fake ply 0.
-	if (!m) throw new Error("anchorPly: mainline has no moves");
+	if (!m) throw new Error("anchorPly: parent line has no moves");
 	return m.ply;
 }
 
@@ -58,9 +58,7 @@ export function numberNotes(lines) {
 	// replaced when it does.
 	const byLine = new Map(lines.map((l) => [l, {}]));
 	const seen = new Map(); // "ply|text" -> the number first assigned to it
-	// Parent-generalization seam: every footnote anchors on the mainline, even one
-	// that actually branches off a sideline. Group footnotes will need this to be a
-	// per-line parent (a trie node) instead — here, in anchorPly, and at owner: main below.
+	// Fallback parent, and the tie-break winner in parentOf below.
 	const main = lines.find((l) => l.isMain) || lines[0];
 	const footEntries = []; // [entry, line] — noteByPly filled in after the loop
 	// A note the editor shared onto a non-footnote line stays a global numbered
@@ -73,6 +71,30 @@ export function numberNotes(lines) {
 		if (isFoot(l)) return;
 		(l.comments || []).forEach((c) => globalKeys.add(c.ply + "|" + c.text));
 	});
+	// The line a footnote hangs off: the one it shares the most moves with.
+	// A footnote branching off a sideline belongs on THAT line's row and card —
+	// anchoring every footnote on the mainline filed its note under a line it
+	// never touches. Foot lines are excluded as candidates because grid() pulls
+	// them out of the table, so a note anchored on one would have no row or card
+	// to render on. The mainline wins ties, leaving a footnote off the trunk
+	// exactly where it was.
+	//
+	// Group-footnote seam: a group marks a SET of sibling lines as one footnote,
+	// which needs the parent to be the trie node they share rather than a single
+	// line. This lookup is where that generalization goes.
+	const parentOf = (l) => {
+		let best = null;
+		let bestD = -1;
+		lines.forEach((c) => {
+			if (c === l || isFoot(c)) return;
+			const d = divergence(l, c);
+			if (d > bestD || (d === bestD && c.isMain)) {
+				best = c;
+				bestD = d;
+			}
+		});
+		return best || main;
+	};
 	lines.forEach((l) => {
 		const map = byLine.get(l);
 		let entry = null;
@@ -83,12 +105,13 @@ export function numberNotes(lines) {
 		// line's comments are processed below, so the entry gets it after the loop
 		// instead of aliasing the still-empty map in.
 		if (!l.isMain && l.tag === "foot" && main) {
-			const d = divergence(l, main);
-			const ply = anchorPly(main, d);
+			const parent = parentOf(l);
+			const d = divergence(l, parent);
+			const ply = anchorPly(parent, d);
 			const n = entries.length + 1;
 			entry = {
 				ply,
-				owner: main,
+				owner: parent,
 				n,
 				foot: {
 					name: l.name || "",
@@ -102,8 +125,8 @@ export function numberNotes(lines) {
 			};
 			entries.push(entry);
 			footEntries.push([entry, l]);
-			const mainMap = byLine.get(main);
-			(mainMap[ply] = mainMap[ply] || []).push(n);
+			const parentMap = byLine.get(parent);
+			(parentMap[ply] = parentMap[ply] || []).push(n);
 		}
 		(l.comments || []).forEach((c) => {
 			const k = c.ply + "|" + c.text;

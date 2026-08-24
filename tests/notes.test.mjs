@@ -366,3 +366,45 @@ test("ties at one ply keep first-seen order", () => {
 	assert.strictEqual(entries[0].foot.moves.some((m) => m.san === "e6"), true);
 	assert.strictEqual(entries[1].foot.moves.some((m) => m.san === "g6"), true);
 });
+
+test("a footnote anchors on the line it shares the most moves with", () => {
+	// lines[1] (…Bc4 Bc5 Qh5) branches off lines[2] (…Bc4 Nf6), not off the
+	// mainline: it shares three moves with the sideline and only two with main.
+	const s = loadState("1. e4 e5 2. Nf3 (2. Bc4 Nf6 (2... Bc5 3. Qh5)) Nc6", {
+		tags: { 1: "foot" },
+	});
+	const [main, foot, side] = s.lines;
+	const { entries, byLine } = numberNotes(s.lines);
+	const e = entries.find((x) => x.foot);
+	assert.strictEqual(e.owner, side, "owned by its true parent, not the mainline");
+	// it replaces the parent's Nf6, so it anchors there
+	const nf6 = side.moves.find((m) => m.san === "Nf6");
+	assert.strictEqual(e.ply, nf6.ply);
+	assert.deepStrictEqual(byLine.get(side)[nf6.ply], [e.n], "marked on the parent");
+	assert.deepStrictEqual(
+		byLine.get(main),
+		{},
+		"the mainline carries no marker for it",
+	);
+	assert.ok(foot.tag === "foot");
+});
+
+test("a footnote off the trunk still anchors on the mainline", () => {
+	// nothing shares more with it than the mainline does, so behaviour is
+	// unchanged — the mainline is also the tie-break winner
+	const s = loadState("1. e4 e5 (1... c5 2. Nf3) 2. Nf3", { tags: { 1: "foot" } });
+	const { entries } = numberNotes(s.lines);
+	assert.strictEqual(entries.find((x) => x.foot).owner, s.lines[0]);
+});
+
+test("a footnote never anchors on another footnote", () => {
+	// foot lines are pulled out of the table by grid(), so a note anchored on
+	// one would have no row or card to render on
+	const s = loadState("1. e4 e5 2. Nf3 (2. Bc4 Nf6 (2... Bc5 3. Qh5)) Nc6", {
+		tags: { 1: "foot", 2: "foot" },
+	});
+	const { entries } = numberNotes(s.lines);
+	entries
+		.filter((x) => x.foot)
+		.forEach((e) => assert.strictEqual(e.owner.tag === "foot", false));
+});
