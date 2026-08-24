@@ -424,7 +424,7 @@ export function renderCards(container, grid, opts = {}) {
 				const row = document.createElement("div");
 				row.className = "nt";
 				// A footnote's text already names itself and shows its own branch
-				// (spec §6: "Name: ⋯ moves — commentary"); the move it replaces is
+				// (spec §6: "Name: moves — commentary"); the move it replaces is
 				// not part of it, and the panel, print block and Markdown all omit
 				// it too. Only an ordinary note needs saying which move it is on.
 				row.textContent = o.foot
@@ -469,16 +469,18 @@ export function fullMovesText(moves, marks) {
 		.join(" ");
 }
 
-// A footnote-derived note: "Sicilian: ⋯ 1.e4 1...c5 = — commentary". The moves
-// shown are the footnote's own tail, prefixed with the last shared move for
-// context, and any notes on those moves render as inline superscripts.
+// A footnote-derived note: "Sicilian: 1...c5 = — commentary". The moves shown
+// are the footnote's own tail, starting at the move it plays instead of the
+// one its [n] marker sits on, and any notes on those moves render as inline
+// superscripts. The last shared move is deliberately not shown: the marker
+// already says where the branch happens, and leading with a move from before
+// it read as though the note diverged earlier than it does.
 export function appendFootnote(container, foot) {
 	const t = (s) => container.appendChild(document.createTextNode(s));
 	if (foot.name) t(foot.name + ": ");
-	const pm = foot.d > 0 ? foot.moves[foot.d - 1] : null;
-	if (pm) t("⋯ " + fullmoveLabel(pm.ply) + pm.san);
-	foot.moves.slice(foot.d).forEach((m, i) => {
-		if (i || pm) t(" ");
+	const tail = foot.moves.slice(foot.d);
+	tail.forEach((m, i) => {
+		if (i) t(" ");
 		const mark = foot.marks && foot.marks[m.ply] ? " " + foot.marks[m.ply] : "";
 		t(fullmoveLabel(m.ply) + m.san + mark);
 		const refs = (foot.noteByPly && foot.noteByPly[m.ply]) || [];
@@ -488,9 +490,12 @@ export function appendFootnote(container, foot) {
 			container.appendChild(sup);
 		}
 	});
-	if (foot.eval) t(" " + foot.eval);
+	if (foot.eval) t((tail.length ? " " : "") + foot.eval);
 	if (foot.note) {
-		t(" — ");
+		// The dash separates moves from commentary. A footnote that shares
+		// everything it has with its parent has no moves to separate, so the
+		// commentary follows the name directly instead of a dangling dash.
+		if (tail.length || foot.eval) t(" — ");
 		renderInline(container, foot.note);
 	}
 }
@@ -520,9 +525,7 @@ export function subNoteLines(foot) {
 // Same footnote, as plain text for exports that have no DOM. Inline note
 // markers are dropped: a text export has no superscripts to render them as.
 export function footnoteText(foot) {
-	const pm = foot.d > 0 ? foot.moves[foot.d - 1] : null;
-	const ctx = pm ? "⋯ " + fullmoveLabel(pm.ply) + pm.san : "";
-	const tail = foot.moves
+	const moves = foot.moves
 		.slice(foot.d)
 		.map(
 			(m) =>
@@ -531,11 +534,10 @@ export function footnoteText(foot) {
 				(foot.marks && foot.marks[m.ply] ? " " + foot.marks[m.ply] : ""),
 		)
 		.join(" ");
-	const moves = [ctx, tail].filter(Boolean).join(" ");
+	const body = [moves, foot.eval].filter(Boolean).join(" ");
 	return (
 		(foot.name ? foot.name + ": " : "") +
-		moves +
-		(foot.eval ? " " + foot.eval : "") +
-		(foot.note ? " — " + foot.note : "")
+		body +
+		(foot.note ? (body ? " — " : "") + foot.note : "")
 	);
 }

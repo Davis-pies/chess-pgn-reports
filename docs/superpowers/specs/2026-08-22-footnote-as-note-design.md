@@ -189,12 +189,23 @@ derived notes. Only the lettering goes.
 The existing footnote-section format, minus the letter:
 
 ```
-Name: ⋯ 6...Nbd7 7.Bg5 ± — commentary
+Name: 7.Bg5 ± — commentary
 ```
 
-Name and commentary are omitted when absent. Evaluation symbols come from `marks`
-as they do today. Inline `[n]` superscripts on the footnote's own moves come from the
-existing `noteByPly` path.
+The moves shown start at the divergence — the move the footnote plays instead of the
+one its `[n]` marker sits on.
+
+**Amended 2026-08-24.** This originally opened with the last shared move for context
+(`Name: ⋯ 6...Nbd7 7.Bg5 ± — commentary`). In use that read as though the note
+diverged one move before its marker: the marker sits on the parent's `7.Nbd2`, so
+leading with `6...Nbd7` pointed at a move before the branch. The marker already
+establishes where the branch happens, so the context move is dropped.
+
+Name and commentary are omitted when absent. A footnote that shares everything it has
+with its parent has no moves to show, and the em dash before the commentary is
+dropped with them rather than left dangling (`Transposes: same position`). Evaluation
+symbols come from `marks` as they do today. Inline `[n]` superscripts on the
+footnote's own moves come from the existing `noteByPly` path.
 
 ## 7. Edge cases
 

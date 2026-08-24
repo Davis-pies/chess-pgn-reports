@@ -45,8 +45,8 @@ test("buildMarkdown renders a footnote as a numbered note, not a Footnotes secti
   const md = buildMarkdown();
   assert.ok(!md.includes("## Footnotes"), "no Footnotes section");
   assert.match(md, /## Notes/);
-  // name, the "⋯ preceding move" context, the tail moves, eval, then the note
-  assert.match(md, /1\. Sicilian: ⋯ 1\.e4 1\.\.\.c5 2\.Nf3 2\.\.\.Nc6 = — sharp/);
+  // name, the tail moves from the divergence, eval, then the note
+  assert.match(md, /1\. Sicilian: 1\.\.\.c5 2\.Nf3 2\.\.\.Nc6 = — sharp/);
   off();
 });
 

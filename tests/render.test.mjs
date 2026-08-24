@@ -207,7 +207,7 @@ test("horizontal layout transposes to one row per ply", () => {
 	delete global.document;
 });
 
-test("appendFootnote renders name, context, moves, eval and commentary", () => {
+test("appendFootnote renders name, moves, eval and commentary", () => {
 	const off = installDom();
 	const span = document.createElement("span");
 	appendFootnote(span, {
@@ -225,8 +225,12 @@ test("appendFootnote renders name, context, moves, eval and commentary", () => {
 	});
 	const text = span.textContent;
 	assert.match(text, /^Sicilian: /);
-	assert.match(text, /1\.e4/, "context move precedes the divergent tail");
-	assert.match(text, /1\.\.\.c5/);
+	assert.doesNotMatch(
+		text,
+		/1\.e4/,
+		"the shared move before the branch is not shown",
+	);
+	assert.match(text, /^Sicilian: 1\.\.\.c5/, "it opens at the divergence");
 	assert.match(text, /2\.Nf3 !/, "per-move marks are kept");
 	assert.match(text, /—/);
 	assert.strictEqual(
@@ -256,7 +260,7 @@ test("appendFootnote omits the parts a footnote does not have", () => {
 		noteByPly: {},
 		d: 1,
 	});
-	assert.strictEqual(span.textContent.trim(), "⋯ 1.e4 1...c5");
+	assert.strictEqual(span.textContent.trim(), "1...c5");
 	assert.strictEqual(span.querySelector("sup"), null);
 	off();
 });
@@ -273,9 +277,10 @@ test("appendFootnote with no divergent tail renders name and commentary alone", 
 		noteByPly: {},
 		d: 1,
 	});
-	// a footnote that shares everything it has with the mainline has no tail to
-	// show, so it is just its name, the anchor move, and its commentary
-	assert.strictEqual(span.textContent, "Transposes: ⋯ 1.e4 — same position");
+	// a footnote that shares everything it has with its parent has no tail to
+	// show, so it is just its name and its commentary — and with no moves to
+	// separate, the em dash would dangle, so it is dropped too
+	assert.strictEqual(span.textContent, "Transposes: same position");
 	off();
 });
 
@@ -290,7 +295,7 @@ test("footnoteText with no divergent tail renders name and commentary alone", ()
 			noteByPly: {},
 			d: 1,
 		}),
-		"Transposes: ⋯ 1.e4 — same position",
+		"Transposes: same position",
 	);
 });
 
@@ -308,7 +313,7 @@ test("footnoteText renders the same footnote as plain text", () => {
 			noteByPly: {},
 			d: 1,
 		}),
-		"Sicilian: ⋯ 1.e4 1...c5 = — sharp",
+		"Sicilian: 1...c5 = — sharp",
 	);
 });
 
@@ -459,7 +464,7 @@ test("a card's sub-note row is actually indented by the stylesheet", () => {
 });
 
 test("a card's footnote row carries no anchor-move prefix", () => {
-	// Spec §6: a footnote note reads "Name: ⋯ moves — commentary". The anchor
+	// Spec §6: a footnote note reads "Name: moves — commentary". The anchor
 	// move is not part of it — the panel, print block and Markdown all omit it,
 	// and with commentary present a prefix would put two em dashes in one row.
 	const off = installDom();
