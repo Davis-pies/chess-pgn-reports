@@ -147,10 +147,22 @@ function td(text, cls) {
 	return e;
 }
 
+// A per-move symbol (=, ±, ∞, !, …) as its own element. The gap before it is a
+// CSS margin rather than a space character: the move text is monospace, where a
+// literal space is a full character cell — exactly as wide as the gap between
+// whole moves — so the symbol read as a floating token instead of belonging to
+// the move it annotates. Plain-text exports have no CSS and keep a real space.
+function markEl(sym) {
+	const e = document.createElement("span");
+	e.className = "mv-mark";
+	e.textContent = sym;
+	return e;
+}
+
 // A move cell, plus any per-move symbol mark and referenced note markers.
 function moveCell(c, ply, noteByPly) {
 	const e = td(c ? c.text : "", c ? c.cls : "");
-	if (c && c.mark) e.appendChild(document.createTextNode(" " + c.mark));
+	if (c && c.mark) e.appendChild(markEl(c.mark));
 	const notes = noteByPly && noteByPly[ply];
 	if (notes && notes.length) {
 		// comma-separated so multiple notes at one move stay readable
@@ -332,8 +344,8 @@ function buildCardMoves(container, v) {
 	range.forEach((m, i) => {
 		const n = moveNum(m.ply, i === 0 && !ctx);
 		const num = n ? n + " " : "";
-		const mark = v.marks && v.marks[m.ply] ? " " + v.marks[m.ply] : "";
-		seg(num + m.san + mark);
+		seg(num + m.san);
+		if (v.marks && v.marks[m.ply]) container.appendChild(markEl(v.marks[m.ply]));
 		const refs = (v.noteByPly && v.noteByPly[m.ply]) || [];
 		if (refs.length) {
 			const sup = document.createElement("sup");
@@ -496,8 +508,9 @@ export function appendFootnote(container, foot) {
 	const tail = foot.moves.slice(foot.d);
 	tail.forEach((m, i) => {
 		if (i) t(" ");
-		const mark = foot.marks && foot.marks[m.ply] ? " " + foot.marks[m.ply] : "";
-		t(moveNum(m.ply, i === 0) + m.san + mark);
+		t(moveNum(m.ply, i === 0) + m.san);
+		if (foot.marks && foot.marks[m.ply])
+			container.appendChild(markEl(foot.marks[m.ply]));
 		const refs = (foot.noteByPly && foot.noteByPly[m.ply]) || [];
 		if (refs.length) {
 			const sup = document.createElement("sup");

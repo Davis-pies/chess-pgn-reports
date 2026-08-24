@@ -615,6 +615,12 @@ sup {
   line-height: 1.7;
   font-size: 0.9em;
 }
+/* per-move symbol: a tight, font-independent gap. A literal space would be a
+   full character cell in the monospace move text — as wide as the gap between
+   whole moves — and the symbol would read as floating between them. */
+.mv-mark {
+  margin-left: 0.18em;
+}
 .card-notes {
   margin-top: 10px;
   border-top: 1px solid var(--line);

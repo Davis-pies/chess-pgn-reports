@@ -14,6 +14,7 @@ import {
 	fullMovesText,
 	appendFootnote,
 	footnoteText,
+	cardMovesText,
 	appendSubNotes,
 	subNoteLines,
 } from "../src/render.js";
@@ -231,7 +232,7 @@ test("appendFootnote renders name, moves, eval and commentary", () => {
 		"the shared move before the branch is not shown",
 	);
 	assert.match(text, /^Sicilian: 1\.\.\.c5/, "it opens at the divergence");
-	assert.match(text, /2\.Nf3 !/, "per-move marks are kept");
+	assert.match(text, /2\.Nf3!/, "per-move marks are kept (gap is CSS)");
 	assert.match(text, /—/);
 	assert.strictEqual(
 		span.querySelector("sup").textContent,
@@ -558,4 +559,43 @@ test("a footnote's moves pair after the first", () => {
 		}),
 		"Line 264: 14.f6 gxf6 15.gxf6 Nxf6",
 	);
+});
+
+test("a per-move symbol is attached to its move, not spaced like a separator", () => {
+	// .card-moves is monospace, where a literal space is a full character cell
+	// — the same width as the gap between whole moves, so the symbol read as a
+	// floating token. The gap is CSS margin now, not a space character.
+	const off = installDom();
+	const s = loadState("1. e4 e5 2. Nf3 Nc6");
+	s.lines[0].marks = { 3: "∞" };
+	const box = document.createElement("div");
+	renderCards(box, grid(s.lines), { notes: allNotes() });
+	const moves = box.querySelector(".card-moves");
+	const mark = moves.querySelector(".mv-mark");
+	assert.ok(mark, "the symbol is its own element");
+	assert.strictEqual(mark.textContent, "∞");
+	assert.ok(
+		!/ ∞/.test(moves.textContent),
+		`no literal space before it (got ${JSON.stringify(moves.textContent)})`,
+	);
+	off();
+});
+
+test("a table cell's symbol is attached the same way", () => {
+	const off = installDom();
+	const s = loadState("1. e4 e5 2. Nf3 Nc6");
+	s.lines[0].marks = { 3: "∞" };
+	const t = document.createElement("div");
+	renderTable(t, grid(s.lines), "vertical");
+	const cell = [...t.querySelectorAll("td")].find((x) => /∞/.test(x.textContent));
+	assert.ok(cell.querySelector(".mv-mark"), "symbol is its own element");
+	assert.ok(!/ ∞/.test(cell.textContent), cell.textContent);
+	off();
+});
+
+test("plain-text exports keep a real space before the symbol", () => {
+	// no CSS there to make the gap, so the character has to
+	const s = loadState("1. e4 e5 2. Nf3 Nc6");
+	s.lines[0].marks = { 3: "∞" };
+	assert.match(cardMovesText(grid(s.lines).vars[0]), /Nc6 ∞/);
 });
