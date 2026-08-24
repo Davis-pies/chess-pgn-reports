@@ -477,6 +477,28 @@ export function appendFootnote(container, foot) {
 	}
 }
 
+// A footnote's own notes, as labelled rows nested under it. Rendered as a
+// sibling block rather than inside appendFootnote so each consumer can place
+// and indent it — the panel and the print block both style .subnote.
+export function appendSubNotes(container, foot) {
+	(foot.subNotes || []).forEach((s) => {
+		const row = document.createElement("div");
+		row.className = "subnote";
+		const sup = document.createElement("sup");
+		sup.textContent = "[" + s.label + "]";
+		row.appendChild(sup);
+		const span = document.createElement("span");
+		renderInline(span, s.text);
+		row.appendChild(span);
+		container.appendChild(row);
+	});
+}
+
+// Same sub-notes for exports with no DOM, one indented line each.
+export function subNoteLines(foot) {
+	return (foot.subNotes || []).map((s) => "   " + s.label + ". " + s.text);
+}
+
 // Same footnote, as plain text for exports that have no DOM. Inline note
 // markers are dropped: a text export has no superscripts to render them as.
 export function footnoteText(foot) {

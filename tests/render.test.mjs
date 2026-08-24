@@ -13,6 +13,8 @@ import {
 	fullMovesText,
 	appendFootnote,
 	footnoteText,
+	appendSubNotes,
+	subNoteLines,
 } from "../src/render.js";
 
 function dom() {
@@ -336,4 +338,42 @@ test("a card lists a footnote anchored on its own line", () => {
 	const mainCard = box.querySelector(".card");
 	assert.match(mainCard.querySelector(".card-notes").textContent, /Sicilian/);
 	off();
+});
+
+test("appendSubNotes renders one labelled row per sub-note", () => {
+	const off = installDom();
+	const box = document.createElement("div");
+	appendSubNotes(box, {
+		subNotes: [
+			{ label: "a", ply: 2, text: "knight move" },
+			{ label: "b", ply: 3, text: "**sharp**" },
+		],
+	});
+	const rows = [...box.querySelectorAll(".subnote")];
+	assert.strictEqual(rows.length, 2);
+	assert.strictEqual(rows[0].querySelector("sup").textContent, "[a]");
+	assert.match(rows[0].textContent, /knight move/);
+	assert.ok(rows[1].querySelector("strong"), "text goes through renderInline");
+	off();
+});
+
+test("appendSubNotes renders nothing when a footnote has none", () => {
+	const off = installDom();
+	const box = document.createElement("div");
+	appendSubNotes(box, { subNotes: [] });
+	assert.strictEqual(box.childNodes.length, 0);
+	off();
+});
+
+test("subNoteLines renders the same sub-notes as indented text", () => {
+	assert.deepStrictEqual(
+		subNoteLines({
+			subNotes: [
+				{ label: "a", ply: 2, text: "knight move" },
+				{ label: "b", ply: 3, text: "sharp" },
+			],
+		}),
+		["   a. knight move", "   b. sharp"],
+	);
+	assert.deepStrictEqual(subNoteLines({ subNotes: [] }), []);
 });
