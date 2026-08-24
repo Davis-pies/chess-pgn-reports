@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert";
 import { JSDOM } from "jsdom";
+import { readFileSync } from "node:fs";
 import { parsePgn } from "../src/pgn.js";
 import { collectLines } from "../src/tree.js";
 import { grid } from "../src/table.js";
@@ -439,4 +440,20 @@ test("a card's sub-notes render as their own indented rows", () => {
 		"placed directly below its footnote",
 	);
 	off();
+});
+
+test("a card's sub-note row is actually indented by the stylesheet", () => {
+	// Guards the cascade, not the markup: `.card-notes .nt` sets the margin
+	// shorthand at the same specificity as `.subnote`, so the plain `.subnote`
+	// indent loses and the row renders flush left — gray, but not indented.
+	const css = readFileSync(new URL("../style.css", import.meta.url), "utf8");
+	const w = new JSDOM(
+		`<!DOCTYPE html><style>${css}</style><div class="card-notes">` +
+			`<div class="nt" id="plain">plain</div>` +
+			`<div class="nt subnote" id="sub">[a] sub</div></div>`,
+	).window;
+	const px = (id) =>
+		parseFloat(w.getComputedStyle(w.document.getElementById(id)).marginLeft) || 0;
+	assert.strictEqual(px("plain"), 0, "an ordinary card note is flush left");
+	assert.ok(px("sub") > 0, `a sub-note is indented (got ${px("sub")}px)`);
 });

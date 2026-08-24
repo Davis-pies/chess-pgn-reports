@@ -631,6 +631,11 @@ sup {
   margin: 2px 0;
   line-height: 1.4;
 }
+/* .subnote's indent alone loses to .card-notes .nt — same specificity, and the
+   margin shorthand there resets margin-left. Restate it at that weight. */
+.card-notes .subnote {
+  margin-left: 1.6em;
+}
 .card-board .board-svg {
   margin: 8px 0 0;
 }
