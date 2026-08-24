@@ -5,7 +5,7 @@ import { renderTable, appendFootnote, appendSubNotes } from "./render.js";
 import { el, renderInline } from "./dom.js";
 import { getCurrent } from "./state.js";
 import { allNotes } from "./notes.js";
-import { buildTrie, leavesOf } from "./trie-view.js";
+import { buildTrie, leavesOf } from "./tree.js";
 import { moveRef } from "./export.js";
 
 // Highest ply present in a subset of table vars — so a per-branch print table

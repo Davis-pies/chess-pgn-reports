@@ -1,4 +1,4 @@
-import { divergence } from "./tree.js";
+import { buildTrie, leavesOf, countLeaves } from "./tree.js";
 import { renderTable, fullmoveLabel } from "./render.js";
 import { el } from "./dom.js";
 import {
@@ -12,35 +12,6 @@ import { subMaxPly } from "./print.js";
 // and lineEditor (seam 3) are reached through the render-hooks registry
 // rather than a static `import ... from "./app.js"` -- see the comment on
 // setRenderHooks() in state.js for why.
-
-// Trie of the side lines' divergent tails, so lines that share pieces of their
-// divergence from the mainline are grouped together (nested collapsible groups).
-export function buildTrie(lines, main) {
-	const root = { children: new Map(), leaf: null };
-	for (const l of lines) {
-		if (l.isMain) continue;
-		const d = divergence(l, main);
-		let node = root;
-		for (const m of l.moves.slice(d)) {
-			const k = m.ply + ":" + m.san;
-			let child = node.children.get(k);
-			if (!child) {
-				child = {
-					children: new Map(),
-					leaf: null,
-					move: m,
-					// root-relative path key: stable across renders, used to
-					// remember which <details> groups are open
-					key: (node.key ? node.key + "/" : "") + k,
-				};
-				node.children.set(k, child);
-			}
-			node = child;
-		}
-		node.leaf = l;
-	}
-	return root;
-}
 
 // Left-panel preview: ONE table. The mainline column is always visible (left
 // in horizontal, top row in vertical); each top-level trie branch contributes
@@ -138,23 +109,8 @@ function sharedMoves(node) {
 	return out;
 }
 
-function countLeaves(node) {
-	let n = node.leaf ? 1 : 0;
-	node.children.forEach((c) => (n += countLeaves(c)));
-	return n;
-}
-
 function branchLabel(move) {
 	return fullmoveLabel(move.ply) + move.san;
-}
-
-// All descendant lines of a trie node, depth-first (the flat row/column set
-// a table branch contributes to the preview).
-export function leavesOf(node) {
-	const out = [];
-	if (node.leaf) out.push(node.leaf);
-	node.children.forEach((c) => out.push(...leavesOf(c)));
-	return out;
 }
 
 // Shared move path of a branch, accumulated through its single-child chain

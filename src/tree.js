@@ -76,3 +76,49 @@ export function divergence(line, main) {
 	while (i < a.length && i < b.length && a[i].san === b[i].san) i++;
 	return i;
 }
+
+// Trie of the side lines' divergent tails, so lines that share pieces of their
+// divergence from the mainline are grouped together (nested collapsible groups).
+// Lives here rather than in trie-view.js so notes.js and foot-groups.js can use
+// it without importing the view layer.
+export function buildTrie(lines, main) {
+	const root = { children: new Map(), leaf: null };
+	for (const l of lines) {
+		if (l.isMain) continue;
+		const d = divergence(l, main);
+		let node = root;
+		for (const m of l.moves.slice(d)) {
+			const k = m.ply + ":" + m.san;
+			let child = node.children.get(k);
+			if (!child) {
+				child = {
+					children: new Map(),
+					leaf: null,
+					move: m,
+					// root-relative path key: stable across renders, used to
+					// remember which <details> groups are open
+					key: (node.key ? node.key + "/" : "") + k,
+				};
+				node.children.set(k, child);
+			}
+			node = child;
+		}
+		node.leaf = l;
+	}
+	return root;
+}
+
+export function countLeaves(node) {
+	let n = node.leaf ? 1 : 0;
+	node.children.forEach((c) => (n += countLeaves(c)));
+	return n;
+}
+
+// All descendant lines of a trie node, depth-first (the flat row/column set
+// a table branch contributes to the preview).
+export function leavesOf(node) {
+	const out = [];
+	if (node.leaf) out.push(node.leaf);
+	node.children.forEach((c) => out.push(...leavesOf(c)));
+	return out;
+}

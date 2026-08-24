@@ -1,6 +1,6 @@
 // Browser glue: import PGN, tag each line, render the table, persist notebook.
 import { parsePgn, fenMap } from "./pgn.js";
-import { collectLines } from "./tree.js";
+import { collectLines, buildTrie } from "./tree.js";
 import { grid } from "./table.js";
 import { renderCards } from "./render.js";
 import {
@@ -22,7 +22,6 @@ import {
 import { allNotes } from "./notes.js";
 import { appendPrintTables } from "./print.js";
 import {
-  buildTrie,
   renderTrieTable,
   collectKeys,
   renderTrieNode,

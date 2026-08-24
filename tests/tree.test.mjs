@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert";
 import { parsePgn } from "../src/pgn.js";
-import { collectLines, divergence } from "../src/tree.js";
+import { collectLines, divergence, buildTrie, leavesOf, countLeaves } from "../src/tree.js";
 
 test("collects mainline plus each variation as a line", () => {
 	const { nodes } = parsePgn(
@@ -48,4 +48,16 @@ test("divergence finds where a variation splits from mainline", () => {
 	const e5var = lines.find((l) => l.moves.some((m) => m.san === "e5"));
 	// main: e4 c5 Nf3 d6 ; var: e4 e5 Nf3  -> differ at index 1
 	assert.strictEqual(divergence(e5var, main), 1);
+});
+
+test("buildTrie groups lines by their shared divergent tail", () => {
+	const main = { isMain: true, moves: [{ ply: 0, san: "e4" }, { ply: 1, san: "e5" }] };
+	const a = { moves: [{ ply: 0, san: "e4" }, { ply: 1, san: "c5" }, { ply: 2, san: "Nf3" }] };
+	const b = { moves: [{ ply: 0, san: "e4" }, { ply: 1, san: "c5" }, { ply: 2, san: "Nc3" }] };
+	const root = buildTrie([main, a, b], main);
+	assert.strictEqual(root.children.size, 1, "both branch at 1...c5");
+	const c5 = [...root.children.values()][0];
+	assert.strictEqual(c5.key, "1:c5");
+	assert.strictEqual(countLeaves(c5), 2);
+	assert.deepStrictEqual(leavesOf(c5), [a, b]);
 });
