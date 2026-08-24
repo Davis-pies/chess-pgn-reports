@@ -680,3 +680,39 @@ test("a member's note on its own move is unchanged by the hosting rule", () => {
 	);
 	assert.deepStrictEqual(member.noteByPly[2], ["1"]);
 });
+
+test("a note shared with a sideline marks the group's stem move", () => {
+	const s = loadState(
+		"1. e4 {first} e5 (1... c5 2. Nf3) (1... c5 2. Nc3) (1... e6 2. d4) 2. Nf3 Nc6 3. Bb5",
+		{ tags: { 1: "foot", 2: "foot", 3: "sideline" } },
+	);
+	const [m1, , sideline] = s.lines.filter((l) => !l.isMain);
+	sideline.comments = [{ ply: 1, text: "shared" }];
+	m1.comments = [{ ply: 1, text: "shared" }];
+	const { entries } = numberNotes(s.lines);
+	const e = entries.find((x) => x.foot);
+	const shared = entries.find((x) => x.text === "shared");
+	assert.deepStrictEqual(
+		e.foot.noteByPly[1],
+		[shared.n],
+		"the stem move carries the shared note's number",
+	);
+	e.foot.children.forEach((c) =>
+		assert.deepStrictEqual(c.noteByPly[1], undefined, "not on a branch"),
+	);
+});
+
+test("a note before the group's divergence is stated once at group level", () => {
+	const s = loadState("1. e4 e5 (1... c5 2. Nf3) (1... c5 2. Nc3) 2. Nf3", {
+		tags: { 1: "foot", 2: "foot" },
+	});
+	const member = s.lines.filter((l) => !l.isMain)[0];
+	member.comments = [{ ply: 0, text: "pre-divergence" }];
+	const [e] = numberNotes(s.lines).entries.filter((x) => x.foot);
+	assert.deepStrictEqual(
+		e.foot.subNotes.map((sn) => sn.text),
+		["pre-divergence"],
+		"hosted by the group, not lettered under a branch it does not belong to",
+	);
+	e.foot.children.forEach((c) => assert.deepStrictEqual(c.subNotes, []));
+});

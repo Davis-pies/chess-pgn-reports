@@ -194,7 +194,9 @@ export function numberNotes(lines) {
 			subNotes: [],
 			children: [],
 		};
-		pliesOf.set(foot, new Set(pseudo.moves.map((m) => m.ply)));
+		// Only the moves the renderer actually draws: it slices at `d`, so the
+		// prefix the group shares with its parent line is never shown.
+		pliesOf.set(foot, new Set(pseudo.moves.slice(d).map((m) => m.ply)));
 		foot.children = decorate(g.tree, 1, [foot]);
 		mergeMarks(foot);
 		roots.push(foot);
@@ -211,7 +213,11 @@ export function numberNotes(lines) {
 		const chain = chainOfLine.get(l);
 		for (let i = chain.length - 1; i >= 0; i--)
 			if (pliesOf.get(chain[i]).has(ply)) return chain[i];
-		return chain[chain.length - 1];
+		// No node draws this move at all — a ply before the group's divergence.
+		// Lettering it under a member whose own moves don't contain it would
+		// print a label pointing at nothing, so state it once at group level,
+		// exactly as a lone footnote has always handled a pre-divergence note.
+		return chain[0];
 	};
 	lines.forEach((l) => {
 		const map = byLine.get(l);
@@ -266,7 +272,7 @@ export function numberNotes(lines) {
 					at = { label: labelFor(depth, sub.length), ply: c.ply, text: c.text };
 					sub.push(at);
 				}
-				const into = host === own || !own ? map : host.noteByPly;
+				const into = own && host !== own ? host.noteByPly : map;
 				const marks = (into[c.ply] = into[c.ply] || []);
 				if (!marks.includes(at.label)) marks.push(at.label);
 				return;
@@ -277,17 +283,23 @@ export function numberNotes(lines) {
 				seen.set(k, n);
 				entries.push({ ply: c.ply, text: c.text, owner: l, n });
 			}
-			const at = (map[c.ply] = map[c.ply] || []);
+			// A global note is hosted like any other: at a shared ply its number
+			// belongs on the node that draws that move, or the group's rendering
+			// would drop the cross-reference. A note on the member's own move stays
+			// in the line's map, which the member's node aliases.
+			const own = nodeOfLine.get(l);
+			const host = own && hostFor(l, c.ply);
+			const into = host && host !== own ? host.noteByPly : map;
+			const at = (into[c.ply] = into[c.ply] || []);
 			if (!at.includes(n)) at.push(n);
 		});
 	});
 	footEntries.forEach(([e, l]) => (e.foot.noteByPly = byLine.get(l)));
-	// A member node's own markers were written into its line's map, so alias it
-	// in wholesale — but keep anything already hosted on the node itself (a note
-	// a DEEPER node could not host lands here).
-	nodeOfLine.forEach(
-		(node, l) => (node.noteByPly = Object.assign(byLine.get(l), node.noteByPly)),
-	);
+	// A member node is only ever the host for its OWN moves, and those markers
+	// went into the line's map, so the node just aliases that map. (A note at a
+	// ply the member doesn't draw is hosted by an ancestor instead, and lives on
+	// that node.)
+	nodeOfLine.forEach((node, l) => (node.noteByPly = byLine.get(l)));
 	roots.forEach(label);
 	// Reading order. Numbers are handed out above in lines order — a whole line
 	// at a time — which is not the order a reader meets the markers in: a
@@ -308,7 +320,16 @@ export function numberNotes(lines) {
 	// both have to see the new numbers. Letters are a footnote's own sub-notes
 	// and are never remapped. Relative order within a ply is preserved by the
 	// stable tie-break, so each marker array stays ascending.
-	byLine.forEach((map) =>
+	// Every marker map, once each: the per-line maps plus the group nodes that
+	// host a marker of their own. A member node aliases its line's map, so the
+	// seen-set keeps it from being remapped twice.
+	const maps = new Set(byLine.values());
+	const collect = (node) => {
+		maps.add(node.noteByPly);
+		node.children.forEach(collect);
+	};
+	roots.forEach(collect);
+	maps.forEach((map) =>
 		Object.values(map).forEach((marks) =>
 			marks.forEach((m, i) => {
 				if (typeof m === "number") marks[i] = remap.get(m);
