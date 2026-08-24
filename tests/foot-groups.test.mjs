@@ -103,3 +103,24 @@ test("foot lines diverging at different moves are separate groups", () => {
 		[["c5"], ["e6"]],
 	);
 });
+
+test("a member ending at an inner fork becomes a moveless child there too", () => {
+	const s = loadState(
+		"1. e4 e5 (1... c5 2. Nf3) (1... c5 2. Nf3 d6) (1... c5 2. Nc3) 2. Nf3",
+		{ tags: { 1: "foot", 2: "foot", 3: "foot" } },
+	);
+	const { groups } = footGroups(s.lines, s.lines[0]);
+	const g = groups[0];
+	assert.deepStrictEqual(sans(g.stem), ["c5"]);
+	const nf3 = g.tree[0];
+	assert.deepStrictEqual(sans(nf3.moves), ["Nf3"]);
+	assert.strictEqual(nf3.line, null, "a fork never carries a line itself");
+	assert.deepStrictEqual(
+		nf3.children.map((c) => [sans(c.moves), !!c.line]),
+		[
+			[[], true],
+			[["d6"], true],
+		],
+		"the line ending at the fork is demoted to a moveless first child",
+	);
+});

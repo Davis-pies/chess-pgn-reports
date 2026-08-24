@@ -20,25 +20,29 @@ function run(node) {
 	return { moves, end: n };
 }
 
-// One branch below the stem: its own move run, the line that ends on it (leaf
-// only), and its children. Undecorated — labels, depths and note maps are
-// notes.js's job.
+// One branch of a group: its own move run, its children, and — when a line
+// ends exactly HERE while others continue past it — that line demoted to a
+// moveless first child. A node is therefore strictly one of two things: a leaf
+// carrying a line, or a fork carrying children. notes.js and the renderers
+// branch on that dichotomy, and a node that was both would silently lose either
+// its line's name and commentary or its children.
 function subtree(node) {
 	const { moves, end } = run(node);
-	const t = { moves, line: end.leaf || null, children: [] };
-	end.children.forEach((c) => t.children.push(subtree(c)));
-	return t;
+	const children = [];
+	if (end.leaf && end.children.size)
+		children.push({ moves: [], line: end.leaf, children: [] });
+	end.children.forEach((c) => children.push(subtree(c)));
+	return { moves, line: children.length ? null : end.leaf, children };
 }
 
-function group(node) {
-	const { moves, end } = run(node);
-	const tree = [];
-	// A line whose moves are a prefix of its siblings' ends ON the stem. It has
-	// no tail of its own, so it becomes a moveless first child rather than a
-	// special case every renderer would have to know about.
-	if (end.leaf) tree.push({ moves: [], line: end.leaf, children: [] });
-	end.children.forEach((c) => tree.push(subtree(c)));
-	return { members: leavesOf(node), stem: moves, tree };
+function buildGroup(node) {
+	// The stem has no line field of its own — the group's entry owns it — so a
+	// member ending on the stem surfaces as a child exactly like the fork case.
+	const t = subtree(node);
+	const tree = t.line
+		? [{ moves: [], line: t.line, children: [] }, ...t.children]
+		: t.children;
+	return { members: leavesOf(node), stem: t.moves, tree };
 }
 
 // Groups of foot-tagged lines, plus the set of lines they account for. A lone
@@ -51,7 +55,7 @@ export function footGroups(lines, main) {
 	const root = buildTrie(foots, main);
 	root.children.forEach((child) => {
 		if (countLeaves(child) < 2) return;
-		const g = group(child);
+		const g = buildGroup(child);
 		groups.push(g);
 		g.members.forEach((l) => grouped.add(l));
 	});
