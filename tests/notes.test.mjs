@@ -595,3 +595,88 @@ test("a lone foot line alongside a group is still its own footnote", () => {
 		"the lone footnote keeps its existing shape",
 	);
 });
+
+test("a note on a shared stem move is hosted by the group, not a member", () => {
+	const s = loadState("1. e4 e5 (1... c5 2. Nf3) (1... c5 2. Nc3) 2. Nf3", {
+		tags: { 1: "foot", 2: "foot" },
+	});
+	const member = s.lines.filter((l) => !l.isMain)[0];
+	member.comments = [{ ply: 1, text: "sharp gambit line" }];
+	const [e] = numberNotes(s.lines).entries.filter((x) => x.foot);
+	assert.deepStrictEqual(
+		e.foot.subNotes.map((sn) => [sn.label, sn.text]),
+		[["a", "sharp gambit line"]],
+		"the stem's own note is a level-1 item on the group",
+	);
+	assert.deepStrictEqual(
+		e.foot.noteByPly[1],
+		["a"],
+		"and its marker sits on the stem move it is about",
+	);
+	assert.deepStrictEqual(
+		e.foot.children.map((c) => c.label),
+		["b", "c"],
+		"the branches continue the same sequence",
+	);
+	assert.deepStrictEqual(e.foot.children[0].subNotes, []);
+});
+
+test("both members carrying the same stem note state it once", () => {
+	const s = loadState("1. e4 e5 (1... c5 2. Nf3) (1... c5 2. Nc3) 2. Nf3", {
+		tags: { 1: "foot", 2: "foot" },
+	});
+	s.lines
+		.filter((l) => !l.isMain)
+		.forEach((l) => (l.comments = [{ ply: 1, text: "shared stem" }]));
+	const [e] = numberNotes(s.lines).entries.filter((x) => x.foot);
+	assert.strictEqual(e.foot.subNotes.length, 1);
+	assert.deepStrictEqual(e.foot.noteByPly[1], ["a"]);
+});
+
+test("a note on an inner fork's move is hosted by that fork", () => {
+	const s = loadState(
+		"1. e4 e5 (1... c5 2. Nf3 d6) (1... c5 2. Nf3 Nc6) (1... c5 2. Nc3) 2. Nf3",
+		{ tags: { 1: "foot", 2: "foot", 3: "foot" } },
+	);
+	const d6 = s.lines.find((l) => l.moves.some((m) => m.san === "d6"));
+	d6.comments = [{ ply: 2, text: "the fork move" }]; // 2.Nf3, owned by the fork
+	const [e] = numberNotes(s.lines).entries.filter((x) => x.foot);
+	const fork = e.foot.children.find((c) => c.moves.some((m) => m.san === "Nf3"));
+	assert.deepStrictEqual(
+		fork.subNotes.map((sn) => [sn.label, sn.text]),
+		[["1", "the fork move"]],
+		"depth 2 under the fork: numbers",
+	);
+	assert.deepStrictEqual(fork.noteByPly[2], ["1"]);
+	assert.deepStrictEqual(
+		fork.children.map((c) => c.label),
+		["2", "3"],
+		"the fork's branches continue after its own note",
+	);
+});
+
+test("a symbol on a shared move renders on the node that owns it", () => {
+	const s = loadState("1. e4 e5 (1... c5 2. Nf3) (1... c5 2. Nc3) 2. Nf3", {
+		tags: { 1: "foot", 2: "foot" },
+	});
+	const [m1, m2] = s.lines.filter((l) => !l.isMain);
+	m1.marks = { 1: "!", 2: "±" };
+	m2.marks = { 1: "!" };
+	const [e] = numberNotes(s.lines).entries.filter((x) => x.foot);
+	assert.strictEqual(e.foot.marks[1], "!", "the stem move keeps its symbol");
+	assert.strictEqual(e.foot.children[0].marks[2], "±");
+});
+
+test("a member's note on its own move is unchanged by the hosting rule", () => {
+	const s = loadState(
+		"1. e4 e5 (1... c5 2. Nf3 {pressure}) (1... c5 2. Nc3) 2. Nf3",
+		{ tags: { 1: "foot", 2: "foot" } },
+	);
+	const [e] = numberNotes(s.lines).entries.filter((x) => x.foot);
+	const member = e.foot.children[0];
+	assert.deepStrictEqual(
+		member.subNotes.map((sn) => [sn.label, sn.text]),
+		[["1", "pressure"]],
+	);
+	assert.deepStrictEqual(member.noteByPly[2], ["1"]);
+});

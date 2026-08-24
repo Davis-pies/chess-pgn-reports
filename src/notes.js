@@ -111,54 +111,108 @@ export function numberNotes(lines) {
 	// line gets a single [n]. Built before the per-line pass so that pass can
 	// route a member's comments into its node rather than into the global list.
 	const { groups, grouped } = footGroups(lines, main);
-	const nodeOfLine = new Map(); // member line -> its decorated node
+	const nodeOfLine = new Map(); // member line -> its own decorated node
+	const chainOfLine = new Map(); // member line -> [group foot, ...ancestors, own]
+	const pliesOf = new Map(); // node -> the set of plies that node renders
 	// The stem as a pseudo-line, so parentOf/divergence — which compare whole
 	// move arrays from move 0 — can be run on the group as a unit.
 	const stemLine = (g) => {
 		const k = divergence(g.members[0], main) + g.stem.length;
 		return { moves: g.members[0].moves.slice(0, k) };
 	};
-	const decorate = (nodes, depth) =>
-		nodes.map((t, i) => {
+	// Every member line below a node, in reading order — the lines whose symbols
+	// the node's own moves may carry.
+	const linesUnder = (node) => {
+		const out = node.line ? [node.line] : [];
+		node.children.forEach((c) => out.push(...linesUnder(c)));
+		return out;
+	};
+	// A node's per-move symbols are merged from the lines beneath it, at the
+	// plies that node actually renders: a symbol on a shared move belongs to the
+	// node that draws that move, not to whichever member happens to carry it.
+	// First line wins, so a disagreement between members is resolved in reading
+	// order rather than by whichever was visited last.
+	const mergeMarks = (node) => {
+		const plies = pliesOf.get(node);
+		linesUnder(node).forEach((l) =>
+			plies.forEach((ply) => {
+				const m = l.marks && l.marks[ply];
+				if (m !== undefined && node.marks[ply] === undefined)
+					node.marks[ply] = m;
+			}),
+		);
+		node.children.forEach(mergeMarks);
+	};
+	// Labels run in ONE sequence per level: a node's own notes take the first
+	// labels below it and its branches continue that same sequence, so a note and
+	// a branch can never collide on one label. That means labels can only be
+	// handed out after the comment pass has filled in subNotes.
+	const label = (node) => {
+		node.children.forEach((c, i) => {
+			c.label = labelFor(node.depth + 1, node.subNotes.length + i);
+			label(c);
+		});
+	};
+	const decorate = (nodes, depth, chain) =>
+		nodes.map((t) => {
 			const node = {
-				label: labelFor(depth, i),
+				label: "", // assigned by label() once subNotes are known
 				depth,
 				moves: t.moves,
 				d: 0, // `moves` is already only this node's tail
-				marks: (t.line && t.line.marks) || {},
+				marks: {},
 				noteByPly: {},
 				name: (t.line && t.line.name) || "",
 				eval: (t.line && t.line.meta && t.line.meta.eval) || "",
 				note: (t.line && t.line.meta && t.line.meta.note) || "",
 				subNotes: [],
 				line: t.line,
-				children: decorate(t.children, depth + 1),
+				children: [],
 			};
-			if (t.line) nodeOfLine.set(t.line, node);
+			pliesOf.set(node, new Set(t.moves.map((m) => m.ply)));
+			const below = [...chain, node];
+			node.children = decorate(t.children, depth + 1, below);
+			if (t.line) {
+				nodeOfLine.set(t.line, node);
+				chainOfLine.set(t.line, below);
+			}
 			return node;
 		});
+	const roots = [];
 	groups.forEach((g) => {
 		const pseudo = stemLine(g);
 		const parent = parentOf(pseudo);
 		const d = divergence(pseudo, parent);
 		const ply = anchorPly(parent, d);
 		const n = entries.length + 1;
-		entries.push({
-			ply,
-			owner: parent,
-			n,
-			foot: {
-				moves: pseudo.moves,
-				d,
-				marks: {},
-				noteByPly: {},
-				depth: 0,
-				children: decorate(g.tree, 1),
-			},
-		});
+		const foot = {
+			moves: pseudo.moves,
+			d,
+			marks: {},
+			noteByPly: {},
+			depth: 0,
+			subNotes: [],
+			children: [],
+		};
+		pliesOf.set(foot, new Set(pseudo.moves.map((m) => m.ply)));
+		foot.children = decorate(g.tree, 1, [foot]);
+		mergeMarks(foot);
+		roots.push(foot);
+		entries.push({ ply, owner: parent, n, foot });
 		const parentMap = byLine.get(parent);
 		(parentMap[ply] = parentMap[ply] || []).push(n);
 	});
+	// The node a member's note belongs to: the DEEPEST one on its path whose own
+	// moves include the note's ply. A note at a stem or fork ply would otherwise
+	// print a label with no superscript to sit on, because the member's own node
+	// never renders that move. Two members carrying the same note at a shared ply
+	// land on the same host and so state it once.
+	const hostFor = (l, ply) => {
+		const chain = chainOfLine.get(l);
+		for (let i = chain.length - 1; i >= 0; i--)
+			if (pliesOf.get(chain[i]).has(ply)) return chain[i];
+		return chain[chain.length - 1];
+	};
 	lines.forEach((l) => {
 		const map = byLine.get(l);
 		let entry = null;
@@ -198,17 +252,22 @@ export function numberNotes(lines) {
 			const k = c.ply + "|" + c.text;
 			// exclusive to footnote lines: it belongs under this footnote, lettered
 			if (isFoot(l) && !globalKeys.has(k)) {
-				// A grouped member's notes hang off its node in the group tree, one
-				// level below it; a lone footnote's hang off its own entry at depth 1.
-				const host = nodeOfLine.get(l) || entry.foot;
-				const depth = (host.depth || 0) + 1;
+				// A grouped member's notes hang off the node that renders the move
+				// they annotate, one level below it; a lone footnote's hang off its
+				// own entry at depth 1. A note hosted by an ancestor writes its
+				// marker onto that node; a note on the member's own move keeps going
+				// through the line's map, which the node aliases below.
+				const own = nodeOfLine.get(l);
+				const host = own ? hostFor(l, c.ply) : entry.foot;
+				const depth = (host.depth || 0) + 1; // a lone footnote's entry has none
 				const sub = host.subNotes;
 				let at = sub.find((x) => x.ply === c.ply && x.text === c.text);
 				if (!at) {
 					at = { label: labelFor(depth, sub.length), ply: c.ply, text: c.text };
 					sub.push(at);
 				}
-				const marks = (map[c.ply] = map[c.ply] || []);
+				const into = host === own || !own ? map : host.noteByPly;
+				const marks = (into[c.ply] = into[c.ply] || []);
 				if (!marks.includes(at.label)) marks.push(at.label);
 				return;
 			}
@@ -223,7 +282,13 @@ export function numberNotes(lines) {
 		});
 	});
 	footEntries.forEach(([e, l]) => (e.foot.noteByPly = byLine.get(l)));
-	nodeOfLine.forEach((node, l) => (node.noteByPly = byLine.get(l)));
+	// A member node's own markers were written into its line's map, so alias it
+	// in wholesale — but keep anything already hosted on the node itself (a note
+	// a DEEPER node could not host lands here).
+	nodeOfLine.forEach(
+		(node, l) => (node.noteByPly = Object.assign(byLine.get(l), node.noteByPly)),
+	);
+	roots.forEach(label);
 	// Reading order. Numbers are handed out above in lines order — a whole line
 	// at a time — which is not the order a reader meets the markers in: a
 	// footnote anchored on an early mainline move is created only when its own
