@@ -32,6 +32,11 @@ function letters(i) {
 // and so on for as deep as a group nests. Only depth 0 takes part in global
 // numbering, so a label anywhere below it can never renumber a table marker.
 export function labelFor(depth, i) {
+	// Depth 0 is the note's own global [n], handed out by the reading-order
+	// renumbering pass at the end of numberNotes — never a local sibling index.
+	// Answering for it here would hand back a plausible-looking "1" that is not
+	// the note's number, so refuse instead of lying.
+	if (depth < 1) throw new Error("labelFor: depth 0 is the global note number");
 	return depth % 2 === 1 ? letters(i) : String(i + 1);
 }
 

@@ -452,3 +452,7 @@ test("labelFor alternates letters and numbers by depth", () => {
 	assert.strictEqual(labelFor(4, 1), "2", "numbers again at depth 4");
 	assert.strictEqual(labelFor(1, 26), "aa", "bijective base-26 past z");
 });
+
+test("labelFor refuses depth 0, which is the global note number", () => {
+	assert.throws(() => labelFor(0, 0), /global note number/);
+});
