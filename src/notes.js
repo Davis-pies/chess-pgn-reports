@@ -161,7 +161,12 @@ export function numberNotes(lines) {
 				moves: t.moves,
 				d: 0, // `moves` is already only this node's tail
 				marks: {},
-				noteByPly: {},
+				// A leaf aliases its line's map from birth: a member node is only ever
+				// the host for its OWN moves, and those markers go into the line's map.
+				// (A note at a ply the member doesn't draw is hosted by an ancestor
+				// instead, and lives on that node.) `byLine` is pre-seeded above, so the
+				// map already exists; an internal fork owns no line and starts empty.
+				noteByPly: t.line ? byLine.get(t.line) : {},
 				name: (t.line && t.line.name) || "",
 				eval: (t.line && t.line.meta && t.line.meta.eval) || "",
 				note: (t.line && t.line.meta && t.line.meta.note) || "",
@@ -262,7 +267,7 @@ export function numberNotes(lines) {
 				// they annotate, one level below it; a lone footnote's hang off its
 				// own entry at depth 1. A note hosted by an ancestor writes its
 				// marker onto that node; a note on the member's own move keeps going
-				// through the line's map, which the node aliases below.
+				// through the line's map, which the node aliases.
 				const own = nodeOfLine.get(l);
 				const host = own ? hostFor(l, c.ply) : entry.foot;
 				const depth = (host.depth || 0) + 1; // a lone footnote's entry has none
@@ -295,11 +300,6 @@ export function numberNotes(lines) {
 		});
 	});
 	footEntries.forEach(([e, l]) => (e.foot.noteByPly = byLine.get(l)));
-	// A member node is only ever the host for its OWN moves, and those markers
-	// went into the line's map, so the node just aliases that map. (A note at a
-	// ply the member doesn't draw is hosted by an ancestor instead, and lives on
-	// that node.)
-	nodeOfLine.forEach((node, l) => (node.noteByPly = byLine.get(l)));
 	roots.forEach(label);
 	// Reading order. Numbers are handed out above in lines order — a whole line
 	// at a time — which is not the order a reader meets the markers in: a
