@@ -165,9 +165,11 @@ export function exportBar() {
       ["include in print", "printTables", true],
       ["split table by trie", "showSplitTrie", false],
     ]),
-    // Applies everywhere a footnote is rendered — notes panel, print, Markdown
-    // and the exported PGN — not just to print, so it sits in its own group.
-    group("Notes", [["footnote line names", "showFootNames", false]]),
+    // Applies everywhere a line's name would prefix a note — the notes panel,
+    // print, Markdown and every comment in the exported PGN — not just to
+    // print, so it sits in its own group. A line's name still heads its own
+    // column in the table, which is a heading rather than a note.
+    group("Notes", [["line names in notes and PGN", "showFootNames", false]]),
   );
   bar.appendChild(pOpts);
   bar.append(printBtn, pgn, copyPgn, md, copy);

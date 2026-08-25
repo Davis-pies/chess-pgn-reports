@@ -169,12 +169,25 @@ test("a mark on a sideline lands on the sideline's node", () => {
 	assert.deepEqual(tree[1].variations[0][0].nags, [16]);
 });
 
-test("a line's name and eval comment its first divergent move", () => {
+test("a line's eval comments its first divergent move, without the name", () => {
+	// names are gated; the eval is not — it says something the moves do not
 	const { tree } = annotated("1. e4 e5 (1... c5) *", (lines) => {
 		lines[1].name = "Sicilian";
 		lines[1].meta = { eval: "\u221e" };
 	});
-	assert.deepEqual(tree[1].variations[0][0].comments, ["Sicilian \u221e"]);
+	assert.deepEqual(tree[1].variations[0][0].comments, ["\u221e"]);
+});
+
+test("a sideline's name is exported only when the notebook asks for it", () => {
+	// a plain sideline, not a footnote: its name was exported unconditionally,
+	// so a line whose only content was its name became a bare {Line 7} comment
+	const build = (showFootNames) => {
+		const lines = linesOf("1. e4 e5 (1... c5 2. Nf3) *");
+		lines[1].name = "Line 7";
+		return buildPgn({ name: "T", lines, showFootNames });
+	};
+	assert.doesNotMatch(build(false), /Line 7/, build(false));
+	assert.match(build(true), /\{Line 7\}/, build(true));
 });
 
 test("a note comments the move it is anchored to", () => {

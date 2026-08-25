@@ -189,11 +189,13 @@ export function annotate({ trunk, byLine }, lines, notes, opts = {}) {
 			} else if (!n.nags.includes(code)) n.nags.push(code);
 		}
 		// the line's own name and evaluation, on its first divergent move
-		// A footnote line's name is suppressed unless the notebook asks for it,
-		// the same gate the report views use — the variation already sits under
-		// the move it branches from.
-		const named = l.tag !== "foot" || opts.footNames;
-		const label = [named ? l.name : "", (l.meta || {}).eval]
+		// A line's name is suppressed unless the notebook asks for it. In a PGN
+		// the variation already sits under the move it branches from, so the
+		// name mostly repeated what the surrounding moves said — and for a
+		// footnote, which is a note ABOUT another variation, the bare name was
+		// all the comment ended up carrying. The evaluation is not gated: it
+		// says something the moves do not.
+		const label = [opts.footNames ? l.name : "", (l.meta || {}).eval]
 			.filter(Boolean)
 			.join(" ");
 		if (label && !l.isMain) {
