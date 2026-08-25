@@ -1,7 +1,7 @@
 // Print/PDF horizontal table. The mainline is always shown as the reference
 // column; the side lines are split into vertical slices of ~16 columns so the
 // table wraps across pages instead of being cut off or scaled.
-import { renderTable, appendFootnote, appendSubNotes } from "./render.js";
+import { renderTable, appendFootnote } from "./render.js";
 import { el, renderInline } from "./dom.js";
 import { getCurrent } from "./state.js";
 import { allNotes } from "./notes.js";
@@ -126,13 +126,12 @@ function renderTableNotes(wrap, vars, showMain) {
     row.appendChild(el("sup", { textContent: "[" + n.n + "]" }));
     const span = document.createElement("span");
     if (n.foot) {
-      appendFootnote(span, n.foot);
+      appendFootnote(row, n.foot);
     } else {
       span.appendChild(document.createTextNode(moveRef(n.ply, n.owner) + " — "));
       renderInline(span, n.text);
+      row.appendChild(span);
     }
-    row.appendChild(span);
-    if (n.foot) appendSubNotes(row, n.foot);
     box.appendChild(row);
   });
 }

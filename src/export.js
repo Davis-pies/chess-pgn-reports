@@ -4,7 +4,6 @@ import {
   cardMovesText,
   appendFootnote,
   footnoteText,
-  appendSubNotes,
   subNoteLines,
 } from "./render.js";
 import { el, renderInline } from "./dom.js";
@@ -57,16 +56,17 @@ export function notesPanel() {
     const row = el("div", { className: "nt" });
     row.appendChild(el("sup", { textContent: "[" + note.n + "]" }));
     const span = document.createElement("span");
+    // A footnote owns the whole row: its stem goes in a span of its own, and
+    // its sub-notes and a group's branches are block rows beside that span.
     if (note.foot) {
-      appendFootnote(span, note.foot);
+      appendFootnote(row, note.foot);
     } else {
       span.appendChild(
         document.createTextNode(moveRef(note.ply, note.owner) + " — "),
       );
       renderInline(span, note.text);
+      row.appendChild(span);
     }
-    row.appendChild(span);
-    if (note.foot) appendSubNotes(row, note.foot);
     box.appendChild(row);
   });
   return box;

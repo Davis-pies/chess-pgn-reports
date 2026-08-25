@@ -511,26 +511,34 @@ export function fullMovesText(moves, marks) {
 // superscripts. The last shared move is deliberately not shown: the marker
 // already says where the branch happens, and leading with a move from before
 // it read as though the note diverged earlier than it does.
+//
+// `container` is the note's ROW, not an inline span: the stem is inline, but a
+// footnote's own notes and a group's branches are block rows, and they have to
+// be the row's siblings rather than blocks buried inside an inline span. This
+// function owns the whole footnote, so it also creates the stem's span itself
+// and renders the sub-notes in the one place that can put them above the
+// branches.
 export function appendFootnote(container, foot) {
-	const t = (s) => container.appendChild(document.createTextNode(s));
+	const span = document.createElement("span");
+	const t = (s) => span.appendChild(document.createTextNode(s));
 	if (foot.name) t(foot.name + ": ");
-	const tail = appendFootMoves(container, foot);
+	const tail = appendFootMoves(span, foot);
 	if (foot.eval) t((tail.length ? " " : "") + foot.eval);
 	if (foot.note) {
 		// The dash separates moves from commentary. A footnote that shares
 		// everything it has with its parent has no moves to separate, so the
 		// commentary follows the name directly instead of a dangling dash.
 		if (tail.length || foot.eval) t(" — ");
-		renderInline(container, foot.note);
+		renderInline(span, foot.note);
 	}
+	// Nothing inline to show (a footnote with no moves, name, eval or note)
+	// leaves no empty span behind.
+	if (span.childNodes.length) container.appendChild(span);
+	renderSubNotes(container, foot);
 	// A group's members hang below it as nested labelled rows, one level of
 	// indentation per depth (the nesting does the indenting; see .fnode in
-	// style.css). A lone footnote has no children and stops here, leaving its
-	// own sub-notes to the caller's own appendSubNotes — only a group renders
-	// them here, because its branches have to follow them.
-	if (!foot.children || !foot.children.length) return;
-	renderSubNotes(container, foot);
-	foot.children.forEach((c) => appendFootNode(container, c));
+	// style.css). A lone footnote has no children and stops here.
+	(foot.children || []).forEach((c) => appendFootNode(container, c));
 }
 
 // One node's move run, with its per-move symbol marks and note markers. Shared
@@ -573,19 +581,11 @@ function appendFootNode(container, node) {
 	container.appendChild(row);
 }
 
-// A footnote's own notes, as labelled rows nested under it. Rendered as a
-// sibling block rather than inside appendFootnote so each consumer can place
-// and indent it — the panel and the print block both style .subnote.
-//
-// A GROUP is the exception: its own notes have to sit above its branches, which
-// only appendFootnote can place, so it renders them itself and this is a no-op.
-// Callers can go on pairing appendFootnote with appendSubNotes unconditionally
-// without a group's notes appearing twice.
-export function appendSubNotes(container, foot) {
-	if (foot.children && foot.children.length) return;
-	renderSubNotes(container, foot);
-}
-
+// A footnote's own notes, as labelled rows nested under it. Block rows, so they
+// are siblings of the stem's span rather than children of it, and they sit
+// above a group's branches — everything one level inside the note, in label
+// order. Placed by appendFootnote, the one function that owns that order, so
+// there is no second call for a caller to make (or to make twice).
 function renderSubNotes(container, foot) {
 	(foot.subNotes || []).forEach((s) => {
 		const row = document.createElement("div");

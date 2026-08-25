@@ -15,7 +15,6 @@ import {
 	appendFootnote,
 	footnoteText,
 	cardMovesText,
-	appendSubNotes,
 	subNoteLines,
 } from "../src/render.js";
 
@@ -347,10 +346,12 @@ test("a card lists a footnote anchored on its own line", () => {
 	off();
 });
 
-test("appendSubNotes renders one labelled row per sub-note", () => {
+test("appendFootnote renders one labelled row per sub-note", () => {
 	const off = installDom();
 	const box = document.createElement("div");
-	appendSubNotes(box, {
+	appendFootnote(box, {
+		moves: [],
+		d: 0,
 		subNotes: [
 			{ label: "a", ply: 2, text: "knight move" },
 			{ label: "b", ply: 3, text: "**sharp**" },
@@ -364,10 +365,10 @@ test("appendSubNotes renders one labelled row per sub-note", () => {
 	off();
 });
 
-test("appendSubNotes renders nothing when a footnote has none", () => {
+test("appendFootnote renders nothing when a footnote has none", () => {
 	const off = installDom();
 	const box = document.createElement("div");
-	appendSubNotes(box, { subNotes: [] });
+	appendFootnote(box, { moves: [], d: 0, subNotes: [] });
 	assert.strictEqual(box.childNodes.length, 0);
 	off();
 });
