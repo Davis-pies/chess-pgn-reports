@@ -34,6 +34,13 @@ export const openTablePaths = new Set();
 // path -- one shared Set would make opening a drawer group open its twin above.
 export const openHiddenPaths = new Set();
 
+// Note groups the user COLLAPSED in the Notes panel. Inverted relative to
+// openPaths: the notes are a reference list you read, so everything starts
+// expanded and this records only what was closed. A key that goes stale
+// therefore reopens a group — it can never hide a note. Session-only: nothing
+// in store.js saves it.
+export const closedNotePaths = new Set();
+
 // Identical-move tracking: which lines carry each shared move (same
 // position reached + same SAN). Recomputed wholesale by computeShared() in
 // app.js before every render — { byLine: line -> Map(ply -> id), idLines:

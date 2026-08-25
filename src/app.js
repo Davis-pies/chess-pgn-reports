@@ -17,6 +17,7 @@ import {
   openPaths,
   openTablePaths,
   openHiddenPaths,
+  closedNotePaths,
   setSharedInfo,
   setRenderHooks,
 } from "./state.js";
@@ -73,6 +74,7 @@ setCurrent(freshState());
 // from a previous test's app.js instance into this one.
 openPaths.clear();
 openTablePaths.clear();
+closedNotePaths.clear();
 // Point the extracted view modules' callbacks at *this* app.js instance --
 // see the comment on setRenderHooks() in state.js for why this indirection
 // (rather than a static `import ... from "./app.js"`) is necessary.
@@ -454,6 +456,7 @@ function openNotebook(id) {
       alert("Could not open workbook: " + e.message);
     }
     openPaths.clear();
+    closedNotePaths.clear();
     renderApp();
   });
 }
@@ -692,6 +695,7 @@ function importPanel() {
           return;
         }
         openPaths.clear();
+        closedNotePaths.clear();
         setCurrent(
           freshState({
             id: getCurrent().id,
