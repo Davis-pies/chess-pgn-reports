@@ -90,6 +90,7 @@ test("a footnote prints in the notes block under the first table", () => {
     tags: { 1: "foot" },
   });
   s.lines.find((l) => l.moves.some((m) => m.san === "c5")).name = "Sicilian";
+  s.showFootNames = true; // footnote names are off by default
   const box = document.createElement("div");
   appendPrintTables(box, grid(s.lines));
   const blocks = [...box.querySelectorAll(".print-notes")];
@@ -109,6 +110,7 @@ test("a footnote's own notes print nested under it", () => {
     tags: { 1: "foot" },
   });
   s.lines.find((l) => l.moves.some((m) => m.san === "c5")).name = "Sicilian";
+  s.showFootNames = true; // footnote names are off by default
   const box = document.createElement("div");
   appendPrintTables(box, grid(s.lines));
   const block = box.querySelector(".print-notes");

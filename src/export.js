@@ -165,6 +165,9 @@ export function exportBar() {
       ["include in print", "printTables", true],
       ["split table by trie", "showSplitTrie", false],
     ]),
+    // Applies everywhere a footnote is rendered — notes panel, print, Markdown
+    // and the exported PGN — not just to print, so it sits in its own group.
+    group("Notes", [["footnote line names", "showFootNames", false]]),
   );
   bar.appendChild(pOpts);
   bar.append(printBtn, pgn, copyPgn, md, copy);

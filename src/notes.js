@@ -40,7 +40,13 @@ function anchorPly(parent, d) {
 // for the exact `lines` array it was computed from — recompute per render
 // rather than caching it across mutations (a promoted or re-tagged line is a
 // different key set).
-export function numberNotes(lines) {
+// `opts.footNames` keeps a footnote's line name at the head of its entry. It
+// defaults to false: a footnote already sits under the move it branches from,
+// so the name mostly repeated what the surrounding row said. The setting lives
+// here, where the foot tree is BUILT, so every renderer — the notes panel,
+// print, Markdown and the PGN exporter — follows one gate instead of each
+// stripping the name itself.
+export function numberNotes(lines, opts = {}) {
 	const entries = [];
 	// Pre-seeded so every line's map is created exactly once, up front: a
 	// footnote can write into the mainline's map before the mainline's own
@@ -105,7 +111,7 @@ export function numberNotes(lines) {
 		const d = divergence(pseudo, parent);
 		const ply = anchorPly(parent, d);
 		const n = entries.length + 1;
-		const foot = groupFoot(g, d, byLine, index);
+		const foot = groupFoot(g, d, byLine, index, opts);
 		roots.push(foot);
 		entries.push({ ply, owner: parent, n, foot });
 		const parentMap = byLine.get(parent);
@@ -136,7 +142,7 @@ export function numberNotes(lines) {
 				// renderer branches on that.
 				foot: {
 					depth: 0,
-					name: l.name || "",
+					name: opts.footNames ? l.name || "" : "",
 					eval: (l.meta && l.meta.eval) || "",
 					note: (l.meta && l.meta.note) || "",
 					moves: l.moves,
@@ -241,5 +247,7 @@ export function numberNotes(lines) {
 
 // The numbered Notes list for the open notebook.
 export function allNotes() {
-	return numberNotes(getCurrent().lines).entries;
+	return numberNotes(getCurrent().lines, {
+		footNames: getCurrent().showFootNames,
+	}).entries;
 }

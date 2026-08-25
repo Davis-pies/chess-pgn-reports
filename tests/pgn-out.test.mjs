@@ -331,3 +331,17 @@ test("a footnote's sub-notes reach the moves they annotate", () => {
 	// which is what matters here.
 	assert.match(out, /\(1\.\.\. c5 2\. Nf3 d6 \{develops[^}]*\}\)/, out);
 });
+
+test("a footnote line's name is omitted from the PGN unless asked for", () => {
+	const build = (showFootNames) => {
+		const lines = linesOf("1. e4 e5 (1... c5 2. Nf3) *");
+		lines[1].tag = "foot";
+		lines[1].name = "Sicilian";
+		lines[1].meta = { eval: "∞" };
+		return buildPgn({ name: "T", lines, showFootNames });
+	};
+	// the eval still rides along; only the name is gated
+	assert.match(build(false), /\{∞\}/);
+	assert.doesNotMatch(build(false), /Sicilian/);
+	assert.match(build(true), /\{Sicilian ∞\}/);
+});

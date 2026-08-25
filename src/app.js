@@ -49,6 +49,7 @@ function freshState(overrides = {}) {
     cardFont: 100,
     showFinalBoard: true,
     showFirstDivBoard: false,
+    showFootNames: false, // footnote entries lead with their line's name
     sideWidth: 420, // px; the drag-resized table panel width
     sel: null, // { l: line, ply } — the move the symbol row targets (null = line-end)
     ...overrides,
@@ -261,6 +262,7 @@ function viewRoot() {
           showBoards: getCurrent().showBoards,
           showFinalBoard: getCurrent().showFinalBoard,
           showFirstDivBoard: getCurrent().showFirstDivBoard,
+          showFootNames: getCurrent().showFootNames,
         },
       },
     );
@@ -429,6 +431,7 @@ function openNotebook(id) {
           showFirstDivBoard: !!(
             view.showFirstDivBoard ?? getCurrent().showFirstDivBoard
           ),
+          showFootNames: !!(view.showFootNames ?? getCurrent().showFootNames),
           sideWidth: getCurrent().sideWidth,
         }),
       );

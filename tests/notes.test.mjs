@@ -79,8 +79,9 @@ test("a footnote line derives a note anchored on the move it replaces", () => {
 	});
 	const c5 = s.lines.find((l) => l.moves.some((m) => m.san === "c5"));
 	c5.name = "Sicilian";
+	// footnote names are off by default; this test is about the name
 	c5.meta = { eval: "=", note: "sharp" };
-	const { entries, byLine } = numberNotes(s.lines);
+	const { entries, byLine } = numberNotes(s.lines, { footNames: true });
 	assert.strictEqual(entries.length, 1);
 	const e = entries[0];
 	// the mainline plays e5 at ply 1; the footnote replaces it with c5
@@ -490,7 +491,8 @@ test("a group carries each member's name, eval and note", () => {
 	m1.name = "Open Sicilian";
 	m1.meta = { eval: "±", note: "main try" };
 	m2.meta = { eval: "=" };
-	const [e] = numberNotes(s.lines).entries;
+	// names are off by default; this test is about the name being carried
+	const [e] = numberNotes(s.lines, { footNames: true }).entries;
 	assert.deepStrictEqual(
 		e.foot.children.map((c) => [c.name, c.eval, c.note]),
 		[
@@ -705,4 +707,17 @@ test("a note before the group's divergence is stated once at group level", () =>
 		"hosted by the group, not lettered under a branch it does not belong to",
 	);
 	e.foot.children.forEach((c) => assert.deepStrictEqual(c.subNotes, []));
+});
+
+test("a footnote's line name is omitted unless the notebook asks for it", () => {
+	const s = loadState("1. e4 e5 (1... c5 2. Nf3) 2. Nf3", {
+		tags: { 1: "foot" },
+	});
+	const c5 = s.lines.find((l) => l.moves.some((m) => m.san === "c5"));
+	c5.name = "Sicilian";
+	assert.strictEqual(numberNotes(s.lines).entries[0].foot.name, "");
+	assert.strictEqual(
+		numberNotes(s.lines, { footNames: true }).entries[0].foot.name,
+		"Sicilian",
+	);
 });

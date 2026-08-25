@@ -174,7 +174,7 @@ function nodeFor(idx, line, ply, main) {
 	return (own && own.get(ply)) || (idx.get(main) && idx.get(main).get(ply));
 }
 
-export function annotate(trunk, lines, notes) {
+export function annotate(trunk, lines, notes, opts = {}) {
 	const main = lines.find((l) => l.isMain) || lines[0];
 	const idx = indexByLine(trunk, lines);
 
@@ -189,7 +189,13 @@ export function annotate(trunk, lines, notes) {
 			} else if (!n.nags.includes(code)) n.nags.push(code);
 		}
 		// the line's own name and evaluation, on its first divergent move
-		const label = [l.name, (l.meta || {}).eval].filter(Boolean).join(" ");
+		// A footnote line's name is suppressed unless the notebook asks for it,
+		// the same gate the report views use — the variation already sits under
+		// the move it branches from.
+		const named = l.tag !== "foot" || opts.footNames;
+		const label = [named ? l.name : "", (l.meta || {}).eval]
+			.filter(Boolean)
+			.join(" ");
 		if (label && !l.isMain) {
 			const d = divergence(l, main);
 			const m = l.moves[d] || l.moves[l.moves.length - 1];
@@ -252,7 +258,13 @@ export function buildPgn(state) {
 	const trunk = treeFromLines(lines);
 	// numberNotes rather than allNotes: allNotes reads the current-state
 	// singleton, and this module deliberately takes its state as an argument.
-	annotate(trunk, lines, lines.length ? numberNotes(lines).entries : []);
+	const opts = { footNames: state.showFootNames };
+	annotate(
+		trunk,
+		lines,
+		lines.length ? numberNotes(lines, opts).entries : [],
+		opts,
+	);
 	return tagPairs(state, result) + "\n\n" + writeMovetext(trunk, result) + "\n";
 }
 

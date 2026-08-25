@@ -102,7 +102,7 @@ export function hostIndex() {
 	};
 }
 
-function decorate(nodes, depth, chain, byLine, index) {
+function decorate(nodes, depth, chain, byLine, index, opts = {}) {
 	return nodes.map((t) => {
 		const node = {
 			label: "", // assigned by labelNodes() once subNotes are known
@@ -117,7 +117,7 @@ function decorate(nodes, depth, chain, byLine, index) {
 			// so the map already exists; an internal fork owns no line and starts
 			// empty.
 			noteByPly: t.line ? byLine.get(t.line) : {},
-			name: (t.line && t.line.name) || "",
+			name: opts.footNames ? (t.line && t.line.name) || "" : "",
 			eval: (t.line && t.line.meta && t.line.meta.eval) || "",
 			note: (t.line && t.line.meta && t.line.meta.note) || "",
 			subNotes: [],
@@ -126,7 +126,7 @@ function decorate(nodes, depth, chain, byLine, index) {
 		};
 		index.plies.set(node, new Set(t.moves.map((m) => m.ply)));
 		const below = [...chain, node];
-		node.children = decorate(t.children, depth + 1, below, byLine, index);
+		node.children = decorate(t.children, depth + 1, below, byLine, index, opts);
 		if (t.line) {
 			index.nodeOfLine.set(t.line, node);
 			index.chainOfLine.set(t.line, below);
@@ -141,7 +141,7 @@ function decorate(nodes, depth, chain, byLine, index) {
 // the renderer can slice off the prefix it shares with that parent. Labels are
 // NOT assigned here — call labelNodes once the comment pass has filled in
 // subNotes. `index` is filled in as a side effect for that pass.
-export function groupFoot(group, d, byLine, index) {
+export function groupFoot(group, d, byLine, index, opts = {}) {
 	const foot = {
 		moves: group.stemMoves,
 		d,
@@ -154,7 +154,7 @@ export function groupFoot(group, d, byLine, index) {
 	// Only the moves the renderer actually draws: it slices at `d`, so the prefix
 	// the group shares with its parent line is never shown.
 	index.plies.set(foot, new Set(group.stemMoves.slice(d).map((m) => m.ply)));
-	foot.children = decorate(group.tree, 1, [foot], byLine, index);
+	foot.children = decorate(group.tree, 1, [foot], byLine, index, opts);
 	mergeMarks(foot, index.plies);
 	return foot;
 }

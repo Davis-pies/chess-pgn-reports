@@ -40,6 +40,7 @@ test("buildMarkdown renders a footnote as a numbered note, not a Footnotes secti
     tags: { 1: "foot" },
   });
   s.lines[1].name = "Sicilian";
+  s.showFootNames = true; // footnote names are off by default
   s.lines[1].meta.note = "sharp";
   s.lines[1].meta.eval = "=";
   const md = buildMarkdown();
@@ -188,12 +189,16 @@ test("exportBar's print options toggle state and trigger a re-render", () => {
   const bar = exportBar();
   // checkboxes only — the group also holds the card text-size number input
   const boxes = [...bar.querySelectorAll('.printopts input[type="checkbox"]')];
-  assert.strictEqual(boxes.length, 5, "three card options + two table options");
+  assert.strictEqual(
+    boxes.length,
+    6,
+    "three card options, two table options, one notes option",
+  );
   // defaults: cards printed, final-position on, latest-divergence off;
-  // table printed, split-trie off
+  // table printed, split-trie off; footnote line names off
   assert.deepStrictEqual(
     boxes.map((b) => b.checked),
-    [true, true, false, true, false],
+    [true, true, false, true, false, false],
   );
   boxes[2].checked = true;
   boxes[2].onchange({ target: boxes[2] });
@@ -353,6 +358,7 @@ test("the notes panel renders footnotes as numbered notes with no separate secti
     tags: { 1: "foot" },
   });
   s.lines.find((l) => l.moves.some((m) => m.san === "c5")).name = "Sicilian";
+  s.showFootNames = true; // footnote names are off by default
   const box = notesPanel();
   const headings = [...box.querySelectorAll("h3")].map((h) => h.textContent);
   assert.deepStrictEqual(headings, ["Notes"], "no Footnotes heading");
@@ -376,6 +382,7 @@ test("Markdown emits footnotes as notes with no Footnotes section", () => {
     tags: { 1: "foot" },
   });
   s.lines.find((l) => l.moves.some((m) => m.san === "c5")).name = "Sicilian";
+  s.showFootNames = true; // footnote names are off by default
   const md = buildMarkdown();
   assert.ok(!md.includes("## Footnotes"), "no Footnotes section");
   assert.match(md, /## Notes/);
@@ -389,6 +396,7 @@ test("the notes panel nests a footnote's own notes under it", () => {
     tags: { 1: "foot" },
   });
   s.lines.find((l) => l.moves.some((m) => m.san === "c5")).name = "Sicilian";
+  s.showFootNames = true; // footnote names are off by default
   const box = notesPanel();
   const rows = [...box.querySelectorAll(".nt")];
   assert.strictEqual(rows.length, 1, "one top-level row: the footnote");
@@ -404,6 +412,7 @@ test("Markdown indents a footnote's own notes under it", () => {
     tags: { 1: "foot" },
   });
   s.lines.find((l) => l.moves.some((m) => m.san === "c5")).name = "Sicilian";
+  s.showFootNames = true; // footnote names are off by default
   const md = buildMarkdown();
   const lines = md.split("\n");
   const i = lines.findIndex((l) => /^1\. Sicilian: /.test(l));

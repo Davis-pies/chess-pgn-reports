@@ -338,6 +338,7 @@ test("a card lists a footnote anchored on its own line", () => {
 		tags: { 1: "foot" },
 	});
 	s.lines.find((l) => l.moves.some((m) => m.san === "c5")).name = "Sicilian";
+	s.showFootNames = true; // footnote names are off by default
 	const g = grid(s.lines);
 	const box = document.createElement("div");
 	renderCards(box, g, { notes: allNotes() });
@@ -392,6 +393,7 @@ test("a card's footnote note carries its sub-notes", () => {
 		tags: { 1: "foot" },
 	});
 	s.lines.find((l) => l.moves.some((m) => m.san === "c5")).name = "Sicilian";
+	s.showFootNames = true; // footnote names are off by default
 	const g = grid(s.lines);
 	const box = document.createElement("div");
 	renderCards(box, g, { notes: allNotes() });
@@ -427,6 +429,7 @@ test("a card's sub-notes render as their own indented rows", () => {
 		tags: { 1: "foot" },
 	});
 	s.lines.find((l) => l.moves.some((m) => m.san === "c5")).name = "Sicilian";
+	s.showFootNames = true; // footnote names are off by default
 	const box = document.createElement("div");
 	renderCards(box, grid(s.lines), { notes: allNotes() });
 	const notesBox = box.querySelector(".card .card-notes");
@@ -474,6 +477,7 @@ test("a card's footnote row carries no anchor-move prefix", () => {
 	const foot = s.lines.find((l) => l.moves.some((m) => m.san === "c5"));
 	foot.name = "Sicilian";
 	foot.meta = { note: "commentary" };
+	s.showFootNames = true; // footnote names are off by default
 	const box = document.createElement("div");
 	renderCards(box, grid(s.lines), { notes: allNotes() });
 	const row = [...box.querySelectorAll(".card-notes .nt")].find((r) =>
@@ -641,7 +645,10 @@ test("a group member shows its name, eval and note", () => {
 	const m1 = s.lines.filter((l) => !l.isMain)[0];
 	m1.name = "Open";
 	m1.meta = { eval: "±", note: "critical" };
-	const [e] = numberNotes(s.lines).entries.filter((x) => x.foot);
+	// names are off by default; this test is about the name being shown
+	const [e] = numberNotes(s.lines, { footNames: true }).entries.filter(
+		(x) => x.foot,
+	);
 	const box = document.createElement("div");
 	appendFootnote(box, e.foot);
 	const row = box.querySelector(".fnode");
