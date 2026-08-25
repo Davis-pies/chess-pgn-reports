@@ -10,7 +10,6 @@ import {
 	writeMovetext,
 	annotate,
 	buildPgn,
-	applyLineState,
 } from "../src/pgn-out.js";
 
 // SAN-only view of a node list, so structure assertions stay readable.
@@ -20,17 +19,9 @@ const shape = (nodes) =>
 		vars: n.variations.map(shape),
 	}));
 
-// The movetext alone: round-trip state lives in a tag pair, which no reader
-// draws into the move list, so assertions about visible text look only here.
+// The movetext alone, without the tag-pair header.
 function visible(pgn) {
 	return pgn.split("\n\n").slice(1).join("\n\n");
-}
-
-// Export, re-import, and reapply the state the header carried.
-function roundTrip(lines, state = {}) {
-	const out = buildPgn({ name: "T", lines, ...state });
-	const re = parsePgn(out);
-	return { out, back: applyLineState(collectLines(re.nodes), re.tags) };
 }
 
 function linesOf(pgn) {
@@ -409,70 +400,20 @@ test("many deep lines' notes do not collapse onto one mainline move", () => {
 	for (let i = 0; i < 3; i++) assert.ok(out.includes("{N" + i + "}"), out);
 });
 
-// Round-trip fidelity: re-importing our own export must not lose which lines
-// are footnotes, their names, or their evaluations. The visible comment is
-// gated by showFootNames and formatted for humans, so it cannot be the
-// carrier — the state has to travel independently of it.
-test("a footnote tag survives an export and re-import", () => {
+// PGN is a lossy interchange format for this app by choice: a footnote is a
+// concept PGN has no word for, and every carrier for it either shows up as
+// noise in other viewers ([%...] markers) or keys on something that does not
+// survive editing elsewhere (a variation path). Exported footnotes are
+// ordinary variations; the notebook itself, saved by store.js, is what keeps
+// the footnote structure.
+test("a footnote line exports as an ordinary variation and nothing more", () => {
 	const lines = linesOf("1. e4 e5 (1... c5 2. Nf3) *");
 	lines[1].tag = "foot";
 	lines[1].name = "Sicilian";
-	lines[1].meta = { eval: "\u221e", note: "sharp" };
-	const { back } = roundTrip(lines);
-	const side = back.find((l) => l.moves.some((m) => m.san === "c5"));
-	assert.equal(side.tag, "foot");
-	assert.equal(side.name, "Sicilian");
-	assert.equal(side.meta.eval, "\u221e");
-	assert.equal(side.meta.note, "sharp");
-});
-
-test("the round-trip state never appears in the movetext", () => {
-	const lines = linesOf("1. e4 e5 (1... c5) *");
-	lines[1].tag = "foot";
-	lines[1].name = "Sicilian";
-	const { out, back } = roundTrip(lines);
-	// names are off by default, so the moves carry no trace of it — the point
-	// of the tag-pair carrier is that a reader is never shown this
-	assert.doesNotMatch(visible(out), /Sicilian/, out);
-	assert.doesNotMatch(visible(out), /%7B|ott/, out);
-	assert.equal(
-		back.find((l) => l.moves.some((m) => m.san === "c5")).name,
-		"Sicilian",
-	);
-});
-
-test("state survives alongside real commentary and a NAG", () => {
-	const lines = linesOf("1. e4 e5 (1... c5 2. Nf3) *");
-	lines[1].tag = "foot";
-	lines[1].name = "Sicilian";
-	lines[1].marks = { 1: "!" };
-	lines[1].comments = [{ ply: 2, text: "a real note" }];
-	const { back } = roundTrip(lines);
-	const side = back.find((l) => l.moves.some((m) => m.san === "c5"));
-	assert.equal(side.tag, "foot");
-	assert.equal(side.marks[1], "!");
-	assert.deepEqual(
-		side.comments.map((c) => c.text),
-		["a real note"],
-	);
-});
-
-test("a name with quotes and backslashes survives the tag pair", () => {
-	const lines = linesOf("1. e4 e5 (1... c5 2. Nf3) *");
-	lines[1].tag = "foot";
-	lines[1].name = 'the "sharp" \\ line';
-	lines[1].meta = { note: "brackets } and ] inside" };
-	const { out, back } = roundTrip(lines);
-	const c = new Chess();
-	assert.doesNotThrow(() => c.loadPgn(out), out);
-	const side = back.find((l) => l.moves.some((m) => m.san === "c5"));
-	assert.equal(side.name, 'the "sharp" \\ line');
-	assert.equal(side.meta.note, "brackets } and ] inside");
-});
-
-test("a notebook with no line state exports no extra tag", () => {
-	const out = buildPgn({ name: "T", lines: linesOf("1. e4 e5 *") });
-	assert.doesNotMatch(out, /OttLines/, out);
+	const out = buildPgn({ name: "T", lines });
+	assert.match(visible(out), /\(1\.\.\. c5 2\. Nf3\)/, out);
+	// no hidden carrier: nothing in the file names the line or calls it a foot
+	assert.doesNotMatch(out, /Sicilian|foot|Ott/, out);
 });
 
 test("each line's label goes on the move unique to that line", () => {

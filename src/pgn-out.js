@@ -231,77 +231,6 @@ export function annotate({ trunk, byLine, ownFirst }, lines, notes, opts = {}) {
 	return trunk;
 }
 
-// What our own importer needs back that the movetext cannot say on its own:
-// whether a line is a footnote, its name, and its evaluation and note. Marks
-// already travel as NAGs, comments as comments, and a promoted mainline comes
-// back as the trunk it was exported as.
-//
-// It rides in a PGN tag pair rather than a "[%...]" comment marker. A comment
-// marker looked tidier on paper, but viewers do not agree on hiding unknown
-// ones -- Chesstempo renders them as visible text, so a notebook with a hundred
-// named lines showed a wall of encoded JSON against a move. Tag pairs are
-// metadata by definition: every reader parses them, none draws them into the
-// move list, and an unknown one is ignored.
-//
-// Lines are keyed by their SAN move string, the same key store.js uses for
-// saved notebooks, so the mapping survives re-parsing. The payload is
-// URI-encoded, which escapes the quote and backslash that would otherwise
-// need tag-value escaping.
-const STATE_TAG = "OttLines";
-
-function lineState(l) {
-	const meta = l.meta || {};
-	const data = {};
-	if (l.tag === "foot") data.t = "foot";
-	if (l.name) data.n = l.name;
-	if (meta.eval) data.e = meta.eval;
-	if (meta.note) data.o = meta.note;
-	return Object.keys(data).length ? data : null;
-}
-
-function keyOf(l) {
-	return l.moves.map((m) => m.san).join(" ");
-}
-
-// The tag value carrying every line that has state worth keeping. Empty when
-// nothing does, so an untouched notebook exports a clean file.
-function stateTag(lines) {
-	const out = {};
-    for (const l of lines) {
-		const data = lineState(l);
-		if (data) out[keyOf(l)] = data;
-	}
-	return Object.keys(out).length
-		? encodeURIComponent(JSON.stringify(out))
-		: "";
-}
-
-// Reapply what stateTag wrote. Called by the import path after collectLines;
-// a PGN we did not write simply has no such tag and leaves the lines alone.
-export function applyLineState(lines, tags) {
-	const raw = tags && tags[STATE_TAG];
-	if (!raw) return lines;
-	let map;
-	try {
-		map = JSON.parse(decodeURIComponent(raw));
-	} catch {
-		// a corrupted or hand-edited tag is not worth failing an import over
-		return lines;
-	}
-	for (const l of lines) {
-		const d = map[keyOf(l)];
-		if (!d) continue;
-		if (d.t) l.tag = d.t;
-		if (d.n) l.name = d.n;
-		if (d.e || d.o) {
-			l.meta = { ...(l.meta || {}) };
-			if (d.e) l.meta.eval = d.e;
-			if (d.o) l.meta.note = d.o;
-		}
-	}
-	return lines;
-}
-
 // A PGN tag value is a quoted string: '"' and '\' are the only characters that
 // need escaping, and both escape with a backslash.
 function tagValue(s) {
@@ -314,8 +243,7 @@ function tagValue(s) {
 // chesstempo) reject or mangle a file that omits it, and the report has no
 // player or event data to put there, so the spec's "?" / "????.??.??"
 // placeholders stand in.
-function tagPairs(state, result, lines) {
-	const extra = stateTag(lines);
+function tagPairs(state, result) {
 	return [
 		["Event", state.name || "?"],
 		["Site", "?"],
@@ -324,7 +252,6 @@ function tagPairs(state, result, lines) {
 		["White", "?"],
 		["Black", "?"],
 		["Result", result],
-		...(extra ? [[STATE_TAG, extra]] : []),
 	]
 		.map(([k, v]) => `[${k} "${tagValue(v)}"]`)
 		.join("\n");
@@ -350,7 +277,7 @@ export function buildPgn(state) {
 		opts,
 	);
 	return (
-		tagPairs(state, result, lines) +
+		tagPairs(state, result) +
 		"\n\n" +
 		writeMovetext(tree.trunk, result) +
 		"\n"
