@@ -15,8 +15,13 @@ test("two foot lines sharing a divergent move form one group", () => {
 	const { groups, grouped } = footGroups(s.lines, main);
 	assert.strictEqual(groups.length, 1);
 	const g = groups[0];
-	assert.deepStrictEqual(sans(g.stem), ["c5"], "shared move is the stem");
+	assert.deepStrictEqual(
+		sans(g.stemMoves),
+		["e4", "c5"],
+		"the shared move is the stem, stated as the whole path to it",
+	);
 	assert.strictEqual(g.members.length, 2);
+	assert.ok(g.key, "the group carries its trie node's key");
 	assert.deepStrictEqual(
 		g.tree.map((t) => sans(t.moves)),
 		[["Nf3"], ["Nc3"]],
@@ -53,7 +58,7 @@ test("an inner fork becomes a nested child, not a flattened sibling", () => {
 	const { groups } = footGroups(s.lines, s.lines[0]);
 	assert.strictEqual(groups.length, 1);
 	const g = groups[0];
-	assert.deepStrictEqual(sans(g.stem), ["c5"]);
+	assert.deepStrictEqual(sans(g.stemMoves), ["e4", "c5"]);
 	assert.deepStrictEqual(
 		g.tree.map((t) => sans(t.moves)),
 		[["Nf3"], ["Nc3"]],
@@ -72,7 +77,12 @@ test("the stem runs down a single-child chain to the first fork", () => {
 		{ tags: { 1: "foot", 2: "foot" } },
 	);
 	const { groups } = footGroups(s.lines, s.lines[0]);
-	assert.deepStrictEqual(sans(groups[0].stem), ["c5", "Nf3", "d6"]);
+	assert.deepStrictEqual(sans(groups[0].stemMoves), [
+		"e4",
+		"c5",
+		"Nf3",
+		"d6",
+	]);
 	assert.deepStrictEqual(
 		groups[0].tree.map((t) => sans(t.moves)),
 		[["d4"], ["Bb5+"]],
@@ -85,7 +95,7 @@ test("a member ending at the stem becomes a moveless child", () => {
 	});
 	const { groups } = footGroups(s.lines, s.lines[0]);
 	const g = groups[0];
-	assert.deepStrictEqual(sans(g.stem), ["c5"]);
+	assert.deepStrictEqual(sans(g.stemMoves), ["e4", "c5"]);
 	assert.deepStrictEqual(g.tree[0].moves, [], "the short line has no tail");
 	assert.ok(g.tree[0].line, "but it still carries its line");
 	assert.deepStrictEqual(sans(g.tree[1].moves), ["Nf3"]);
@@ -99,8 +109,11 @@ test("foot lines diverging at different moves are separate groups", () => {
 	const { groups } = footGroups(s.lines, s.lines[0]);
 	assert.strictEqual(groups.length, 2);
 	assert.deepStrictEqual(
-		groups.map((g) => sans(g.stem)),
-		[["c5"], ["e6"]],
+		groups.map((g) => sans(g.stemMoves)),
+		[
+			["e4", "c5"],
+			["e4", "e6"],
+		],
 	);
 });
 
@@ -111,7 +124,7 @@ test("a member ending at an inner fork becomes a moveless child there too", () =
 	);
 	const { groups } = footGroups(s.lines, s.lines[0]);
 	const g = groups[0];
-	assert.deepStrictEqual(sans(g.stem), ["c5"]);
+	assert.deepStrictEqual(sans(g.stemMoves), ["e4", "c5"]);
 	const nf3 = g.tree[0];
 	assert.deepStrictEqual(sans(nf3.moves), ["Nf3"]);
 	assert.strictEqual(nf3.line, null, "a fork never carries a line itself");
@@ -138,11 +151,6 @@ test("a group off a sideline reports its stem in absolute terms", () => {
 	const { groups } = footGroups(s.lines, s.lines[0]);
 	assert.strictEqual(groups.length, 1);
 	const g = groups[0];
-	assert.deepStrictEqual(
-		sans(g.stem),
-		["c5", "Nf3"],
-		"relative to the trie root",
-	);
 	assert.deepStrictEqual(
 		sans(g.stemMoves),
 		["e4", "c5", "Nf3"],

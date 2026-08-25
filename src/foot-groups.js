@@ -43,17 +43,19 @@ function buildGroup(node, main) {
 		? [{ moves: [], line: branch.line, children: [] }, ...branch.children]
 		: branch.children;
 	const members = leavesOf(node);
-	// `stem` is relative to the trie's rooting (top-level children are rooted at
-	// each line's divergence from `main`); `stemMoves` is the same run stated
-	// absolutely — the member's own move array from move 1 up to and including the
-	// last stem move. Callers that need to compare the group against whole lines
-	// (parenting, divergence) want the absolute form, and re-deriving it from
-	// `stem` means re-deriving buildTrie's rooting rule out here.
+	// `stemMoves` states the group's shared run absolutely — the member's own
+	// move array from move 1 up to and including the last stem move. Callers
+	// compare the group against whole lines (parenting, divergence), so the
+	// trie-relative form (the run rooted at the line's divergence from `main`)
+	// would make each of them re-derive buildTrie's rooting rule.
 	const stemMoves = members[0].moves.slice(
 		0,
 		divergence(members[0], main) + branch.moves.length,
 	);
-	return { members, stem: branch.moves, stemMoves, tree };
+	// buildTrie's root-relative path key for the node this group is: stable
+	// across renders, so the editor can name a group (task 23's hide/disable
+	// needs one) without any group id being persisted on the lines.
+	return { key: node.key, members, stemMoves, tree };
 }
 
 // Groups of foot-tagged lines, plus the set of lines they account for. A lone

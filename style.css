@@ -495,10 +495,13 @@ select:focus {
   color: var(--foot);
   font-weight: 700;
 }
+/* One treatment for both nested footnote shapes: smaller and indented, but NOT
+   dimmed. The dimming only ever applied to .subnote, so a lone footnote's notes
+   were faded and a group's branches were not, and a .subnote inside an .fnode
+   faded twice — at depth 6 a group would have dimmed itself out. */
 .subnote {
   margin-left: 1.6em;
   font-size: 0.95em;
-  opacity: 0.85;
 }
 .subnote sup {
   margin-right: 0.3em;
