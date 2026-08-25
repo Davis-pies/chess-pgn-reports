@@ -512,15 +512,6 @@ select:focus {
   margin: 0 auto 6px;
 }
 
-.help {
-  margin: 8px 0;
-  max-width: 720px;
-}
-.help summary {
-  cursor: pointer;
-  font-weight: 600;
-}
-
 .notes {
   margin-top: 16px;
   max-width: 720px;
@@ -803,7 +794,6 @@ sup {
   .notebooks,
   .orow,
   .markup,
-  .help,
   .export,
   .pv-table,
   .notes {
