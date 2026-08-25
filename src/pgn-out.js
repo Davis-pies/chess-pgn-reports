@@ -62,3 +62,69 @@ export function treeFromLines(lines) {
 	}
 	return trunk;
 }
+
+// The spec's export format wraps movetext at 80 columns, breaking only
+// between tokens.
+const WRAP = 80;
+
+// A comment body cannot contain '}' (it would close the comment early) and
+// cannot span lines in a way readers agree on, so newlines collapse to
+// spaces. A '}' becomes ')' rather than being dropped, so the text still
+// reads as the user wrote it.
+function commentText(s) {
+	return String(s).replace(/\}/g, ")").replace(/\s+/g, " ").trim();
+}
+
+function fullmove(ply) {
+	return Math.floor(ply / 2) + 1;
+}
+
+// Emits one run of moves into `out`. `forceNumber` starts true so the first
+// move of a run always carries its number — a variation opening on Black's
+// move must read "1... c5", not a bare "c5".
+function emitSeq(nodes, out) {
+	let forceNumber = true;
+	for (const n of nodes) {
+		if (n.ply % 2 === 0) out.push(fullmove(n.ply) + ".");
+		else if (forceNumber) out.push(fullmove(n.ply) + "...");
+		out.push(n.san);
+		forceNumber = false;
+		// Everything below annotates the move just written, and each of them
+		// separates White's move from Black's reply — so Black has to re-state
+		// its move number afterwards, or a reader pairs it with the wrong move.
+		for (const g of n.nags) {
+			out.push("$" + g);
+			forceNumber = true;
+		}
+		for (const c of n.comments) {
+			out.push("{" + commentText(c) + "}");
+			forceNumber = true;
+		}
+		for (const v of n.variations) {
+			const inner = [];
+			emitSeq(v, inner);
+			out.push("(" + inner.join(" ") + ")");
+			forceNumber = true;
+		}
+	}
+}
+
+// A node's comments are written AFTER its move: a PGN comment annotates the
+// move it follows, which is also how annotate() anchors notes and marks.
+export function writeMovetext(nodes, result) {
+	const out = [];
+	emitSeq(nodes, out);
+	out.push(result);
+	const lines = [];
+	let line = "";
+	for (const tok of out) {
+		if (!line) line = tok;
+		else if (line.length + 1 + tok.length <= WRAP) line += " " + tok;
+		else {
+			lines.push(line);
+			line = tok;
+		}
+	}
+	if (line) lines.push(line);
+	return lines.join("\n");
+}

@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parsePgn } from "../src/pgn.js";
 import { collectLines } from "../src/tree.js";
-import { treeFromLines } from "../src/pgn-out.js";
+import { treeFromLines, writeMovetext } from "../src/pgn-out.js";
 
 // SAN-only view of a node list, so structure assertions stay readable.
 const shape = (nodes) =>
@@ -82,4 +82,47 @@ test("a footnote-tagged line is an ordinary variation", () => {
 
 test("no lines produces no nodes", () => {
 	assert.deepEqual(treeFromLines([]), []);
+});
+
+test("numbers White's moves and runs Black's straight on", () => {
+	const t = treeFromLines(linesOf("1. e4 e5 2. Nf3 Nc6 *"));
+	assert.equal(writeMovetext(t, "*"), "1. e4 e5 2. Nf3 Nc6 *");
+});
+
+test("re-numbers a Black move that follows a variation", () => {
+	const t = treeFromLines(linesOf("1. e4 e5 (1... c5) 2. Nf3 *"));
+	assert.equal(writeMovetext(t, "*"), "1. e4 e5 (1... c5) 2. Nf3 *");
+});
+
+test("re-numbers a Black move that follows a comment", () => {
+	const t = treeFromLines(linesOf("1. e4 e5 *"));
+	t[0].comments.push("a strong start");
+	assert.equal(writeMovetext(t, "*"), "1. e4 {a strong start} 1... e5 *");
+});
+
+test("writes NAG tokens after the move they annotate", () => {
+	const t = treeFromLines(linesOf("1. e4 e5 *"));
+	t[0].nags.push(1);
+	t[1].nags.push(16);
+	assert.equal(writeMovetext(t, "*"), "1. e4 $1 1... e5 $16 *");
+});
+
+test("writes the result token given", () => {
+	const t = treeFromLines(linesOf("1. e4 e5 1-0"));
+	assert.equal(writeMovetext(t, "1-0"), "1. e4 e5 1-0");
+});
+
+test("wraps at 80 columns on token boundaries", () => {
+	const long =
+		"1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 " +
+		"7. Bb3 d6 8. c3 O-O 9. h3 Na5 10. Bc2 c5 11. d4 Qc7 *";
+	const out = writeMovetext(treeFromLines(linesOf(long)), "*");
+	for (const line of out.split("\n")) assert.ok(line.length <= 80, line);
+	assert.equal(out.split(/\s+/).join(" "), long.replace(/\s+/g, " "));
+});
+
+test("escapes a closing brace inside a comment", () => {
+	const t = treeFromLines(linesOf("1. e4 *"));
+	t[0].comments.push("a } brace and\na newline");
+	assert.equal(writeMovetext(t, "*"), "1. e4 {a ) brace and a newline} *");
 });
