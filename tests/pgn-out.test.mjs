@@ -1,5 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { Chess } from "chess.js";
+import { readFileSync } from "node:fs";
 import { parsePgn } from "../src/pgn.js";
 import { collectLines } from "../src/tree.js";
 import {
@@ -232,4 +234,72 @@ test("ends with a single trailing newline", () => {
 	const out = buildPgn({ lines: linesOf("1. e4 *") });
 	assert.ok(out.endsWith("*\n"));
 	assert.ok(!out.endsWith("\n\n"));
+});
+
+const FIXTURE = readFileSync(
+	new URL("./fixtures/capablanca.pgn", import.meta.url),
+	"utf8",
+);
+
+// `nullMoves` marks a case chess.js cannot validate: it does not implement the
+// PGN null move ("--"), which the Capablanca fixture uses to show what a side
+// was threatening. Our export reproduces those moves faithfully — dropping them
+// to satisfy the validator would lose annotation the source carried — so that
+// case is checked by the round-trip alone.
+const CASES = [
+	["plain mainline", "1. e4 e5 2. Nf3 Nc6 *"],
+	["one sideline", "1. e4 e5 (1... c5 2. Nf3 d6) 2. Nf3 *"],
+	["nested sidelines", "1. e4 c5 2. Nf3 d6 (2... Nc6 3. Bb5 (3. d4 cxd4)) *"],
+	["comments", "1. e4 {best by test} e5 (1... c5 {sharp}) *"],
+	["NAGs", "1. e4 $1 e5 $16 2. Nf3 $13 *"],
+	["a decisive result", "1. e4 e5 1-0"],
+	["the capablanca fixture", FIXTURE, { nullMoves: true }],
+];
+
+for (const [name, pgn, opts = {}] of CASES) {
+	const exported = () => {
+		const lines = linesOf(pgn);
+		return { lines, out: buildPgn({ name: "T", lines, result: parsePgn(pgn).result }) };
+	};
+
+	test(`chess.js parses our export of ${name}`, { skip: opts.nullMoves && "chess.js has no null-move support" }, () => {
+		const { out } = exported();
+		const c = new Chess();
+		assert.doesNotThrow(() => c.loadPgn(out), out);
+		// the trunk actually survived, rather than loading as an empty game
+		assert.ok(c.history().length > 0, out);
+	});
+
+	test(`our parser round-trips our export of ${name}`, () => {
+		const { lines, out } = exported();
+		const back = collectLines(parsePgn(out).nodes);
+		const key = (ls) =>
+			ls
+				.map((l) => l.moves.map((m) => m.ply + m.san).join(" "))
+				.sort()
+				.join(" | ");
+		assert.equal(key(back), key(lines), out);
+	});
+}
+
+test("marks survive a round-trip", () => {
+	const lines = linesOf("1. e4 e5 2. Nf3 *");
+	lines[0].marks = { 0: "!", 2: "\u00b1" };
+	const out = buildPgn({ name: "T", lines });
+	const back = collectLines(parsePgn(out).nodes);
+	assert.deepEqual(back[0].marks, { 0: "!", 2: "\u00b1" });
+});
+
+test("a null move survives the export", () => {
+	// chess.js rejects "--", so this is checked against our own parser: the
+	// fixture uses null moves to show a threat, and losing them would drop
+	// annotation the source carried.
+	const lines = linesOf("1. e4 e5 2. -- Bc5 *");
+	const out = buildPgn({ name: "T", lines });
+	assert.match(out, /2\. -- Bc5/);
+	const back = collectLines(parsePgn(out).nodes);
+	assert.deepEqual(
+		back[0].moves.map((m) => m.san),
+		["e4", "e5", "--", "Bc5"],
+	);
 });

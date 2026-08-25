@@ -29,8 +29,11 @@ export function treeFromLines(lines) {
 	if (!lines.length) return [];
 	const main = lines.find((l) => l.isMain) || lines[0];
 	const trunk = tailNodes(main, 0);
-	// nodes[i] of a placed line, so a child can attach into its parent's nodes
-	const placed = new Map([[main, trunk]]);
+	// A placed line's own nodes, plus the move index its first node sits at.
+	// The offset matters: a nested line's `nodes` covers only its tail, so a
+	// child's divergence index (which counts from the START of the game) has to
+	// be rebased before it can pick a host node out of it.
+	const placed = new Map([[main, { nodes: trunk, start: 0 }]]);
 
 	// Shallowest first: a line's parent must already be placed when we get to
 	// it. Depth is how far the line diverges from the mainline — a sideline of
@@ -57,10 +60,10 @@ export function treeFromLines(lines) {
 		if (!nodes.length) continue; // l duplicates its parent; nothing to add
 		// l replaces its parent's move at index pd, so the variation hangs on
 		// that move. A line running past its parent's end hangs on the last.
-		const pn = placed.get(parent);
-		const host = pn[Math.min(pd, pn.length - 1)];
+		const { nodes: pn, start } = placed.get(parent);
+		const host = pn[Math.min(pd - start, pn.length - 1)];
 		host.variations.push(nodes);
-		placed.set(l, nodes);
+		placed.set(l, { nodes, start: pd });
 	}
 	return trunk;
 }
