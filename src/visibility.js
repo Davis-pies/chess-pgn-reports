@@ -46,11 +46,3 @@ export function solo(all, keep) {
 	);
 	setHidden(keep, false);
 }
-
-// Tri-state for the group chip, read back off the leaves rather than stored --
-// the same derivation groupFootChip uses for the group Footnote chip.
-export function hiddenState(leaves) {
-	const hid = leaves.filter((l) => l.hidden).length;
-	if (!hid) return "none";
-	return hid === leaves.length ? "all" : "some";
-}

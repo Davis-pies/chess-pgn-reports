@@ -7,7 +7,6 @@ import {
 	hideAll,
 	showAll,
 	solo,
-	hiddenState,
 } from "../src/visibility.js";
 
 // four lines: the mainline plus three sidelines
@@ -88,13 +87,4 @@ test("solo keeps a whole group", () => {
 		visibleLines(ls).map((l) => l.name),
 		["Mainline", "Line 1", "Line 2"],
 	);
-});
-
-test("hiddenState reads a group's chip state off its leaves", () => {
-	const ls = mk();
-	assert.equal(hiddenState([ls[1], ls[2]]), "none");
-	ls[1].hidden = true;
-	assert.equal(hiddenState([ls[1], ls[2]]), "some");
-	ls[2].hidden = true;
-	assert.equal(hiddenState([ls[1], ls[2]]), "all");
 });

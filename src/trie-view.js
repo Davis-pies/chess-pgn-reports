@@ -8,7 +8,7 @@ import {
 	getRenderHooks,
 } from "./state.js";
 import { subMaxPly } from "./print.js";
-import { setHidden, solo, hiddenState } from "./visibility.js";
+import { setHidden, solo } from "./visibility.js";
 // rerenderTable/rerenderMarkup (app.js shell glue, in-place panel rebuilds)
 // and lineEditor (seam 3) are reached through the render-hooks registry
 // rather than a static `import ... from "./app.js"` -- see the comment on
@@ -121,25 +121,26 @@ function groupFootChip(node) {
 	return chip;
 }
 
-// The group-level Hide chip. Like groupFootChip its state is read back off the
-// leaves rather than stored: all hidden reads "on", some reads "partial". One
-// click always changes something -- it hides every line unless they are all
-// already hidden, in which case it brings them all back.
+// The group-level Hide chip, read back off the leaves rather than stored.
+//
+// Unlike groupFootChip there is no "partial" state to show: a group's leaves
+// are always uniformly visible or uniformly hidden, because the editor builds
+// its trie over the VISIBLE lines and the drawer builds its own over the
+// hidden ones. So the chip hides a whole group in the editor, and brings a
+// whole group back in the drawer.
 function groupHideChip(node) {
 	const leaves = leavesOf(node);
-	const state = hiddenState(leaves);
+	const allHidden = leaves.every((l) => l.hidden);
 	const chip = el("button", {
-		className:
-			"chip hide grouphide" +
-			(state === "all" ? " on" : state === "some" ? " partial" : ""),
-		textContent: state === "all" ? "Hidden" : "Hide",
+		className: "chip hide grouphide" + (allHidden ? " on" : ""),
+		textContent: allHidden ? "Hidden" : "Hide",
 	});
 	chip.onclick = (e) => {
 		// the chip lives in the <summary>, where a click would otherwise toggle
 		// the <details> open/closed as well
 		e.preventDefault();
 		e.stopPropagation();
-		setHidden(leaves, state !== "all");
+		setHidden(leaves, !allHidden);
 		getRenderHooks().renderApp();
 	};
 	return chip;
