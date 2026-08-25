@@ -10,6 +10,7 @@ import {
 	writeMovetext,
 	annotate,
 	buildPgn,
+	applyLineState,
 } from "../src/pgn-out.js";
 
 // SAN-only view of a node list, so structure assertions stay readable.
@@ -19,12 +20,17 @@ const shape = (nodes) =>
 		vars: n.variations.map(shape),
 	}));
 
-// The PGN as a reader sees it: [%...] markers are machine data that viewers
-// hide, so assertions about visible text must not see them.
+// The movetext alone: round-trip state lives in a tag pair, which no reader
+// draws into the move list, so assertions about visible text look only here.
 function visible(pgn) {
-	return pgn
-		.replace(/\[%[^\]]*\]\s?/g, "")
-		.replace(/\{\s*\}\s?/g, ""); // a comment that held only a marker
+	return pgn.split("\n\n").slice(1).join("\n\n");
+}
+
+// Export, re-import, and reapply the state the header carried.
+function roundTrip(lines, state = {}) {
+	const out = buildPgn({ name: "T", lines, ...state });
+	const re = parsePgn(out);
+	return { out, back: applyLineState(collectLines(re.nodes), re.tags) };
 }
 
 function linesOf(pgn) {
@@ -413,40 +419,42 @@ test("many deep lines' notes do not collapse onto one mainline move", () => {
 // Round-trip fidelity: re-importing our own export must not lose which lines
 // are footnotes, their names, or their evaluations. The visible comment is
 // gated by showFootNames and formatted for humans, so it cannot be the
-// carrier — the marker has to survive independently of it.
+// carrier — the state has to travel independently of it.
 test("a footnote tag survives an export and re-import", () => {
 	const lines = linesOf("1. e4 e5 (1... c5 2. Nf3) *");
 	lines[1].tag = "foot";
 	lines[1].name = "Sicilian";
-	lines[1].meta = { eval: "∞", note: "sharp" };
-	const back = collectLines(parsePgn(buildPgn({ name: "T", lines })).nodes);
+	lines[1].meta = { eval: "\u221e", note: "sharp" };
+	const { back } = roundTrip(lines);
 	const side = back.find((l) => l.moves.some((m) => m.san === "c5"));
 	assert.equal(side.tag, "foot");
 	assert.equal(side.name, "Sicilian");
-	assert.equal(side.meta.eval, "∞");
+	assert.equal(side.meta.eval, "\u221e");
 	assert.equal(side.meta.note, "sharp");
 });
 
-test("the round-trip marker is invisible to a reader", () => {
+test("the round-trip state never appears in the movetext", () => {
 	const lines = linesOf("1. e4 e5 (1... c5) *");
 	lines[1].tag = "foot";
 	lines[1].name = "Sicilian";
-	const out = buildPgn({ name: "T", lines });
-	// names are off by default, so nothing human-readable should appear —
-	// the marker is metadata, not text
-	assert.doesNotMatch(out, /Sicilian(?![^[]*\])/, out);
-	const back = collectLines(parsePgn(out).nodes);
-	assert.equal(back.find((l) => l.moves.some((m) => m.san === "c5")).name, "Sicilian");
+	const { out, back } = roundTrip(lines);
+	// names are off by default, so the moves carry no trace of it — the point
+	// of the tag-pair carrier is that a reader is never shown this
+	assert.doesNotMatch(visible(out), /Sicilian/, out);
+	assert.doesNotMatch(visible(out), /%7B|ott/, out);
+	assert.equal(
+		back.find((l) => l.moves.some((m) => m.san === "c5")).name,
+		"Sicilian",
+	);
 });
 
-test("a marker survives alongside real commentary and a NAG", () => {
+test("state survives alongside real commentary and a NAG", () => {
 	const lines = linesOf("1. e4 e5 (1... c5 2. Nf3) *");
 	lines[1].tag = "foot";
 	lines[1].name = "Sicilian";
 	lines[1].marks = { 1: "!" };
-	lines[1].comments = [{ ply: 2, text: "a real note" }]; // Nf3
-	const out = buildPgn({ name: "T", lines });
-	const back = collectLines(parsePgn(out).nodes);
+	lines[1].comments = [{ ply: 2, text: "a real note" }];
+	const { back } = roundTrip(lines);
 	const side = back.find((l) => l.moves.some((m) => m.san === "c5"));
 	assert.equal(side.tag, "foot");
 	assert.equal(side.marks[1], "!");
@@ -456,18 +464,38 @@ test("a marker survives alongside real commentary and a NAG", () => {
 	);
 });
 
-test("chess.js still parses an export carrying round-trip markers", () => {
-	const lines = linesOf("1. e4 e5 (1... c5 2. Nf3) 2. Nf3 *");
+test("a name with quotes and backslashes survives the tag pair", () => {
+	const lines = linesOf("1. e4 e5 (1... c5 2. Nf3) *");
 	lines[1].tag = "foot";
-	lines[1].name = "Sicilian ]}\\ awkward";
-	lines[1].meta = { eval: "∞", note: "brackets } and ] inside" };
-	const out = buildPgn({ name: "T", lines });
+	lines[1].name = 'the "sharp" \\ line';
+	lines[1].meta = { note: "brackets } and ] inside" };
+	const { out, back } = roundTrip(lines);
 	const c = new Chess();
 	assert.doesNotThrow(() => c.loadPgn(out), out);
-	assert.ok(c.history().length > 0, out);
-	// and the awkward characters survive our own round-trip
-	const back = collectLines(parsePgn(out).nodes);
 	const side = back.find((l) => l.moves.some((m) => m.san === "c5"));
-	assert.equal(side.name, "Sicilian ]}\\ awkward");
+	assert.equal(side.name, 'the "sharp" \\ line');
 	assert.equal(side.meta.note, "brackets } and ] inside");
+});
+
+test("a notebook with no line state exports no extra tag", () => {
+	const out = buildPgn({ name: "T", lines: linesOf("1. e4 e5 *") });
+	assert.doesNotMatch(out, /OttLines/, out);
+});
+
+test("each line's label goes on the move unique to that line", () => {
+	// every one of these branches off the same mainline move, so anchoring on
+	// the divergence from the MAINLINE piled every label onto one shared node
+	const lines = linesOf(
+		"1. e4 c5 2. Nf3 d6 (2... Nc6 3. d4) (2... Nc6 3. Bb5) (2... Nc6 3. Bc4) *",
+	);
+	lines.forEach((l, i) => {
+		if (i) l.name = "Line " + i;
+	});
+	const out = visible(buildPgn({ name: "T", lines, showFootNames: true }));
+	for (const body of out.match(/\{[^}]*\}/g) || [])
+		assert.ok(
+			!/Line \d.*Line \d/.test(body),
+			"labels piled onto one move: " + body,
+		);
+	for (let i = 1; i <= 3; i++) assert.ok(out.includes("{Line " + i + "}"), out);
 });

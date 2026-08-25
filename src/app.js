@@ -28,6 +28,7 @@ import {
 } from "./trie-view.js";
 import { lineEditor } from "./line-editor.js";
 import { notesPanel, exportBar } from "./export.js";
+import { applyLineState } from "./pgn-out.js";
 
 // Canonical reset for `current`. Every "start over" path (New/Import, Load &
 // Tag, opening a saved notebook, a failed open) rebuilt this object from an
@@ -629,7 +630,7 @@ function importPanel() {
   go.onclick = () => {
     withLoading(() => {
       try {
-        const { nodes } = parsePgn(ta.value);
+        const { nodes, tags } = parsePgn(ta.value);
         if (!nodes.length) {
           alert("No moves found in PGN");
           return;
@@ -639,7 +640,9 @@ function importPanel() {
           freshState({
             id: getCurrent().id,
             pgn: ta.value,
-            lines: collectLines(nodes),
+            // re-importing our own export restores each line's tag, name and
+            // notes from the header; another program's PGN has no such tag
+            lines: applyLineState(collectLines(nodes), tags),
             boardSize: getCurrent().boardSize,
             cardFont: getCurrent().cardFont,
             sideWidth: getCurrent().sideWidth,

@@ -35,12 +35,16 @@ function tailNodes(line, d) {
 // altogether — which used to fall back to the MAINLINE's node at that ply, so
 // notes from every deep variation piled onto one early mainline move.
 export function buildTree(lines) {
-	if (!lines.length) return { trunk: [], byLine: new Map() };
+	if (!lines.length)
+		return { trunk: [], byLine: new Map(), ownFirst: new Map() };
 	const main = lines.find((l) => l.isMain) || lines[0];
 	const trunk = tailNodes(main, 0);
-	const byLine = new Map([
-		[main, new Map(trunk.map((n) => [n.ply, n]))],
-	]);
+	const byLine = new Map([[main, new Map(trunk.map((n) => [n.ply, n]))]]);
+	// The first node that exists BECAUSE of this line — the head of its own
+	// tail. Anything describing the line as a whole belongs here. Its
+	// divergence from the MAINLINE is the wrong anchor: a hundred branches off
+	// one mainline move all share that node, so a hundred labels piled onto it.
+	const ownFirst = new Map([[main, trunk[0]]]);
 	// A placed line's own nodes, plus the move index its first node sits at.
 	// The offset matters: a nested line's `nodes` covers only its tail, so a
 	// child's divergence index (which counts from the START of the game) has to
@@ -73,6 +77,8 @@ export function buildTree(lines) {
 			// l duplicates its parent: no moves of its own, so it draws none —
 			// but it still needs a map, and its parent's is exactly right.
 			byLine.set(l, byLine.get(parent));
+			// no moves of its own: the best it can point at is its parent's head
+			ownFirst.set(l, ownFirst.get(parent));
 			continue;
 		}
 		const { nodes: pn, start } = placed.get(parent);
@@ -89,8 +95,9 @@ export function buildTree(lines) {
 			if (ply < nodes[0].ply) map.set(ply, n);
 		for (const n of nodes) map.set(n.ply, n);
 		byLine.set(l, map);
+		ownFirst.set(l, nodes[0]);
 	}
-	return { trunk, byLine };
+	return { trunk, byLine, ownFirst };
 }
 
 export function treeFromLines(lines) {
@@ -173,7 +180,7 @@ export function writeMovetext(nodes, result) {
 //
 // A note whose ply its line never draws is dropped rather than guessed at —
 // putting it on some other line's move is worse than leaving it out.
-export function annotate({ trunk, byLine }, lines, notes, opts = {}) {
+export function annotate({ trunk, byLine, ownFirst }, lines, notes, opts = {}) {
 	const main = lines.find((l) => l.isMain) || lines[0];
 	const idx = byLine;
 
@@ -201,14 +208,9 @@ export function annotate({ trunk, byLine }, lines, notes, opts = {}) {
 		// The marker rides on the same move as the label but is independent of
 		// it: the label is gated by the name setting and formatted for humans,
 		// so it cannot carry the state our own importer needs back.
-		const mark = lineMarker(l);
-		if ((label || mark) && !l.isMain) {
-			const d = divergence(l, main);
-			const m = l.moves[d] || l.moves[l.moves.length - 1];
-			const n = m && per && per.get(m.ply);
-			// the marker goes first so a reader's eye meets the prose, not it
-			if (n && mark && !n.comments.includes(mark)) n.comments.push(mark);
-			if (n && label && !n.comments.includes(label)) n.comments.push(label);
+		if (label && !l.isMain) {
+			const n = ownFirst.get(l);
+			if (n && !n.comments.includes(label)) n.comments.push(label);
 		}
 	}
 
@@ -234,22 +236,70 @@ export function annotate({ trunk, byLine }, lines, notes, opts = {}) {
 // already travel as NAGs, comments as comments, and a promoted mainline comes
 // back as the trunk it was exported as.
 //
-// It is written as a PGN "[%...]" comment marker: readers that understand them
-// (lichess, chesstempo) treat them as machine data and never show them as
-// text, and pgn.js already strips them out of comment prose. The payload is
-// URI-encoded, which escapes "]" and "}" — the two characters that would
-// otherwise end the marker or the comment early.
-const MARKER = "ott";
+// It rides in a PGN tag pair rather than a "[%...]" comment marker. A comment
+// marker looked tidier on paper, but viewers do not agree on hiding unknown
+// ones -- Chesstempo renders them as visible text, so a notebook with a hundred
+// named lines showed a wall of encoded JSON against a move. Tag pairs are
+// metadata by definition: every reader parses them, none draws them into the
+// move list, and an unknown one is ignored.
+//
+// Lines are keyed by their SAN move string, the same key store.js uses for
+// saved notebooks, so the mapping survives re-parsing. The payload is
+// URI-encoded, which escapes the quote and backslash that would otherwise
+// need tag-value escaping.
+const STATE_TAG = "OttLines";
 
-function lineMarker(l) {
+function lineState(l) {
 	const meta = l.meta || {};
 	const data = {};
 	if (l.tag === "foot") data.t = "foot";
 	if (l.name) data.n = l.name;
 	if (meta.eval) data.e = meta.eval;
 	if (meta.note) data.o = meta.note;
-	if (!Object.keys(data).length) return "";
-	return "[%" + MARKER + " " + encodeURIComponent(JSON.stringify(data)) + "]";
+	return Object.keys(data).length ? data : null;
+}
+
+function keyOf(l) {
+	return l.moves.map((m) => m.san).join(" ");
+}
+
+// The tag value carrying every line that has state worth keeping. Empty when
+// nothing does, so an untouched notebook exports a clean file.
+function stateTag(lines) {
+	const out = {};
+    for (const l of lines) {
+		const data = lineState(l);
+		if (data) out[keyOf(l)] = data;
+	}
+	return Object.keys(out).length
+		? encodeURIComponent(JSON.stringify(out))
+		: "";
+}
+
+// Reapply what stateTag wrote. Called by the import path after collectLines;
+// a PGN we did not write simply has no such tag and leaves the lines alone.
+export function applyLineState(lines, tags) {
+	const raw = tags && tags[STATE_TAG];
+	if (!raw) return lines;
+	let map;
+	try {
+		map = JSON.parse(decodeURIComponent(raw));
+	} catch {
+		// a corrupted or hand-edited tag is not worth failing an import over
+		return lines;
+	}
+	for (const l of lines) {
+		const d = map[keyOf(l)];
+		if (!d) continue;
+		if (d.t) l.tag = d.t;
+		if (d.n) l.name = d.n;
+		if (d.e || d.o) {
+			l.meta = { ...(l.meta || {}) };
+			if (d.e) l.meta.eval = d.e;
+			if (d.o) l.meta.note = d.o;
+		}
+	}
+	return lines;
 }
 
 // A PGN tag value is a quoted string: '"' and '\' are the only characters that
@@ -264,7 +314,8 @@ function tagValue(s) {
 // chesstempo) reject or mangle a file that omits it, and the report has no
 // player or event data to put there, so the spec's "?" / "????.??.??"
 // placeholders stand in.
-function tagPairs(state, result) {
+function tagPairs(state, result, lines) {
+	const extra = stateTag(lines);
 	return [
 		["Event", state.name || "?"],
 		["Site", "?"],
@@ -273,6 +324,7 @@ function tagPairs(state, result) {
 		["White", "?"],
 		["Black", "?"],
 		["Result", result],
+		...(extra ? [[STATE_TAG, extra]] : []),
 	]
 		.map(([k, v]) => `[${k} "${tagValue(v)}"]`)
 		.join("\n");
@@ -298,7 +350,7 @@ export function buildPgn(state) {
 		opts,
 	);
 	return (
-		tagPairs(state, result) +
+		tagPairs(state, result, lines) +
 		"\n\n" +
 		writeMovetext(tree.trunk, result) +
 		"\n"

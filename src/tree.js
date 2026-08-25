@@ -31,22 +31,6 @@ function chainToMarks(chain) {
 	return marks;
 }
 
-// The per-line state a [%ott ...] marker carried, unpacked into the fields the
-// editor uses. Written by src/pgn-out.js; absent for any PGN we did not write,
-// which simply leaves the line with its defaults.
-function lineState(node) {
-	const d = node && node.ott;
-	if (!d) return {};
-	const meta = {};
-	if (d.e) meta.eval = d.e;
-	if (d.o) meta.note = d.o;
-	const out = {};
-	if (d.t) out.tag = d.t;
-	if (d.n) out.name = d.n;
-	if (Object.keys(meta).length) out.meta = meta;
-	return out;
-}
-
 function nodeComments(seq) {
 	const out = [];
 	seq.forEach((n) =>
@@ -83,9 +67,6 @@ export function collectLines(nodes) {
 				fen: last.fen,
 				ply: last.ply,
 				comments: nodeComments(own),
-				// state our PGN exporter wrote onto this line's FIRST OWN move —
-				// the same move its label comment sits on
-				...lineState(own[0]),
 			});
 		}
 	}
