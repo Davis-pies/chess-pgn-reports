@@ -232,14 +232,16 @@ export function renderTrieNode(
 	});
 	// Marking a group as a footnote is marking all its lines: the group IS one
 	// footnote precisely when every line under it is tagged (see foot-groups.js).
-	// A group of one is just a line, and its own editor row already has the chip.
-	// A group of one is just a line, and its own editor row already has these.
-	if (count > 1)
-		summary.append(
-			groupFootChip(node),
-			groupHideChip(node),
-			groupSoloChip(node),
-		);
+	//
+	// A group of ONE gets the chips too. Its line editor carries the same three,
+	// but only once the group is expanded -- and a collapsed lone line is the
+	// common case, so hiding or tagging it would otherwise cost an expand first.
+	// leavesOf() returns the single line, so each chip acts on exactly it.
+	summary.append(
+		groupFootChip(node),
+		groupHideChip(node),
+		groupSoloChip(node),
+	);
 	det.appendChild(summary);
 	const body = el("div", { className: "lgroup-body" });
 	const open = det.open;

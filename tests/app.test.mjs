@@ -584,7 +584,7 @@ test("clicking the group chip does not toggle the group open or shut", async () 
 	);
 });
 
-test("a one-line group carries no group chip -- its line editor has one", async () => {
+test("a collapsed one-line group carries the chips without expanding", async () => {
 	app.reset();
 	const view = doc("view");
 	view.querySelector("textarea.pgnin").value =
@@ -593,14 +593,42 @@ test("a one-line group carries no group chip -- its line editor has one", async 
 		.find((b) => b.textContent.includes("Load"))
 		.click();
 	await tick();
-	const groups = [...doc("view").querySelectorAll(".markup details.lgroup")];
-	assert.ok(groups.length, "a group is rendered for the lone line");
-	groups.forEach((g) =>
-		assert.strictEqual(
-			g.querySelector("summary .chip.groupfoot"),
-			null,
-			"a group of one is just a line",
+	const group = doc("view").querySelector(".markup details.lgroup");
+	assert.ok(group, "a group is rendered for the lone line");
+	assert.strictEqual(group.open, false, "still collapsed");
+	["groupfoot", "grouphide", "groupsolo"].forEach((cls) =>
+		assert.ok(
+			group.querySelector("summary .chip." + cls),
+			cls + " is reachable without expanding",
 		),
+	);
+});
+
+test("a one-line group's chips act on its single line", async () => {
+	app.reset();
+	const view = doc("view");
+	view.querySelector("textarea.pgnin").value =
+		"1. e4 e5 (1... c5 2. Nf3) 2. Nf3";
+	[...view.querySelectorAll("button")]
+		.find((b) => b.textContent.includes("Load"))
+		.click();
+	await tick();
+	const line = getCurrent().lines.find((l) => !l.isMain);
+
+	doc("view")
+		.querySelector(".markup details.lgroup summary .chip.groupfoot")
+		.click();
+	await tick();
+	assert.strictEqual(line.tag, "foot", "the Footnote chip tagged the line");
+
+	doc("view")
+		.querySelector(".markup details.lgroup summary .chip.grouphide")
+		.click();
+	await tick();
+	assert.strictEqual(line.hidden, true, "the Hide chip hid the line");
+	assert.ok(
+		doc("view").querySelector(".hidden-drawer"),
+		"and it moved into the drawer",
 	);
 });
 
