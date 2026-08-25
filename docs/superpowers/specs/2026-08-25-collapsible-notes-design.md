@@ -1,0 +1,229 @@
+# Collapsible Notes — Design
+
+**Task:** `df3c5369` — Let the editor collapse note groups and notes as a whole,
+matching the collapsible grouping the line editor already has for trie branches.
+
+**Goal:** Make the on-screen **Notes** panel foldable. Every cluster of related
+entries — a group footnote's branches, a footnote's own sub-notes, several notes
+sharing one move — collapses to a one-line header, and the whole section
+collapses to its heading. Everything starts expanded; the panel remembers what
+you closed for the rest of the session.
+
+The task annotation calls its sibling "task 23 (table expand/collapse)". Task 23
+is the PGN tag editor; the sibling it means is **task 21**, the table's
+expand/collapse work.
+
+---
+
+## 1. Scope
+
+Screen only. `.notes` is `display: none` inside the print `@media` block in
+`style.css`, and Markdown, PGN and the print report each build their notes
+through their own code path (`buildMarkdown`, `buildPgn`, `print.js`'s
+`printNotes`). No exported artifact changes shape, and no test covering one
+should move.
+
+## 2. `src/notes-view.js`
+
+A new module. It owns the screen Notes panel, which moves out of `src/export.js`
+— that file is left with `moveRef`, `branchContext`, `exportBar` and
+`buildMarkdown`, one subject instead of three. Indents with **TABS**, matching
+`notes.js`, `render.js` and `visibility.js`.
+
+### 2.1 `noteTree(entries)` — pure
+
+Takes `allNotes()`'s entry list and returns the root node. Every node is:
+
+```js
+{ key, head, count, kind, rows }   // kind: "branches" | "notes" | "items"
+```
+
+`rows` holds child nodes and leaves; a **leaf** is an entry with nothing nested
+under it. Only nodes are collapsible, so nothing gains a disclosure triangle it
+has no use for.
+
+Three rules build the tree:
+
+| Rule | Becomes a node when | Head | `kind` |
+| ---- | ------------------- | ---- | ------ |
+| Same-move cluster | **two or more** entries share an `(owner, ply)` pair | `moveRef(ply, owner)` | `notes` |
+| Footnote entry | `foot.children.length \|\| foot.subNotes.length` | the footnote stem | see below |
+| Nested foot node | an `.fnode` that itself has children or sub-notes | that node's stem | see below |
+
+A footnote's `kind` is `branches` when it has only children, `notes` when it has
+only sub-notes, `items` when it has both. The header count reads `4 branches`,
+`2 notes`, `3 items`, singular below two.
+
+Sub-notes come before branches inside a footnote node, which is the order
+`appendFootnote()` already renders them in.
+
+**A cluster suppresses the repeated move reference.** A plain note renders as
+`moveRef(ply, owner) + " — " + text` today. Inside a cluster the reference is
+already in the header, so the rows render their text alone; a note that is not in
+a cluster is unchanged.
+
+A footnote entry inside a same-move cluster keeps its own stem — it never
+printed a move reference to begin with. If that footnote has branches of its own
+it is a node **inside** the cluster node, collapsible on its own; the rules
+compose rather than competing for the entry.
+
+### 2.2 Keys
+
+`numberNotes()` renumbers every entry on every render (the `remap` pass at the
+end of `notes.js`), so `n` cannot key anything that must survive an edit. A key
+is a path built from content:
+
+| Level | Segment |
+| ----- | ------- |
+| root | `notes` |
+| same-move cluster | `m<ownerIdx>:<ply>` |
+| entry | `e<ply>:<firstSan>` |
+| nested foot node | its sibling index |
+
+`ownerIdx` is the owner line's index in `getCurrent().lines`; `firstSan` is
+`foot.moves[foot.d]`'s SAN, or empty for a footnote with no tail of its own.
+Segments join with `/`.
+
+Two footnote entries sharing an owner, a ply **and** a first SAN would share a
+key and therefore a collapse state. `numberNotes()` gives each such entry its own
+number, so this is possible in principle; it is accepted, because the only
+consequence is that the pair folds together.
+
+A key that does go stale — a line promoted to mainline reorders `lines`, say —
+costs nothing: the default is expanded and the state Set records only what the
+user **closed**, so a stale key reopens a group. It can never hide a note.
+
+### 2.3 `notesPanel()`
+
+Walks the tree. A node becomes:
+
+```html
+<details class="ngroup" open>
+  <summary class="ng-head">…head… · 4 branches</summary>
+  <div class="ngroup-body">…rows…</div>
+</details>
+```
+
+with `details.open = !closedNotePaths.has(key)`. A leaf keeps rendering exactly
+as it does now — a `.nt` row for a note, `appendFootnote()`'s output for a
+footnote with nothing nested.
+
+The section itself is the outermost node: `<details class="notes">` whose
+`<summary>` holds the existing `<h3>Notes</h3>` and the two bulk chips. The class
+stays `notes`, so the print rule that hides it still matches.
+
+### 2.4 Toggling does not re-render
+
+The `toggle` listener adds or deletes the key and stops. This differs from
+`renderTrieNode()` in `trie-view.js`, which rebuilds on every toggle — it has to,
+because inline boards appear and disappear with expansion. The notes panel's
+nested content is already in the DOM and `<details>` hides it natively, so a
+rebuild would be work with no visible effect. It also sidesteps the toggle-loop
+guard `renderTrieNode()` needs, because jsdom fires `toggle` when a rebuilt
+element is handed `open = true`.
+
+Recording the key still matters: the next full `renderApp()` — from tagging a
+line, editing a note, anything — rebuilds the panel from the Set.
+
+### 2.5 Expand all / Collapse all
+
+Two `chip mini` buttons in the section's `<summary>`, matching `markupPanel()`'s
+pair. Both call `preventDefault()` and `stopPropagation()` so the click does not
+also toggle the section, the way `groupFootChip()` does inside its `<summary>`.
+
+- **Expand all** — `closedNotePaths.clear()`
+- **Collapse all** — walk the tree with `collectNoteKeys()` and add every key,
+  the section's own key included
+
+Both then call `getRenderHooks().rerenderNotes()`.
+
+## 3. `src/state.js`
+
+```js
+// Note groups the user COLLAPSED in the Notes panel. Inverted relative to
+// openPaths: notes are a reference list, so everything starts expanded and the
+// Set records what was closed. Session-only — never saved with the notebook.
+export const closedNotePaths = new Set();
+```
+
+Session lifetime, like `openPaths` / `openTablePaths` / `openHiddenPaths`:
+survives re-renders, cleared when a notebook is opened or started fresh, gone on
+reload. Nothing in `store.js` changes.
+
+## 4. `src/app.js`
+
+A `notesBox` module reference beside the existing `markupBox`, and a
+`rerenderNotes()` that rebuilds it in place:
+
+```js
+function rerenderNotes() {
+  if (!notesBox) return;
+  const nb = notesPanel();
+  notesBox.replaceChildren(...nb.children);
+}
+```
+
+registered in the `setRenderHooks()` call alongside `rerenderMarkup`. In-place,
+so the left panel's scroll position survives — the same reason `rerenderMarkup`
+exists.
+
+`closedNotePaths.clear()` joins `openPaths.clear()` at all three sites that
+already call it: the module-level pair near the top of `app.js` (which exists for
+the test suite's re-imports), the notebook-open handler, and the PGN-import
+handler.
+
+## 5. `src/render.js` seams
+
+Two exports, so the collapsible view reuses the footnote rendering rather than
+restating it:
+
+| Export | Content |
+| ------ | ------- |
+| `footStem(container, foot)` | the inline span: name, moves (via `appendFootMoves`), eval, note. Appends nothing when there is nothing to show, which is the existing `span.childNodes.length` guard. |
+| `subNoteRow(s)` | one `.subnote` div for a sub-note |
+
+`appendFootnote()` and `renderSubNotes()` are refactored to call them and keep
+their exact current output. `print.js` and the cards path are untouched, and
+neither acquires a screen-only mode flag — the reason for a new module rather
+than a `{ collapsible }` option on `appendFootnote()`.
+
+## 6. CSS
+
+```css
+.ngroup-body {
+  border-left: 2px solid var(--line);
+  padding-left: 8px;
+  margin-left: 0.4em;
+}
+```
+
+The vertical guide at every indentation level, the treatment `.lgroup` already
+uses in the editor. The body wrapper now supplies the indentation step, so
+`.fnode` and `.subnote` inside a `.ngroup-body` drop their own `margin-left` and
+do not step twice. The bare `.fnode` / `.subnote` rules are unchanged, because
+print and the cards still render those rows flat and rely on the `em` margin —
+including the depth-6 behaviour `render.test.mjs` pins.
+
+`.ng-head` copies `.lg-head`'s `cursor: pointer` and hover color.
+
+## 7. Testing
+
+New `tests/notes-view.test.mjs`:
+
+- `noteTree`: two entries at one `(owner, ply)` cluster; a lone entry at a move
+  stays a leaf; a group footnote becomes a node counting its branches; a
+  footnote with sub-notes becomes a node counting its notes; a footnote with
+  both reads `items`; nesting recurses into an inner fork.
+- Keys are stable across a rerender that renumbers the notes.
+- `closedNotePaths` drives `details.open`.
+- Toggling a `<details>` records the key, and closing it does **not** rebuild the
+  panel (the same element instance is still in the DOM afterwards).
+- Collapse all fills the Set from the tree; Expand all empties it.
+- A cluster prints its move reference once, in the header.
+
+`tests/export.test.mjs` updates its `notesPanel` import to the new module.
+`tests/render.test.mjs` and `tests/print.test.mjs` must pass **unchanged** —
+that is the evidence the flat footnote path did not move.
+
+Do not import `src/app.js` with a `?t=` cache-buster in any new test; it hides
+most of that module's coverage.
