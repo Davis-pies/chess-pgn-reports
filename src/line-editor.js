@@ -5,7 +5,8 @@ import { getCurrent, getSharedInfo, getRenderHooks } from "./state.js";
 import { NAGS } from "./nags.js";
 import { numberNotes } from "./notes.js";
 import { branchContext } from "./export.js";
-import { visibleLines, setHidden, solo } from "./visibility.js";
+import { visibleLines, setHidden, isFocused } from "./visibility.js";
+import { focusLines } from "./trie-view.js";
 
 export function lineEditor(l, idx, showBoard = false) {
 	const row = el("div", { className: "ledge" });
@@ -56,17 +57,18 @@ export function lineEditor(l, idx, showBoard = false) {
 			setHidden([l], !l.hidden);
 			getRenderHooks().renderApp();
 		};
-		// Labelled "Focus"; the mechanism behind it is visibility.js's solo(),
-		// which is what the class and the handler are still named after.
+		// Labelled "Focus"; the class is still `solo`, after the visibility.js
+		// primitive underneath. It lights up when this line is exactly what the
+		// notebook is showing, so a focus is visible rather than guessed at.
+		const focused = isFocused(getCurrent().lines, [l]);
 		const soloBtn = el("button", {
-			className: "chip solo",
+			className: "chip solo" + (focused ? " on" : ""),
 			textContent: "Focus",
-			title: "hide every other line",
+			title: focused
+				? "this line is what the notebook is showing"
+				: "hide every other line",
 		});
-		soloBtn.onclick = () => {
-			solo(getCurrent().lines, [l]);
-			getRenderHooks().renderApp();
-		};
+		soloBtn.onclick = () => focusLines([l]);
 		tags.append(hide, soloBtn);
 	}
 	const head = el("div", { className: "ledge-head" });

@@ -935,3 +935,147 @@ test("focusing a child group keeps its parent standing as a group", async () => 
 		"the focused child is nested inside it",
 	);
 });
+
+// 4.Nxd4 forks into 4...e5 and 4...g6; the 4...g6 group itself holds two lines,
+// so focusing it leaves the table with a single multi-line branch.
+const FOCUS_PGN =
+	"1. e4 c5 2. Nf3 d6 " +
+	"(2... Nc6 3. d4 cxd4 4. Nxd4 g6 (4... e5 5. Nb5 d6) 5. c4 Bg7 " +
+	"(5... Nf6 6. Nc3)) " +
+	"3. d4 cxd4 4. Nxd4 Nf6";
+
+async function loadFocusPgn() {
+	app.reset();
+	const view = doc("view");
+	view.querySelector("textarea.pgnin").value = FOCUS_PGN;
+	[...view.querySelectorAll("button")]
+		.find((b) => b.textContent.includes("Load"))
+		.click();
+	await tick();
+}
+
+const tableRows = () =>
+	[...doc("view").querySelectorAll(".pv-table table.tbl tr")].map((r) =>
+		[...r.children].map((c) => c.textContent.trim()).join(" "),
+	);
+
+test("group Focus shows the focused lines in the table, not a collapsed stub", async () => {
+	await loadFocusPgn();
+	const group = [...doc("view").querySelectorAll(".markup details.lgroup")].find(
+		(d) => d.querySelector("summary").firstChild.textContent.includes("4...g6"),
+	);
+	assert.ok(group, "the 4...g6 group is there");
+	group.querySelector("summary .chip.groupsolo").click();
+	await tick();
+
+	const visible = getCurrent().lines.filter((l) => !l.hidden && !l.isMain);
+	assert.strictEqual(visible.length, 2, "two lines survive the focus");
+	assert.strictEqual(
+		doc("view").querySelectorAll(".pv-table .collapsed").length,
+		0,
+		"the focused branch is not shown as an 'N lines' stub:\n" +
+			tableRows().join("\n"),
+	);
+	// both focused lines have a row of their own, so their divergent moves show
+	const body = doc("view").querySelector(".pv-table").textContent;
+	assert.ok(body.includes("Bg7"), "one focused line's own move is in the table");
+	assert.ok(body.includes("Nf6"), "the other's too");
+});
+
+test("per-line Focus shows that line in the table", async () => {
+	await loadFocusPgn();
+	const row = [...doc("view").querySelectorAll(".markup .ledge")].find((r) =>
+		r.textContent.includes("Nb5"),
+	);
+	assert.ok(row, "the 4...e5 line has an editor row");
+	[...row.querySelectorAll("button")]
+		.find((b) => b.textContent === "Focus")
+		.click();
+	await tick();
+
+	assert.strictEqual(
+		doc("view").querySelectorAll(".pv-table .collapsed").length,
+		0,
+		"no collapsed stub:\n" + tableRows().join("\n"),
+	);
+	assert.ok(
+		doc("view").querySelector(".pv-table").textContent.includes("Nb5"),
+		"the focused line's own move is in the table",
+	);
+});
+
+test("the Focus chip lights up for the group that is showing", async () => {
+	await loadFocusPgn();
+	const groupNamedG6 = () =>
+		[...doc("view").querySelectorAll(".markup details.lgroup")].find((d) =>
+			d.querySelector("summary").firstChild.textContent.includes("4...g6"),
+		);
+	const chip = () => groupNamedG6().querySelector("summary .chip.groupsolo");
+	assert.ok(!chip().className.includes("on"), "off before any focus");
+
+	chip().click();
+	await tick();
+	assert.ok(chip().className.includes("on"), "on once it is what is showing");
+
+	// Show all ends the focus, and the chip has to stop claiming it
+	[...doc("view").querySelectorAll(".markup button")]
+		.find((b) => b.textContent === "Show all")
+		.click();
+	await tick();
+	assert.ok(!chip().className.includes("on"), "off again after Show all");
+});
+
+test("a focused line's Focus chip lights up, its sibling's does not", async () => {
+	await loadFocusPgn();
+	// not the drawer's rows: a hidden line still has a .ledge down there
+	const rowFor = (san) =>
+		[...doc("view").querySelectorAll(".markup .ledge")]
+			.filter((r) => !r.closest(".hidden-drawer"))
+			.find((r) => r.textContent.includes(san));
+	const chipIn = (row) =>
+		[...row.querySelectorAll("button")].find((b) => b.textContent === "Focus");
+
+	chipIn(rowFor("Nb5")).click();
+	await tick();
+	assert.ok(
+		chipIn(rowFor("Nb5")).className.includes("on"),
+		"the focused line's chip is lit",
+	);
+	assert.strictEqual(
+		rowFor("Bg7"),
+		undefined,
+		"the lines outside the focus have left the editor for the drawer",
+	);
+	assert.ok(
+		[...doc("view").querySelectorAll(".hidden-drawer .ledge")].some((r) =>
+			r.textContent.includes("Bg7"),
+		),
+		"and they are findable there",
+	);
+});
+
+test("a focused group that is tagged Footnote stays out of the table", async () => {
+	await loadFocusPgn();
+	const group = () =>
+		[...doc("view").querySelectorAll(".markup details.lgroup")].find((d) =>
+			d.querySelector("summary").firstChild.textContent.includes("4...g6"),
+		);
+	group().querySelector("summary .chip.groupfoot").click();
+	await tick();
+	group().querySelector("summary .chip.groupsolo").click();
+	await tick();
+
+	// the lines are visible — Focus kept them — but a footnote is not a table
+	// row, so the table holds the mainline alone and they render as notes
+	assert.strictEqual(
+		getCurrent().lines.filter((l) => !l.hidden && !l.isMain).length,
+		2,
+		"both focused lines are still visible",
+	);
+	const body = doc("view").querySelector(".pv-table").textContent;
+	assert.ok(!body.includes("Bg7"), "a footnote line is not a table row");
+	assert.ok(
+		doc("view").querySelector(".notes").textContent.includes("Bg7"),
+		"it is in the Notes instead",
+	);
+});
