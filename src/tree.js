@@ -4,10 +4,31 @@
 // comments owned by it (mainline owns trunk comments; a variation owns only
 // its own nodes' comments), so note markers render without row duplication.
 
+import { symFor } from "./nags.js";
+
 function chainToMoves(chain) {
 	return chain
 		.filter((x) => x && x.san)
 		.map((x) => ({ san: x.san, ply: x.ply }));
+}
+
+// A line's per-move symbols, recovered from the NAG codes the PGN carried.
+// pgn.js records them on the node; without this they would be parsed and then
+// silently dropped, so an imported annotation could never be re-exported.
+// A code outside our table has no glyph to show, so it is skipped.
+function chainToMarks(chain) {
+	const marks = {};
+	chain.forEach((x) => {
+		if (!x || !x.san || !x.nags) return;
+		for (const code of x.nags) {
+			const sym = symFor(code);
+			if (sym) {
+				marks[x.ply] = sym;
+				break;
+			}
+		}
+	});
+	return marks;
 }
 
 function nodeComments(seq) {
@@ -42,6 +63,7 @@ export function collectLines(nodes) {
 			const last = path[path.length - 1];
 			lines.push({
 				moves: chainToMoves(path),
+				marks: chainToMarks(path),
 				fen: last.fen,
 				ply: last.ply,
 				comments: nodeComments(own),
@@ -57,6 +79,7 @@ export function collectLines(nodes) {
 	const last = chain[chain.length - 1];
 	const main = {
 		moves: chainToMoves(chain),
+		marks: chainToMarks(chain),
 		fen: last.fen,
 		ply: last.ply,
 		isMain: true,

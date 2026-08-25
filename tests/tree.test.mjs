@@ -61,3 +61,13 @@ test("buildTrie groups lines by their shared divergent tail", () => {
 	assert.strictEqual(countLeaves(c5), 2);
 	assert.deepStrictEqual(leavesOf(c5), [a, b]);
 });
+
+test("carries a move's imported NAGs onto the line's marks", () => {
+	const lines = collectLines(parsePgn("1. e4 $1 e5 $16 *").nodes);
+	assert.deepEqual(lines[0].marks, { 0: "!", 1: "±" });
+});
+
+test("ignores a NAG code outside the table", () => {
+	const lines = collectLines(parsePgn("1. e4 $250 *").nodes);
+	assert.deepEqual(lines[0].marks, {});
+});
