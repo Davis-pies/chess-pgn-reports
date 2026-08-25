@@ -121,3 +121,47 @@ test("a variation's note shows only on the variation, not the mainline branch mo
 		"the variation shows its own note",
 	);
 });
+
+test("a hidden line is absent from the grid", () => {
+	const lines = [
+		{ isMain: true, moves: [{ san: "e4", ply: 0 }], name: "Mainline" },
+		{
+			moves: [
+				{ san: "e4", ply: 0 },
+				{ san: "c5", ply: 1 },
+			],
+			name: "Visible",
+			tag: "sideline",
+		},
+		{
+			moves: [
+				{ san: "e4", ply: 0 },
+				{ san: "e5", ply: 1 },
+			],
+			name: "Gone",
+			tag: "sideline",
+			hidden: true,
+		},
+	];
+	const g = grid(lines);
+	assert.deepEqual(
+		g.vars.map((v) => v.name),
+		["Mainline", "Visible"],
+	);
+});
+
+test("a hidden footnote is absent from footNotes", () => {
+	const lines = [
+		{ isMain: true, moves: [{ san: "e4", ply: 0 }], name: "Mainline" },
+		{
+			moves: [
+				{ san: "e4", ply: 0 },
+				{ san: "e5", ply: 1 },
+			],
+			name: "Gone",
+			tag: "foot",
+			hidden: true,
+		},
+	];
+	assert.equal(grid(lines).footNotes.length, 0);
+});

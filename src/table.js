@@ -8,6 +8,7 @@
 
 import { divergence } from "./tree.js";
 import { numberNotes } from "./notes.js";
+import { visibleLines } from "./visibility.js";
 
 const TAG_META = {
 	mainline: { label: "Mainline" },
@@ -15,7 +16,11 @@ const TAG_META = {
 	foot: { label: "Footnote" },
 };
 
-export function grid(lines) {
+export function grid(all) {
+	// Hidden lines leave the table, the print view and the Markdown export.
+	// Filtering HERE -- ahead of the isMain lookup and numberNotes -- also means
+	// a hidden line consumes no [n] note number and no footnote letter.
+	const lines = visibleLines(all);
 	const main = lines.find((l) => l.isMain) || lines[0];
 	// Numbering lives in notes.js so the table's [n] superscripts and the Notes
 	// list cannot drift apart. byLine gives each line its own ply -> [numbers].
