@@ -434,7 +434,7 @@ export function renderCards(container, grid, opts = {}) {
 					ply: Number(ply),
 					foot: !!note.foot,
 					text: note.foot ? footnoteText(note.foot) : strip(note.text),
-					subNotes: note.foot ? subNoteLines(note.foot) : [],
+					subNotes: note.foot ? footLines(note.foot) : [],
 				});
 			});
 		}
@@ -459,21 +459,16 @@ export function renderCards(container, grid, opts = {}) {
 				// A footnote's nested content gets its own indented rows beneath it,
 				// the same shape it has on screen and in the print block. A card row
 				// is plain text, so the label is already inline in the line.
-				o.subNotes.forEach((line) => {
+				o.subNotes.forEach((r) => {
 					const s = document.createElement("div");
-					// subNoteLines pads three spaces per depth level; recover that
-					// depth before trimming it away so each level can be indented
-					// independently, the same as the nested .fnode rows elsewhere.
-					const lead = line.match(/^ */)[0].length;
-					// Clamped to style.css's deepest .card-notes .dN rule (d4) — a
-					// group nesting past that stays at its indent rather than
-					// collapsing flush left.
-					const depth = Math.min(4, Math.max(1, Math.round(lead / 3)));
-					s.className = "nt subnote d" + depth;
+					// Card rows are flat siblings, so each one carries its own depth
+					// rather than inheriting an ancestor's indent — footLines states
+					// that depth, so nothing here has to measure whitespace.
+					s.className = "nt subnote d" + r.depth;
 					// Cards bracket the label ("[a] …") where the text exports write
 					// "a. …": a card row sits under note rows that carry bracketed [n]
 					// markers, so the labels below it read as the same kind of marker.
-					s.textContent = strip(line.trim().replace(/^(\S+)\.\s/, "[$1] "));
+					s.textContent = strip("[" + r.label + "] " + r.text);
 					notesBox.appendChild(s);
 				});
 			});
@@ -601,18 +596,29 @@ function renderSubNotes(container, foot) {
 	});
 }
 
-// A footnote's nested content as plain indented lines, for exports with no DOM:
-// its own notes, and — for a group — each member with its moves, commentary and
-// notes beneath it. Three spaces per level, matching the on-screen indent.
-export function subNoteLines(foot, depth = 1) {
-	const pad = "   ".repeat(depth);
+// A footnote's nested content as flat rows that still KNOW their depth: its own
+// notes, and — for a group — each member with its moves, commentary and notes
+// beneath it. Depth and label are exactly known here, at the point each row is
+// built, so they travel as data. A consumer that indents structurally (the
+// cards) reads `.depth` instead of measuring the whitespace a formatter chose.
+function footLines(foot, depth = 1) {
 	const out = [];
-	(foot.subNotes || []).forEach((s) => out.push(pad + s.label + ". " + s.text));
+	(foot.subNotes || []).forEach((s) =>
+		out.push({ depth, label: s.label, text: s.text }),
+	);
 	(foot.children || []).forEach((c) => {
-		out.push(pad + c.label + ". " + footnoteText(c));
-		out.push(...subNoteLines(c, depth + 1));
+		out.push({ depth, label: c.label, text: footnoteText(c) });
+		out.push(...footLines(c, depth + 1));
 	});
 	return out;
+}
+
+// The same rows as plain indented lines, for exports with no DOM. Three spaces
+// per level, matching the on-screen indent.
+export function subNoteLines(foot, depth = 1) {
+	return footLines(foot, depth).map(
+		(r) => "   ".repeat(r.depth) + r.label + ". " + r.text,
+	);
 }
 
 // Same footnote, as plain text for exports that have no DOM. Inline note
