@@ -142,6 +142,11 @@ export function numberNotes(lines) {
 					moves: l.moves,
 					marks: l.marks || {},
 					subNotes: [],
+					// The line this footnote is: a group's child nodes each carry
+					// theirs, and a consumer that walks the foot tree (the PGN
+					// exporter) needs the root's too, to anchor its sub-notes on the
+					// right line when a ply collides with the mainline's.
+					line: l,
 					d,
 				},
 			};

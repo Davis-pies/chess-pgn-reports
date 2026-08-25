@@ -198,11 +198,18 @@ export function annotate(trunk, lines, notes) {
 		}
 	}
 
-	for (const note of notes) {
-		const owner = note.owner || main;
-		const n = nodeFor(idx, owner, note.ply, main);
-		const text = note.foot ? note.text || "" : note.text;
+	const put = (line, ply, text) => {
+		const n = nodeFor(idx, line || main, ply, main);
 		if (n && text && !n.comments.includes(text)) n.comments.push(text);
+	};
+
+	for (const note of notes) {
+		// A footnote entry carries no `text`: its prose lives in the foot tree,
+		// as the line's own `note` plus lettered sub-notes (and, for a group, the
+		// same again on each branch). Reading `note.text` here dropped every
+		// footnote's words and left only the line's name.
+		if (note.foot) putFoot(note.foot, note.foot.line, put);
+		else put(note.owner, note.ply, note.text);
 	}
 	return trunk;
 }
@@ -247,4 +254,22 @@ export function buildPgn(state) {
 	// singleton, and this module deliberately takes its state as an argument.
 	annotate(trunk, lines, lines.length ? numberNotes(lines).entries : []);
 	return tagPairs(state, result) + "\n\n" + writeMovetext(trunk, result) + "\n";
+}
+
+// One footnote's prose, anchored move by move rather than dumped whole onto the
+// anchor move: PGN comments are positional, so a sub-note about the third move
+// belongs on the third move. The footnote's moves and symbols are NOT repeated
+// here — they are already in the movetext as the variation itself, with its
+// marks as NAGs.
+//
+// The lettered labels the report shows ("a.", "b.") are dropped for the same
+// reason: they exist to tie a note back to a marker in a printed list, and a
+// PGN reader shows each comment where it belongs.
+function putFoot(foot, line, put) {
+	const own = foot.line || line;
+	// the node's own note describes the branch, so it goes on its first move
+	const first = (foot.moves || []).slice(foot.d || 0)[0];
+	if (foot.note && first) put(own, first.ply, foot.note);
+	for (const s of foot.subNotes || []) put(own, s.ply, s.text);
+	for (const c of foot.children || []) putFoot(c, own, put);
 }

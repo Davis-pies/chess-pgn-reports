@@ -309,3 +309,25 @@ test("merges a move's comments into one brace group", () => {
 	t[0].comments.push("Sicilian ∞", "a note");
 	assert.equal(writeMovetext(t, "*"), "1. e4 {Sicilian ∞ a note} *");
 });
+
+// A footnote's prose lives in `foot.note` and its lettered sub-notes, not in
+// `note.text` — an entry with a `foot` has no `text` at all. Reading it as a
+// plain note dropped every footnote's words and left only the line's name.
+test("a footnote's own note reaches the PGN", () => {
+	const lines = linesOf("1. e4 e5 (1... c5 2. Nf3) *");
+	lines[1].tag = "foot";
+	lines[1].meta = { note: "a sharp reply" };
+	const out = buildPgn({ name: "T", lines });
+	assert.match(out, /a sharp reply/, out);
+});
+
+test("a footnote's sub-notes reach the moves they annotate", () => {
+	const lines = linesOf("1. e4 e5 (1... c5 2. Nf3 {develops} d6) *");
+	lines[1].tag = "foot";
+	const out = buildPgn({ name: "T", lines });
+	// parsePgn merges a variation's fragment comments with the moves that
+	// follow them into one note (see parseSeq), so the text arrives as
+	// "develops 2... d6" anchored on d6 — inside the footnote's variation,
+	// which is what matters here.
+	assert.match(out, /\(1\.\.\. c5 2\. Nf3 d6 \{develops[^}]*\}\)/, out);
+});
