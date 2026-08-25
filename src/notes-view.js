@@ -5,7 +5,7 @@
 // footnote renderer a screen-only mode flag would be one branch that only one
 // caller ever takes.
 import { el, renderInline } from "./dom.js";
-import { closedNotePaths, getCurrent } from "./state.js";
+import { closedNotePaths, getCurrent, getRenderHooks } from "./state.js";
 import { allNotes } from "./notes.js";
 import {
 	appendFootnote,
@@ -25,6 +25,10 @@ export function notesPanel() {
 	bindToggle(box, tree.key);
 	const head = el("summary", { className: "ng-head notes-head" });
 	head.appendChild(el("h3", { textContent: "Notes" }));
+	head.append(
+		bulkChip("Expand all", () => closedNotePaths.clear()),
+		bulkChip("Collapse all", () => collectNoteKeys(tree, closedNotePaths)),
+	);
 	box.appendChild(head);
 	// The section's own rows sit in a plain wrapper: .ngroup-body draws the
 	// indent guide, and the top level is not indented.
@@ -32,6 +36,20 @@ export function notesPanel() {
 	tree.rows.forEach((r) => appendRow(body, r));
 	box.appendChild(body);
 	return box;
+}
+
+// A bulk control living in the section's <summary>, where a plain click would
+// also toggle the section — the same reason groupFootChip() in trie-view.js
+// stops its event.
+function bulkChip(text, act) {
+	const chip = el("button", { className: "chip mini", textContent: text });
+	chip.onclick = (e) => {
+		e.preventDefault();
+		e.stopPropagation();
+		act();
+		getRenderHooks().rerenderNotes();
+	};
+	return chip;
 }
 
 // A <details> records what the reader closed and stops there — unlike

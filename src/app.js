@@ -79,7 +79,13 @@ closedNotePaths.clear();
 // Point the extracted view modules' callbacks at *this* app.js instance --
 // see the comment on setRenderHooks() in state.js for why this indirection
 // (rather than a static `import ... from "./app.js"`) is necessary.
-setRenderHooks({ renderApp, rerenderTable, rerenderMarkup, lineEditor });
+setRenderHooks({
+  renderApp,
+  rerenderTable,
+  rerenderMarkup,
+  rerenderNotes,
+  lineEditor,
+});
 let sideDragging = false; // dragging the table-panel resize handle
 
 // Rebuild-only-the-panel refs: expanding/collapsing a trie group must not
@@ -87,6 +93,7 @@ let sideDragging = false; // dragging the table-panel resize handle
 // state), so these two panels rebuild in place instead.
 let tableBox = null; // the .pv-table container
 let markupBox = null; // the .markup container
+let notesBox = null; // the .notes container
 export function rerenderTable() {
   if (!tableBox || !hasNotebook()) return;
   const g = grid(getCurrent().lines);
@@ -107,6 +114,16 @@ export function rerenderMarkup() {
   if (!markupBox || !hasNotebook()) return;
   const nb = markupPanel();
   markupBox.replaceChildren(...nb.children);
+}
+// In place, like rerenderMarkup: rebuilding the whole app would reset the
+// preview panel's scroll position, and folding a note has no effect outside
+// this panel. `open` is copied across because Collapse all closes the section
+// itself, which lives on the element rather than in its children.
+export function rerenderNotes() {
+  if (!notesBox || !hasNotebook()) return;
+  const nb = notesPanel();
+  notesBox.open = nb.open;
+  notesBox.replaceChildren(...nb.children);
 }
 
 // identical-move tracking: a shared move (same position reached + same SAN)
@@ -329,7 +346,7 @@ function viewRoot() {
   main.appendChild(notebookList());
   const mb = markupPanel();
   markupBox = mb; // module ref for in-place re-renders
-  const notesBox = notesPanel();
+  notesBox = notesPanel();
   main.appendChild(mb);
   main.appendChild(notesBox);
   main.appendChild(exportBar());

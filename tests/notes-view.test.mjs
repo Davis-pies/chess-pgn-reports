@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert";
 import { installDom, loadState } from "./helpers.mjs";
 import { allNotes } from "../src/notes.js";
-import { closedNotePaths } from "../src/state.js";
+import { closedNotePaths, setRenderHooks } from "../src/state.js";
 import { noteTree, collectNoteKeys, notesPanel } from "../src/notes-view.js";
 
 // The tree for the state a PGN produces, which is what every case below wants.
@@ -210,5 +210,60 @@ test("a footnote with both notes and branches counts them as items", () => {
 	s.lines[1].comments = [{ ply: 1, text: "sharp" }];
 	const g = notesPanel().querySelector("details.nt.ngroup");
 	assert.match(g.querySelector("summary").textContent, /· 3 items$/);
+	off();
+});
+
+test("Collapse all closes every group, Expand all reopens them", () => {
+	const off = installDom();
+	closedNotePaths.clear();
+	let box = null;
+	const s = loadState("1. e4 e5 (1... c5 2. Nf3) (1... c5 2. Nc3) 2. Nf3", {
+		tags: { 1: "foot", 2: "foot" },
+	});
+	// the panel rebuilds itself in place, exactly as app.js's hook does
+	const rerenderNotes = () => {
+		const fresh = notesPanel();
+		box.open = fresh.open;
+		box.replaceChildren(...fresh.children);
+	};
+	setRenderHooks({
+		renderApp() {},
+		rerenderTable() {},
+		rerenderMarkup() {},
+		rerenderNotes,
+	});
+	box = notesPanel();
+	const chip = (txt) =>
+		[...box.querySelectorAll("summary .chip")].find(
+			(b) => b.textContent === txt,
+		);
+	chip("Collapse all").click();
+	const keys = collectNoteKeys(noteTree(allNotes(), s.lines), new Set());
+	assert.strictEqual(closedNotePaths.size, keys.size, "every key recorded");
+	assert.strictEqual(box.open, false, "the section closed too");
+	assert.ok(
+		[...box.querySelectorAll("details")].every((d) => !d.open),
+		"nothing left open",
+	);
+	chip("Expand all").click();
+	assert.strictEqual(closedNotePaths.size, 0);
+	assert.ok(box.open, "the section reopened");
+	off();
+});
+
+test("a bulk chip does not toggle the section it sits in", () => {
+	const off = installDom();
+	closedNotePaths.clear();
+	loadState("1. e4 {solid} e5 2. Nf3");
+	setRenderHooks({
+		renderApp() {},
+		rerenderTable() {},
+		rerenderMarkup() {},
+		rerenderNotes() {},
+	});
+	const box = notesPanel();
+	const before = box.open;
+	[...box.querySelectorAll("summary .chip")][0].click();
+	assert.strictEqual(box.open, before, "the click was stopped at the chip");
 	off();
 });

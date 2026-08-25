@@ -54,8 +54,10 @@ export function setSharedInfo(v) {
 	return sharedInfo;
 }
 
-// Render callbacks owned by app.js (renderApp/rerenderTable/rerenderMarkup
-// close over app.js's own module-level `tableBox`/`markupBox`; lineEditor is
+// Render callbacks owned by app.js (renderApp/rerenderTable/rerenderMarkup/
+// rerenderNotes
+// close over app.js's own module-level `tableBox`/`markupBox`/`notesBox`;
+// lineEditor is
 // seam 3, not yet extracted). The extracted view modules call back into
 // app.js through this registry instead of a static `import ... from
 // "./app.js"`.
