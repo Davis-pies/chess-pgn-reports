@@ -3,11 +3,11 @@
 **Task:** `df3c5369` — Let the editor collapse note groups and notes as a whole,
 matching the collapsible grouping the line editor already has for trie branches.
 
-**Goal:** Make the on-screen **Notes** panel foldable. Every cluster of related
-entries — a group footnote's branches, a footnote's own sub-notes, several notes
-sharing one move — collapses to a one-line header, and the whole section
-collapses to its heading. Everything starts expanded; the panel remembers what
-you closed for the rest of the session.
+**Goal:** Make the on-screen **Notes** panel foldable. Anything nested under an
+entry — a group footnote's branches, a footnote's own sub-notes — collapses to a
+one-line header saying how much is beneath it, and the whole section collapses to
+its heading. Everything starts expanded; the panel remembers what you closed for
+the rest of the session.
 
 The task annotation calls its sibling "task 23 (table expand/collapse)". Task 23
 is the PGN tag editor; the sibling it means is **task 21**, the table's
@@ -44,28 +44,25 @@ has no use for.
 
 Three rules build the tree:
 
-| Rule | Becomes a node when | Head | `kind` |
-| ---- | ------------------- | ---- | ------ |
-| Same-move cluster | **two or more** entries share an `(owner, ply)` pair | `moveRef(ply, owner)` | `notes` |
-| Footnote entry | `foot.children.length \|\| foot.subNotes.length` | the footnote stem | see below |
-| Nested foot node | an `.fnode` that itself has children or sub-notes | that node's stem | see below |
+| Rule | Becomes a node when | Head |
+| ---- | ------------------- | ---- |
+| Footnote entry | `foot.children.length \|\| foot.subNotes.length` | the footnote stem |
+| Nested foot node | an `.fnode` that itself has children or sub-notes | that node's stem |
 
-A footnote's `kind` is `branches` when it has only children, `notes` when it has
-only sub-notes, `items` when it has both. The header count reads `4 branches`,
-`2 notes`, `3 items`, singular below two.
+Entries are never grouped with one another. Several notes on one move stay
+separate numbered rows, each stating its own `moveRef(ply, owner) + " — "`
+prefix — grouping them under a shared move header was tried and read worse than
+the repetition it saved.
 
 Sub-notes come before branches inside a footnote node, which is the order
 `appendFootnote()` already renders them in.
 
-**A cluster suppresses the repeated move reference.** A plain note renders as
-`moveRef(ply, owner) + " — " + text` today. Inside a cluster the reference is
-already in the header, so the rows render their text alone; a note that is not in
-a cluster is unchanged.
-
-A footnote entry inside a same-move cluster keeps its own stem — it never
-printed a move reference to begin with. If that footnote has branches of its own
-it is a node **inside** the cluster node, collapsible on its own; the rules
-compose rather than competing for the entry.
+**The header count is recursive.** `tally(rows)` gives each node the number of
+rows beneath it *at any depth*, not just its direct children: a group whose
+branches carry the commentary would otherwise announce "2 branches" and say
+nothing about the notes inside them. The word follows what the subtree contains
+— `3 notes` when it is all commentary, `5 items` once any branch is in it —
+singular below two.
 
 ### 2.2 Keys
 
@@ -76,18 +73,13 @@ is a path built from content:
 | Level | Segment |
 | ----- | ------- |
 | root | `notes` |
-| same-move cluster | `m<ownerIdx>:<ply>` |
-| entry | `e<ply>:<firstSan>` |
+| entry | `e<ownerIdx>:<ply>:<firstSan>` |
 | nested foot node | its sibling index |
 
-`ownerIdx` is the owner line's index in `getCurrent().lines`; `firstSan` is
-`foot.moves[foot.d]`'s SAN, or empty for a footnote with no tail of its own.
-Segments join with `/`.
-
-Two footnote entries sharing an owner, a ply **and** a first SAN would share a
-key and therefore a collapse state. `numberNotes()` gives each such entry its own
-number, so this is possible in principle; it is accepted, because the only
-consequence is that the pair folds together.
+`ownerIdx` is the owner line's index in `getCurrent().lines` — the ply alone is
+not enough, since two footnotes anchored at the same ply on different lines can
+open with the same move. `firstSan` is `foot.moves[foot.d]`'s SAN, or empty for a
+footnote with no tail of its own. Segments join with `/`.
 
 A key that does go stale — a line promoted to mainline reorders `lines`, say —
 costs nothing: the default is expanded and the state Set records only what the
@@ -226,16 +218,16 @@ inside a branch.
 
 New `tests/notes-view.test.mjs`:
 
-- `noteTree`: two entries at one `(owner, ply)` cluster; a lone entry at a move
-  stays a leaf; a group footnote becomes a node counting its branches; a
-  footnote with sub-notes becomes a node counting its notes; a footnote with
-  both reads `items`; nesting recurses into an inner fork.
+- `noteTree`: a lone note stays a leaf; several notes on one move stay separate
+  rows; a group footnote becomes a node; a footnote with sub-notes becomes a
+  node; nesting recurses into an inner fork; a group's count reaches notes
+  buried inside its branches.
 - Keys are stable across a rerender that renumbers the notes.
 - `closedNotePaths` drives `details.open`.
 - Toggling a `<details>` records the key, and closing it does **not** rebuild the
   panel (the same element instance is still in the DOM afterwards).
 - Collapse all fills the Set from the tree; Expand all empties it.
-- A cluster prints its move reference once, in the header.
+- Every note row prints its own move reference.
 
 `tests/export.test.mjs` updates its `notesPanel` import to the new module.
 `tests/render.test.mjs` and `tests/print.test.mjs` must pass **unchanged** —

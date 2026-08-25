@@ -21,7 +21,7 @@ test("a lone note at a move stays a leaf", () => {
 	off();
 });
 
-test("two notes on one move cluster under a single move reference", () => {
+test("several notes on one move stay separate rows", () => {
 	const off = installDom();
 	const { s } = treeFor("1. e4 e5 2. Nf3");
 	const main = s.lines.find((l) => l.isMain);
@@ -30,31 +30,11 @@ test("two notes on one move cluster under a single move reference", () => {
 		{ ply: 0, text: "second" },
 	];
 	const tree = noteTree(allNotes(), s.lines);
-	assert.strictEqual(tree.rows.length, 1, "one cluster, not two notes");
-	const c = tree.rows[0];
-	assert.strictEqual(c.kind, "cluster");
-	assert.strictEqual(c.ref, "1.e4");
-	assert.strictEqual(c.notes, 2);
-	assert.strictEqual(c.rows.length, 2);
+	assert.strictEqual(tree.rows.length, 2, "two rows, not one group");
 	assert.ok(
-		c.rows.every((r) => r.kind === "note" && r.inCluster),
-		"members drop the repeated move reference",
+		tree.rows.every((r) => r.kind === "note" && !r.rows.length),
+		"each is a plain leaf",
 	);
-	off();
-});
-
-test("notes on the same ply but different owners do not cluster", () => {
-	const off = installDom();
-	const { s } = treeFor("1. e4 e5 (1... c5 2. Nf3) 2. Nf3", {
-		tags: { 1: "sideline" },
-	});
-	s.lines.find((l) => l.isMain).comments = [{ ply: 2, text: "on the main" }];
-	s.lines.find((l) => l.moves.some((m) => m.san === "c5")).comments = [
-		{ ply: 2, text: "on the sideline" },
-	];
-	const tree = noteTree(allNotes(), s.lines);
-	assert.strictEqual(tree.rows.length, 2, "two separate notes");
-	assert.ok(tree.rows.every((r) => r.kind === "note"));
 	off();
 });
 
@@ -67,8 +47,8 @@ test("a group footnote becomes a node counting its branches", () => {
 	assert.strictEqual(tree.rows.length, 1);
 	const g = tree.rows[0];
 	assert.strictEqual(g.kind, "foot");
-	assert.strictEqual(g.branches, 2);
-	assert.strictEqual(g.notes, 0);
+	assert.strictEqual(g.count, 2);
+	assert.ok(g.hasBranch);
 	assert.strictEqual(g.rows.length, 2);
 	assert.ok(g.rows.every((r) => r.kind === "fnode"));
 	off();
@@ -80,8 +60,8 @@ test("a footnote with its own notes becomes a node counting them", () => {
 		tags: { 1: "foot" },
 	});
 	const f = tree.rows.find((r) => r.kind === "foot");
-	assert.strictEqual(f.notes, 1);
-	assert.strictEqual(f.branches, 0);
+	assert.strictEqual(f.count, 1);
+	assert.strictEqual(f.hasBranch, false, "all commentary — reads as notes");
 	assert.strictEqual(f.rows.length, 1);
 	assert.strictEqual(f.rows[0].kind, "subnote");
 	off();
@@ -130,7 +110,7 @@ test("a group footnote renders as an open details with its branches inside", () 
 	assert.ok(box.open, "expanded by default");
 	const g = box.querySelector("details.nt.ngroup");
 	assert.ok(g.open, "the group is expanded too");
-	assert.match(g.querySelector("summary").textContent, /· 2 branches$/);
+	assert.match(g.querySelector("summary").textContent, /· 2 items$/);
 	assert.strictEqual(g.querySelectorAll(".fnode").length, 2);
 	assert.strictEqual(box.querySelectorAll(".nt").length, 1, "one numbered note");
 	off();
@@ -176,7 +156,7 @@ test("toggling a group records the key without rebuilding the panel", async () =
 	off();
 });
 
-test("a cluster heads its notes with the move reference, once", () => {
+test("each note on a move states that move itself", () => {
 	const off = installDom();
 	closedNotePaths.clear();
 	const s = loadState("1. e4 e5 2. Nf3");
@@ -185,13 +165,11 @@ test("a cluster heads its notes with the move reference, once", () => {
 		{ ply: 0, text: "second" },
 	];
 	const box = notesPanel();
-	const c = box.querySelector("details.ntcluster");
-	assert.match(c.querySelector("summary").textContent, /^1\.e4 · 2 notes$/);
-	assert.strictEqual(box.querySelectorAll(".nt").length, 2, "both entries");
-	assert.strictEqual(
-		box.textContent.match(/1\.e4/g).length,
-		1,
-		"the move reference is not repeated on every row",
+	const rows = [...box.querySelectorAll(".nt")];
+	assert.strictEqual(rows.length, 2);
+	assert.ok(
+		rows.every((r) => r.textContent.includes("1.e4 — ")),
+		"every row carries its own move reference",
 	);
 	off();
 });
@@ -269,5 +247,22 @@ test("a bulk chip does not toggle the section it sits in", () => {
 	const before = box.open;
 	[...box.querySelectorAll("summary .chip")][0].click();
 	assert.strictEqual(box.open, before, "the click was stopped at the chip");
+	off();
+});
+
+test("a group's count reaches notes buried inside its branches", () => {
+	const off = installDom();
+	closedNotePaths.clear();
+	// the parser merges a comment inside a variation with the moves after it,
+	// so this gives branch [a] a sub-note of its own (see parseSeq in pgn.js)
+	loadState("1. e4 e5 (1... c5 {sharp} 2. Nf3) (1... c5 2. Nc3) 2. Nf3", {
+		tags: { 1: "foot", 2: "foot" },
+	});
+	const box = notesPanel();
+	const g = box.querySelector("details.nt.ngroup");
+	// two branches plus the note inside one of them — not "2 branches"
+	assert.match(g.querySelector("summary").textContent, /· 3 items$/);
+	const inner = g.querySelector("details.fnode");
+	assert.match(inner.querySelector("summary").textContent, /· 1 note$/);
 	off();
 });

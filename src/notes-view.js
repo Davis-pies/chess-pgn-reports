@@ -90,18 +90,14 @@ function appendRow(container, row) {
 }
 
 function rowClass(row) {
-	if (row.kind === "cluster") return "ntcluster ngroup";
 	if (row.kind === "fnode") return "fnode d" + row.node.depth + " ngroup";
 	return "nt ngroup"; // a footnote entry
 }
 
-// A collapsed row has to say what it is hiding, in the words of the thing it
-// hides: a group's members are branches, a footnote's own notes are notes.
 function countLabel(row) {
-	const { branches, notes } = row;
-	if (branches && notes) return plural(branches + notes, "item", "items");
-	if (branches) return plural(branches, "branch", "branches");
-	return plural(notes, "note", "notes");
+	return row.hasBranch
+		? plural(row.count, "item", "items")
+		: plural(row.count, "note", "notes");
 }
 
 function plural(n, one, many) {
@@ -109,10 +105,6 @@ function plural(n, one, many) {
 }
 
 function appendHead(head, row) {
-	if (row.kind === "cluster") {
-		head.appendChild(el("span", { textContent: row.ref }));
-		return;
-	}
 	if (row.kind === "fnode") {
 		head.appendChild(el("sup", { textContent: "[" + row.node.label + "]" }));
 		footStem(head, row.node);
@@ -139,15 +131,9 @@ function appendLeaf(container, row) {
 		appendFootnote(div, row.entry.foot);
 	} else {
 		const span = document.createElement("span");
-		// Inside a cluster the move reference is already in the header, so the
-		// row states its text alone rather than repeating "7.Nbd2 — " down the
-		// group.
-		if (!row.inCluster)
-			span.appendChild(
-				document.createTextNode(
-					moveRef(row.entry.ply, row.entry.owner) + " — ",
-				),
-			);
+		span.appendChild(
+			document.createTextNode(moveRef(row.entry.ply, row.entry.owner) + " — "),
+		);
 		renderInline(span, row.entry.text);
 		div.appendChild(span);
 	}
@@ -158,68 +144,43 @@ function appendLeaf(container, row) {
 // rows. Pure: `lines` is passed rather than read off the state so the grouping
 // can be tested without a notebook loaded.
 //
-// Three rules, applied together: several entries on one move cluster under that
-// move's reference; a footnote with branches or notes of its own is a node; and
-// a branch inside a group that has branches or notes of its own is a node too,
+// Two rules: a footnote with branches or notes of its own is a node, and a
+// branch inside a group that has branches or notes of its own is a node too,
 // recursively. Anything with nothing under it stays a leaf and gets no key.
+// Entries themselves are never grouped with each other — several notes on one
+// move stay separate numbered rows, each stating its own move.
 export function noteTree(entries, lines) {
-	const rows = [];
-	// Cluster members by owning line + ply. Entries arrive in reading order, so
-	// recording each key's first appearance keeps a cluster where its first
-	// member stood; the same ply on two different lines is two clusters, since
-	// a variation's first move shares its ply with the move it replaces.
-	const at = new Map();
-	entries.forEach((e) => {
-		const k = lines.indexOf(e.owner) + ":" + e.ply;
-		const arr = at.get(k);
-		if (arr) arr.push(e);
-		else at.set(k, [e]);
-	});
-	const done = new Set();
-	entries.forEach((e) => {
-		const k = lines.indexOf(e.owner) + ":" + e.ply;
-		if (done.has(k)) return;
-		done.add(k);
-		const members = at.get(k);
-		if (members.length < 2) {
-			rows.push(entryRow(e, "notes", false));
-			return;
-		}
-		const key = "notes/m" + k;
-		rows.push({
-			kind: "cluster",
-			key,
-			entry: e,
-			ref: moveRef(e.ply, e.owner),
-			rows: members.map((m) => entryRow(m, key, true)),
-			branches: 0,
-			notes: members.length,
-		});
-	});
-	return {
-		kind: "root",
-		key: "notes",
-		rows,
-		branches: 0,
-		notes: entries.length,
-	};
+	const rows = entries.map((e) => entryRow(e, lines));
+	return { kind: "root", key: "notes", rows, ...tally(rows) };
 }
 
 // One numbered entry. A plain note has nothing under it; a footnote may carry
 // its own notes, its group's branches, or both.
-function entryRow(entry, parentKey, inCluster) {
-	if (!entry.foot)
-		return { kind: "note", entry, inCluster, rows: [], branches: 0, notes: 0 };
+function entryRow(entry, lines) {
+	if (!entry.foot) return { kind: "note", entry, rows: [], ...tally([]) };
 	const foot = entry.foot;
-	const key = parentKey + "/e" + entry.ply + ":" + firstSan(foot);
-	return {
-		kind: "foot",
-		key,
-		entry,
-		rows: footRows(foot, key),
-		branches: (foot.children || []).length,
-		notes: (foot.subNotes || []).length,
-	};
+	// The owning line as well as the ply: two footnotes anchored at the same ply
+	// on different lines can open with the same move.
+	const key =
+		"notes/e" + lines.indexOf(entry.owner) + ":" + entry.ply + ":" +
+		firstSan(foot);
+	const rows = footRows(foot, key);
+	return { kind: "foot", key, entry, rows, ...tally(rows) };
+}
+
+// What a collapsed row is hiding: every row beneath it at any depth, not just
+// its direct children — a group whose branches carry the commentary would
+// otherwise announce "2 branches" and say nothing about the notes inside them.
+// `hasBranch` only picks the word: a subtree that is all commentary reads
+// "notes", and anything with a branch in it reads "items".
+function tally(rows) {
+	let count = 0;
+	let hasBranch = false;
+	rows.forEach((r) => {
+		count += 1 + r.count;
+		if (r.kind === "fnode" || r.hasBranch) hasBranch = true;
+	});
+	return { count, hasBranch };
 }
 
 // A footnote's contents in the order appendFootnote() renders them: its own
@@ -229,19 +190,12 @@ function footRows(foot, key) {
 		kind: "subnote",
 		sub,
 		rows: [],
-		branches: 0,
-		notes: 0,
+		...tally([]),
 	}));
 	(foot.children || []).forEach((node, i) => {
 		const k = key + "/" + i;
-		rows.push({
-			kind: "fnode",
-			key: k,
-			node,
-			rows: footRows(node, k),
-			branches: (node.children || []).length,
-			notes: (node.subNotes || []).length,
-		});
+		const kids = footRows(node, k);
+		rows.push({ kind: "fnode", key: k, node, rows: kids, ...tally(kids) });
 	});
 	return rows;
 }

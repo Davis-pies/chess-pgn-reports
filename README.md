@@ -39,9 +39,9 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    sequence. Lines get an
    **evaluation/quality symbol** picker (=, ±, ∓, +=, =+, ∞, !, ?, …). The
    **Notes** section is editable — add a note at any move, or edit/delete
-   existing ones. On screen the Notes list folds: a group footnote, a
-   footnote's own notes, and several notes on one move each collapse to a
-   one-line header, with **Expand all** / **Collapse all** beside the heading.
+   existing ones. On screen the Notes list folds: a group footnote and a
+   footnote's own notes collapse to a one-line header saying how much is
+   nested beneath, with **Expand all** / **Collapse all** beside the heading.
    Everything starts expanded, and the folding is not saved with the notebook.
 4. **Export** — **Export PGN** (editable chess notation for any chess app),
    **Export Markdown** (paste into Google Docs/Word), or **Print → Save as
