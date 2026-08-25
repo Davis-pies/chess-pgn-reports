@@ -2,7 +2,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parsePgn } from "../src/pgn.js";
 import { collectLines } from "../src/tree.js";
-import { treeFromLines, writeMovetext, annotate } from "../src/pgn-out.js";
+import {
+	treeFromLines,
+	writeMovetext,
+	annotate,
+	buildPgn,
+} from "../src/pgn-out.js";
 
 // SAN-only view of a node list, so structure assertions stay readable.
 const shape = (nodes) =>
@@ -188,4 +193,43 @@ test("a note owned by a sideline lands on the sideline's move", () => {
 test("imported NAGs survive as marks and re-export", () => {
 	const { tree } = annotated("1. e4 $1 e5 *");
 	assert.deepEqual(tree[0].nags, [1]);
+});
+
+test("emits a full seven tag roster", () => {
+	const out = buildPgn({ name: "Ruy Lopez", lines: linesOf("1. e4 e5 *") });
+	const tags = out.split("\n\n")[0].split("\n");
+	assert.deepEqual(tags, [
+		'[Event "Ruy Lopez"]',
+		'[Site "?"]',
+		'[Date "????.??.??"]',
+		'[Round "?"]',
+		'[White "?"]',
+		'[Black "?"]',
+		'[Result "*"]',
+	]);
+});
+
+test("falls back to ? for an unnamed notebook", () => {
+	const out = buildPgn({ lines: linesOf("1. e4 *") });
+	assert.ok(out.startsWith('[Event "?"]'));
+});
+
+test("escapes quotes and backslashes in a tag value", () => {
+	const out = buildPgn({
+		name: 'the "sharp" \\ line',
+		lines: linesOf("1. e4 *"),
+	});
+	assert.ok(out.includes('[Event "the \\"sharp\\" \\\\ line"]'), out);
+});
+
+test("a blank state produces a valid empty game", () => {
+	const out = buildPgn({ lines: [] });
+	assert.ok(out.includes('[Result "*"]'));
+	assert.ok(out.trimEnd().endsWith("*"));
+});
+
+test("ends with a single trailing newline", () => {
+	const out = buildPgn({ lines: linesOf("1. e4 *") });
+	assert.ok(out.endsWith("*\n"));
+	assert.ok(!out.endsWith("\n\n"));
 });

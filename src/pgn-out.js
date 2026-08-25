@@ -1,5 +1,6 @@
 import { divergence } from "./tree.js";
 import { nagFor } from "./nags.js";
+import { numberNotes } from "./notes.js";
 
 // Serializes the live editor state back to PGN.
 //
@@ -198,4 +199,46 @@ export function annotate(trunk, lines, notes) {
 		if (n && text && !n.comments.includes(text)) n.comments.push(text);
 	}
 	return trunk;
+}
+
+// A PGN tag value is a quoted string: '"' and '\' are the only characters that
+// need escaping, and both escape with a backslash.
+function tagValue(s) {
+	return String(s || "?")
+		.replace(/\\/g, "\\\\")
+		.replace(/"/g, '\\"');
+}
+
+// The full Seven Tag Roster. It is not decoration: importers (lichess,
+// chesstempo) reject or mangle a file that omits it, and the report has no
+// player or event data to put there, so the spec's "?" / "????.??.??"
+// placeholders stand in.
+function tagPairs(state, result) {
+	return [
+		["Event", state.name || "?"],
+		["Site", "?"],
+		["Date", "????.??.??"],
+		["Round", "?"],
+		["White", "?"],
+		["Black", "?"],
+		["Result", result],
+	]
+		.map(([k, v]) => `[${k} "${tagValue(v)}"]`)
+		.join("\n");
+}
+
+// The whole export: tag pairs, a blank line, movetext.
+//
+// `state` is passed in rather than read from state.js on purpose. The bug this
+// module replaces was export.js shipping `getCurrent().pgn` — the text the user
+// IMPORTED — so every edit was missing from the file. Taking the state as an
+// argument keeps the serializer honest and directly testable.
+export function buildPgn(state) {
+	const lines = state.lines || [];
+	const result = state.result || "*";
+	const trunk = treeFromLines(lines);
+	// numberNotes rather than allNotes: allNotes reads the current-state
+	// singleton, and this module deliberately takes its state as an argument.
+	annotate(trunk, lines, lines.length ? numberNotes(lines).entries : []);
+	return tagPairs(state, result) + "\n\n" + writeMovetext(trunk, result) + "\n";
 }
