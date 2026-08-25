@@ -241,6 +241,30 @@ h3 {
 .chip.partial {
   opacity: 0.55;
 }
+.chip.hide.on {
+  background: var(--muted);
+  border-color: var(--muted);
+  color: #fff;
+}
+.chip.grouphide,
+.chip.groupsolo {
+  margin-left: 0.4em;
+}
+.hidden-drawer {
+  margin-top: 1rem;
+  border-top: 1px solid var(--line);
+  padding-top: 0.6rem;
+}
+.hidden-drawer .hd-head {
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+.hidden-body {
+  opacity: 0.75;
+  padding-top: 0.5rem;
+}
 .maintag {
   font-size: 0.8rem;
   font-weight: 600;

@@ -16,10 +16,17 @@ import {
   setCurrent,
   openPaths,
   openTablePaths,
+  openHiddenPaths,
   setSharedInfo,
   setRenderHooks,
 } from "./state.js";
 import { allNotes } from "./notes.js";
+import {
+  visibleLines,
+  hiddenLines,
+  hideAll,
+  showAll,
+} from "./visibility.js";
 import { appendPrintTables } from "./print.js";
 import {
   renderTrieTable,
@@ -400,6 +407,8 @@ function openNotebook(id) {
           l.comments = t.comments || [];
           // legacy notebooks used 'main'/'minor'; mainline is now structural
           l.tag = l.isMain ? undefined : t.tag === "foot" ? "foot" : "sideline";
+          // notebooks saved before hidden existed have no field and load visible
+          l.hidden = !l.isMain && !!t.hidden;
         }
       });
       // restore a user-promoted mainline, if any
@@ -541,7 +550,7 @@ function markupPanel() {
       className: "chip mini",
       textContent: "Expand all",
       onclick: () => {
-        const trie = buildTrie(getCurrent().lines, main);
+        const trie = buildTrie(visibleLines(getCurrent().lines), main);
         openPaths.clear();
         trie.children.forEach((c) => collectKeys(c, openPaths));
         renderApp();
@@ -557,6 +566,24 @@ function markupPanel() {
     });
     row.append(all, none);
   }
+  // bulk hide/show, in both views: the mainline is never affected
+  const hideEvery = el("button", {
+    className: "chip mini",
+    textContent: "Hide all",
+    onclick: () => {
+      hideAll(getCurrent().lines);
+      renderApp();
+    },
+  });
+  const showEvery = el("button", {
+    className: "chip mini",
+    textContent: "Show all",
+    onclick: () => {
+      showAll(getCurrent().lines);
+      renderApp();
+    },
+  });
+  row.append(" Lines: ", hideEvery, showEvery);
   box.appendChild(row);
   box.appendChild(
     el("h3", {
@@ -567,17 +594,66 @@ function markupPanel() {
   // mainline first, then the side lines grouped as a trie of shared divergence
   box.appendChild(lineEditor(main, 0, getCurrent().showBoards));
   const counter = { n: 1 };
-  const trie = buildTrie(getCurrent().lines, main);
+  // hidden lines leave BOTH editor views and live in the drawer below
+  const shown = visibleLines(getCurrent().lines);
+  const trie = buildTrie(shown, main);
   // flat view renders every non-main line in order; grouped uses the trie
   if (getCurrent().groupView === "flat") {
-    getCurrent().lines.forEach((l) => {
+    shown.forEach((l) => {
       if (!l.isMain)
         box.appendChild(lineEditor(l, counter.n++, getCurrent().showBoards));
     });
   } else {
     trie.children.forEach((c) => renderTrieNode(box, c, counter, "", true));
   }
+  const hid = hiddenLines(getCurrent().lines);
+  if (hid.length) box.appendChild(hiddenDrawer(hid, main, counter));
   return box;
+}
+
+// The hidden lines, in their own collapsed drawer at the foot of the editor.
+// They keep their trie grouping so a whole group can be brought back in one
+// click, and they continue the main list's name counter so an auto-assigned
+// "Line N" cannot collide across the two lists.
+function hiddenDrawer(hid, main, counter) {
+  const det = el("details", { className: "hidden-drawer" });
+  det.open = !!getCurrent().hiddenOpen;
+  det.addEventListener("toggle", () => {
+    // no rerender here: only the drawer's own open state changed, and
+    // rebuilding would re-fire this toggle (see the guard in renderTrieNode)
+    getCurrent().hiddenOpen = det.open;
+  });
+  det.appendChild(
+    el("summary", {
+      className: "hd-head",
+      textContent: `Hidden (${hid.length})`,
+    }),
+  );
+  const body = el("div", { className: "hidden-body" });
+  body.appendChild(
+    el("button", {
+      className: "chip mini",
+      textContent: "Show all",
+      onclick: () => {
+        showAll(hid);
+        renderApp();
+      },
+    }),
+  );
+  const trie = buildTrie(hid, main);
+  // a hidden line that is a strict PREFIX of the mainline lands on the trie
+  // root rather than on a child; render it too, or it would be unreachable
+  if (trie.leaf)
+    body.appendChild(
+      lineEditor(trie.leaf, counter.n++, getCurrent().showBoards),
+    );
+  // openHiddenPaths, not openPaths: the drawer's trie can produce the SAME
+  // node.key as the editor's, and one shared Set would open both at once
+  trie.children.forEach((c) =>
+    renderTrieNode(body, c, counter, "", true, openHiddenPaths),
+  );
+  det.appendChild(body);
+  return det;
 }
 
 // A form to append a note to a specific mainline move.

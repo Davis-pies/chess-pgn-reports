@@ -607,3 +607,190 @@ test("a one-line group carries no group chip -- its line editor has one", async 
 function doc(id) {
 	return global.document.getElementById(id);
 }
+
+// Hidden lines must KEEP receiving notes added at a shared move: computeShared
+// is deliberately NOT filtered (see the spec's decisions section). This guard
+// fails loudly if someone later filters it.
+test("a note added at a shared move still reaches a hidden line", async () => {
+	await loadGroupPgn();
+	const hidden = getCurrent().lines.find((l) =>
+		l.moves.some((m) => m.san === "Nc3"),
+	);
+	hidden.hidden = true;
+	getRenderHooks().renderApp();
+	await tick();
+
+	// select the shared 1... c5 move on the line that is still visible
+	const chip = [
+		...doc("view").querySelectorAll(".markup .ledge .move-chip"),
+	].find((b) => b.textContent.includes("c5"));
+	assert.ok(chip, "a shared c5 move chip is present");
+	chip.click();
+	await tick();
+
+	const box = doc("view").querySelector(".markup .cedit");
+	assert.ok(box, "the comment editor opened");
+	box.querySelector("input.lno").value = "shared idea";
+	[...box.querySelectorAll("button")]
+		.find((b) => b.textContent === "Add note")
+		.click();
+	await tick();
+
+	assert.ok(
+		(hidden.comments || []).some((c) => c.text === "shared idea"),
+		"the hidden line received the shared note",
+	);
+});
+
+test("the group Hide chip hides every line under the group", async () => {
+	await loadGroupPgn();
+	const chip = doc("view").querySelector(
+		".markup details.lgroup summary .chip.grouphide",
+	);
+	assert.ok(chip, "group summary carries a Hide chip");
+	assert.ok(!chip.className.includes("on"), "off to start");
+
+	chip.click();
+	await tick();
+	assert.strictEqual(
+		getCurrent().lines.filter((l) => l.hidden).length,
+		2,
+		"both lines under the group are hidden",
+	);
+});
+
+test("the drawer's group Hide chip brings a whole group back", async () => {
+	await loadGroupPgn();
+	doc("view")
+		.querySelector(".markup details.lgroup summary .chip.grouphide")
+		.click();
+	await tick();
+	assert.strictEqual(getCurrent().lines.filter((l) => l.hidden).length, 2);
+
+	// in the drawer the same chip reads "Hidden" and restores the group
+	const chip = doc("view").querySelector(
+		".hidden-drawer details.lgroup summary .chip.grouphide",
+	);
+	assert.ok(chip, "the drawer's group carries the chip");
+	assert.ok(chip.className.includes("on"), "it reads on for a hidden group");
+	chip.click();
+	await tick();
+	assert.strictEqual(getCurrent().lines.filter((l) => l.hidden).length, 0);
+});
+
+test("group Solo hides every line outside the group", async () => {
+	app.reset();
+	const view = doc("view");
+	view.querySelector("textarea.pgnin").value =
+		"1. e4 e5 (1... c5 2. Nf3) (1... c5 2. Nc3) (1... e6) 2. Nf3";
+	[...view.querySelectorAll("button")]
+		.find((b) => b.textContent.includes("Load"))
+		.click();
+	await tick();
+
+	doc("view")
+		.querySelector(".markup details.lgroup summary .chip.groupsolo")
+		.click();
+	await tick();
+	const gone = getCurrent().lines.find((l) =>
+		l.moves.some((m) => m.san === "e6"),
+	);
+	assert.strictEqual(gone.hidden, true, "the line outside the group is hidden");
+});
+
+test("a hidden line leaves the editor list and enters the drawer", async () => {
+	await loadGroupPgn();
+	const before = doc("view").querySelectorAll(".markup .ledge").length;
+	const gone = getCurrent().lines.find((l) =>
+		l.moves.some((m) => m.san === "Nc3"),
+	);
+	gone.hidden = true;
+	getRenderHooks().renderApp();
+	await tick();
+
+	const drawer = doc("view").querySelector(".hidden-drawer");
+	assert.ok(drawer, "the drawer appears once something is hidden");
+	assert.strictEqual(drawer.querySelector("summary").textContent, "Hidden (1)");
+	assert.strictEqual(
+		doc("view").querySelectorAll(".markup .ledge").length -
+			drawer.querySelectorAll(".ledge").length,
+		before - 1,
+		"the hidden line is gone from the editor list itself",
+	);
+});
+
+test("no drawer when nothing is hidden", async () => {
+	await loadGroupPgn();
+	assert.strictEqual(doc("view").querySelector(".hidden-drawer"), null);
+});
+
+test("the drawer's Show all brings every hidden line back", async () => {
+	await loadGroupPgn();
+	getCurrent().lines.forEach((l) => {
+		if (!l.isMain) l.hidden = true;
+	});
+	getRenderHooks().renderApp();
+	await tick();
+
+	[...doc("view").querySelectorAll(".hidden-drawer button")]
+		.find((b) => b.textContent === "Show all")
+		.click();
+	await tick();
+	assert.strictEqual(getCurrent().lines.filter((l) => l.hidden).length, 0);
+	assert.strictEqual(doc("view").querySelector(".hidden-drawer"), null);
+});
+
+test("the flat view also drops hidden lines", async () => {
+	await loadGroupPgn();
+	[...doc("view").querySelectorAll("button")]
+		.find((b) => b.textContent === "Flat")
+		.click();
+	await tick();
+	const before = doc("view").querySelectorAll(".markup > .ledge").length;
+	const gone = getCurrent().lines.find((l) =>
+		l.moves.some((m) => m.san === "Nc3"),
+	);
+	gone.hidden = true;
+	getRenderHooks().renderApp();
+	await tick();
+	assert.strictEqual(
+		doc("view").querySelectorAll(".markup > .ledge").length,
+		before - 1,
+	);
+});
+
+test("opening a drawer group does not open its twin in the editor", async () => {
+	// two c5 lines hidden and one c5 line left visible, so the SAME trie key
+	// exists in the editor and in the drawer at once
+	app.reset();
+	const view = doc("view");
+	view.querySelector("textarea.pgnin").value =
+		"1. e4 e5 (1... c5 2. Nf3) (1... c5 2. Nc3) (1... c5 2. d4) 2. Nf3";
+	[...view.querySelectorAll("button")]
+		.find((b) => b.textContent.includes("Load"))
+		.click();
+	await tick();
+
+	getCurrent()
+		.lines.filter((l) =>
+			l.moves.some((m) => m.san === "Nc3" || m.san === "d4"),
+		)
+		.forEach((l) => (l.hidden = true));
+	getRenderHooks().renderApp();
+	await tick();
+
+	const drawerGroup = doc("view").querySelector(
+		".hidden-drawer details.lgroup",
+	);
+	assert.ok(drawerGroup, "the drawer groups its hidden lines");
+	drawerGroup.open = true;
+	drawerGroup.dispatchEvent(new dom.window.Event("toggle"));
+	await tick();
+
+	const editorGroups = [
+		...doc("view").querySelectorAll(".markup details.lgroup"),
+	].filter((d) => !d.closest(".hidden-drawer"));
+	editorGroups.forEach((g) =>
+		assert.ok(!g.open, "the editor's same-key group stayed closed"),
+	);
+});

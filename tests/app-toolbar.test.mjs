@@ -1,6 +1,8 @@
 import { test, after } from "node:test";
 import assert from "node:assert";
 import { bootApp } from "./helpers.mjs";
+import { getCurrent } from "../src/state.js";
+import { visibleLines } from "../src/visibility.js";
 
 const PGN = "1. e4 e5 (1... c5 2. Nf3 Nc6) 2. Nf3 Nc6";
 
@@ -261,4 +263,16 @@ test("include-in-print toggles mark the card and table sections noprint", async 
   assert.ok(!tables().classList.contains("noprint"), "table still included");
   opt("Table").click();
   assert.ok(tables().classList.contains("noprint"), "table excluded");
+});
+
+test("Hide all hides every line but the mainline, Show all restores them", async () => {
+  app.reset();
+  await app.loadPgn(PGN);
+  app.button("Hide all").click();
+  const shown = visibleLines(getCurrent().lines);
+  assert.strictEqual(shown.length, 1, "only the mainline is left");
+  assert.ok(shown[0].isMain);
+
+  app.button("Show all").click();
+  assert.strictEqual(getCurrent().lines.filter((l) => l.hidden).length, 0);
 });

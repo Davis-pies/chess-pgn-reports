@@ -5,6 +5,7 @@ import { getCurrent, getSharedInfo, getRenderHooks } from "./state.js";
 import { NAGS } from "./nags.js";
 import { numberNotes } from "./notes.js";
 import { branchContext } from "./export.js";
+import { visibleLines, setHidden, solo } from "./visibility.js";
 
 export function lineEditor(l, idx, showBoard = false) {
 	const row = el("div", { className: "ledge" });
@@ -44,6 +45,27 @@ export function lineEditor(l, idx, showBoard = false) {
 			promoteMainline(l);
 		};
 		tags.appendChild(promote);
+		// Hide/Solo sit with the tag chips, and only on a non-mainline row --
+		// the mainline is the table's reference row and is never hidable.
+		const hide = el("button", {
+			className: "chip hide" + (l.hidden ? " on" : ""),
+			textContent: l.hidden ? "Hidden" : "Hide",
+			title: l.hidden ? "bring this line back" : "hide this line",
+		});
+		hide.onclick = () => {
+			setHidden([l], !l.hidden);
+			getRenderHooks().renderApp();
+		};
+		const soloBtn = el("button", {
+			className: "chip solo",
+			textContent: "Solo",
+			title: "hide every other line",
+		});
+		soloBtn.onclick = () => {
+			solo(getCurrent().lines, [l]);
+			getRenderHooks().renderApp();
+		};
+		tags.append(hide, soloBtn);
 	}
 	const head = el("div", { className: "ledge-head" });
 	head.append(name, tags);
@@ -140,7 +162,8 @@ export function moveStrip(l) {
 	//
 	// The `|| {}` is not the dead-fallback pattern removed elsewhere here:
 	// moveStrip can be called with a line that is not in getCurrent().lines.
-	const marksByPly = numberNotes(getCurrent().lines).byLine.get(l) || {};
+	const marksByPly =
+		numberNotes(visibleLines(getCurrent().lines)).byLine.get(l) || {};
 	owned.forEach((m) => {
 		const num = m.ply % 2 === 0 ? Math.floor(m.ply / 2) + 1 + ". " : "";
 		const mark = (l.marks || {})[m.ply];

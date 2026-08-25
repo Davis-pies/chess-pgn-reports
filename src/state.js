@@ -29,6 +29,11 @@ export const openPaths = new Set();
 // editor's openPaths: expanding a table branch does not expand the editor.
 export const openTablePaths = new Set();
 
+// Hidden-drawer groups the user expanded. Separate from openPaths because the
+// drawer's trie can produce the SAME node.key as the editor's for the same move
+// path -- one shared Set would make opening a drawer group open its twin above.
+export const openHiddenPaths = new Set();
+
 // Identical-move tracking: which lines carry each shared move (same
 // position reached + same SAN). Recomputed wholesale by computeShared() in
 // app.js before every render — { byLine: line -> Map(ply -> id), idLines:

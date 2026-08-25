@@ -155,3 +155,24 @@ test("saveNotebook without view stores an empty object, not undefined", () => {
     assert.deepStrictEqual(loadNotebook("noview").view, {});
   });
 });
+
+test("saveNotebook records a line's hidden flag", () => {
+  withStorage(() => {
+    const lines = [
+      { isMain: true, moves: [{ san: "e4", ply: 0 }], name: "Mainline" },
+      {
+        moves: [
+          { san: "e4", ply: 0 },
+          { san: "e5", ply: 1 },
+        ],
+        tag: "sideline",
+        name: "Hidden one",
+        hidden: true,
+      },
+    ];
+    saveNotebook("n1", { name: "t", pgn: "1. e4 e5 *", lines, view: {} });
+    const nb = loadNotebook("n1");
+    assert.strictEqual(nb.tags[0].hidden, false);
+    assert.strictEqual(nb.tags[1].hidden, true);
+  });
+});
