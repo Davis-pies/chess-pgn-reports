@@ -23,7 +23,7 @@ and the editor palette.
 - Create: `src/nags.js`
 - Test: `tests/nags.test.mjs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/nags.test.mjs`:
 
@@ -106,12 +106,12 @@ test("marks a small common set for the palette's default row", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node --test tests/nags.test.mjs`
 Expected: FAIL — `Cannot find module '.../src/nags.js'`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `src/nags.js`:
 
@@ -203,12 +203,12 @@ export function symFor(code) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `node --test tests/nags.test.mjs`
 Expected: PASS, 8 tests
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/nags.js tests/nags.test.mjs
@@ -235,7 +235,7 @@ Node shape produced by `treeFromLines`:
 `variations` is a list of node-lists, matching what `parsePgn` produces, so the
 writer and our own parser agree on one shape.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/pgn-out.test.mjs`:
 
@@ -319,12 +319,12 @@ test("no lines produces no nodes", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node --test tests/pgn-out.test.mjs`
 Expected: FAIL — `Cannot find module '.../src/pgn-out.js'`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `src/pgn-out.js`:
 
@@ -395,12 +395,12 @@ export function treeFromLines(lines) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `node --test tests/pgn-out.test.mjs`
 Expected: PASS, 7 tests
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/pgn-out.js tests/pgn-out.test.mjs
@@ -418,7 +418,7 @@ NAG tokens, comments, 80-column wrapping, result token.
 - Modify: `src/pgn-out.js`
 - Test: `tests/pgn-out.test.mjs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/pgn-out.test.mjs` (and add `writeMovetext` to the existing
 `import` from `../src/pgn-out.js`):
@@ -468,12 +468,12 @@ test("escapes a closing brace inside a comment", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node --test tests/pgn-out.test.mjs`
 Expected: FAIL — `writeMovetext is not a function` / not exported
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Append to `src/pgn-out.js`:
 
@@ -550,12 +550,12 @@ than 80 characters therefore overflows the wrap. The wrapping test uses a
 variation-free line for that reason. Task 8 revisits it if the fixture output
 trips the length assertion.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `node --test tests/pgn-out.test.mjs`
 Expected: PASS, 14 tests
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/pgn-out.js tests/pgn-out.test.mjs
@@ -577,7 +577,7 @@ the notes list.
 calling `allNotes()`, so the module stays free of `state.js` and the test can
 pass notes directly.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/pgn-out.test.mjs` (add `annotate` to the import):
 
@@ -651,12 +651,12 @@ test("imported NAGs survive as marks and re-export", () => {
 The last test depends on Task 5; it will fail until then. Note that in the
 plan's order and leave it failing only for the length of that task.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node --test tests/pgn-out.test.mjs`
 Expected: FAIL — `annotate is not a function` / not exported
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Append to `src/pgn-out.js` (and add the import at the top of the file:
 `import { nagFor } from "./nags.js";`):
@@ -733,13 +733,13 @@ export function annotate(trunk, lines, notes) {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `node --test tests/pgn-out.test.mjs`
 Expected: PASS except `imported NAGs survive as marks and re-export`, which
 Task 5 fixes.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/pgn-out.js tests/pgn-out.test.mjs
@@ -757,7 +757,7 @@ This makes an imported annotation survive into the editor and back out.
 - Modify: `src/tree.js:8-11` (`chainToMoves`)
 - Test: `tests/tree.test.mjs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/tree.test.mjs`:
 
@@ -776,12 +776,12 @@ test("ignores a NAG code outside the table", () => {
 Check the file's existing imports first; add `parsePgn` from `../src/pgn.js`
 and `collectLines` from `../src/tree.js` only if they are not already there.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node --test tests/tree.test.mjs`
 Expected: FAIL — `marks` is undefined
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 In `src/tree.js`, add the import at the top:
 
@@ -843,7 +843,7 @@ and on the mainline object:
 	};
 ```
 
-- [ ] **Step 4: Run the whole suite**
+- [x] **Step 4: Run the whole suite**
 
 Run: `npm test`
 Expected: PASS — including `imported NAGs survive as marks and re-export` from
@@ -851,7 +851,7 @@ Task 4. If a `store.js` or `app.js` test now sees an unexpected `marks: {}`
 on a saved notebook, that is a real behaviour change to reconcile there, not a
 test to loosen.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/tree.js tests/tree.test.mjs
@@ -868,7 +868,7 @@ The one public entry point, and the fix for the actual bug.
 - Modify: `src/pgn-out.js`
 - Test: `tests/pgn-out.test.mjs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/pgn-out.test.mjs` (add `buildPgn` to the import):
 
@@ -910,12 +910,12 @@ test("ends with a single trailing newline", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node --test tests/pgn-out.test.mjs`
 Expected: FAIL — `buildPgn is not a function`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Add to the top of `src/pgn-out.js`:
 
@@ -968,12 +968,12 @@ export function buildPgn(state) {
 `allNotes()` reads `getCurrent()`, so `buildPgn` is called with the same state
 that is current — which is how `export.js` already calls `buildMarkdown()`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `node --test tests/pgn-out.test.mjs`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/pgn-out.js tests/pgn-out.test.mjs
@@ -988,7 +988,7 @@ git commit -m "Assemble the PGN export from tags and movetext"
 - Modify: `src/export.js:80-88` (the `pgn` button) and the button row at the end of `exportBar()`
 - Test: `tests/export.test.mjs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/export.test.mjs`, following the file's existing setup helpers
 (read the top of the file for how it installs jsdom and builds state):
@@ -1035,13 +1035,13 @@ test("Copy PGN writes the export to the clipboard", async () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node --test tests/export.test.mjs`
 Expected: FAIL — the first on the missing `$1`, the second on `btn` being
 undefined
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 In `src/export.js`, add the import:
 
@@ -1099,12 +1099,12 @@ Finally extend the append at the end of `exportBar()`:
 	bar.append(printBtn, pgn, copyPgn, md, copy);
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `node --test tests/export.test.mjs`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/export.js tests/export.test.mjs
@@ -1121,7 +1121,7 @@ and survive a trip back through our own.
 **Files:**
 - Test: `tests/pgn-out.test.mjs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/pgn-out.test.mjs`:
 
@@ -1183,7 +1183,7 @@ test("marks survive a round-trip", () => {
 `setCurrent` is needed because `buildPgn` calls `allNotes()`, which reads the
 current state.
 
-- [ ] **Step 2: Run the tests**
+- [x] **Step 2: Run the tests**
 
 Run: `node --test tests/pgn-out.test.mjs`
 Expected: some FAIL. These are the tests that earn the task — likely failures
@@ -1197,12 +1197,12 @@ and what they mean:
 Fix `src/pgn-out.js` until all pass. Do not weaken an assertion to make it go
 green.
 
-- [ ] **Step 3: Run the whole suite and the linter**
+- [x] **Step 3: Run the whole suite and the linter**
 
 Run: `npm test && npm run lint`
 Expected: PASS, no lint errors
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/pgn-out.js tests/pgn-out.test.mjs
@@ -1221,7 +1221,7 @@ entries go in a closed `<details>` and the visible row stays as dense as now.
 - Modify: `style.css` (after the `.sympick` rule at line 203)
 - Test: `tests/line-editor.test.mjs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/line-editor.test.mjs`, matching the file's existing setup:
 
@@ -1272,12 +1272,12 @@ test("a drawer symbol applies the mark like a common one", () => {
 Check how the file already renders and reaches `movePanel` — import whatever it
 imports, and use its existing selection setup if it differs from `state.sel`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `node --test tests/line-editor.test.mjs`
 Expected: FAIL — no `details.symmore` element
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 In `src/line-editor.js`, add the import:
 
@@ -1383,18 +1383,18 @@ In `style.css`, after the existing `.sympick` rule, add:
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `node --test tests/line-editor.test.mjs`
 Expected: PASS
 
-- [ ] **Step 5: Run the whole suite**
+- [x] **Step 5: Run the whole suite**
 
 Run: `npm test && npm run lint && npm run knip`
 Expected: PASS. `knip` should report no unused export from `nags.js` — if it
 flags one, that export has no caller and should be removed rather than ignored.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/line-editor.js style.css tests/line-editor.test.mjs
@@ -1408,7 +1408,7 @@ git commit -m "Offer the full NAG palette, with the rarer symbols in a drawer"
 **Files:**
 - Modify: `docs/superpowers/plans/2026-08-25-pgn-export.md`
 
-- [ ] **Step 1: Full verification**
+- [x] **Step 1: Full verification**
 
 Run: `npm test && npm run lint && npm run knip && npm run coverage`
 Expected: all pass; `src/pgn-out.js` and `src/nags.js` well covered.
@@ -1416,13 +1416,13 @@ Expected: all pass; `src/pgn-out.js` and `src/nags.js` well covered.
 Do not import `src/app.js` with a `?t=` cache-buster in any new test — it hides
 most of that module's coverage.
 
-- [ ] **Step 2: Manual check**
+- [x] **Step 2: Manual check**
 
 Open `index.html`, import a PGN, add symbols and notes, promote a sideline, then
 Export PGN. Paste the file into lichess's PGN import and chesstempo. Both must
 load the game with its variations, symbols and comments intact.
 
-- [ ] **Step 3: Mark the plan complete and close the task**
+- [x] **Step 3: Mark the plan complete and close the task**
 
 ```bash
 git commit -am "Mark the PGN export plan complete"

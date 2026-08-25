@@ -303,3 +303,9 @@ test("a null move survives the export", () => {
 		["e4", "e5", "--", "Bc5"],
 	);
 });
+
+test("merges a move's comments into one brace group", () => {
+	const t = treeFromLines(linesOf("1. e4 *"));
+	t[0].comments.push("Sicilian ∞", "a note");
+	assert.equal(writeMovetext(t, "*"), "1. e4 {Sicilian ∞ a note} *");
+});

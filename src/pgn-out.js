@@ -101,8 +101,11 @@ function emitSeq(nodes, out) {
 			out.push("$" + g);
 			forceNumber = true;
 		}
-		for (const c of n.comments) {
-			out.push("{" + commentText(c) + "}");
+		// One brace group, not one per comment: a move can carry a line label
+		// and a note at once, and readers render two adjacent {} groups
+		// inconsistently.
+		if (n.comments.length) {
+			out.push("{" + n.comments.map(commentText).join(" ") + "}");
 			forceNumber = true;
 		}
 		for (const v of n.variations) {
