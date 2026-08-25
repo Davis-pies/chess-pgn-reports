@@ -145,7 +145,16 @@ export function collectKeys(node, into) {
 	node.children.forEach((c) => collectKeys(c, into));
 }
 
-export function renderTrieNode(container, node, nameCounter, path, allOpen) {
+export function renderTrieNode(
+	container,
+	node,
+	nameCounter,
+	path,
+	allOpen,
+	// which open-state Set to record this trie's <details> in: the editor's
+	// openPaths by default, openHiddenPaths for the hidden drawer's own trie
+	paths = openPaths,
+) {
 	const nextPath = path
 		? path + "  " + branchLabel(node.move)
 		: branchLabel(node.move);
@@ -154,21 +163,21 @@ export function renderTrieNode(container, node, nameCounter, path, allOpen) {
 	// continuation shows as one compressed header, not nested single groups
 	if (!node.leaf && node.children.size === 1) {
 		node.children.forEach((c) =>
-			renderTrieNode(container, c, nameCounter, nextPath, allOpen),
+			renderTrieNode(container, c, nameCounter, nextPath, allOpen, paths),
 		);
 		return;
 	}
 	// every node — fork OR lone line — is a collapsible group, closed by
 	// default; header shows the full shared path up to this node
 	const det = el("details", { className: "lgroup" });
-	det.open = openPaths.has(node.key);
+	det.open = paths.has(node.key);
 	det.addEventListener("toggle", () => {
 		// only rebuild when the open-state actually changed; jsdom fires a
 		// toggle when a rebuilt element gets open=true, and without this guard
 		// that rebuild re-schedules another toggle forever
-		const had = openPaths.has(node.key);
-		if (det.open && !had) openPaths.add(node.key);
-		else if (!det.open && had) openPaths.delete(node.key);
+		const had = paths.has(node.key);
+		if (det.open && !had) paths.add(node.key);
+		else if (!det.open && had) paths.delete(node.key);
 		else return;
 		getRenderHooks().rerenderMarkup(); // boards appear/disappear with expansion (in-place, so the table scroll keeps its position)
 		// ponytail: whole-app re-render; if toggling feels slow on huge files,
@@ -195,7 +204,7 @@ export function renderTrieNode(container, node, nameCounter, path, allOpen) {
 			),
 		);
 	node.children.forEach((c) =>
-		renderTrieNode(body, c, nameCounter, "", allOpen && open),
+		renderTrieNode(body, c, nameCounter, "", allOpen && open, paths),
 	);
 	det.appendChild(body);
 	container.appendChild(det);
