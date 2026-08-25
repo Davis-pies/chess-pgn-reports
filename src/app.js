@@ -324,7 +324,6 @@ function viewRoot() {
   main.appendChild(top);
   main.appendChild(orientationToggle());
   main.appendChild(notebookList());
-  main.appendChild(helpPanel());
   const mb = markupPanel();
   markupBox = mb; // module ref for in-place re-renders
   const notesBox = notesPanel();
@@ -656,31 +655,13 @@ function hiddenDrawer(hid, main, counter) {
   return det;
 }
 
-// A form to append a note to a specific mainline move.
-function helpPanel() {
-  const d = document.createElement("details");
-  d.className = "help";
-  d.appendChild(el("summary", { textContent: "How to use" }));
-  const ol = el("ol", {});
-  [
-    "Paste a PGN or upload a .pgn file, then click Load & Tag. Every variation in parentheses becomes its own line.",
-    "The mainline is the reference row. For each other line choose Sideline or Footnote, add a name, or use ★ Make mainline to promote it.",
-    "Tap any move chip (or the end chip) on a line — a panel opens to add symbols and notes to that specific move; press done to close.",
-    "Switch layout between Horizontal and Vertical, or the Lines (print) view; toggle board diagrams; use the toolbar to flip the dark theme.",
-    "Click Save to keep this workbook in your browser (localStorage). Reopen it anytime from My saved workbooks.",
-    "Export PGN (editable chess notation for any chess software), Export Markdown (paste into Google Docs/Word), or Print → Save as PDF.",
-  ].forEach((s) => ol.appendChild(el("li", { textContent: s })));
-  d.appendChild(ol);
-  return d;
-}
-
 function importPanel() {
   const box = el("div", { className: "panel" });
   box.appendChild(
     el("h2", { textContent: "Chess Opening Theory Table Builder" }),
   );
   box.appendChild(themeBtn());
-  box.append(helpPanel(), notebookList());
+  box.appendChild(notebookList());
   const ta = el("textarea", {
     className: "pgnin",
     rows: 10,
