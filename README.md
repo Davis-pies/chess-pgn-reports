@@ -39,7 +39,10 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    sequence. Lines get an
    **evaluation/quality symbol** picker (=, ±, ∓, +=, =+, ∞, !, ?, …). The
    **Notes** section is editable — add a note at any move, or edit/delete
-   existing ones.
+   existing ones. On screen the Notes list folds: a group footnote, a
+   footnote's own notes, and several notes on one move each collapse to a
+   one-line header, with **Expand all** / **Collapse all** beside the heading.
+   Everything starts expanded, and the folding is not saved with the notebook.
 4. **Export** — **Export PGN** (editable chess notation for any chess app),
    **Export Markdown** (paste into Google Docs/Word), or **Print → Save as
    PDF** (always the linear card view). Saved workbooks (`localStorage`) are
@@ -77,6 +80,7 @@ Because it's fully client-side, the same URL works on your phone's browser.
 | `src/tree.js` | flatten the tree into root-to-leaf "lines" (mainline + each variation) |
 | `src/table.js` | tagged lines -> a ply-keyed cell grid shared by both layouts |
 | `src/render.js` | grid -> DOM table (vertical/horizontal) + SVG board diagrams from FEN |
+| `src/notes-view.js` | the on-screen Notes list, grouped into collapsible `<details>` |
 | `src/store.js` | `localStorage` notebook persistence |
 | `src/app.js` | browser glue: import, tag buttons, orientation toggle, print |
 
