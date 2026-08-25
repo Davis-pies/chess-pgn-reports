@@ -65,11 +65,12 @@ A new pure module. Indents with TABS, matching `table.js`, `foot-groups.js` and
 | `hideAll(lines)` | hide every non-mainline line |
 | `showAll(lines)` | unhide every line |
 | `solo(all, keep)` | hide every non-mainline line not in `keep`; unhide every line in `keep` |
-| `hiddenState(leaves)` | `"all"` \| `"some"` \| `"none"`, for the tri-state group chip |
 
 `setHidden` and `solo` are the only writers and both refuse `isMain`, so §1's
 mainline rule lives in exactly one place. Every export is a pure function over a
-line array and is testable without a DOM.
+line array and is testable without a DOM. (A `hiddenState()` tri-state
+helper was specified here originally and dropped during implementation as
+unreachable — see §5.)
 
 `solo` unhides the lines it keeps: "hide all except this" implies this one is
 visible, including when the target is a group whose members were themselves
@@ -113,13 +114,20 @@ note numbers and no footnote letters, as the task requires.
 the existing `else` branch, so they are absent on the mainline exactly as
 `★ Make mainline` already is.
 
-**Per group.** A tri-state `[Hide]` chip and a `[Solo]` chip in
-`renderTrieNode`'s `<summary>`, beside `groupFootChip` and under the same
-`count > 1` guard. Both call `e.preventDefault()` and `e.stopPropagation()` so
-the click does not also toggle the `<details>`, as `groupFootChip` already does.
-The Hide chip reads its state back off the leaves via `hiddenState()` — `on`
-when all are hidden, `partial` when some are — and one click always changes
-something: it hides all unless all are already hidden, in which case it clears.
+**Per group.** A `[Hide]` chip and a `[Solo]` chip in `renderTrieNode`'s
+`<summary>`, beside `groupFootChip` and under the same `count > 1` guard. Both
+call `e.preventDefault()` and `e.stopPropagation()` so the click does not also
+toggle the `<details>`, as `groupFootChip` already does. The Hide chip reads its
+state back off the leaves, and one click always changes something: it hides the
+whole group unless the group is already hidden, in which case it restores it.
+
+Unlike `groupFootChip` there is **no `partial` state**, because a group's leaves
+are always uniformly visible or uniformly hidden: the editor builds its trie over
+the visible lines and the drawer builds its own over the hidden ones, so a node's
+leaves come from one set or the other, never both. (Found during implementation —
+the original tri-state design had an unreachable third branch.) The chip is
+therefore "off, hides the group" in the editor and "on, restores the group" in
+the drawer.
 
 **Bulk.** A `Lines: [Hide all] [Show all]` control row beside the existing
 `Branches: [Expand all] [Collapse all]` controls.
@@ -147,8 +155,7 @@ Test-driven, matching the repo's existing habit of a test file per module.
 
 `tests/visibility.test.mjs` covers the pure module: each filter, `setHidden`
 deleting rather than falsifying, `setHidden`/`hideAll`/`solo` all refusing to
-hide the mainline, `solo` unhiding the lines it keeps, and `hiddenState`'s three
-results.
+hide the mainline, and `solo` unhiding the lines it keeps.
 
 Per-consumer assertions, added to the existing test files:
 

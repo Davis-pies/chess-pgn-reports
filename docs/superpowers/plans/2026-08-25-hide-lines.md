@@ -1,6 +1,6 @@
 # Hide/Disable Lines Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Let a line — or a whole trie group — be marked hidden, dropping it from the table, print view, Markdown export and PGN, and moving it into a collapsed drawer in the editor from which it can be restored individually or as a group.
 
@@ -24,7 +24,7 @@ The predicate and every writer of `l.hidden`, as pure functions over a line arra
 - Create: `src/visibility.js`
 - Test: `tests/visibility.test.mjs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/visibility.test.mjs`:
 
@@ -131,12 +131,12 @@ test("hiddenState reads a group's chip state off its leaves", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `node --test tests/visibility.test.mjs`
 Expected: FAIL — cannot find module `../src/visibility.js`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `src/visibility.js` (TABS):
 
@@ -199,12 +199,12 @@ export function hiddenState(leaves) {
 }
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `node --test tests/visibility.test.mjs`
 Expected: PASS, 8 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/visibility.js tests/visibility.test.mjs
@@ -223,7 +223,7 @@ hidden lines consume no `[n]` numbers and no footnote letters.
 - Modify: `src/table.js:18-19`
 - Test: `tests/table.test.mjs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/table.test.mjs`. This file indents with **TABS** and already
 imports `grid`, `parsePgn`, `collectLines` and `assert`.
@@ -274,12 +274,12 @@ test("a hidden footnote is absent from footNotes", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `node --test tests/table.test.mjs`
 Expected: FAIL — the hidden line still appears in `vars` / `footNotes`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 In `src/table.js`, add the import at the top of the import block:
 
@@ -305,12 +305,12 @@ export function grid(all) {
 	const main = lines.find((l) => l.isMain) || lines[0];
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `node --test tests/table.test.mjs tests/print.test.mjs tests/render.test.mjs`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/table.js tests/table.test.mjs
@@ -328,7 +328,7 @@ through `grid()`, so it needs its own filter.
 - Modify: `src/pgn-out.js:267`
 - Test: `tests/pgn-out.test.mjs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/pgn-out.test.mjs` (TABS):
 
@@ -351,12 +351,12 @@ import { parsePgn } from "../src/pgn.js";
 import { collectLines } from "../src/tree.js";
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `node --test tests/pgn-out.test.mjs`
 Expected: FAIL — `e6` still present in the exported PGN.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 In `src/pgn-out.js`, add to the import block:
 
@@ -379,12 +379,12 @@ to:
 	const lines = visibleLines(state.lines || []);
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `node --test tests/pgn-out.test.mjs`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/pgn-out.js tests/pgn-out.test.mjs
@@ -404,7 +404,7 @@ the array it was given, so footnote lettering follows automatically.
 - Modify: `src/line-editor.js:143`
 - Test: `tests/notes.test.mjs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/notes.test.mjs` (TABS). This uses `loadState` from
 `tests/helpers.mjs`; if the file does not already import it, add
@@ -457,7 +457,7 @@ test("hiding a group's members dissolves the footnote group", () => {
 });
 ```
 
-- [ ] **Step 1b: Guard the shared-notes decision**
+- [x] **Step 1b: Guard the shared-notes decision**
 
 Hidden lines must KEEP receiving notes added at a shared move, so
 `computeShared` in `app.js` is deliberately NOT filtered (spec §7). Append this
@@ -495,14 +495,14 @@ test("a note added at a shared move still reaches a hidden line", async () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `node --test tests/notes.test.mjs tests/app.test.mjs`
 Expected: FAIL — the hidden line's note is still numbered. The shared-note
 guard should already PASS (nothing filters `computeShared`); it is there to
 fail loudly if someone later filters it.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 In `src/notes.js` add to the import block:
 
@@ -545,12 +545,12 @@ Note the existing `|| {}` already covers the new case where `l` is itself
 hidden and therefore absent from the numbering — its chips simply show no
 superscripts, which is correct.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `node --test tests/notes.test.mjs tests/line-editor.test.mjs tests/app.test.mjs`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/notes.js src/line-editor.js tests/notes.test.mjs tests/app.test.mjs
@@ -566,7 +566,7 @@ git commit -m "Keep hidden lines out of note numbering"
 - Modify: `src/app.js:396-405` (the `// re-apply tags` block)
 - Test: `tests/store.test.mjs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/store.test.mjs` (2 SPACES — this file uses spaces):
 
@@ -593,12 +593,12 @@ test("saveNotebook records a line's hidden flag", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `node --test tests/store.test.mjs`
 Expected: FAIL — `nb.tags[1].hidden` is `undefined`.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 In `src/store.js`, add `hidden` to the `tags` map (2 SPACES):
 
@@ -628,12 +628,12 @@ Note `l.hidden = false` here rather than a delete is deliberate and harmless:
 `openNotebook` builds brand new line objects from `collectLines`, and the next
 `saveNotebook` writes `!!l.hidden` regardless.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `node --test tests/store.test.mjs tests/app.test.mjs`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/store.js src/app.js tests/store.test.mjs
@@ -653,7 +653,7 @@ in the editor above, so `renderTrieNode` takes the Set as a parameter.
 - Modify: `src/trie-view.js:148-200` (`renderTrieNode`)
 - Test: none of its own — Task 9 asserts the key-isolation behaviour this enables
 
-- [ ] **Step 1: Add the Set**
+- [x] **Step 1: Add the Set**
 
 Append to `src/state.js` after the `openTablePaths` declaration (TABS to match
 the file — check: `state.js` uses TABS):
@@ -665,7 +665,7 @@ the file — check: `state.js` uses TABS):
 export const openHiddenPaths = new Set();
 ```
 
-- [ ] **Step 2: Parameterise renderTrieNode**
+- [x] **Step 2: Parameterise renderTrieNode**
 
 In `src/trie-view.js`, change the signature from:
 
@@ -710,13 +710,13 @@ And pass `paths` down both recursive calls:
 	);
 ```
 
-- [ ] **Step 3: Run the suite to verify nothing regressed**
+- [x] **Step 3: Run the suite to verify nothing regressed**
 
 Run: `npm test`
 Expected: PASS — the default parameter keeps every existing call site behaving
 exactly as before.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/state.js src/trie-view.js
@@ -731,7 +731,7 @@ git commit -m "Let renderTrieNode render against a caller's open-path set"
 - Modify: `src/line-editor.js` (the `else` branch of the tags block, after the promote chip)
 - Test: `tests/line-editor.test.mjs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/line-editor.test.mjs`. This file indents with **TABS** and
 already defines `byText(node, sel, txt)`, the `TWO_LINES` PGN constant, and
@@ -776,12 +776,12 @@ test("Solo hides every other line but keeps the mainline", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `node --test tests/line-editor.test.mjs`
 Expected: FAIL — no Hide chip exists, so `byText(...)` returns undefined.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 In `src/line-editor.js`, add to the import block:
 
@@ -817,12 +817,12 @@ add:
 		tags.append(hide, soloBtn);
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `node --test tests/line-editor.test.mjs`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/line-editor.js tests/line-editor.test.mjs
@@ -840,7 +840,7 @@ Mirrors the existing `groupFootChip`, including the `preventDefault` /
 - Modify: `src/trie-view.js` (add two chip builders; extend the `count > 1` line)
 - Test: `tests/app.test.mjs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/app.test.mjs`. This file indents with **TABS** and already
 provides `app` (from `bootApp()`), `doc(id)`, `tick()`, the `GROUP_PGN`
@@ -909,12 +909,12 @@ test("group Solo hides every line outside the group", async () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `node --test tests/app.test.mjs`
 Expected: FAIL — no `.chip.grouphide` element exists.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 In `src/trie-view.js`, add to the import block:
 
@@ -984,12 +984,12 @@ to:
 		);
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `node --test tests/app.test.mjs`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/trie-view.js tests/app.test.mjs
@@ -1008,7 +1008,7 @@ open-path Set.
 - Modify: `src/app.js` `markupPanel()`
 - Test: `tests/app.test.mjs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/app.test.mjs` (**TABS**, reusing `app`, `doc`, `tick`,
 `GROUP_PGN` and `loadGroupPgn` as above):
@@ -1114,12 +1114,12 @@ test("opening a drawer group does not open its twin in the editor", async () => 
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `node --test tests/app.test.mjs`
 Expected: FAIL — no `.hidden-drawer` element.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 In `src/app.js` add to the import block:
 
@@ -1221,12 +1221,12 @@ function hiddenDrawer(hid, main, counter) {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `node --test tests/app.test.mjs`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/app.js tests/app.test.mjs
@@ -1241,7 +1241,7 @@ git commit -m "Move hidden lines out of the editor into a drawer"
 - Modify: `src/app.js` `markupPanel()` control row
 - Test: `tests/app-toolbar.test.mjs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/app-toolbar.test.mjs`. This file indents with **2 SPACES** and
 provides `app` from `bootApp()` plus the `PGN` constant; drive it with
@@ -1266,12 +1266,12 @@ test("Hide all hides every line but the mainline, Show all restores them", async
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `node --test tests/app-toolbar.test.mjs`
 Expected: FAIL — `app.button("Hide all")` is undefined.
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 In `markupPanel()`, after the `if (getCurrent().groupView !== "flat") { ... }`
 block closes — so the buttons appear in both views — and before
@@ -1301,12 +1301,12 @@ Note the drawer's own "Show all" button (Task 9) has the same label. The
 toolbar one lives in `.markup > .orow` and the drawer's in `.hidden-drawer`;
 `app.button()` returns the first match in DOM order, which is the toolbar's.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `node --test tests/app-toolbar.test.mjs`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/app.js tests/app-toolbar.test.mjs
@@ -1320,7 +1320,7 @@ git commit -m "Add bulk Hide all and Show all controls"
 **Files:**
 - Modify: `style.css` (near the existing `.chip.groupfoot` / `.chip.partial` block at ~line 238)
 
-- [ ] **Step 1: Add the rules**
+- [x] **Step 1: Add the rules**
 
 `.chip.partial { opacity: 0.55 }` already exists and is generic, so the group
 Hide chip's partial state needs nothing new. Add (2 SPACES):
@@ -1352,12 +1352,12 @@ Hide chip's partial state needs nothing new. Add (2 SPACES):
 }
 ```
 
-- [ ] **Step 2: Verify nothing broke**
+- [x] **Step 2: Verify nothing broke**
 
 Run: `npm test && npm run lint`
 Expected: PASS.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add style.css
@@ -1371,12 +1371,12 @@ git commit -m "Style the hide chips and the hidden drawer"
 **Files:**
 - Modify: `docs/superpowers/plans/2026-08-25-hide-lines.md`
 
-- [ ] **Step 1: Full verification**
+- [x] **Step 1: Full verification**
 
 Run: `npm test && npm run lint && npm run knip && npm run coverage`
 Expected: all pass, with `src/visibility.js` well covered.
 
-- [ ] **Step 2: Manual check**
+- [x] **Step 2: Manual check**
 
 Open `index.html`, import a PGN with several variations. Hide a line — confirm
 it leaves the table, the print view and the Markdown/PGN exports and appears in
@@ -1384,7 +1384,7 @@ the drawer. Hide a whole group with the group chip. Use Solo on a group. Save
 the notebook, reload the page, reopen it, and confirm the hidden lines are
 still hidden.
 
-- [ ] **Step 3: Mark the plan complete and close the task**
+- [x] **Step 3: Mark the plan complete and close the task**
 
 ```bash
 git commit -am "Mark the hide-lines plan complete"
