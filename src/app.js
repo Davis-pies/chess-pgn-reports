@@ -21,7 +21,12 @@ import {
   setRenderHooks,
 } from "./state.js";
 import { allNotes } from "./notes.js";
-import { visibleLines, hiddenLines, showAll } from "./visibility.js";
+import {
+  visibleLines,
+  hiddenLines,
+  hideAll,
+  showAll,
+} from "./visibility.js";
 import { appendPrintTables } from "./print.js";
 import {
   renderTrieTable,
@@ -561,6 +566,24 @@ function markupPanel() {
     });
     row.append(all, none);
   }
+  // bulk hide/show, in both views: the mainline is never affected
+  const hideEvery = el("button", {
+    className: "chip mini",
+    textContent: "Hide all",
+    onclick: () => {
+      hideAll(getCurrent().lines);
+      renderApp();
+    },
+  });
+  const showEvery = el("button", {
+    className: "chip mini",
+    textContent: "Show all",
+    onclick: () => {
+      showAll(getCurrent().lines);
+      renderApp();
+    },
+  });
+  row.append(" Lines: ", hideEvery, showEvery);
   box.appendChild(row);
   box.appendChild(
     el("h3", {
