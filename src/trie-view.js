@@ -8,6 +8,7 @@ import {
 	getRenderHooks,
 } from "./state.js";
 import { subMaxPly } from "./print.js";
+import { setHidden, solo, hiddenState } from "./visibility.js";
 // rerenderTable/rerenderMarkup (app.js shell glue, in-place panel rebuilds)
 // and lineEditor (seam 3) are reached through the render-hooks registry
 // rather than a static `import ... from "./app.js"` -- see the comment on
@@ -120,6 +121,46 @@ function groupFootChip(node) {
 	return chip;
 }
 
+// The group-level Hide chip. Like groupFootChip its state is read back off the
+// leaves rather than stored: all hidden reads "on", some reads "partial". One
+// click always changes something -- it hides every line unless they are all
+// already hidden, in which case it brings them all back.
+function groupHideChip(node) {
+	const leaves = leavesOf(node);
+	const state = hiddenState(leaves);
+	const chip = el("button", {
+		className:
+			"chip hide grouphide" +
+			(state === "all" ? " on" : state === "some" ? " partial" : ""),
+		textContent: state === "all" ? "Hidden" : "Hide",
+	});
+	chip.onclick = (e) => {
+		// the chip lives in the <summary>, where a click would otherwise toggle
+		// the <details> open/closed as well
+		e.preventDefault();
+		e.stopPropagation();
+		setHidden(leaves, state !== "all");
+		getRenderHooks().renderApp();
+	};
+	return chip;
+}
+
+// "Hide everything outside this group."
+function groupSoloChip(node) {
+	const chip = el("button", {
+		className: "chip solo groupsolo",
+		textContent: "Solo",
+		title: "hide every line outside this group",
+	});
+	chip.onclick = (e) => {
+		e.preventDefault();
+		e.stopPropagation();
+		solo(getCurrent().lines, leavesOf(node));
+		getRenderHooks().renderApp();
+	};
+	return chip;
+}
+
 // The moves a branch's lines share, from the branch's root child down its
 // single-child chain to the first fork (or the leaf).
 function sharedMoves(node) {
@@ -191,7 +232,13 @@ export function renderTrieNode(
 	// Marking a group as a footnote is marking all its lines: the group IS one
 	// footnote precisely when every line under it is tagged (see foot-groups.js).
 	// A group of one is just a line, and its own editor row already has the chip.
-	if (count > 1) summary.appendChild(groupFootChip(node));
+	// A group of one is just a line, and its own editor row already has these.
+	if (count > 1)
+		summary.append(
+			groupFootChip(node),
+			groupHideChip(node),
+			groupSoloChip(node),
+		);
 	det.appendChild(summary);
 	const body = el("div", { className: "lgroup-body" });
 	const open = det.open;

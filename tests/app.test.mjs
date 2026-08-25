@@ -641,3 +641,58 @@ test("a note added at a shared move still reaches a hidden line", async () => {
 		"the hidden line received the shared note",
 	);
 });
+
+test("the group Hide chip hides every line under the group", async () => {
+	await loadGroupPgn();
+	const chip = doc("view").querySelector(
+		".markup details.lgroup summary .chip.grouphide",
+	);
+	assert.ok(chip, "group summary carries a Hide chip");
+	assert.ok(!chip.className.includes("on"), "off to start");
+
+	chip.click();
+	await tick();
+	assert.strictEqual(
+		getCurrent().lines.filter((l) => l.hidden).length,
+		2,
+		"both lines under the group are hidden",
+	);
+});
+
+test("the group Hide chip reads partial when only some are hidden", async () => {
+	await loadGroupPgn();
+	const leaf = getCurrent().lines.find((l) =>
+		l.moves.some((m) => m.san === "Nc3"),
+	);
+	leaf.hidden = true;
+	getRenderHooks().renderApp();
+	await tick();
+	const chip = doc("view").querySelector(
+		".markup details.lgroup summary .chip.grouphide",
+	);
+	assert.ok(chip, "the group still renders with one line left");
+	assert.ok(
+		chip.className.includes("partial"),
+		"chip reads partial with one of two hidden",
+	);
+});
+
+test("group Solo hides every line outside the group", async () => {
+	app.reset();
+	const view = doc("view");
+	view.querySelector("textarea.pgnin").value =
+		"1. e4 e5 (1... c5 2. Nf3) (1... c5 2. Nc3) (1... e6) 2. Nf3";
+	[...view.querySelectorAll("button")]
+		.find((b) => b.textContent.includes("Load"))
+		.click();
+	await tick();
+
+	doc("view")
+		.querySelector(".markup details.lgroup summary .chip.groupsolo")
+		.click();
+	await tick();
+	const gone = getCurrent().lines.find((l) =>
+		l.moves.some((m) => m.san === "e6"),
+	);
+	assert.strictEqual(gone.hidden, true, "the line outside the group is hidden");
+});
