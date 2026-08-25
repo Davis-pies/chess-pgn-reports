@@ -16,7 +16,14 @@ function tokenize(mt) {
 }
 
 export function parsePgn(mt) {
-	const cleaned = mt.replace(/\[[^\]\n]*\]\s*/g, " "); // strip PGN tag/header lines
+	// Strip PGN tag-pair lines. Anchored per line and matched against the real
+	// tag-pair shape on purpose: the old pattern removed ANY bracketed text
+	// anywhere, which also ate "[%...]" markers inside comments — including the
+	// ones our own exporter writes to carry per-line state.
+	const cleaned = mt.replace(
+		/^[ \t]*\[[A-Za-z0-9_]+\s+"[^"]*"\][ \t]*$/gm,
+		" ",
+	);
 	const tokens = tokenize(cleaned);
 	const ctx = { i: 0, result: "*", comments: [] };
 	const nodes = parseSeq(tokens, ctx, { fen: START_FEN, ply: 0 });
@@ -124,10 +131,23 @@ function parseSeq(tokens, ctx, state, inVariation = false, intro = null) {
 		const t = tokens[ctx.i];
 		if (t.startsWith("{") || t.startsWith(";")) {
 			let text = t.startsWith("{") ? t.slice(1, -1) : t.slice(1);
+			// Our own [%ott ...] marker carries the per-line state the movetext
+			// cannot say (footnote tag, name, eval, note). It has to be read off
+			// BEFORE the strip below, and before the empty-text early exit — a
+			// comment holding nothing but a marker still has state to deliver.
+			const own = text.match(/\[%ott ([^\]]*)\]/);
+			if (own && last) {
+				try {
+					last.ott = JSON.parse(decodeURIComponent(own[1]));
+				} catch {
+					// a corrupted or hand-edited marker is not worth failing an
+					// otherwise valid import over
+				}
+			}
 			text = text
 				.trim()
 				.replace(/\[%.*?\]/g, "")
-				.trim(); // drop [%...] NAG markers
+				.trim(); // drop [%...] markers (ours, and NAG markers)
 			if (!text) {
 				ctx.i++;
 				continue;

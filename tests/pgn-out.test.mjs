@@ -19,6 +19,14 @@ const shape = (nodes) =>
 		vars: n.variations.map(shape),
 	}));
 
+// The PGN as a reader sees it: [%...] markers are machine data that viewers
+// hide, so assertions about visible text must not see them.
+function visible(pgn) {
+	return pgn
+		.replace(/\[%[^\]]*\]\s?/g, "")
+		.replace(/\{\s*\}\s?/g, ""); // a comment that held only a marker
+}
+
 function linesOf(pgn) {
 	return collectLines(parsePgn(pgn).nodes);
 }
@@ -175,7 +183,12 @@ test("a line's eval comments its first divergent move, without the name", () => 
 		lines[1].name = "Sicilian";
 		lines[1].meta = { eval: "\u221e" };
 	});
-	assert.deepEqual(tree[1].variations[0][0].comments, ["\u221e"]);
+	const comments = tree[1].variations[0][0].comments;
+	// the round-trip marker rides along; the human-readable part is the eval
+	assert.deepEqual(
+		comments.filter((c) => !c.startsWith("[%")),
+		["\u221e"],
+	);
 });
 
 test("a sideline's name is exported only when the notebook asks for it", () => {
@@ -186,8 +199,10 @@ test("a sideline's name is exported only when the notebook asks for it", () => {
 		lines[1].name = "Line 7";
 		return buildPgn({ name: "T", lines, showFootNames });
 	};
-	assert.doesNotMatch(build(false), /Line 7/, build(false));
-	assert.match(build(true), /\{Line 7\}/, build(true));
+	// the marker still carries the name so our own importer gets it back; what
+	// must not appear is human-readable text outside a [%...] marker
+	assert.doesNotMatch(visible(build(false)), /Line 7/, build(false));
+	assert.match(visible(build(true)), /\{Line 7\}/, build(true));
 });
 
 test("a note comments the move it is anchored to", () => {
@@ -332,7 +347,7 @@ test("a footnote's own note reaches the PGN", () => {
 	lines[1].tag = "foot";
 	lines[1].meta = { note: "a sharp reply" };
 	const out = buildPgn({ name: "T", lines });
-	assert.match(out, /a sharp reply/, out);
+	assert.match(visible(out), /a sharp reply/, out);
 });
 
 test("a footnote's sub-notes reach the moves they annotate", () => {
@@ -343,7 +358,11 @@ test("a footnote's sub-notes reach the moves they annotate", () => {
 	// follow them into one note (see parseSeq), so the text arrives as
 	// "develops 2... d6" anchored on d6 — inside the footnote's variation,
 	// which is what matters here.
-	assert.match(out, /\(1\.\.\. c5 2\. Nf3 d6 \{develops[^}]*\}\)/, out);
+	assert.match(
+		visible(out).replace(/\s+/g, " "),
+		/\(1\.\.\. c5 2\. Nf3 d6 \{develops[^}]*\}\)/,
+		out,
+	);
 });
 
 test("a footnote line's name is omitted from the PGN unless asked for", () => {
@@ -355,9 +374,11 @@ test("a footnote line's name is omitted from the PGN unless asked for", () => {
 		return buildPgn({ name: "T", lines, showFootNames });
 	};
 	// the eval still rides along; only the name is gated
-	assert.match(build(false), /\{∞\}/);
-	assert.doesNotMatch(build(false), /Sicilian/);
-	assert.match(build(true), /\{Sicilian ∞\}/);
+	// the marker still carries the name for our own importer; what is gated is
+	// the human-readable text outside a [%...] marker
+	assert.match(visible(build(false)), /\{∞\}/, build(false));
+	assert.doesNotMatch(visible(build(false)), /Sicilian/, build(false));
+	assert.match(visible(build(true)), /\{Sicilian ∞\}/, build(true));
 });
 
 test("a note on a move a line inherits stays out of the mainline's comments", () => {
@@ -387,4 +408,66 @@ test("many deep lines' notes do not collapse onto one mainline move", () => {
 	for (const body of out.match(/\{[^}]*\}/g) || [])
 		assert.ok(!/N\d.*N\d/.test(body), "notes clumped into one comment: " + body);
 	for (let i = 0; i < 3; i++) assert.ok(out.includes("{N" + i + "}"), out);
+});
+
+// Round-trip fidelity: re-importing our own export must not lose which lines
+// are footnotes, their names, or their evaluations. The visible comment is
+// gated by showFootNames and formatted for humans, so it cannot be the
+// carrier — the marker has to survive independently of it.
+test("a footnote tag survives an export and re-import", () => {
+	const lines = linesOf("1. e4 e5 (1... c5 2. Nf3) *");
+	lines[1].tag = "foot";
+	lines[1].name = "Sicilian";
+	lines[1].meta = { eval: "∞", note: "sharp" };
+	const back = collectLines(parsePgn(buildPgn({ name: "T", lines })).nodes);
+	const side = back.find((l) => l.moves.some((m) => m.san === "c5"));
+	assert.equal(side.tag, "foot");
+	assert.equal(side.name, "Sicilian");
+	assert.equal(side.meta.eval, "∞");
+	assert.equal(side.meta.note, "sharp");
+});
+
+test("the round-trip marker is invisible to a reader", () => {
+	const lines = linesOf("1. e4 e5 (1... c5) *");
+	lines[1].tag = "foot";
+	lines[1].name = "Sicilian";
+	const out = buildPgn({ name: "T", lines });
+	// names are off by default, so nothing human-readable should appear —
+	// the marker is metadata, not text
+	assert.doesNotMatch(out, /Sicilian(?![^[]*\])/, out);
+	const back = collectLines(parsePgn(out).nodes);
+	assert.equal(back.find((l) => l.moves.some((m) => m.san === "c5")).name, "Sicilian");
+});
+
+test("a marker survives alongside real commentary and a NAG", () => {
+	const lines = linesOf("1. e4 e5 (1... c5 2. Nf3) *");
+	lines[1].tag = "foot";
+	lines[1].name = "Sicilian";
+	lines[1].marks = { 1: "!" };
+	lines[1].comments = [{ ply: 2, text: "a real note" }]; // Nf3
+	const out = buildPgn({ name: "T", lines });
+	const back = collectLines(parsePgn(out).nodes);
+	const side = back.find((l) => l.moves.some((m) => m.san === "c5"));
+	assert.equal(side.tag, "foot");
+	assert.equal(side.marks[1], "!");
+	assert.deepEqual(
+		side.comments.map((c) => c.text),
+		["a real note"],
+	);
+});
+
+test("chess.js still parses an export carrying round-trip markers", () => {
+	const lines = linesOf("1. e4 e5 (1... c5 2. Nf3) 2. Nf3 *");
+	lines[1].tag = "foot";
+	lines[1].name = "Sicilian ]}\\ awkward";
+	lines[1].meta = { eval: "∞", note: "brackets } and ] inside" };
+	const out = buildPgn({ name: "T", lines });
+	const c = new Chess();
+	assert.doesNotThrow(() => c.loadPgn(out), out);
+	assert.ok(c.history().length > 0, out);
+	// and the awkward characters survive our own round-trip
+	const back = collectLines(parsePgn(out).nodes);
+	const side = back.find((l) => l.moves.some((m) => m.san === "c5"));
+	assert.equal(side.name, "Sicilian ]}\\ awkward");
+	assert.equal(side.meta.note, "brackets } and ] inside");
 });

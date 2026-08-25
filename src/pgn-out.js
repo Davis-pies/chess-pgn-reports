@@ -198,11 +198,17 @@ export function annotate({ trunk, byLine }, lines, notes, opts = {}) {
 		const label = [opts.footNames ? l.name : "", (l.meta || {}).eval]
 			.filter(Boolean)
 			.join(" ");
-		if (label && !l.isMain) {
+		// The marker rides on the same move as the label but is independent of
+		// it: the label is gated by the name setting and formatted for humans,
+		// so it cannot carry the state our own importer needs back.
+		const mark = lineMarker(l);
+		if ((label || mark) && !l.isMain) {
 			const d = divergence(l, main);
 			const m = l.moves[d] || l.moves[l.moves.length - 1];
 			const n = m && per && per.get(m.ply);
-			if (n && !n.comments.includes(label)) n.comments.push(label);
+			// the marker goes first so a reader's eye meets the prose, not it
+			if (n && mark && !n.comments.includes(mark)) n.comments.push(mark);
+			if (n && label && !n.comments.includes(label)) n.comments.push(label);
 		}
 	}
 
@@ -221,6 +227,29 @@ export function annotate({ trunk, byLine }, lines, notes, opts = {}) {
 		else put(note.owner, note.ply, note.text);
 	}
 	return trunk;
+}
+
+// What our own importer needs back that the movetext cannot say on its own:
+// whether a line is a footnote, its name, and its evaluation and note. Marks
+// already travel as NAGs, comments as comments, and a promoted mainline comes
+// back as the trunk it was exported as.
+//
+// It is written as a PGN "[%...]" comment marker: readers that understand them
+// (lichess, chesstempo) treat them as machine data and never show them as
+// text, and pgn.js already strips them out of comment prose. The payload is
+// URI-encoded, which escapes "]" and "}" — the two characters that would
+// otherwise end the marker or the comment early.
+const MARKER = "ott";
+
+function lineMarker(l) {
+	const meta = l.meta || {};
+	const data = {};
+	if (l.tag === "foot") data.t = "foot";
+	if (l.name) data.n = l.name;
+	if (meta.eval) data.e = meta.eval;
+	if (meta.note) data.o = meta.note;
+	if (!Object.keys(data).length) return "";
+	return "[%" + MARKER + " " + encodeURIComponent(JSON.stringify(data)) + "]";
 }
 
 // A PGN tag value is a quoted string: '"' and '\' are the only characters that
