@@ -13,6 +13,9 @@ import {
 	boardSvg,
 	fullMovesText,
 	appendFootnote,
+	appendFootNode,
+	footStem,
+	subNoteRow,
 	footnoteText,
 	cardMovesText,
 	subNoteLines,
@@ -804,4 +807,70 @@ test("nesting a group's rows does not shrink the indent step", () => {
 	assert.ok(size("d1") < size("root"), "the first level is smaller");
 	assert.strictEqual(size("d2"), size("d1"), "the second level is not smaller");
 	assert.strictEqual(size("d3"), size("d2"), "nor the third");
+});
+
+test("footStem renders a footnote's inline content and nothing else", () => {
+	const off = installDom();
+	const box = document.createElement("div");
+	footStem(box, {
+		depth: 0,
+		name: "Sicilian",
+		eval: "=",
+		note: "the **main** try",
+		moves: [{ ply: 2, san: "c5" }],
+		marks: {},
+		noteByPly: {},
+		subNotes: [{ label: "a", ply: 2, text: "ignored here" }],
+		children: [],
+		d: 0,
+	});
+	assert.strictEqual(box.children.length, 1, "one inline span");
+	assert.strictEqual(box.firstChild.tagName, "SPAN");
+	assert.match(box.textContent, /Sicilian: 2\.c5 = — the main try/);
+	assert.strictEqual(
+		box.querySelector(".subnote"),
+		null,
+		"sub-notes are the caller's job, not the stem's",
+	);
+	off();
+});
+
+test("footStem appends nothing when a footnote has no inline content", () => {
+	const off = installDom();
+	const box = document.createElement("div");
+	footStem(box, { depth: 0, moves: [], marks: {}, noteByPly: {}, d: 0 });
+	assert.strictEqual(box.childNodes.length, 0);
+	off();
+});
+
+test("subNoteRow builds one labelled .subnote row", () => {
+	const off = installDom();
+	const row = subNoteRow({ label: "b", ply: 4, text: "a *sharp* reply" });
+	assert.strictEqual(row.className, "subnote");
+	assert.strictEqual(row.querySelector("sup").textContent, "[b]");
+	assert.strictEqual(row.querySelector("em").textContent, "sharp");
+	off();
+});
+
+test("appendFootNode renders one group branch as a depth-marked row", () => {
+	const off = installDom();
+	const box = document.createElement("div");
+	appendFootNode(box, {
+		depth: 1,
+		label: "a",
+		name: "",
+		eval: "",
+		note: "",
+		moves: [{ ply: 3, san: "Nf3" }],
+		marks: {},
+		noteByPly: {},
+		subNotes: [],
+		children: [],
+		d: 0,
+	});
+	const row = box.querySelector(".fnode");
+	assert.ok(row.className.includes("d1"), "carries its depth class");
+	assert.strictEqual(row.querySelector("sup").textContent, "[a]");
+	assert.match(row.textContent, /2\.\.\.Nf3/);
+	off();
 });

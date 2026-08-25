@@ -42,6 +42,7 @@ export function loadState(pgn, { tags = {}, name = "", renderHooks = {} } = {}) 
 		renderApp() {},
 		rerenderTable() {},
 		rerenderMarkup() {},
+		rerenderNotes() {},
 		...renderHooks,
 	});
 	computeShared(lines);

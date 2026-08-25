@@ -822,3 +822,55 @@ test("opening a drawer group does not open its twin in the editor", async () => 
 		assert.ok(!g.open, "the editor's same-key group stayed closed"),
 	);
 });
+
+test("Collapse all folds the live notes panel, Expand all brings it back", async () => {
+	await loadGroupPgn();
+	// tag the whole group so the notes panel has a group footnote to fold
+	doc("view")
+		.querySelector(".markup details.lgroup summary .chip.groupfoot")
+		.click();
+	await tick();
+
+	const notes = () => doc("view").querySelector("details.notes");
+	const chip = (txt) =>
+		[...notes().querySelectorAll("summary .chip")].find(
+			(b) => b.textContent === txt,
+		);
+	assert.ok(notes().open, "the section starts expanded");
+	assert.ok(
+		notes().querySelector("details.nt.ngroup").open,
+		"so does the group note",
+	);
+
+	chip("Collapse all").click();
+	assert.strictEqual(notes().open, false, "the section folded in place");
+	assert.ok(
+		[...notes().querySelectorAll("details")].every((d) => !d.open),
+		"and so did everything inside it",
+	);
+
+	chip("Expand all").click();
+	assert.ok(notes().open, "Expand all reopens the section");
+	assert.ok(
+		notes().querySelector("details.nt.ngroup").open,
+		"and the group inside it",
+	);
+});
+
+test("a folded note stays folded across an unrelated re-render", async () => {
+	await loadGroupPgn();
+	doc("view")
+		.querySelector(".markup details.lgroup summary .chip.groupfoot")
+		.click();
+	await tick();
+
+	const group = () => doc("view").querySelector("details.notes details.nt");
+	group().open = false;
+	await sleep(5); // <details> fires `toggle` asynchronously
+	// rename a line — a full renderApp(), nothing to do with the notes panel
+	const name = doc("view").querySelector(".markup .ledge input.ln");
+	name.value = "Renamed";
+	name.dispatchEvent(new dom.window.Event("change"));
+	await tick();
+	assert.strictEqual(group().open, false, "the fold survived the re-render");
+});

@@ -24,7 +24,7 @@ Split `appendFootnote()`'s three jobs into reusable pieces so the collapsible vi
 - Modify: `src/render.js:521-542` (`appendFootnote`), `src/render.js:566-582` (`appendFootNode`), `src/render.js:589-601` (`renderSubNotes`)
 - Test: `tests/render.test.mjs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/render.test.mjs`:
 
@@ -98,12 +98,12 @@ test("appendFootNode renders one group branch as a depth-marked row", () => {
 
 Add `footStem`, `subNoteRow` and `appendFootNode` to the `../src/render.js` import list at the top of `tests/render.test.mjs:11-20`.
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `npm test -- --test-name-pattern='footStem|subNoteRow|appendFootNode'`
 Expected: FAIL — `SyntaxError: The requested module '../src/render.js' does not provide an export named 'footStem'`.
 
-- [ ] **Step 3: Implement the seams**
+- [x] **Step 3: Implement the seams**
 
 In `src/render.js`, replace the body of `appendFootnote` (keep its existing doc comment above it) with:
 
@@ -178,12 +178,12 @@ export function subNoteRow(s) {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `npm test`
 Expected: PASS — the four new tests, and every existing `render.test.mjs`, `print.test.mjs` and `export.test.mjs` test unchanged. If any flat-output test fails, the refactor changed behaviour; fix `render.js`, do not edit the test.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/render.js tests/render.test.mjs
@@ -199,7 +199,7 @@ The session-only collapse Set, and the three sites that already reset trie state
 **Files:**
 - Modify: `src/state.js:37` (after `openHiddenPaths`), `src/app.js:14-20` (imports), `src/app.js:74-75`, `src/app.js:456`, `src/app.js:694`
 
-- [ ] **Step 1: Add the Set**
+- [x] **Step 1: Add the Set**
 
 In `src/state.js`, after the `openHiddenPaths` block:
 
@@ -212,7 +212,7 @@ In `src/state.js`, after the `openHiddenPaths` block:
 export const closedNotePaths = new Set();
 ```
 
-- [ ] **Step 2: Clear it alongside `openPaths`**
+- [x] **Step 2: Clear it alongside `openPaths`**
 
 In `src/app.js`, add `closedNotePaths` to the `./state.js` import list, then add `closedNotePaths.clear();` immediately after each of the three existing `openPaths.clear();` calls that reset a notebook:
 
@@ -222,12 +222,12 @@ In `src/app.js`, add `closedNotePaths` to the `./state.js` import list, then add
 
 Leave the two `openPaths.clear()` calls inside `markupPanel()`'s Expand/Collapse-all buttons (`src/app.js:553`, `src/app.js:562`) alone — those are line-editor controls, not notebook resets.
 
-- [ ] **Step 3: Verify nothing broke**
+- [x] **Step 3: Verify nothing broke**
 
 Run: `npm test && npm run lint`
 Expected: PASS. `npm run knip` will report `closedNotePaths` as an unused export until Task 3 — that is expected here and must be gone by Task 6.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/state.js src/app.js
@@ -261,7 +261,7 @@ Row shape, used by every following task:
 }
 ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/notes-view.test.mjs`:
 
@@ -385,12 +385,12 @@ test("keys are unique and survive a renumbering edit", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `npm test -- tests/notes-view.test.mjs`
 Expected: FAIL — `Cannot find module '.../src/notes-view.js'`.
 
-- [ ] **Step 3: Implement `noteTree` and `collectNoteKeys`**
+- [x] **Step 3: Implement `noteTree` and `collectNoteKeys`**
 
 Create `src/notes-view.js` (TABS):
 
@@ -504,12 +504,12 @@ export function collectNoteKeys(node, into) {
 }
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `npm test -- tests/notes-view.test.mjs`
 Expected: PASS, all seven.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/notes-view.js tests/notes-view.test.mjs
@@ -539,7 +539,7 @@ Class contract — three existing test files depend on it:
 | foot branch (leaf) | `appendFootNode()` — unchanged |
 | sub-note | `subNoteRow()` — unchanged |
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/notes-view.test.mjs` (and add `notesPanel` to the `../src/notes-view.js` import, plus `import { closedNotePaths } from "../src/state.js";`):
 
@@ -634,12 +634,12 @@ test("a footnote with both notes and branches counts them as items", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `npm test -- tests/notes-view.test.mjs`
 Expected: FAIL — `notesPanel is not a function` (it is not exported from `notes-view.js` yet).
 
-- [ ] **Step 3: Implement the renderer**
+- [x] **Step 3: Implement the renderer**
 
 Add to `src/notes-view.js`. Extend the imports at the top:
 
@@ -775,7 +775,7 @@ function appendLeaf(container, row) {
 }
 ```
 
-- [ ] **Step 4: Delete `notesPanel` from `export.js` and repoint its callers**
+- [x] **Step 4: Delete `notesPanel` from `export.js` and repoint its callers**
 
 In `src/export.js`, delete the whole `notesPanel()` function (`src/export.js:52-75`) together with its doc comment, and change the `./dom.js` import from `{ el, renderInline }` to `{ el }`: `renderInline` was used only by `notesPanel`, while `el` is still used throughout `exportBar`. `allNotes`, `getCurrent` and `getRenderHooks` all still have callers in the file — leave them.
 
@@ -792,12 +792,12 @@ In `tests/export.test.mjs`, remove `notesPanel` from the `../src/export.js` impo
 import { notesPanel } from "../src/notes-view.js";
 ```
 
-- [ ] **Step 5: Run the whole suite**
+- [x] **Step 5: Run the whole suite**
 
 Run: `npm test`
 Expected: PASS, including every unchanged assertion in `export.test.mjs`, `app.test.mjs`, `render.test.mjs` and `print.test.mjs`. If an `.nt`/`.fnode`/`.subnote` count fails, the class contract table above was not honoured — fix `rowClass`/`appendLeaf`, not the test.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/notes-view.js src/export.js src/app.js tests/notes-view.test.mjs tests/export.test.mjs
@@ -814,7 +814,7 @@ The two bulk chips, and the hook that rebuilds only the notes panel.
 - Modify: `src/notes-view.js` (`notesPanel`), `src/state.js` (doc comment on `setRenderHooks`), `src/app.js:78` (`setRenderHooks`), `src/app.js:100-107` (beside `rerenderMarkup`), `src/app.js:329-331`
 - Test: `tests/notes-view.test.mjs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/notes-view.test.mjs` (add `setRenderHooks` to the `../src/state.js` import):
 
@@ -871,12 +871,12 @@ test("a bulk chip does not toggle the section it sits in", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `npm test -- tests/notes-view.test.mjs`
 Expected: FAIL — no `.chip` inside the summary, so `chip("Collapse all")` is undefined.
 
-- [ ] **Step 3: Add the chips**
+- [x] **Step 3: Add the chips**
 
 In `src/notes-view.js`, import `getRenderHooks` from `./state.js`, and in `notesPanel()` append the chips to `head` after the `<h3>`:
 
@@ -905,7 +905,7 @@ function bulkChip(text, act) {
 }
 ```
 
-- [ ] **Step 4: Wire `rerenderNotes` in `app.js`**
+- [x] **Step 4: Wire `rerenderNotes` in `app.js`**
 
 Beside the existing `rerenderMarkup` (`src/app.js:100-107`) add:
 
@@ -928,12 +928,12 @@ Update the `setRenderHooks` doc comment in `src/state.js` to list `rerenderNotes
 
 Add `rerenderNotes() {}` to the default hooks in `tests/helpers.mjs`'s `loadState` so existing tests that render the panel keep a complete registry.
 
-- [ ] **Step 5: Run the tests to verify they pass**
+- [x] **Step 5: Run the tests to verify they pass**
 
 Run: `npm test`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/notes-view.js src/app.js src/state.js tests/notes-view.test.mjs tests/helpers.mjs
@@ -947,7 +947,7 @@ git commit -m "Add Expand all and Collapse all to the notes panel"
 **Files:**
 - Modify: `style.css:515-556` (the `.notes` block)
 
-- [ ] **Step 1: Add the rules**
+- [x] **Step 1: Add the rules**
 
 After the existing `.nt sup` rule in `style.css` (2-SPACE indent), add:
 
@@ -993,13 +993,13 @@ After the existing `.nt sup` rule in `style.css` (2-SPACE indent), add:
 }
 ```
 
-- [ ] **Step 2: Verify in the browser**
+- [x] **Step 2: Verify in the browser**
 
 Run: `python3 -m http.server 8000` and open `http://localhost:8000`. Load a PGN with a group footnote (e.g. `1. e4 e5 (1... c5 2. Nf3) (1... c5 2. Nc3) 2. Nf3`), tag both sidelines Footnote.
 
 Expected: the Notes section shows a disclosure triangle beside its heading; the group note shows one below it with `· 2 branches`; the branches sit behind a vertical guide line; collapsing hides them; Collapse all shuts everything including the section; both light and dark themes read correctly (toggle in the toolbar).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add style.css
@@ -1013,7 +1013,7 @@ git commit -m "Style the collapsible note groups"
 **Files:**
 - Modify: `README.md` (the Architecture table and the step-3 "Render" paragraph)
 
-- [ ] **Step 1: Document the module**
+- [x] **Step 1: Document the module**
 
 Add a row to the Architecture table in `README.md`, after the `src/render.js` row:
 
@@ -1028,7 +1028,7 @@ And in the step-3 "Render" paragraph, after the sentence about the Notes section
 > and Collapse all beside the heading. Everything starts expanded and the
 > folding is not saved with the notebook.
 
-- [ ] **Step 2: Full verification**
+- [x] **Step 2: Full verification**
 
 Run each and confirm the output:
 
@@ -1040,7 +1040,7 @@ npm run knip      # no unused files or exports
 
 Expected: `knip` reports nothing for `src/notes-view.js`, `closedNotePaths`, `footStem`, `subNoteRow` or `appendFootNode`. If it flags one, that export has no caller — find out why before moving on.
 
-- [ ] **Step 3: Commit and merge**
+- [x] **Step 3: Commit and merge**
 
 ```bash
 git add README.md
@@ -1049,7 +1049,7 @@ git commit -m "Document the collapsible notes panel"
 
 Then follow the project's merge convention (`superpowers:finishing-a-development-branch`): merge to `master` locally and push — this repo does not use PRs.
 
-- [ ] **Step 4: Close the task**
+- [x] **Step 4: Close the task**
 
 ```bash
 task 24 done

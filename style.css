@@ -524,6 +524,51 @@ select:focus {
   color: var(--foot);
   font-weight: 700;
 }
+
+/* A collapsible note group. The body draws the vertical guide that shows which
+   rows belong to it, the same affordance .lgroup gives a trie branch in the
+   editor. */
+.ng-head {
+  cursor: pointer;
+  padding: 2px 0;
+}
+.ng-head:hover {
+  color: var(--main);
+}
+/* The section's own summary holds an <h3>, which is a block — inline it so the
+   heading and the bulk chips share the summary's line. Deliberately NOT
+   `display: flex` on the <summary> itself: that drops the disclosure triangle
+   in Chrome and Safari. */
+.notes-head h3 {
+  display: inline;
+  margin: 0;
+  margin-right: 8px;
+}
+.notes-head .chip {
+  margin-right: 4px;
+}
+.ngcount {
+  color: var(--muted);
+  font-size: 0.9em;
+}
+.ngroup-body {
+  border-left: 2px solid var(--line);
+  padding-left: 8px;
+  margin-left: 0.4em;
+  margin-top: 4px;
+}
+/* The body wrapper supplies the indentation step, so a nested row must not
+   step again. The bare .fnode/.subnote rules are untouched: print and the
+   cards still render these rows flat and rely on that em margin. */
+.ngroup-body > .fnode,
+.ngroup-body > .subnote {
+  margin-left: 0;
+}
+/* Inside a cluster a row leads with its number instead of a move reference, so
+   the marker needs the same breathing room .subnote and .fnode markers get. */
+.ntcluster .nt sup {
+  margin-right: 0.3em;
+}
 /* One treatment for both nested footnote shapes: smaller and indented, but NOT
    dimmed. The dimming only ever applied to .subnote, so a lone footnote's notes
    were faded and a group's branches were not, and a .subnote inside an .fnode
