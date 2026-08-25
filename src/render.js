@@ -465,6 +465,10 @@ export function renderCards(container, grid, opts = {}) {
 					// rather than inheriting an ancestor's indent — footLines states
 					// that depth, so nothing here has to measure whitespace.
 					s.className = "nt subnote d" + r.depth;
+					// One step per level, however deep the group goes: the same
+					// 1.6em step the nested .fnode rows produce on screen and in
+					// print, so all four surfaces indent identically (spec goal 4).
+					s.style.marginLeft = 1.6 * r.depth + "em";
 					// Cards bracket the label ("[a] …") where the text exports write
 					// "a. …": a card row sits under note rows that carry bracketed [n]
 					// markers, so the labels below it read as the same kind of marker.

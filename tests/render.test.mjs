@@ -738,3 +738,62 @@ test("a card's group rows keep one indent step per depth", () => {
 	assert.ok(inner.className.includes("d2"));
 	off();
 });
+
+// A group nesting six deep, built so every level is a real fork: 2.Nc3 splits
+// off the stem, then 2...Nc6, 3.Bb5+, 3...Nf6, 4.c3 and 4...a6 each split off
+// the next node down. (collectLines emits a node's variations before the node,
+// so the line order below is not the order they appear in the PGN.)
+const DEEP_PGN =
+	"1. e4 e5 (1... c5 2. Nc3) (1... c5 2. Nf3 Nc6) (1... c5 2. Nf3 d6 3. Bb5+) " +
+	"(1... c5 2. Nf3 d6 3. d4 Nf6) (1... c5 2. Nf3 d6 3. d4 cxd4 4. c3) " +
+	"(1... c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6) " +
+	"(1... c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 a6) 2. Nf3";
+const DEEP_TAGS = {
+	tags: { 1: "foot", 2: "foot", 3: "foot", 4: "foot", 5: "foot", 6: "foot", 7: "foot" },
+};
+
+test("a card's group rows keep stepping past depth 4", () => {
+	// The card ladder used to stop at d4 and clamp everything below it to the
+	// same offset, so a deep group's nesting flattened out on cards while screen
+	// and print still showed it. Each depth gets its own step, unbounded.
+	const off = installDom();
+	const s = loadState(DEEP_PGN, DEEP_TAGS);
+	const box = document.createElement("div");
+	renderCards(box, grid(s.lines), { notes: allNotes() });
+	const rows = [...box.querySelectorAll(".card-notes .subnote")];
+	const seen = new Map();
+	rows.forEach((r) => {
+		const d = Number(r.className.match(/\bd(\d+)\b/)[1]);
+		seen.set(d, parseFloat(r.style.marginLeft));
+	});
+	assert.ok(seen.has(6), `rows reach depth 6 (got ${[...seen.keys()]})`);
+	const steps = [];
+	for (let d = 1; d <= 6; d++) {
+		assert.ok(seen.has(d), `a depth-${d} row is present`);
+		steps.push(seen.get(d) - (seen.get(d - 1) || 0));
+	}
+	assert.strictEqual(
+		new Set(steps.map((x) => x.toFixed(3))).size,
+		1,
+		`one equal step per level, got ${steps}`,
+	);
+	off();
+});
+
+test("nesting a group's rows does not shrink the indent step", () => {
+	// `.fnode` sets a smaller font size and indents in `em`, which resolves
+	// against the element's OWN size — so applying the smaller size at every
+	// level would make each nested step smaller than the one above it, and the
+	// screen would stop matching the cards' even ladder.
+	const css = readFileSync(new URL("../style.css", import.meta.url), "utf8");
+	const w = new JSDOM(
+		`<!DOCTYPE html><style>${css}</style><div class="nt" id="root">` +
+			`<div class="fnode" id="d1"><div class="fnode" id="d2">` +
+			`<div class="fnode" id="d3"></div></div></div></div>`,
+	).window;
+	const size = (id) =>
+		parseFloat(w.getComputedStyle(w.document.getElementById(id)).fontSize);
+	assert.ok(size("d1") < size("root"), "the first level is smaller");
+	assert.strictEqual(size("d2"), size("d1"), "the second level is not smaller");
+	assert.strictEqual(size("d3"), size("d2"), "nor the third");
+});

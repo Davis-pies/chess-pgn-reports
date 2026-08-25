@@ -510,6 +510,14 @@ select:focus {
   margin-left: 1.6em;
   font-size: 0.95em;
 }
+/* The smaller size applies once, at the first level. An `em` margin resolves
+   against the element's OWN font size, so a size shrinking at every level would
+   shrink the indent step with it and each depth would step less than the last —
+   while the flat card rows step evenly. One step is one step, at any depth. */
+.fnode .fnode,
+.fnode .subnote {
+  font-size: 1em;
+}
 .fnode sup {
   margin-right: 0.3em;
 }
@@ -658,23 +666,11 @@ sup {
 .card-notes .subnote {
   margin-left: 1.6em;
 }
-/* Card rows are flat siblings (subNoteLines flattens a group to plain lines),
-   not the nested .fnode elements screen/print use, so each depth needs its
-   own explicit offset instead of one cumulative margin. Same weight fight as
-   .card-notes .subnote above. Depths past d4 keep reusing d4's indent rather
-   than going flush left. */
-.card-notes .d1 {
-  margin-left: 1.6em;
-}
-.card-notes .d2 {
-  margin-left: 3.2em;
-}
-.card-notes .d3 {
-  margin-left: 4.8em;
-}
-.card-notes .d4 {
-  margin-left: 6.4em;
-}
+/* Card rows are flat siblings, not the nested .fnode elements screen/print use,
+   so renderCards sets each row's offset inline from the depth footLines gave it
+   — depth * 1.6em, the same step the nesting produces, unbounded and with no
+   ladder of rules to keep in sync. The rule above is the depth-1 fallback for a
+   row rendered without that inline style. */
 .card-board .board-svg {
   margin: 8px 0 0;
 }
