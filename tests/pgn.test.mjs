@@ -110,3 +110,27 @@ test("fenMap records the FEN after every ply, matching fenAt (incl. null moves)"
 		);
 	}
 });
+
+test("strips tag-pair lines without eating [%...] markers inside comments", () => {
+	// The header strip used to match ANY bracketed text anywhere, so a marker
+	// inside a comment was deleted before tokenizing -- taking an imported
+	// file's [%eval] / [%clk] annotations with it, and any bracketed aside the
+	// annotator wrote. Only whole tag-pair lines should go.
+	const { nodes, tags } = parsePgn(
+		'[Event "Test"]\n[Result "*"]\n\n1. e4 {[%eval 0.3] a good start} e5 *',
+	);
+	assert.strictEqual(tags.Event, "Test");
+	assert.strictEqual(nodes.length, 2);
+	// the marker is still stripped from the visible prose, as before
+	assert.deepStrictEqual(nodes[0].comments, ["a good start"]);
+});
+
+test("keeps a bracketed aside that is not a tag pair", () => {
+	const { nodes } = parsePgn("1. e4 {see [Kasparov 1985] for more} e5 *");
+	assert.deepStrictEqual(nodes[0].comments, ["see [Kasparov 1985] for more"]);
+});
+
+test("unescapes quotes and backslashes in a tag value", () => {
+	const { tags } = parsePgn('[Event "the \\"sharp\\" \\\\ line"]\n\n1. e4 *');
+	assert.strictEqual(tags.Event, 'the "sharp" \\ line');
+});

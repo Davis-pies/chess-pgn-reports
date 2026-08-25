@@ -189,12 +189,7 @@ test("a line's eval comments its first divergent move, without the name", () => 
 		lines[1].name = "Sicilian";
 		lines[1].meta = { eval: "\u221e" };
 	});
-	const comments = tree[1].variations[0][0].comments;
-	// the round-trip marker rides along; the human-readable part is the eval
-	assert.deepEqual(
-		comments.filter((c) => !c.startsWith("[%")),
-		["\u221e"],
-	);
+	assert.deepEqual(tree[1].variations[0][0].comments, ["\u221e"]);
 });
 
 test("a sideline's name is exported only when the notebook asks for it", () => {
@@ -205,8 +200,8 @@ test("a sideline's name is exported only when the notebook asks for it", () => {
 		lines[1].name = "Line 7";
 		return buildPgn({ name: "T", lines, showFootNames });
 	};
-	// the marker still carries the name so our own importer gets it back; what
-	// must not appear is human-readable text outside a [%...] marker
+	// the OttLines tag still carries the name so our own importer gets it back;
+	// what must not appear is the name in the movetext
 	assert.doesNotMatch(visible(build(false)), /Line 7/, build(false));
 	assert.match(visible(build(true)), /\{Line 7\}/, build(true));
 });
@@ -380,8 +375,6 @@ test("a footnote line's name is omitted from the PGN unless asked for", () => {
 		return buildPgn({ name: "T", lines, showFootNames });
 	};
 	// the eval still rides along; only the name is gated
-	// the marker still carries the name for our own importer; what is gated is
-	// the human-readable text outside a [%...] marker
 	assert.match(visible(build(false)), /\{∞\}/, build(false));
 	assert.doesNotMatch(visible(build(false)), /Sicilian/, build(false));
 	assert.match(visible(build(true)), /\{Sicilian ∞\}/, build(true));
