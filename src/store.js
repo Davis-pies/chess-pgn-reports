@@ -32,6 +32,7 @@ export function saveNotebook(id, { name, pgn, lines, view }) {
           meta: l.meta || {},
           marks: l.marks || {},
           comments: l.comments || [],
+          hidden: !!l.hidden,
         })),
       }),
     );

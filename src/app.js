@@ -400,6 +400,8 @@ function openNotebook(id) {
           l.comments = t.comments || [];
           // legacy notebooks used 'main'/'minor'; mainline is now structural
           l.tag = l.isMain ? undefined : t.tag === "foot" ? "foot" : "sideline";
+          // notebooks saved before hidden existed have no field and load visible
+          l.hidden = !l.isMain && !!t.hidden;
         }
       });
       // restore a user-promoted mainline, if any
