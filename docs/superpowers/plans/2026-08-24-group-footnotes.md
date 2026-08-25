@@ -26,7 +26,7 @@ Pure refactor, no behaviour change. `notes.js` and `foot-groups.js` need `buildT
 - Modify: `src/app.js:25` (import site)
 - Test: `tests/tree.test.mjs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/tree.test.mjs`:
 
@@ -46,12 +46,12 @@ test("buildTrie groups lines by their shared divergent tail", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx node --test tests/tree.test.mjs`
 Expected: FAIL — `SyntaxError: The requested module '../src/tree.js' does not provide an export named 'buildTrie'`
 
-- [ ] **Step 3: Move the three functions**
+- [x] **Step 3: Move the three functions**
 
 Cut these from `src/trie-view.js` and paste them into `src/tree.js` (append at the end), unchanged except for adding `export` where missing. `buildTrie` already calls `divergence`, which is defined in `tree.js`, so drop that from the copied code's needs:
 
@@ -110,17 +110,17 @@ import { divergence, buildTrie, leavesOf, countLeaves } from "./tree.js";
 
 In `src/app.js:25`, `buildTrie` is imported from `./trie-view.js`. Since `trie-view.js` no longer defines it, change app.js to import `buildTrie` from `./tree.js` and leave its other `trie-view.js` imports alone.
 
-- [ ] **Step 4: Run the full suite**
+- [x] **Step 4: Run the full suite**
 
 Run: `npm test`
 Expected: PASS, including the existing `tests/app.test.mjs` grouped-view tests (they exercise the moved code through `renderTrieNode`).
 
-- [ ] **Step 5: Lint and knip**
+- [x] **Step 5: Lint and knip**
 
 Run: `npm run lint && npm run knip`
 Expected: no errors. If knip reports `leavesOf` unused from `trie-view.js`, that is the stale re-export — make sure `trie-view.js` re-exports nothing it no longer owns.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/tree.js src/trie-view.js src/app.js tests/tree.test.mjs
@@ -147,7 +147,7 @@ tree node = { moves: [{ply, san}], line, children: [] }
 
 A group needs at least two member lines; a lone foot line stays today's plain footnote. A line that ends exactly at the stem (its moves are a prefix of its siblings') becomes a first child with `moves: []`, so every member is reachable uniformly.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `tests/foot-groups.test.mjs`:
 
@@ -259,12 +259,12 @@ test("foot lines diverging at different moves are separate groups", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `npx node --test tests/foot-groups.test.mjs`
 Expected: FAIL — `Cannot find module '.../src/foot-groups.js'`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `src/foot-groups.js`:
 
@@ -330,12 +330,12 @@ export function footGroups(lines, main) {
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `npx node --test tests/foot-groups.test.mjs`
 Expected: PASS, 7 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/foot-groups.js tests/foot-groups.test.mjs
@@ -352,7 +352,7 @@ git commit -m "Derive footnote groups from all-foot trie nodes"
 
 Depth 0 is the global `[n]`. Odd depths are bijective base-26 letters (today's `subLabel`, which is what a lone footnote's sub-notes already use, so its output must not change). Even depths ≥ 2 are `1, 2, 3 …`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/notes.test.mjs`:
 
@@ -374,12 +374,12 @@ test("labelFor alternates letters and numbers by depth", () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npx node --test tests/notes.test.mjs`
 Expected: FAIL — `does not provide an export named 'labelFor'`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `src/notes.js`, replace the `subLabel` function with:
 
@@ -408,12 +408,12 @@ export function labelFor(depth, i) {
 
 Then replace the one existing call site — `subLabel(sub.length)` in the comments loop — with `labelFor(1, sub.length)`.
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 Run: `npx node --test tests/notes.test.mjs`
 Expected: PASS, including the pre-existing sub-note lettering tests (a lone footnote's sub-notes are depth 1, so their labels are unchanged).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/notes.js tests/notes.test.mjs
@@ -444,7 +444,7 @@ node = { label, depth, moves, d: 0, marks, noteByPly, name, eval, note,
 
 `d: 0` on a child because a child's `moves` is already only its tail — the renderer slices with `d`, and there is nothing to skip.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `tests/notes.test.mjs`:
 
@@ -588,12 +588,12 @@ test("a lone foot line alongside a group is still its own footnote", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `npx node --test tests/notes.test.mjs`
 Expected: FAIL — the group tests see two separate foot entries (one per line), not one.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `src/notes.js`, add the import:
 
@@ -713,17 +713,17 @@ The marker still goes into the line's own map (`map[c.ply]`), which is what a me
 
 One caveat the renumber pass already handles: a member's markers are label strings, not numbers, so the `typeof m === "number"` guard leaves them alone.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `npx node --test tests/notes.test.mjs`
 Expected: PASS, including every pre-existing test in the file.
 
-- [ ] **Step 5: Run the full suite**
+- [x] **Step 5: Run the full suite**
 
 Run: `npm test`
 Expected: PASS. Some render/print/export tests may fail if they assert on foot entries for lines that now group — if so, they are asserting the old behaviour, and Task 5 updates them. Note which ones and carry on.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/notes.js tests/notes.test.mjs
@@ -738,7 +738,7 @@ git commit -m "Render an all-foot group as one note entry with nested members"
 - Modify: `src/render.js:505-529` (`appendFootnote`), `:534-546` (`appendSubNotes`), `:549-551` (`subNoteLines`), `:555-571` (`footnoteText`), `:430-470` (card note rows)
 - Test: `tests/render.test.mjs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `tests/render.test.mjs` (match the file's existing import/DOM setup — it already installs jsdom and imports from `../src/render.js`; add `appendFootnote`, `footnoteText` and `subNoteLines` to that import if they are not there):
 
@@ -809,12 +809,12 @@ test("a lone footnote still renders exactly as before", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `npx node --test tests/render.test.mjs`
 Expected: FAIL — no `.fnode` elements exist and `subNoteLines` returns `[]` for a group.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `src/render.js`, extract the move-emitting loop out of `appendFootnote` so both the stem and every nested node use it, then add the recursion:
 
@@ -921,17 +921,17 @@ and in the row loop, replace the `o.subNotes.forEach` block with:
 				});
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `npx node --test tests/render.test.mjs`
 Expected: PASS.
 
-- [ ] **Step 5: Run the full suite**
+- [x] **Step 5: Run the full suite**
 
 Run: `npm test`
 Expected: PASS. The screen panel (`export.js`), the print block (`print.js`) and Markdown all call `appendFootnote`/`footnoteText`/`subNoteLines`, so they inherit the group rendering with no edit.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/render.js tests/render.test.mjs
@@ -946,7 +946,7 @@ git commit -m "Render a group footnote's members as nested labelled rows"
 - Modify: `style.css:492-499` (near `.subnote`), `:640-644` (card override), and the print block
 - Test: `tests/print.test.mjs`, `tests/export.test.mjs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `tests/print.test.mjs`:
 
@@ -990,12 +990,12 @@ test("the screen notes panel renders a group's members", () => {
 });
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `npx node --test tests/print.test.mjs tests/export.test.mjs`
 Expected: the Markdown and panel assertions FAIL only if Task 5 was skipped; they should now PASS, since both surfaces call the shared renderers. If they pass immediately, that is the expected outcome — keep the tests as regression cover and move to the CSS step.
 
-- [ ] **Step 3: Add the styles**
+- [x] **Step 3: Add the styles**
 
 In `style.css`, next to `.subnote`:
 
@@ -1021,18 +1021,18 @@ And beside the existing `.card-notes .subnote` override, which exists because `.
 
 Check the print stylesheet section for a `.print-notes .subnote` rule; if one exists, add the matching `.print-notes .fnode` beside it.
 
-- [ ] **Step 4: Verify in the browser**
+- [x] **Step 4: Verify in the browser**
 
 Run: `python3 -m http.server 8000` and open `http://localhost:8000`. Paste
 `1. e4 e5 (1... c5 2. Nf3 d6) (1... c5 2. Nf3 Nc6) (1... c5 2. Nc3) 2. Nf3`,
 tag all three variations Footnote, and confirm: one `[1]` on the mainline's `1...e5` cell, one note reading `1...c5` with `[a] 2.Nf3` containing `[1] d6` and `[2] Nc6`, then `[b] 2.Nc3`. Check both themes and Print preview.
 
-- [ ] **Step 5: Run the full suite**
+- [x] **Step 5: Run the full suite**
 
 Run: `npm test && npm run lint`
 Expected: PASS, no lint errors.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add style.css tests/print.test.mjs tests/export.test.mjs
@@ -1049,7 +1049,7 @@ git commit -m "Indent nested group-footnote rows on screen, in print and on card
 
 A chip on a group's `<summary>`, on nodes with at least two leaves. State from the leaves: all foot → `on`; some → `partial` (dimmed); none → neither. Clicking clears all if all are foot, otherwise sets all.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/app.test.mjs`, following the file's existing `app.reset()` / `tick()` pattern:
 
@@ -1117,12 +1117,12 @@ test("the group chip reads partial when only some lines are footnotes", async ()
 
 Add `import { getCurrent, getRenderHooks } from "../src/state.js";` at the top of the file if it is not already imported.
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `npx node --test tests/app.test.mjs`
 Expected: FAIL — `chip` is null.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `src/trie-view.js`, inside `renderTrieNode`, after `count` is computed and before the `summary` is appended, build the chip and put it in the summary:
 
@@ -1178,17 +1178,17 @@ In `style.css`, beside the other `.chip.tag` rules:
 }
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `npx node --test tests/app.test.mjs`
 Expected: PASS.
 
-- [ ] **Step 5: Run the full suite**
+- [x] **Step 5: Run the full suite**
 
 Run: `npm test && npm run lint && npm run knip`
 Expected: PASS, no lint errors, no unused exports.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/trie-view.js style.css tests/app.test.mjs
@@ -1202,7 +1202,7 @@ git commit -m "Tag a whole group as one footnote from its group header"
 **Files:**
 - Modify: `README.md` (the "Tag" and "Render" bullets under **What it does**)
 
-- [ ] **Step 1: Update the README**
+- [x] **Step 1: Update the README**
 
 In the **Tag** bullet, after the sentence describing a Footnote line, add:
 
@@ -1220,12 +1220,12 @@ In the **Render** bullet, after the sentence about lettered sub-notes, add:
    alternating by depth — `[n]`, then letters, then numbers, and so on.
 ```
 
-- [ ] **Step 2: Verify the whole thing**
+- [x] **Step 2: Verify the whole thing**
 
 Run: `npm test && npm run lint && npm run knip && npm run coverage`
 Expected: all tests pass, no lint errors, no unused exports. Confirm `src/foot-groups.js` shows in the coverage table with high line coverage.
 
-- [ ] **Step 3: Manual check of the mixed case**
+- [x] **Step 3: Manual check of the mixed case**
 
 Serve the app (`python3 -m http.server 8000`) and load:
 
@@ -1235,14 +1235,14 @@ Serve the app (`python3 -m http.server 8000`) and load:
 
 Tag the three `1...c5` lines Footnote via the group chip and tag `1...e6` Footnote on its own line. Expect two notes: one group note with nested members, one plain footnote — confirming a lone foot line beside a group is untouched.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add README.md
 git commit -m "Document group footnotes"
 ```
 
-- [ ] **Step 5: Close the task**
+- [x] **Step 5: Close the task**
 
 ```bash
 task 21 done
