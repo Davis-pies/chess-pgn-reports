@@ -1,6 +1,7 @@
 import { getCurrent } from "./state.js";
 import { divergence } from "./tree.js";
 import { footGroups } from "./foot-groups.js";
+import { visibleLines } from "./visibility.js";
 // The tree INSIDE a group footnote — decoration, symbol merging and lettering —
 // lives in foot-nodes.js, which assigns no global numbers; this module keeps the
 // one-pass numbering. labelFor lives there too, with the rest of the labelling.
@@ -245,9 +246,10 @@ export function numberNotes(lines, opts = {}) {
 	return { entries: ordered, byLine };
 }
 
-// The numbered Notes list for the open notebook.
+// The numbered Notes list for the open notebook. Hidden lines are filtered out
+// here so they consume no [n] number and no footnote letter.
 export function allNotes() {
-	return numberNotes(getCurrent().lines, {
+	return numberNotes(visibleLines(getCurrent().lines), {
 		footNames: getCurrent().showFootNames,
 	}).entries;
 }

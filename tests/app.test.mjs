@@ -607,3 +607,37 @@ test("a one-line group carries no group chip -- its line editor has one", async 
 function doc(id) {
 	return global.document.getElementById(id);
 }
+
+// Hidden lines must KEEP receiving notes added at a shared move: computeShared
+// is deliberately NOT filtered (see the spec's decisions section). This guard
+// fails loudly if someone later filters it.
+test("a note added at a shared move still reaches a hidden line", async () => {
+	await loadGroupPgn();
+	const hidden = getCurrent().lines.find((l) =>
+		l.moves.some((m) => m.san === "Nc3"),
+	);
+	hidden.hidden = true;
+	getRenderHooks().renderApp();
+	await tick();
+
+	// select the shared 1... c5 move on the line that is still visible
+	const chip = [
+		...doc("view").querySelectorAll(".markup .ledge .move-chip"),
+	].find((b) => b.textContent.includes("c5"));
+	assert.ok(chip, "a shared c5 move chip is present");
+	chip.click();
+	await tick();
+
+	const box = doc("view").querySelector(".markup .cedit");
+	assert.ok(box, "the comment editor opened");
+	box.querySelector("input.lno").value = "shared idea";
+	[...box.querySelectorAll("button")]
+		.find((b) => b.textContent === "Add note")
+		.click();
+	await tick();
+
+	assert.ok(
+		(hidden.comments || []).some((c) => c.text === "shared idea"),
+		"the hidden line received the shared note",
+	);
+});

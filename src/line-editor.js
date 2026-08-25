@@ -5,6 +5,7 @@ import { getCurrent, getSharedInfo, getRenderHooks } from "./state.js";
 import { NAGS } from "./nags.js";
 import { numberNotes } from "./notes.js";
 import { branchContext } from "./export.js";
+import { visibleLines } from "./visibility.js";
 
 export function lineEditor(l, idx, showBoard = false) {
 	const row = el("div", { className: "ledge" });
@@ -140,7 +141,8 @@ export function moveStrip(l) {
 	//
 	// The `|| {}` is not the dead-fallback pattern removed elsewhere here:
 	// moveStrip can be called with a line that is not in getCurrent().lines.
-	const marksByPly = numberNotes(getCurrent().lines).byLine.get(l) || {};
+	const marksByPly =
+		numberNotes(visibleLines(getCurrent().lines)).byLine.get(l) || {};
 	owned.forEach((m) => {
 		const num = m.ply % 2 === 0 ? Math.floor(m.ply / 2) + 1 + ". " : "";
 		const mark = (l.marks || {})[m.ply];

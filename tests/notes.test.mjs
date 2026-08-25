@@ -721,3 +721,44 @@ test("a footnote's line name is omitted unless the notebook asks for it", () => 
 		"Sicilian",
 	);
 });
+
+test("a hidden line's note consumes no number", () => {
+	const s = loadState("1. e4 c5 (1... e5 {open}) 2. Nf3 {develops} *");
+	assert.deepStrictEqual(
+		allNotes().map((e) => [e.n, e.text]),
+		[
+			[1, "open"],
+			[2, "develops"],
+		],
+		"sanity: both notes are numbered while everything is visible",
+	);
+	const gone = s.lines.find((l) => l.moves.some((m) => m.san === "e5"));
+	gone.hidden = true;
+	assert.deepStrictEqual(
+		allNotes().map((e) => [e.n, e.text]),
+		[[1, "develops"]],
+		"the hidden line's note is gone and numbering closes up",
+	);
+});
+
+test("hiding a group's members dissolves the footnote group", () => {
+	const s = loadState("1. e4 e5 (1... c5 2. Nf3) (1... c5 2. Nc3) 2. Nf3");
+	s.lines.forEach((l) => {
+		if (!l.isMain) l.tag = "foot";
+	});
+	const grouped = allNotes().length;
+	assert.ok(grouped >= 1, "sanity: the group produced entries to begin with");
+	// hide one of the two members: the survivor is a lone footnote, not a group
+	s.lines.find((l) => l.moves.some((m) => m.san === "Nc3")).hidden = true;
+	const entries = allNotes();
+	assert.equal(
+		entries.some((e) => JSON.stringify(e).includes("Nc3")),
+		false,
+		"the hidden member contributes nothing",
+	);
+	assert.notStrictEqual(
+		entries.length,
+		0,
+		"the surviving footnote is still listed",
+	);
+});
