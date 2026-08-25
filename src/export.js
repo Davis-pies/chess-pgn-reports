@@ -55,12 +55,12 @@ export function notesPanel() {
   notes.forEach((note) => {
     const row = el("div", { className: "nt" });
     row.appendChild(el("sup", { textContent: "[" + note.n + "]" }));
-    const span = document.createElement("span");
     // A footnote owns the whole row: its stem goes in a span of its own, and
     // its sub-notes and a group's branches are block rows beside that span.
     if (note.foot) {
       appendFootnote(row, note.foot);
     } else {
+      const span = document.createElement("span");
       span.appendChild(
         document.createTextNode(moveRef(note.ply, note.owner) + " — "),
       );

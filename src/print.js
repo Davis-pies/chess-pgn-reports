@@ -124,10 +124,11 @@ function renderTableNotes(wrap, vars, showMain) {
   rows.forEach((n) => {
     const row = el("div", { className: "nt" });
     row.appendChild(el("sup", { textContent: "[" + n.n + "]" }));
-    const span = document.createElement("span");
+    // A footnote owns the whole row (see notesPanel in export.js).
     if (n.foot) {
       appendFootnote(row, n.foot);
     } else {
+      const span = document.createElement("span");
       span.appendChild(document.createTextNode(moveRef(n.ply, n.owner) + " — "));
       renderInline(span, n.text);
       row.appendChild(span);
