@@ -380,3 +380,43 @@ test("a footnote line's move chip shows its sub-note letter", () => {
 	);
 	off();
 });
+
+test("movePanel's default row shows only the common symbols", () => {
+	const off = installDom();
+	const s = loadState(TWO_LINES);
+	s.sel = { lines: [s.lines[0]], ply: 0 };
+	// the first .sympick is the default row; the drawer's rows reuse the class
+	const shown = [
+		...movePanel(s.lines[0]).querySelector(".sympick").children,
+	].map((b) => b.textContent);
+	assert.ok(shown.includes("!"));
+	assert.ok(shown.includes("±"));
+	assert.ok(!shown.includes("⨀"), "zugzwang belongs in the drawer");
+	off();
+});
+
+test("movePanel's drawer holds the rest, grouped, and starts closed", () => {
+	const off = installDom();
+	const s = loadState(TWO_LINES);
+	s.sel = { lines: [s.lines[0]], ply: 0 };
+	const drawer = movePanel(s.lines[0]).querySelector("details.symmore");
+	assert.ok(drawer, "no drawer rendered");
+	assert.strictEqual(drawer.open, false);
+	const more = [...drawer.querySelectorAll("button")].map((b) => b.textContent);
+	assert.ok(more.includes("⨀"));
+	assert.ok(more.includes("⇆"));
+	assert.ok(drawer.querySelectorAll(".symgroup-h").length >= 2);
+	off();
+});
+
+test("a drawer symbol applies the mark like a common one", () => {
+	const off = installDom();
+	const s = loadState(TWO_LINES);
+	s.sel = { lines: [s.lines[0]], ply: 0 };
+	const panel = movePanel(s.lines[0]);
+	[...panel.querySelectorAll("details.symmore button")]
+		.find((b) => b.textContent === "↑")
+		.onclick();
+	assert.strictEqual(s.lines[0].marks[0], "↑");
+	off();
+});

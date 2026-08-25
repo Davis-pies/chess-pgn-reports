@@ -2,6 +2,7 @@ import { fenAt } from "./pgn.js";
 import { appendBoard, fullmoveLabel } from "./render.js";
 import { el } from "./dom.js";
 import { getCurrent, getSharedInfo, getRenderHooks } from "./state.js";
+import { NAGS } from "./nags.js";
 import { numberNotes } from "./notes.js";
 import { branchContext } from "./export.js";
 
@@ -91,32 +92,17 @@ export function promoteMainline(l) {
 	getRenderHooks().renderApp();
 }
 
-// Advantage/quality symbols offered in the line editor's evaluation picker.
+// Advantage/quality symbols offered in the line editor's evaluation picker,
+// derived from the NAG table so the palette can never offer a symbol the PGN
+// exporter has no code for. The leading "" is the clear entry.
+//
+// A symbol shared by a White/Black pair (zugzwang, initiative, ...) appears
+// once: the palette annotates a move with a glyph, and which side it refers to
+// is what the move itself already says.
 export const EVAL_SYMBOLS = [
 	"",
-	"=",
-	"±",
-	"∓",
-	"+=",
-	"=+",
-	"∞",
-	"+−",
-	"−+",
-	"!",
-	"?",
-	"!?",
-	"?!",
-	"!!",
-	"??",
-	"□", // □ only move
-	"⊙", // ⊙ zugzwang
-	"↑", // ↑ initiative
-	"→", // → with attack / idea
-	"⇄", // ⇄ counterplay
-	"△", // △ with the threat
-	"⊕", // ⊕ time trouble
-	"N", // novelty
-	"TN", // theoretical novelty
+	...new Set(NAGS.filter((n) => n.sym).map((n) => n.sym)),
+	"TN", // theoretical novelty; no standard code, exported as a comment
 ];
 
 // A per-line row of tappable symbol buttons; clicking one sets (or clears)
@@ -246,19 +232,26 @@ export function movePanel(l) {
 		}
 	};
 	const srow = el("span", { className: "sympick" });
-	EVAL_SYMBOLS.forEach((sym) => {
-		if (!sym) return;
+	const symButton = (sym, title) => {
 		const b = el("button", {
 			type: "button",
 			className: "chip mini" + (cur === sym ? " on" : ""),
 			textContent: sym,
+			title: title || sym,
 		});
 		b.onclick = () => {
 			apply(sym);
 			getRenderHooks().renderApp();
 		};
-		srow.appendChild(b);
-	});
+		return b;
+	};
+	// The table is large enough that showing every glyph at once would bury the
+	// handful in constant use, so the common ones stay on the visible row and
+	// the rest live in a drawer, grouped the way the PGN spec groups them.
+	const common = NAGS.filter((n) => n.common && n.sym);
+	const commonSyms = new Set(common.map((n) => n.sym));
+	common.forEach((n) => srow.appendChild(symButton(n.sym, n.label)));
+	srow.appendChild(symButton("TN", "theoretical novelty"));
 	const clear = el("button", {
 		type: "button",
 		className: "chip mini danger",
@@ -271,6 +264,34 @@ export function movePanel(l) {
 	};
 	srow.appendChild(clear);
 	box.appendChild(srow);
+
+	const more = el("details", { className: "symmore" });
+	more.appendChild(el("summary", { textContent: "More symbols" }));
+	const GROUPS = [
+		["move", "Move assessment"],
+		["position", "Position"],
+		["time", "Time pressure"],
+	];
+	GROUPS.forEach(([g, title]) => {
+		const seen = new Set();
+		// a paired glyph (White's and Black's share one symbol) appears once
+		const picks = NAGS.filter(
+			(n) =>
+				n.group === g &&
+				n.sym &&
+				!commonSyms.has(n.sym) &&
+				!seen.has(n.sym) &&
+				seen.add(n.sym),
+		);
+		if (!picks.length) return;
+		more.appendChild(
+			el("span", { className: "symgroup-h", textContent: title }),
+		);
+		const row = el("span", { className: "sympick" });
+		picks.forEach((n) => row.appendChild(symButton(n.sym, n.label)));
+		more.appendChild(row);
+	});
+	box.appendChild(more);
 	if (!atEnd) box.appendChild(commentEditor(selPly, lines));
 	const done = el("button", {
 		type: "button",

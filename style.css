@@ -207,6 +207,20 @@ h3 {
   align-items: center;
   margin: 0;
 }
+.symmore {
+	margin-top: 0.4rem;
+}
+.symmore > summary {
+	cursor: pointer;
+	font-size: 0.85em;
+	opacity: 0.75;
+}
+.symgroup-h {
+	display: block;
+	margin: 0.4rem 0 0.15rem;
+	font-size: 0.8em;
+	opacity: 0.7;
+}
 .symlabel {
   font-size: 0.8rem;
   color: var(--muted);
