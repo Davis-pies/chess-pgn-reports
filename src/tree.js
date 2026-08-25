@@ -131,6 +131,22 @@ export function buildTrie(lines, main) {
 	return root;
 }
 
+// Keys of the trie nodes that genuinely fork — more than one child. Built from
+// the WHOLE line set so a view rendering a filtered trie can tell a group that
+// really is a single shared continuation from one that merely has a single
+// VISIBLE child right now. Without it, hiding a node's siblings would dissolve
+// that node into its child's header and the reader would lose the level they
+// were working in.
+export function forkKeys(lines, main) {
+	const out = new Set();
+	const walk = (n) => {
+		if (n.key && n.children.size > 1) out.add(n.key);
+		n.children.forEach(walk);
+	};
+	walk(buildTrie(lines, main));
+	return out;
+}
+
 export function countLeaves(node) {
 	let n = node.leaf ? 1 : 0;
 	node.children.forEach((c) => (n += countLeaves(c)));

@@ -1,7 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert";
 import { parsePgn } from "../src/pgn.js";
-import { collectLines, divergence, buildTrie, leavesOf, countLeaves } from "../src/tree.js";
+import {
+	collectLines,
+	divergence,
+	buildTrie,
+	leavesOf,
+	countLeaves,
+	forkKeys,
+} from "../src/tree.js";
 
 test("collects mainline plus each variation as a line", () => {
 	const { nodes } = parsePgn(
@@ -70,4 +77,29 @@ test("carries a move's imported NAGs onto the line's marks", () => {
 test("ignores a NAG code outside the table", () => {
 	const lines = collectLines(parsePgn("1. e4 $250 *").nodes);
 	assert.deepEqual(lines[0].marks, {});
+});
+
+test("forkKeys names the nodes that really branch, over the whole line set", () => {
+	const { nodes } = parsePgn(
+		"1. e4 c5 2. Nf3 d6 (2... Nc6 3. d4 cxd4 4. Nxd4 g6 (4... e5 5. Nb5) " +
+			"(4... Nf6 5. Nc3)) (2... e6 3. d4 cxd4) 3. d4",
+	);
+	const lines = collectLines(nodes);
+	const main = lines.find((l) => l.isMain);
+	const keys = forkKeys(lines, main);
+	// 4.Nxd4 is where g6 / e5 / Nf6 part company
+	const fork = [...keys].find((k) => k.endsWith("6:Nxd4"));
+	assert.ok(fork, `a fork at Nxd4, got ${[...keys].join(", ")}`);
+	// the shared run leading up to it does not branch, so it is not a fork
+	assert.ok(
+		![...keys].some((k) => k.endsWith("5:cxd4")),
+		"a single-child continuation is not a fork",
+	);
+	// and a filtered trie keeps the same key for that node, which is what lets
+	// the editor recognise it after hiding
+	const kept = lines.filter((l) => !l.moves.some((m) => m.san === "e5"));
+	assert.ok(
+		[...forkKeys(kept, main)].every((k) => keys.has(k)),
+		"filtering never invents a key",
+	);
 });

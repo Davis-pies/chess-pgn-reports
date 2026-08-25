@@ -9,6 +9,10 @@ import {
 } from "./state.js";
 import { subMaxPly } from "./print.js";
 import { setHidden, solo } from "./visibility.js";
+
+// Shared empty default for renderTrieNode's `forks`, so the common call does
+// not allocate a Set per node.
+const EMPTY = new Set();
 // rerenderTable/rerenderMarkup (app.js shell glue, in-place panel rebuilds)
 // and lineEditor (seam 3) are reached through the render-hooks registry
 // rather than a static `import ... from "./app.js"` -- see the comment on
@@ -196,16 +200,24 @@ export function renderTrieNode(
 	// which open-state Set to record this trie's <details> in: the editor's
 	// openPaths by default, openHiddenPaths for the hidden drawer's own trie
 	paths = openPaths,
+	// keys of the nodes that fork in the UNFILTERED tree (see forkKeys) — a
+	// node listed here keeps its own level even when the trie being rendered
+	// has left it with a single child. Empty means "inline every chain", which
+	// is what the trie's own shape says when nothing is filtered out.
+	forks = EMPTY,
 ) {
 	const nextPath = path
 		? path + "  " + branchLabel(node.move)
 		: branchLabel(node.move);
 	const boards = getCurrent().showBoards; // inline-boards master toggle
 	// single-child chain: inline it, accumulating the path so a long shared
-	// continuation shows as one compressed header, not nested single groups
-	if (!node.leaf && node.children.size === 1) {
+	// continuation shows as one compressed header, not nested single groups.
+	// A real fork left with one visible child is NOT such a chain: Focus and
+	// Hide are meant to narrow what is under a group, not to dissolve the group
+	// into what survived, so a forking node keeps its own level.
+	if (!node.leaf && node.children.size === 1 && !forks.has(node.key)) {
 		node.children.forEach((c) =>
-			renderTrieNode(container, c, nameCounter, nextPath, allOpen, paths),
+			renderTrieNode(container, c, nameCounter, nextPath, allOpen, paths, forks),
 		);
 		return;
 	}
@@ -254,7 +266,7 @@ export function renderTrieNode(
 			),
 		);
 	node.children.forEach((c) =>
-		renderTrieNode(body, c, nameCounter, "", allOpen && open, paths),
+		renderTrieNode(body, c, nameCounter, "", allOpen && open, paths, forks),
 	);
 	det.appendChild(body);
 	container.appendChild(det);

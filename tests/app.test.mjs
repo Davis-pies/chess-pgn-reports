@@ -875,3 +875,63 @@ test("a folded note stays folded across an unrelated re-render", async () => {
 	await tick();
 	assert.strictEqual(group().open, false, "the fold survived the re-render");
 });
+
+// The parent group's own header text, so a Focus on one of its children can be
+// checked to have left that level standing.
+const NESTED_PGN =
+	"1. e4 c5 2. Nf3 d6 " +
+	"(2... Nc6 3. d4 cxd4 4. Nxd4 g6 " +
+	"(4... e5 5. Nb5 d6 6. N1c3 a6) " +
+	"(4... Nf6 5. Nc3 e5 6. Ndb5 d6) 5. c4 Bg7) " +
+	"(2... e6 3. d4 cxd4 4. Nxd4 a6 5. Bd3) " +
+	"3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6";
+
+const groupNamed = (txt) =>
+	[...doc("view").querySelectorAll(".markup details.lgroup")].find((d) =>
+		d.querySelector("summary").firstChild.textContent.includes(txt),
+	);
+
+test("focusing a child group keeps its parent standing as a group", async () => {
+	app.reset();
+	const view = doc("view");
+	view.querySelector("textarea.pgnin").value = NESTED_PGN;
+	[...view.querySelectorAll("button")]
+		.find((b) => b.textContent.includes("Load"))
+		.click();
+	await tick();
+
+	const parent = groupNamed("4.Nxd4");
+	assert.ok(parent, "the 2...Nc6 … 4.Nxd4 group is there to start");
+	const child = [...parent.querySelectorAll("details.lgroup")].find((d) =>
+		d.querySelector("summary").firstChild.textContent.includes("4...g6"),
+	);
+	assert.ok(child, "with 4...g6 nested inside it");
+
+	child.querySelector("summary .chip.groupsolo").click();
+	await tick();
+
+	// the siblings and the 2...e6 branch are hidden — that part already worked
+	const hidden = getCurrent().lines.filter((l) => l.hidden);
+	assert.ok(
+		hidden.some((l) => l.moves.some((m) => m.san === "e5")),
+		"a sibling of the focused child is hidden",
+	);
+	assert.ok(
+		hidden.some((l) => l.moves.some((m) => m.san === "Bd3")),
+		"the unrelated 2...e6 branch is hidden",
+	);
+
+	// …and the parent is still its own level rather than merged into the child
+	const after = groupNamed("4.Nxd4");
+	assert.ok(after, "the parent group survives the focus");
+	assert.ok(
+		!after.querySelector("summary").firstChild.textContent.includes("4...g6"),
+		"its header did not swallow the focused child",
+	);
+	assert.ok(
+		[...after.querySelectorAll("details.lgroup")].some((d) =>
+			d.querySelector("summary").firstChild.textContent.includes("4...g6"),
+		),
+		"the focused child is nested inside it",
+	);
+});

@@ -1,6 +1,6 @@
 // Browser glue: import PGN, tag each line, render the table, persist notebook.
 import { parsePgn, fenMap } from "./pgn.js";
-import { collectLines, buildTrie } from "./tree.js";
+import { collectLines, buildTrie, forkKeys } from "./tree.js";
 import { grid } from "./table.js";
 import { renderCards } from "./render.js";
 import {
@@ -624,7 +624,12 @@ function markupPanel() {
         box.appendChild(lineEditor(l, counter.n++, getCurrent().showBoards));
     });
   } else {
-    trie.children.forEach((c) => renderTrieNode(box, c, counter, "", true));
+    // forks come from every line, not just the visible ones: hiding a group's
+    // siblings must not dissolve that group into the one child left standing
+    const forks = forkKeys(getCurrent().lines, main);
+    trie.children.forEach((c) =>
+      renderTrieNode(box, c, counter, "", true, openPaths, forks),
+    );
   }
   const hid = hiddenLines(getCurrent().lines);
   if (hid.length) box.appendChild(hiddenDrawer(hid, main, counter));
@@ -669,8 +674,9 @@ function hiddenDrawer(hid, main, counter) {
     );
   // openHiddenPaths, not openPaths: the drawer's trie can produce the SAME
   // node.key as the editor's, and one shared Set would open both at once
+  const forks = forkKeys(getCurrent().lines, main);
   trie.children.forEach((c) =>
-    renderTrieNode(body, c, counter, "", true, openHiddenPaths),
+    renderTrieNode(body, c, counter, "", true, openHiddenPaths, forks),
   );
   det.appendChild(body);
   return det;
