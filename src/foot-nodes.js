@@ -39,7 +39,7 @@ export function labelFor(depth, i) {
 
 // Every member line below a node, in reading order — the lines whose symbols
 // the node's own moves may carry.
-export function linesUnder(node) {
+function linesUnder(node) {
 	const out = node.line ? [node.line] : [];
 	node.children.forEach((c) => out.push(...linesUnder(c)));
 	return out;
@@ -50,7 +50,7 @@ export function linesUnder(node) {
 // shared move belongs to the node that draws that move, not to whichever member
 // happens to carry it. First line wins, so a disagreement between members is
 // resolved in reading order rather than by whichever was visited last.
-export function mergeMarks(node, plies) {
+function mergeMarks(node, plies) {
 	const own = plies.get(node);
 	linesUnder(node).forEach((l) =>
 		own.forEach((ply) => {

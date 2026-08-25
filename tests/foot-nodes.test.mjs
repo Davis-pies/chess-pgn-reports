@@ -2,13 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert";
 import { loadState } from "./helpers.mjs";
 import { footGroups } from "../src/foot-groups.js";
-import {
-	groupFoot,
-	hostIndex,
-	labelNodes,
-	linesUnder,
-	mergeMarks,
-} from "../src/foot-nodes.js";
+import { groupFoot, hostIndex, labelNodes, labelFor } from "../src/foot-nodes.js";
 
 // Decorate the single group in a PGN, the way numberNotes does: a pre-seeded
 // per-line marker map, then groupFoot with the group's divergence index.
@@ -62,42 +56,53 @@ test("labels alternate by depth and branches continue after a node's own notes",
 	);
 });
 
-test("linesUnder lists every member below a node in reading order", () => {
-	const { foot, group } = decorated(
-		"1. e4 e5 (1... c5 2. Nf3 d6) (1... c5 2. Nf3 Nc6) (1... c5 2. Nc3) 2. Nf3",
-		{ 1: "foot", 2: "foot", 3: "foot" },
-	);
-	assert.deepStrictEqual(linesUnder(foot), group.members);
-	assert.strictEqual(linesUnder(foot.children[0]).length, 2, "the Nf3 fork");
-});
-
 test("a shared move's symbol lands on the node that renders it, first line winning", () => {
-	const { s, foot, index } = decorated(
-		"1. e4 e5 (1... c5 2. Nf3) (1... c5 2. Nc3) 2. Nf3",
-		{ 1: "foot", 2: "foot" },
-	);
+	// The symbols are on the LINES before the group is decorated, which is the
+	// only order production ever runs in: groupFoot merges them once, on its way
+	// down. `decorated` tags lines 1 and 2 — the two members, in collectLines
+	// order — so "first" here means the 2. Nf3 branch.
+	const s = loadState("1. e4 e5 (1... c5 2. Nf3) (1... c5 2. Nc3) 2. Nf3", {
+		tags: { 1: "foot", 2: "foot" },
+	});
 	const [, first, second] = s.lines;
 	first.marks[1] = "!"; // the shared stem move 1... c5
 	second.marks[1] = "?"; // the same move, disagreeing
 	second.marks[2] = "!?"; // its own move, 2. Nc3
-	// re-merge onto the already-decorated tree
-	foot.marks = {};
-	foot.children.forEach((c) => (c.marks = {}));
-	mergeMarks(foot, index.plies);
+	const { groups } = footGroups(s.lines, s.lines[0]);
+	const byLine = new Map(s.lines.map((l) => [l, {}]));
+	const foot = groupFoot(groups[0], 1, byLine, hostIndex());
 	assert.strictEqual(foot.marks[1], "!", "the stem takes the first symbol");
-	assert.strictEqual(foot.children[0].marks[1], undefined, "not on a member too");
-	assert.strictEqual(foot.children[1].marks[2], "!?", "own move stays on its node");
+	assert.strictEqual(
+		foot.children[0].marks[1],
+		undefined,
+		"not on a member too",
+	);
+	assert.strictEqual(
+		foot.children[1].marks[2],
+		"!?",
+		"own move stays on its node",
+	);
 });
 
-test("hostFor picks the deepest node drawing the ply, and the root for an undrawn one", () => {
-	const { s, foot, index } = decorated(
-		"1. e4 e5 (1... c5 2. Nf3 d6) (1... c5 2. Nf3 Nc6) (1... c5 2. Nc3) 2. Nf3",
-		{ 1: "foot", 2: "foot", 3: "foot" },
+// hostFor's user-visible effect — a note at a shared ply landing on the move it
+// is about rather than under a member that never draws that move — is asserted
+// through numberNotes in tests/notes.test.mjs ("a note on a shared stem move is
+// hosted by the group, not a member" and the inner-fork case beside it).
+
+test("labelFor alternates letters and numbers by depth", () => {
+	assert.deepStrictEqual(
+		[0, 1, 2, 3].map((i) => labelFor(1, i)),
+		["a", "b", "c", "d"],
 	);
-	const d6 = s.lines[1]; // 1... c5 2. Nf3 d6
-	const nf3 = foot.children[0];
-	assert.strictEqual(index.hostFor(d6, 3), index.nodeOfLine.get(d6), "own move");
-	assert.strictEqual(index.hostFor(d6, 2), nf3, "the shared fork move 2. Nf3");
-	assert.strictEqual(index.hostFor(d6, 1), foot, "the stem move 1... c5");
-	assert.strictEqual(index.hostFor(d6, 0), foot, "a ply the group never draws");
+	assert.deepStrictEqual(
+		[0, 1, 2].map((i) => labelFor(2, i)),
+		["1", "2", "3"],
+	);
+	assert.strictEqual(labelFor(3, 0), "a", "letters again at depth 3");
+	assert.strictEqual(labelFor(4, 1), "2", "numbers again at depth 4");
+	assert.strictEqual(labelFor(1, 26), "aa", "bijective base-26 past z");
+});
+
+test("labelFor refuses depth 0, which is the global note number", () => {
+	assert.throws(() => labelFor(0, 0), /global note number/);
 });

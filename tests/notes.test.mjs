@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert";
 import { loadState } from "./helpers.mjs";
-import { numberNotes, allNotes, labelFor } from "../src/notes.js";
+import { numberNotes, allNotes } from "../src/notes.js";
 import { grid } from "../src/table.js";
 
 test("numberNotes numbers notes in line order and maps them back per line", () => {
@@ -437,24 +437,6 @@ test("a footnote extending past its parent falls back to the last move", () => {
 	const e = numberNotes(s.lines).entries.find((x) => x.foot);
 	assert.strictEqual(e.foot.d, main.moves.length, "shares the parent entirely");
 	assert.strictEqual(e.ply, main.moves[main.moves.length - 1].ply);
-});
-
-test("labelFor alternates letters and numbers by depth", () => {
-	assert.deepStrictEqual(
-		[0, 1, 2, 3].map((i) => labelFor(1, i)),
-		["a", "b", "c", "d"],
-	);
-	assert.deepStrictEqual(
-		[0, 1, 2].map((i) => labelFor(2, i)),
-		["1", "2", "3"],
-	);
-	assert.strictEqual(labelFor(3, 0), "a", "letters again at depth 3");
-	assert.strictEqual(labelFor(4, 1), "2", "numbers again at depth 4");
-	assert.strictEqual(labelFor(1, 26), "aa", "bijective base-26 past z");
-});
-
-test("labelFor refuses depth 0, which is the global note number", () => {
-	assert.throws(() => labelFor(0, 0), /global note number/);
 });
 
 // The group tests below tag lines by index, and several of them pick a member

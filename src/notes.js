@@ -6,8 +6,6 @@ import { footGroups } from "./foot-groups.js";
 // one-pass numbering. labelFor lives there too, with the rest of the labelling.
 import { groupFoot, hostIndex, labelNodes, labelFor } from "./foot-nodes.js";
 
-export { labelFor };
-
 // The parent-line move a footnote replaces: the one at the divergence index. A
 // footnote that runs past its parent's end has no such move, so it anchors on
 // the parent's last move instead.
