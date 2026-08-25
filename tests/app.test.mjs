@@ -823,7 +823,7 @@ test("opening a drawer group does not open its twin in the editor", async () => 
 	);
 });
 
-test("Collapse all folds the live notes panel, Expand all brings it back", async () => {
+test("Collapse all folds the live notes panel but leaves the section open", async () => {
 	await loadGroupPgn();
 	// tag the whole group so the notes panel has a group footnote to fold
 	doc("view")
@@ -843,11 +843,12 @@ test("Collapse all folds the live notes panel, Expand all brings it back", async
 	);
 
 	chip("Collapse all").click();
-	assert.strictEqual(notes().open, false, "the section folded in place");
+	assert.ok(notes().open, "the section itself stays open");
 	assert.ok(
 		[...notes().querySelectorAll("details")].every((d) => !d.open),
-		"and so did everything inside it",
+		"everything inside it folded",
 	);
+	assert.ok(chip("Expand all"), "the chips are still reachable");
 
 	chip("Expand all").click();
 	assert.ok(notes().open, "Expand all reopens the section");

@@ -131,9 +131,12 @@ Two `chip mini` buttons in the section's `<summary>`, matching `markupPanel()`'s
 pair. Both call `preventDefault()` and `stopPropagation()` so the click does not
 also toggle the section, the way `groupFootChip()` does inside its `<summary>`.
 
-- **Expand all** — `closedNotePaths.clear()`
-- **Collapse all** — walk the tree with `collectNoteKeys()` and add every key,
-  the section's own key included
+- **Expand all** — `closedNotePaths.clear()`, which also reopens the section if
+  the reader had folded it by hand
+- **Collapse all** — walk the tree's **rows** with `collectNoteKeys()`, adding
+  every key inside the section but not the section's own. Collapse all folds
+  what is *in* the Notes list; folding the section too would hide the chip that
+  undoes it
 
 Both then call `getRenderHooks().rerenderNotes()`.
 
@@ -189,20 +192,33 @@ than a `{ collapsible }` option on `appendFootnote()`.
 
 ## 6. CSS
 
+Every row reserves a `1.6em` left gutter, and a collapsible row draws its
+disclosure marker in it via `list-style-position: outside` on the `<summary>`:
+
 ```css
+.notes,
+.notes-body > *,
+.ngroup-body > * {
+  padding-left: 1.6em;
+}
 .ngroup-body {
   border-left: 2px solid var(--line);
-  padding-left: 8px;
-  margin-left: 0.4em;
 }
 ```
 
-The vertical guide at every indentation level, the treatment `.lgroup` already
-uses in the editor. The body wrapper now supplies the indentation step, so
-`.fnode` and `.subnote` inside a `.ngroup-body` drop their own `margin-left` and
-do not step twice. The bare `.fnode` / `.subnote` rules are unchanged, because
-print and the cards still render those rows flat and rely on the `em` margin —
-including the depth-6 behaviour `render.test.mjs` pins.
+So a row's text starts at the same x whether or not it folds, and the arrow
+hangs outside the indent rather than sitting ahead of the `[n]`. That one gutter
+per level is also what produces the indentation — a child's gutter opens inside
+its parent's body, one step further in — and `.ngroup-body`'s border falls
+directly under the text of the row it belongs to, the vertical guide `.lgroup`
+already gives a trie branch in the editor.
+
+Because the gutter supplies the step, `.fnode` and `.subnote` that are direct
+children of a body drop their own `margin-left` and do not step twice. The bare
+`.fnode` / `.subnote` rules are unchanged: print and the cards still render
+those rows flat and rely on the `em` margin — including the depth-6 behaviour
+`render.test.mjs` pins — as do the deeper `.fnode` rows `appendFootNode` nests
+inside a branch.
 
 `.ng-head` copies `.lg-head`'s `cursor: pointer` and hover color.
 

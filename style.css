@@ -528,7 +528,10 @@ select:focus {
 /* A collapsible note group. The body draws the vertical guide that shows which
    rows belong to it, the same affordance .lgroup gives a trie branch in the
    editor. */
+/* The disclosure marker hangs in the gutter the row reserves below, rather
+   than sitting inside the indent ahead of the text. */
 .ng-head {
+  list-style-position: outside;
   cursor: pointer;
   padding: 2px 0;
 }
@@ -553,13 +556,25 @@ select:focus {
 }
 .ngroup-body {
   border-left: 2px solid var(--line);
-  padding-left: 8px;
-  margin-left: 0.4em;
   margin-top: 4px;
 }
-/* The body wrapper supplies the indentation step, so a nested row must not
-   step again. The bare .fnode/.subnote rules are untouched: print and the
-   cards still render these rows flat and rely on that em margin. */
+/* Every row reserves the same left gutter, and a collapsible one draws its
+   marker in it — so a row's text starts at the same x whether or not it folds,
+   and the arrow sits outside the indent instead of ahead of the [n]. That one
+   gutter per level IS the indentation: a child's gutter opens inside its
+   parent's body, one step further in, and the body's border falls directly
+   under the text of the row it belongs to. */
+.notes,
+.notes-body > *,
+.ngroup-body > * {
+  padding-left: 1.6em;
+}
+/* The gutter supplies the step, so a nested row must not also step itself. The
+   bare .fnode/.subnote rules are untouched: print and the cards still render
+   these rows flat and rely on that em margin, as do the deeper .fnode rows
+   appendFootNode nests inside a branch. */
+.notes-body > .fnode,
+.notes-body > .subnote,
 .ngroup-body > .fnode,
 .ngroup-body > .subnote {
   margin-left: 0;

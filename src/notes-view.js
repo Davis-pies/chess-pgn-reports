@@ -27,7 +27,11 @@ export function notesPanel() {
 	head.appendChild(el("h3", { textContent: "Notes" }));
 	head.append(
 		bulkChip("Expand all", () => closedNotePaths.clear()),
-		bulkChip("Collapse all", () => collectNoteKeys(tree, closedNotePaths)),
+		// the rows, not the tree: Collapse all folds what is IN the section, and
+		// closing the section itself would hide the chip that undoes it
+		bulkChip("Collapse all", () =>
+			tree.rows.forEach((r) => collectNoteKeys(r, closedNotePaths)),
+		),
 	);
 	box.appendChild(head);
 	// The section's own rows sit in a plain wrapper: .ngroup-body draws the

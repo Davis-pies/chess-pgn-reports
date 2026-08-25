@@ -213,7 +213,7 @@ test("a footnote with both notes and branches counts them as items", () => {
 	off();
 });
 
-test("Collapse all closes every group, Expand all reopens them", () => {
+test("Collapse all closes every group but not the section itself", () => {
 	const off = installDom();
 	closedNotePaths.clear();
 	let box = null;
@@ -239,8 +239,12 @@ test("Collapse all closes every group, Expand all reopens them", () => {
 		);
 	chip("Collapse all").click();
 	const keys = collectNoteKeys(noteTree(allNotes(), s.lines), new Set());
-	assert.strictEqual(closedNotePaths.size, keys.size, "every key recorded");
-	assert.strictEqual(box.open, false, "the section closed too");
+	assert.strictEqual(
+		closedNotePaths.size,
+		keys.size - 1,
+		"every key except the section's own",
+	);
+	assert.ok(box.open, "the section stays open — it holds the chip that undoes this");
 	assert.ok(
 		[...box.querySelectorAll("details")].every((d) => !d.open),
 		"nothing left open",
