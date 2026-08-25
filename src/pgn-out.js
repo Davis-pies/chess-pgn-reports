@@ -25,10 +25,22 @@ function tailNodes(line, d) {
 	return line.moves.slice(d).map(node);
 }
 
-export function treeFromLines(lines) {
-	if (!lines.length) return [];
+// The tree, plus a per-line map from ply to the node that draws that move,
+// covering the line's WHOLE root-to-leaf path — its own tail and every move it
+// inherits from its ancestors.
+//
+// Handing this back is what makes annotation exact. Recovering it afterwards by
+// matching a variation's moves against the line list mis-assigns lines that
+// share a suffix, and any ply a line inherits from an ancestor is missing
+// altogether — which used to fall back to the MAINLINE's node at that ply, so
+// notes from every deep variation piled onto one early mainline move.
+export function buildTree(lines) {
+	if (!lines.length) return { trunk: [], byLine: new Map() };
 	const main = lines.find((l) => l.isMain) || lines[0];
 	const trunk = tailNodes(main, 0);
+	const byLine = new Map([
+		[main, new Map(trunk.map((n) => [n.ply, n]))],
+	]);
 	// A placed line's own nodes, plus the move index its first node sits at.
 	// The offset matters: a nested line's `nodes` covers only its tail, so a
 	// child's divergence index (which counts from the START of the game) has to
@@ -57,15 +69,32 @@ export function treeFromLines(lines) {
 		}
 		const pd = divergence(l, parent);
 		const nodes = tailNodes(l, pd);
-		if (!nodes.length) continue; // l duplicates its parent; nothing to add
+		if (!nodes.length) {
+			// l duplicates its parent: no moves of its own, so it draws none —
+			// but it still needs a map, and its parent's is exactly right.
+			byLine.set(l, byLine.get(parent));
+			continue;
+		}
+		const { nodes: pn, start } = placed.get(parent);
 		// l replaces its parent's move at index pd, so the variation hangs on
 		// that move. A line running past its parent's end hangs on the last.
-		const { nodes: pn, start } = placed.get(parent);
 		const host = pn[Math.min(pd - start, pn.length - 1)];
 		host.variations.push(nodes);
 		placed.set(l, { nodes, start: pd });
+		// inherited moves come from the parent's map; a variation's first move
+		// shares a ply with the move it REPLACES, so the parent's entry at that
+		// ply must not be inherited — hence the strict `<`.
+		const map = new Map();
+		for (const [ply, n] of byLine.get(parent))
+			if (ply < nodes[0].ply) map.set(ply, n);
+		for (const n of nodes) map.set(n.ply, n);
+		byLine.set(l, map);
 	}
-	return trunk;
+	return { trunk, byLine };
+}
+
+export function treeFromLines(lines) {
+	return buildTree(lines).trunk;
 }
 
 // The spec's export format wraps movetext at 80 columns, breaking only
@@ -137,51 +166,22 @@ export function writeMovetext(nodes, result) {
 	return lines.join("\n");
 }
 
-// Index a tree by the line that owns each node, so an annotation belonging to
-// a particular line reaches THAT line's node — a variation's first move shares
-// a ply with the mainline move it replaces, so ply alone is ambiguous.
-function indexByLine(trunk, lines) {
+// Takes the WHOLE result of buildTree, not just its trunk: the annotation has
+// to land on the very node objects that tree holds, and `byLine` maps each line
+// to the nodes drawing its moves. Passing them together makes it impossible to
+// annotate one tree using another's index.
+//
+// A note whose ply its line never draws is dropped rather than guessed at —
+// putting it on some other line's move is worse than leaving it out.
+export function annotate({ trunk, byLine }, lines, notes, opts = {}) {
 	const main = lines.find((l) => l.isMain) || lines[0];
-	const idx = new Map(); // line -> Map(ply -> node)
-	const walk = (nodes, owner) => {
-		let per = idx.get(owner);
-		if (!per) idx.set(owner, (per = new Map()));
-		for (const n of nodes) {
-			per.set(n.ply, n);
-			for (const v of n.variations) {
-				// the line whose own tail ends with this variation's moves
-				const found = lines.find(
-					(l) =>
-						l !== owner &&
-						v.every((vn, i) => {
-							const m = l.moves[l.moves.length - v.length + i];
-							return m && m.san === vn.san && m.ply === vn.ply;
-						}),
-				);
-				walk(v, found || owner);
-			}
-		}
-	};
-	walk(trunk, main);
-	return idx;
-}
-
-// The node carrying a line's move at `ply`: its own if it has one there,
-// otherwise the trunk's (the move is in the shared prefix, which the trunk
-// owns).
-function nodeFor(idx, line, ply, main) {
-	const own = idx.get(line);
-	return (own && own.get(ply)) || (idx.get(main) && idx.get(main).get(ply));
-}
-
-export function annotate(trunk, lines, notes, opts = {}) {
-	const main = lines.find((l) => l.isMain) || lines[0];
-	const idx = indexByLine(trunk, lines);
+	const idx = byLine;
 
 	for (const l of lines) {
 		// per-move symbols
+		const per = idx.get(l);
 		for (const [ply, sym] of Object.entries(l.marks || {})) {
-			const n = nodeFor(idx, l, Number(ply), main);
+			const n = per && per.get(Number(ply));
 			if (!n) continue;
 			const code = nagFor(sym);
 			if (code === undefined) {
@@ -199,13 +199,14 @@ export function annotate(trunk, lines, notes, opts = {}) {
 		if (label && !l.isMain) {
 			const d = divergence(l, main);
 			const m = l.moves[d] || l.moves[l.moves.length - 1];
-			const n = m && nodeFor(idx, l, m.ply, main);
+			const n = m && per && per.get(m.ply);
 			if (n && !n.comments.includes(label)) n.comments.push(label);
 		}
 	}
 
 	const put = (line, ply, text) => {
-		const n = nodeFor(idx, line || main, ply, main);
+		const per = idx.get(line || main);
+		const n = per && per.get(ply);
 		if (n && text && !n.comments.includes(text)) n.comments.push(text);
 	};
 
@@ -255,17 +256,22 @@ function tagPairs(state, result) {
 export function buildPgn(state) {
 	const lines = state.lines || [];
 	const result = state.result || "*";
-	const trunk = treeFromLines(lines);
+	const tree = buildTree(lines);
 	// numberNotes rather than allNotes: allNotes reads the current-state
 	// singleton, and this module deliberately takes its state as an argument.
 	const opts = { footNames: state.showFootNames };
 	annotate(
-		trunk,
+		tree,
 		lines,
 		lines.length ? numberNotes(lines, opts).entries : [],
 		opts,
 	);
-	return tagPairs(state, result) + "\n\n" + writeMovetext(trunk, result) + "\n";
+	return (
+		tagPairs(state, result) +
+		"\n\n" +
+		writeMovetext(tree.trunk, result) +
+		"\n"
+	);
 }
 
 // One footnote's prose, anchored move by move rather than dumped whole onto the

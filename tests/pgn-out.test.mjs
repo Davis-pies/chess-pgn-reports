@@ -6,6 +6,7 @@ import { parsePgn } from "../src/pgn.js";
 import { collectLines } from "../src/tree.js";
 import {
 	treeFromLines,
+	buildTree,
 	writeMovetext,
 	annotate,
 	buildPgn,
@@ -139,9 +140,9 @@ test("escapes a closing brace inside a comment", () => {
 function annotated(pgn, decorate = () => {}, notes = []) {
 	const lines = linesOf(pgn);
 	decorate(lines);
-	const t = treeFromLines(lines);
-	annotate(t, lines, notes);
-	return { tree: t, lines };
+	const built = buildTree(lines);
+	annotate(built, lines, notes);
+	return { tree: built.trunk, lines, built };
 }
 
 test("a per-move mark becomes a NAG on that move", () => {
@@ -186,8 +187,8 @@ test("a note comments the move it is anchored to", () => {
 });
 
 test("a note owned by a sideline lands on the sideline's move", () => {
-	const { tree, lines } = annotated("1. e4 e5 (1... c5) *", () => {});
-	annotate(tree, lines, [{ n: 1, ply: 1, text: "sharper", owner: lines[1] }]);
+	const { tree, lines, built } = annotated("1. e4 e5 (1... c5) *", () => {});
+	annotate(built, lines, [{ n: 1, ply: 1, text: "sharper", owner: lines[1] }]);
 	assert.deepEqual(tree[1].comments, []);
 	assert.deepEqual(tree[1].variations[0][0].comments, ["sharper"]);
 });
@@ -344,4 +345,33 @@ test("a footnote line's name is omitted from the PGN unless asked for", () => {
 	assert.match(build(false), /\{∞\}/);
 	assert.doesNotMatch(build(false), /Sicilian/);
 	assert.match(build(true), /\{Sicilian ∞\}/);
+});
+
+test("a note on a move a line inherits stays out of the mainline's comments", () => {
+	// The note's ply (3) is drawn by the sideline's own Nc6, and by the
+	// MAINLINE's d6 as well — the two collide. Resolving it against the owning
+	// line used to fall back to the mainline whenever that line's map came up
+	// short, which piled every deep line's notes onto one early mainline move.
+	const lines = linesOf("1. e4 c5 2. Nf3 d6 (2... Nc6 3. d4 e5) 3. d4 cxd4 *");
+	const deep = lines.find((l) => l.moves.some((m) => m.san === "e5"));
+	deep.comments = [{ ply: 3, text: "belongs to the sideline" }];
+	const out = buildPgn({ name: "T", lines });
+	assert.match(out, /Nc6 \{belongs to the sideline\}/, out);
+	assert.doesNotMatch(out, /d6 \{belongs to the sideline\}/, out);
+});
+
+test("many deep lines' notes do not collapse onto one mainline move", () => {
+	const lines = linesOf(
+		"1. e4 c5 2. Nf3 d6 (2... Nc6 3. d4 e5) (2... e6 3. g3 d5) 3. d4 cxd4 (3... Nf6 4. Nc3 a6) *",
+	);
+	lines
+		.filter((l) => !l.isMain)
+		.forEach((l, i) => {
+			l.comments = [{ ply: l.moves[l.moves.length - 1].ply, text: "N" + i }];
+		});
+	const out = buildPgn({ name: "T", lines });
+	// each note sits on its own line's last move, so no comment holds two of them
+	for (const body of out.match(/\{[^}]*\}/g) || [])
+		assert.ok(!/N\d.*N\d/.test(body), "notes clumped into one comment: " + body);
+	for (let i = 0; i < 3; i++) assert.ok(out.includes("{N" + i + "}"), out);
 });
