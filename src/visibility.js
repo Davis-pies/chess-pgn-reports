@@ -1,0 +1,56 @@
+// Hidden lines: a presentation-only flag, orthogonal to a line's tag (a
+// footnote can also be hidden, so hidden is never a tag value). A hidden line
+// leaves the table, the print view, the Markdown export and the PGN, and moves
+// into the editor's hidden drawer.
+//
+// The mainline is never hidden. grid() uses it as the table's reference row and
+// every sideline's cells are computed as a divergence FROM it, so hiding it
+// would redefine the table rather than remove a row from it. setHidden() and
+// solo() are the only writers and both refuse l.isMain, so no caller can route
+// around that rule.
+
+export function visibleLines(lines) {
+	return lines.filter((l) => !l.hidden);
+}
+
+export function hiddenLines(lines) {
+	return lines.filter((l) => l.hidden);
+}
+
+// Clearing DELETES the property rather than writing hidden:false -- the same
+// rule line-editor.js applies to a cleared mark, so a saved notebook never
+// carries a falsy value that means nothing.
+export function setHidden(targets, on) {
+	targets.forEach((l) => {
+		if (l.isMain) return;
+		if (on) l.hidden = true;
+		else delete l.hidden;
+	});
+}
+
+export function hideAll(lines) {
+	setHidden(lines, true);
+}
+
+export function showAll(lines) {
+	setHidden(lines, false);
+}
+
+// "Hide everything except this line/group". The kept lines are unhidden:
+// hiding all but one implies that one is visible, even if it was hidden itself.
+export function solo(all, keep) {
+	const spare = new Set(keep);
+	setHidden(
+		all.filter((l) => !spare.has(l)),
+		true,
+	);
+	setHidden(keep, false);
+}
+
+// Tri-state for the group chip, read back off the leaves rather than stored --
+// the same derivation groupFootChip uses for the group Footnote chip.
+export function hiddenState(leaves) {
+	const hid = leaves.filter((l) => l.hidden).length;
+	if (!hid) return "none";
+	return hid === leaves.length ? "all" : "some";
+}
