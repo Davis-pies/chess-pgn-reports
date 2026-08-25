@@ -433,3 +433,13 @@ test("each line's label goes on the move unique to that line", () => {
 		);
 	for (let i = 1; i <= 3; i++) assert.ok(out.includes("{Line " + i + "}"), out);
 });
+
+test("a hidden line is not exported", () => {
+	const { nodes } = parsePgn("1. e4 c5 (1... e5) (1... e6) *");
+	const lines = collectLines(nodes);
+	const gone = lines.find((l) => l.moves.some((m) => m.san === "e6"));
+	gone.hidden = true;
+	const pgn = buildPgn({ name: "t", lines });
+	assert.ok(pgn.includes("e5"), "the visible variation survives");
+	assert.equal(pgn.includes("e6"), false, "the hidden variation is gone");
+});

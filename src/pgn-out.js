@@ -1,6 +1,7 @@
 import { divergence } from "./tree.js";
 import { nagFor } from "./nags.js";
 import { numberNotes } from "./notes.js";
+import { visibleLines } from "./visibility.js";
 
 // Serializes the live editor state back to PGN.
 //
@@ -264,7 +265,10 @@ function tagPairs(state, result) {
 // IMPORTED — so every edit was missing from the file. Taking the state as an
 // argument keeps the serializer honest and directly testable.
 export function buildPgn(state) {
-	const lines = state.lines || [];
+	// Hidden lines are omitted. PGN is deliberately lossy (see the decision on
+	// task a3f4f9db) and store.js is what archives the notebook, so a hidden
+	// line does not come back on re-import -- that is accepted, not a bug.
+	const lines = visibleLines(state.lines || []);
 	const result = state.result || "*";
 	const tree = buildTree(lines);
 	// numberNotes rather than allNotes: allNotes reads the current-state
