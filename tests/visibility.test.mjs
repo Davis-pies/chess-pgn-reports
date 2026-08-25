@@ -7,8 +7,6 @@ import {
 	hideAll,
 	showAll,
 	solo,
-	focus,
-	focusSet,
 	isFocused,
 } from "../src/visibility.js";
 
@@ -106,58 +104,21 @@ const tree = () => {
 	return { lines, byName: (n) => lines.find((l) => l.name === n) };
 };
 
-test("focusSet keeps the parent lines a focused line hangs off", () => {
-	const { lines, byName } = tree();
-	assert.deepEqual(
-		focusSet(lines, [byName("Child A")])
-			.map((l) => l.name)
-			.sort(),
-		["Child A", "Parent"],
-	);
-});
-
-test("focusSet never includes the mainline, which is never hidden anyway", () => {
-	const { lines, byName } = tree();
-	// the mainline shares "e4" but is not a proper prefix; even if it were, it
-	// has no business in a set whose purpose is deciding what to hide
-	assert.ok(!focusSet(lines, [byName("Child A")]).some((l) => l.isMain));
-	assert.ok(!focusSet(lines, lines).some((l) => l.isMain));
-});
-
-test("focus hides the siblings and the unrelated lines, not the parent", () => {
-	const { lines, byName } = tree();
-	focus(lines, [byName("Child A")]);
-	assert.deepEqual(
-		lines.filter((l) => l.hidden).map((l) => l.name),
-		["Child B", "Unrelated"],
-	);
-	assert.ok(!byName("Parent").hidden, "the parent line stays");
-	assert.ok(!byName("Mainline").hidden, "the mainline is never hidden");
-});
-
-test("focus on a group keeps the parent of the whole group", () => {
-	const { lines, byName } = tree();
-	focus(lines, [byName("Child A"), byName("Child B")]);
-	assert.deepEqual(
-		lines.filter((l) => l.hidden).map((l) => l.name),
-		["Unrelated"],
-	);
-});
-
 test("isFocused reads the current focus back off the lines", () => {
 	const { lines, byName } = tree();
 	assert.ok(!isFocused(lines, [byName("Child A")]), "nothing focused yet");
-	focus(lines, [byName("Child A")]);
+	solo(lines, [byName("Child A")]);
 	assert.ok(isFocused(lines, [byName("Child A")]), "now it is");
 	assert.ok(
 		!isFocused(lines, [byName("Child B")]),
 		"its sibling is not focused",
 	);
-	// a manual hide breaks the focus, and the chip must stop claiming it
-	setHidden([byName("Parent")], true);
+	// bringing another line back breaks the focus, and the chip must stop
+	// claiming it
+	setHidden([byName("Parent")], false);
 	assert.ok(
 		!isFocused(lines, [byName("Child A")]),
-		"hiding the parent by hand ends the focus",
+		"unhiding another line ends the focus",
 	);
 });
 

@@ -8,7 +8,7 @@ import {
 	getRenderHooks,
 } from "./state.js";
 import { subMaxPly } from "./print.js";
-import { setHidden, focus, isFocused } from "./visibility.js";
+import { setHidden, solo, isFocused } from "./visibility.js";
 import { grid } from "./table.js";
 
 // Shared empty default for renderTrieNode's `forks`, so the common call does
@@ -175,7 +175,7 @@ function groupSoloChip(node) {
 // "N lines" stub by default, and focusing a group only to be shown a stub of it
 // is the opposite of what the click asked for.
 export function focusLines(keep) {
-	focus(getCurrent().lines, keep);
+	solo(getCurrent().lines, keep);
 	openTablePaths.clear();
 	const g = grid(getCurrent().lines);
 	if (g.vars.length)
