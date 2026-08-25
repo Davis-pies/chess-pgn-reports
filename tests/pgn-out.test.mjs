@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parsePgn } from "../src/pgn.js";
 import { collectLines } from "../src/tree.js";
-import { treeFromLines, writeMovetext } from "../src/pgn-out.js";
+import { treeFromLines, writeMovetext, annotate } from "../src/pgn-out.js";
 
 // SAN-only view of a node list, so structure assertions stay readable.
 const shape = (nodes) =>
@@ -125,4 +125,67 @@ test("escapes a closing brace inside a comment", () => {
 	const t = treeFromLines(linesOf("1. e4 *"));
 	t[0].comments.push("a } brace and\na newline");
 	assert.equal(writeMovetext(t, "*"), "1. e4 {a ) brace and a newline} *");
+});
+
+// treeFromLines + annotate, returning the trunk, with the per-line index the
+// tests need to attach marks first.
+function annotated(pgn, decorate = () => {}, notes = []) {
+	const lines = linesOf(pgn);
+	decorate(lines);
+	const t = treeFromLines(lines);
+	annotate(t, lines, notes);
+	return { tree: t, lines };
+}
+
+test("a per-move mark becomes a NAG on that move", () => {
+	const { tree } = annotated("1. e4 e5 *", (lines) => {
+		lines[0].marks = { 0: "!" };
+	});
+	assert.deepEqual(tree[0].nags, [1]);
+	assert.deepEqual(tree[1].nags, []);
+});
+
+test("a mark with no standard code becomes a comment", () => {
+	const { tree } = annotated("1. e4 *", (lines) => {
+		lines[0].marks = { 0: "TN" };
+	});
+	assert.deepEqual(tree[0].nags, []);
+	assert.deepEqual(tree[0].comments, ["TN"]);
+});
+
+test("a mark on a sideline lands on the sideline's node", () => {
+	const { tree } = annotated("1. e4 e5 (1... c5) *", (lines) => {
+		lines[1].marks = { 1: "\u00b1" };
+	});
+	assert.deepEqual(tree[1].nags, []);
+	assert.deepEqual(tree[1].variations[0][0].nags, [16]);
+});
+
+test("a line's name and eval comment its first divergent move", () => {
+	const { tree } = annotated("1. e4 e5 (1... c5) *", (lines) => {
+		lines[1].name = "Sicilian";
+		lines[1].meta = { eval: "\u221e" };
+	});
+	assert.deepEqual(tree[1].variations[0][0].comments, ["Sicilian \u221e"]);
+});
+
+test("a note comments the move it is anchored to", () => {
+	const { tree } = annotated(
+		"1. e4 e5 2. Nf3 *",
+		() => {},
+		[{ n: 1, ply: 2, text: "the main try", owner: null }],
+	);
+	assert.deepEqual(tree[2].comments, ["the main try"]);
+});
+
+test("a note owned by a sideline lands on the sideline's move", () => {
+	const { tree, lines } = annotated("1. e4 e5 (1... c5) *", () => {});
+	annotate(tree, lines, [{ n: 1, ply: 1, text: "sharper", owner: lines[1] }]);
+	assert.deepEqual(tree[1].comments, []);
+	assert.deepEqual(tree[1].variations[0][0].comments, ["sharper"]);
+});
+
+test("imported NAGs survive as marks and re-export", () => {
+	const { tree } = annotated("1. e4 $1 e5 *");
+	assert.deepEqual(tree[0].nags, [1]);
 });

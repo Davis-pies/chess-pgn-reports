@@ -1,4 +1,5 @@
 import { divergence } from "./tree.js";
+import { nagFor } from "./nags.js";
 
 // Serializes the live editor state back to PGN.
 //
@@ -127,4 +128,74 @@ export function writeMovetext(nodes, result) {
 	}
 	if (line) lines.push(line);
 	return lines.join("\n");
+}
+
+// Index a tree by the line that owns each node, so an annotation belonging to
+// a particular line reaches THAT line's node — a variation's first move shares
+// a ply with the mainline move it replaces, so ply alone is ambiguous.
+function indexByLine(trunk, lines) {
+	const main = lines.find((l) => l.isMain) || lines[0];
+	const idx = new Map(); // line -> Map(ply -> node)
+	const walk = (nodes, owner) => {
+		let per = idx.get(owner);
+		if (!per) idx.set(owner, (per = new Map()));
+		for (const n of nodes) {
+			per.set(n.ply, n);
+			for (const v of n.variations) {
+				// the line whose own tail ends with this variation's moves
+				const found = lines.find(
+					(l) =>
+						l !== owner &&
+						v.every((vn, i) => {
+							const m = l.moves[l.moves.length - v.length + i];
+							return m && m.san === vn.san && m.ply === vn.ply;
+						}),
+				);
+				walk(v, found || owner);
+			}
+		}
+	};
+	walk(trunk, main);
+	return idx;
+}
+
+// The node carrying a line's move at `ply`: its own if it has one there,
+// otherwise the trunk's (the move is in the shared prefix, which the trunk
+// owns).
+function nodeFor(idx, line, ply, main) {
+	const own = idx.get(line);
+	return (own && own.get(ply)) || (idx.get(main) && idx.get(main).get(ply));
+}
+
+export function annotate(trunk, lines, notes) {
+	const main = lines.find((l) => l.isMain) || lines[0];
+	const idx = indexByLine(trunk, lines);
+
+	for (const l of lines) {
+		// per-move symbols
+		for (const [ply, sym] of Object.entries(l.marks || {})) {
+			const n = nodeFor(idx, l, Number(ply), main);
+			if (!n) continue;
+			const code = nagFor(sym);
+			if (code === undefined) {
+				if (!n.comments.includes(sym)) n.comments.push(sym);
+			} else if (!n.nags.includes(code)) n.nags.push(code);
+		}
+		// the line's own name and evaluation, on its first divergent move
+		const label = [l.name, (l.meta || {}).eval].filter(Boolean).join(" ");
+		if (label && !l.isMain) {
+			const d = divergence(l, main);
+			const m = l.moves[d] || l.moves[l.moves.length - 1];
+			const n = m && nodeFor(idx, l, m.ply, main);
+			if (n && !n.comments.includes(label)) n.comments.push(label);
+		}
+	}
+
+	for (const note of notes) {
+		const owner = note.owner || main;
+		const n = nodeFor(idx, owner, note.ply, main);
+		const text = note.foot ? note.text || "" : note.text;
+		if (n && text && !n.comments.includes(text)) n.comments.push(text);
+	}
+	return trunk;
 }
