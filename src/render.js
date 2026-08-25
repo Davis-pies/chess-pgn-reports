@@ -519,6 +519,20 @@ export function fullMovesText(moves, marks) {
 // and renders the sub-notes in the one place that can put them above the
 // branches.
 export function appendFootnote(container, foot) {
+	footStem(container, foot);
+	renderSubNotes(container, foot);
+	// A group's members hang below it as nested labelled rows, one level of
+	// indentation per depth (the nesting does the indenting; see .fnode in
+	// style.css). A lone footnote has no children and stops here.
+	(foot.children || []).forEach((c) => appendFootNode(container, c));
+}
+
+// A footnote's inline content — name, moves, evaluation, commentary — as one
+// span appended to `container`. Split out of appendFootnote because the
+// collapsible notes panel puts this exact stem in a <summary> while its
+// sub-notes and branches go in the body below; both callers must produce the
+// same stem or the screen and the print report would drift.
+export function footStem(container, foot) {
 	const span = document.createElement("span");
 	const t = (s) => span.appendChild(document.createTextNode(s));
 	if (foot.name) t(foot.name + ": ");
@@ -534,11 +548,6 @@ export function appendFootnote(container, foot) {
 	// Nothing inline to show (a footnote with no moves, name, eval or note)
 	// leaves no empty span behind.
 	if (span.childNodes.length) container.appendChild(span);
-	renderSubNotes(container, foot);
-	// A group's members hang below it as nested labelled rows, one level of
-	// indentation per depth (the nesting does the indenting; see .fnode in
-	// style.css). A lone footnote has no children and stops here.
-	(foot.children || []).forEach((c) => appendFootNode(container, c));
 }
 
 // One node's move run, with its per-move symbol marks and note markers. Shared
@@ -563,19 +572,15 @@ function appendFootMoves(container, foot) {
 
 // One member (or inner fork) of a group footnote: its label, its moves, its own
 // commentary, then its own notes and its own children, recursively.
-function appendFootNode(container, node) {
+// Exported so the collapsible notes panel can render a branch that has nothing
+// nested under it exactly the way print and the cards do.
+export function appendFootNode(container, node) {
 	const row = el("div", { className: "fnode d" + node.depth });
 	row.appendChild(el("sup", { textContent: "[" + node.label + "]" }));
-	const span = document.createElement("span");
-	const t = (s) => span.appendChild(document.createTextNode(s));
-	if (node.name) t(node.name + ": ");
-	const tail = appendFootMoves(span, node);
-	if (node.eval) t((tail.length ? " " : "") + node.eval);
-	if (node.note) {
-		if (tail.length || node.eval) t(" — ");
-		renderInline(span, node.note);
-	}
-	row.appendChild(span);
+	// footStem appends nothing at all for a node with no name, moves, eval or
+	// note, where this used to leave an empty span behind. Invisible either way,
+	// and it makes a branch's stem identical to a footnote's.
+	footStem(row, node);
 	renderSubNotes(row, node);
 	(node.children || []).forEach((c) => appendFootNode(row, c));
 	container.appendChild(row);
@@ -587,17 +592,21 @@ function appendFootNode(container, node) {
 // order. Placed by appendFootnote, the one function that owns that order, so
 // there is no second call for a caller to make (or to make twice).
 function renderSubNotes(container, foot) {
-	(foot.subNotes || []).forEach((s) => {
-		const row = document.createElement("div");
-		row.className = "subnote";
-		const sup = document.createElement("sup");
-		sup.textContent = "[" + s.label + "]";
-		row.appendChild(sup);
-		const span = document.createElement("span");
-		renderInline(span, s.text);
-		row.appendChild(span);
-		container.appendChild(row);
-	});
+	(foot.subNotes || []).forEach((s) => container.appendChild(subNoteRow(s)));
+}
+
+// One sub-note as its own labelled row. Exported because the collapsible notes
+// panel places these rows itself, inside a <details> body.
+export function subNoteRow(s) {
+	const row = document.createElement("div");
+	row.className = "subnote";
+	const sup = document.createElement("sup");
+	sup.textContent = "[" + s.label + "]";
+	row.appendChild(sup);
+	const span = document.createElement("span");
+	renderInline(span, s.text);
+	row.appendChild(span);
+	return row;
 }
 
 // A footnote's nested content as flat rows that still KNOW their depth: its own
