@@ -10,6 +10,7 @@ import {
 	EVAL_SYMBOLS,
 } from "../src/line-editor.js";
 import { getCurrent } from "../src/state.js";
+import { visibleLines } from "../src/visibility.js";
 
 const TWO_LINES = "1. e4 e5 (1... c5 2. Nf3 Nc6) 2. Nf3 Nc6";
 const chips = (node) => [...node.querySelectorAll("button.move-chip")];
@@ -418,5 +419,38 @@ test("a drawer symbol applies the mark like a common one", () => {
 		.find((b) => b.textContent === "↑")
 		.onclick();
 	assert.strictEqual(s.lines[0].marks[0], "↑");
+	off();
+});
+
+test("the mainline offers no Hide chip", () => {
+	const off = installDom();
+	const s = loadState(TWO_LINES);
+	const row = lineEditor(s.lines[0], 0);
+	assert.ok(!byText(row, "button", "Hide"), "no Hide chip on the mainline");
+	assert.ok(!byText(row, "button", "Solo"), "no Solo chip on the mainline");
+	off();
+});
+
+test("the Hide chip hides its line and then brings it back", () => {
+	const off = installDom();
+	const s = loadState(TWO_LINES);
+	const side = s.lines[1];
+	byText(lineEditor(side, 1), "button", "Hide").click();
+	assert.strictEqual(side.hidden, true);
+	// the chip on a hidden line reads "Hidden" and clears the flag outright
+	byText(lineEditor(side, 1), "button", "Hidden").click();
+	assert.strictEqual("hidden" in side, false);
+	off();
+});
+
+test("Solo hides every other line but keeps the mainline", () => {
+	const off = installDom();
+	const s = loadState("1. e4 e5 (1... c5) (1... e6) 2. Nf3");
+	const keep = s.lines.find((l) => l.moves.some((m) => m.san === "c5"));
+	byText(lineEditor(keep, 1), "button", "Solo").click();
+	const shown = visibleLines(s.lines);
+	assert.strictEqual(shown.length, 2, "mainline plus the soloed line");
+	assert.ok(shown.includes(keep));
+	assert.ok(shown.some((l) => l.isMain));
 	off();
 });
