@@ -2,11 +2,10 @@ import { grid } from "./table.js";
 import {
   fullmoveLabel,
   cardMovesText,
-  appendFootnote,
   footnoteText,
   subNoteLines,
 } from "./render.js";
-import { el, renderInline } from "./dom.js";
+import { el } from "./dom.js";
 import { getCurrent, getRenderHooks } from "./state.js";
 import { allNotes } from "./notes.js";
 import { buildPgn } from "./pgn-out.js";
@@ -44,33 +43,6 @@ export function branchContext(l) {
   return (
     "→ " + (m.ply % 2 === 0 ? Math.floor(m.ply / 2) + 1 + ". " : "") + m.san
   );
-}
-
-// The read-only reference list that prints and exports. Notes are numbered
-// (PGN {comments}); a Footnote-tagged line derives an entry in the same
-// sequence, anchored on the mainline move it replaces.
-export function notesPanel() {
-  const box = el("div", { className: "notes" });
-  const notes = allNotes();
-  box.appendChild(el("h3", { textContent: "Notes" }));
-  notes.forEach((note) => {
-    const row = el("div", { className: "nt" });
-    row.appendChild(el("sup", { textContent: "[" + note.n + "]" }));
-    // A footnote owns the whole row: its stem goes in a span of its own, and
-    // its sub-notes and a group's branches are block rows beside that span.
-    if (note.foot) {
-      appendFootnote(row, note.foot);
-    } else {
-      const span = document.createElement("span");
-      span.appendChild(
-        document.createTextNode(moveRef(note.ply, note.owner) + " — "),
-      );
-      renderInline(span, note.text);
-      row.appendChild(span);
-    }
-    box.appendChild(row);
-  });
-  return box;
 }
 
 // card text size bounds, as a percentage of the default

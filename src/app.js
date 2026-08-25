@@ -35,7 +35,8 @@ import {
   renderTrieNode,
 } from "./trie-view.js";
 import { lineEditor } from "./line-editor.js";
-import { notesPanel, exportBar } from "./export.js";
+import { exportBar } from "./export.js";
+import { notesPanel } from "./notes-view.js";
 
 // Canonical reset for `current`. Every "start over" path (New/Import, Load &
 // Tag, opening a saved notebook, a failed open) rebuilt this object from an

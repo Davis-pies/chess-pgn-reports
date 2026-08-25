@@ -4,11 +4,11 @@ import { installDom, loadState } from "./helpers.mjs";
 import { renderInline } from "../src/dom.js";
 import {
   buildMarkdown,
-  notesPanel,
   moveRef,
   branchContext,
   exportBar,
 } from "../src/export.js";
+import { notesPanel } from "../src/notes-view.js";
 
 test("buildMarkdown emits a title, the mainline, and tagged variations", () => {
   const off = installDom();

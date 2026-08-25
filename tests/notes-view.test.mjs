@@ -2,7 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert";
 import { installDom, loadState } from "./helpers.mjs";
 import { allNotes } from "../src/notes.js";
-import { noteTree, collectNoteKeys } from "../src/notes-view.js";
+import { closedNotePaths } from "../src/state.js";
+import { noteTree, collectNoteKeys, notesPanel } from "../src/notes-view.js";
 
 // The tree for the state a PGN produces, which is what every case below wants.
 const treeFor = (pgn, opts) => {
@@ -114,5 +115,100 @@ test("keys are unique and survive a renumbering edit", () => {
 	const after = new Set();
 	collectNoteKeys(noteTree(allNotes(), s.lines), after);
 	before.forEach((k) => assert.ok(after.has(k), `key survived: ${k}`));
+	off();
+});
+
+test("a group footnote renders as an open details with its branches inside", () => {
+	const off = installDom();
+	closedNotePaths.clear();
+	loadState("1. e4 e5 (1... c5 2. Nf3) (1... c5 2. Nc3) 2. Nf3", {
+		tags: { 1: "foot", 2: "foot" },
+	});
+	const box = notesPanel();
+	assert.strictEqual(box.tagName, "DETAILS");
+	assert.strictEqual(box.className, "notes");
+	assert.ok(box.open, "expanded by default");
+	const g = box.querySelector("details.nt.ngroup");
+	assert.ok(g.open, "the group is expanded too");
+	assert.match(g.querySelector("summary").textContent, /· 2 branches$/);
+	assert.strictEqual(g.querySelectorAll(".fnode").length, 2);
+	assert.strictEqual(box.querySelectorAll(".nt").length, 1, "one numbered note");
+	off();
+});
+
+test("closedNotePaths collapses the group it names, and nothing else", () => {
+	const off = installDom();
+	closedNotePaths.clear();
+	const s = loadState("1. e4 e5 (1... c5 2. Nf3) (1... c5 2. Nc3) 2. Nf3", {
+		tags: { 1: "foot", 2: "foot" },
+	});
+	const keys = collectNoteKeys(noteTree(allNotes(), s.lines), new Set());
+	const groupKey = [...keys].find((k) => k.startsWith("notes/e"));
+	closedNotePaths.add(groupKey);
+	const box = notesPanel();
+	assert.ok(box.open, "the section is still open");
+	assert.strictEqual(box.querySelector("details.nt.ngroup").open, false);
+	closedNotePaths.clear();
+	off();
+});
+
+test("toggling a group records the key without rebuilding the panel", async () => {
+	const off = installDom();
+	closedNotePaths.clear();
+	loadState("1. e4 e5 (1... c5 2. Nf3) (1... c5 2. Nc3) 2. Nf3", {
+		tags: { 1: "foot", 2: "foot" },
+	});
+	const box = notesPanel();
+	const g = box.querySelector("details.nt.ngroup");
+	// <details> fires `toggle` asynchronously, in a browser and in jsdom alike
+	const settle = () => new Promise((r) => setTimeout(r, 0));
+	g.open = false;
+	await settle();
+	assert.strictEqual(closedNotePaths.size, 1, "the close is recorded");
+	assert.strictEqual(
+		box.querySelector("details.nt.ngroup"),
+		g,
+		"the same element is still in place — no rebuild",
+	);
+	g.open = true;
+	await settle();
+	assert.strictEqual(closedNotePaths.size, 0, "reopening clears it");
+	off();
+});
+
+test("a cluster heads its notes with the move reference, once", () => {
+	const off = installDom();
+	closedNotePaths.clear();
+	const s = loadState("1. e4 e5 2. Nf3");
+	s.lines.find((l) => l.isMain).comments = [
+		{ ply: 0, text: "first" },
+		{ ply: 0, text: "second" },
+	];
+	const box = notesPanel();
+	const c = box.querySelector("details.ntcluster");
+	assert.match(c.querySelector("summary").textContent, /^1\.e4 · 2 notes$/);
+	assert.strictEqual(box.querySelectorAll(".nt").length, 2, "both entries");
+	assert.strictEqual(
+		box.textContent.match(/1\.e4/g).length,
+		1,
+		"the move reference is not repeated on every row",
+	);
+	off();
+});
+
+test("a footnote with both notes and branches counts them as items", () => {
+	const off = installDom();
+	closedNotePaths.clear();
+	const s = loadState("1. e4 e5 (1... c5 2. Nf3) (1... c5 2. Nc3) 2. Nf3", {
+		tags: { 1: "foot", 2: "foot" },
+	});
+	// The note sits on 1...c5, the group's SHARED stem, so the ROOT hosts it —
+	// a note on a member's own move is hosted by that member's node instead,
+	// leaving the root with branches only. Written onto the line rather than
+	// parsed from a {comment}, because a comment inside a variation merges with
+	// the moves that follow it (see parseSeq in pgn.js).
+	s.lines[1].comments = [{ ply: 1, text: "sharp" }];
+	const g = notesPanel().querySelector("details.nt.ngroup");
+	assert.match(g.querySelector("summary").textContent, /· 3 items$/);
 	off();
 });
