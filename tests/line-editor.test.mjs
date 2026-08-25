@@ -427,7 +427,7 @@ test("the mainline offers no Hide chip", () => {
 	const s = loadState(TWO_LINES);
 	const row = lineEditor(s.lines[0], 0);
 	assert.ok(!byText(row, "button", "Hide"), "no Hide chip on the mainline");
-	assert.ok(!byText(row, "button", "Solo"), "no Solo chip on the mainline");
+	assert.ok(!byText(row, "button", "Focus"), "no Focus chip on the mainline");
 	off();
 });
 
@@ -443,13 +443,13 @@ test("the Hide chip hides its line and then brings it back", () => {
 	off();
 });
 
-test("Solo hides every other line but keeps the mainline", () => {
+test("Focus hides every other line but keeps the mainline", () => {
 	const off = installDom();
 	const s = loadState("1. e4 e5 (1... c5) (1... e6) 2. Nf3");
 	const keep = s.lines.find((l) => l.moves.some((m) => m.san === "c5"));
-	byText(lineEditor(keep, 1), "button", "Solo").click();
+	byText(lineEditor(keep, 1), "button", "Focus").click();
 	const shown = visibleLines(s.lines);
-	assert.strictEqual(shown.length, 2, "mainline plus the soloed line");
+	assert.strictEqual(shown.length, 2, "mainline plus the focused line");
 	assert.ok(shown.includes(keep));
 	assert.ok(shown.some((l) => l.isMain));
 	off();

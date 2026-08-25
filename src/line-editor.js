@@ -45,7 +45,7 @@ export function lineEditor(l, idx, showBoard = false) {
 			promoteMainline(l);
 		};
 		tags.appendChild(promote);
-		// Hide/Solo sit with the tag chips, and only on a non-mainline row --
+		// Hide/Focus sit with the tag chips, and only on a non-mainline row --
 		// the mainline is the table's reference row and is never hidable.
 		const hide = el("button", {
 			className: "chip hide" + (l.hidden ? " on" : ""),
@@ -56,9 +56,11 @@ export function lineEditor(l, idx, showBoard = false) {
 			setHidden([l], !l.hidden);
 			getRenderHooks().renderApp();
 		};
+		// Labelled "Focus"; the mechanism behind it is visibility.js's solo(),
+		// which is what the class and the handler are still named after.
 		const soloBtn = el("button", {
 			className: "chip solo",
-			textContent: "Solo",
+			textContent: "Focus",
 			title: "hide every other line",
 		});
 		soloBtn.onclick = () => {

@@ -706,7 +706,7 @@ test("the drawer's group Hide chip brings a whole group back", async () => {
 	assert.strictEqual(getCurrent().lines.filter((l) => l.hidden).length, 0);
 });
 
-test("group Solo hides every line outside the group", async () => {
+test("group Focus hides every line outside the group", async () => {
 	app.reset();
 	const view = doc("view");
 	view.querySelector("textarea.pgnin").value =

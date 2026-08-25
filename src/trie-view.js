@@ -150,7 +150,7 @@ function groupHideChip(node) {
 function groupSoloChip(node) {
 	const chip = el("button", {
 		className: "chip solo groupsolo",
-		textContent: "Solo",
+		textContent: "Focus",
 		title: "hide every line outside this group",
 	});
 	chip.onclick = (e) => {
