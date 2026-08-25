@@ -9,6 +9,7 @@ import {
 import { el, renderInline } from "./dom.js";
 import { getCurrent, getRenderHooks } from "./state.js";
 import { allNotes } from "./notes.js";
+import { buildPgn } from "./pgn-out.js";
 
 // Explicit move reference for a note, e.g. "7.Nbd2" / "7...Nbd7" (number + SAN).
 // A variation-owned note (inVar) is looked up among non-main lines, since a
@@ -85,28 +86,21 @@ export function exportBar() {
   printBtn.onclick = () => window.print();
   const pgn = el("button", { className: "chip", textContent: "Export PGN" });
   pgn.onclick = () =>
-    download(slug() + ".pgn", getCurrent().pgn, "application/x-chess-pgn");
+    download(
+      slug() + ".pgn",
+      buildPgn(getCurrent()),
+      "application/x-chess-pgn",
+    );
   const md = el("button", {
     className: "chip",
     textContent: "Export Markdown",
   });
   md.onclick = () => download(slug() + ".md", buildMarkdown(), "text/markdown");
   const copy = el("button", { className: "chip", textContent: "Copy report" });
-  copy.onclick = async () => {
-    const text = buildMarkdown();
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      ta.remove();
-    }
-    copy.textContent = "Copied ✓";
-    setTimeout(() => (copy.textContent = "Copy report"), 1500);
-  };
+  copy.onclick = () => copyToClipboard(buildMarkdown(), copy, "Copy report");
+  const copyPgn = el("button", { className: "chip", textContent: "Copy PGN" });
+  copyPgn.onclick = () =>
+    copyToClipboard(buildPgn(getCurrent()), copyPgn, "Copy PGN");
   // print/PDF options: which diagrams appear in the Lines (print) cards, and
   // whether the table splits by trie. Each option is checkbox-first; they're
   // grouped by target with a clear gap between groups. These sit ABOVE the
@@ -173,7 +167,7 @@ export function exportBar() {
     ]),
   );
   bar.appendChild(pOpts);
-  bar.append(printBtn, pgn, md, copy);
+  bar.append(printBtn, pgn, copyPgn, md, copy);
   return bar;
 }
 
@@ -181,6 +175,25 @@ function slug() {
   return (getCurrent().name || "opening-table")
     .replace(/[^a-z0-9_-]+/gi, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+// Clipboard write with the execCommand fallback browsers without the async
+// clipboard API (and jsdom) still need, plus the button's "Copied ✓" flash.
+// Shared because there are two copy buttons; inlining it in both let them
+// drift.
+async function copyToClipboard(text, btn, label) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    ta.remove();
+  }
+  btn.textContent = "Copied ✓";
+  setTimeout(() => (btn.textContent = label), 1500);
 }
 
 function download(filename, text, mime) {

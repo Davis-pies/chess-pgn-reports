@@ -236,9 +236,12 @@ function captureDownloads() {
   };
 }
 
-test("exportBar's PGN export downloads the source PGN under a slugged filename", async () => {
+test("exportBar's PGN export downloads the current state under a slugged filename", async () => {
   const off = installDom();
-  loadState("1. e4 e5", { name: "My Great Book!" });
+  const state = loadState("1. e4 e5", { name: "My Great Book!" });
+  // an edit made after import: it has to reach the file, which is exactly what
+  // exporting the raw source PGN used to lose
+  state.lines[0].marks = { 0: "!" };
   const cap = captureDownloads();
   const bar = exportBar();
   [...bar.querySelectorAll("button")]
@@ -247,8 +250,28 @@ test("exportBar's PGN export downloads the source PGN under a slugged filename",
   assert.strictEqual(cap.anchors.length, 1);
   assert.strictEqual(cap.anchors[0].download, "My-Great-Book.pgn");
   assert.strictEqual(cap.blobs[0].type, "application/x-chess-pgn");
-  assert.strictEqual(await cap.blobs[0].text(), "1. e4 e5");
+  const text = await cap.blobs[0].text();
+  assert.match(text, /\[Event "My Great Book!"\]/);
+  assert.match(text, /1\. e4 \$1 1\.\.\. e5 \*/);
   cap.restore();
+  off();
+});
+
+test("exportBar's Copy PGN writes the export to the clipboard", async () => {
+  const off = installDom();
+  loadState("1. e4 e5", { name: "Book" });
+  let written = "";
+  Object.defineProperty(navigator, "clipboard", {
+    value: { writeText: async (t) => (written = t) },
+    configurable: true,
+  });
+  const bar = exportBar();
+  const btn = [...bar.querySelectorAll("button")].find(
+    (b) => b.textContent === "Copy PGN",
+  );
+  await btn.onclick();
+  assert.match(written, /1\. e4 e5 \*/);
+  assert.strictEqual(btn.textContent, "Copied \u2713");
   off();
 });
 
