@@ -27,7 +27,11 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    print — footnotes don't get their own card, since they're not a table row.
    Boards use the open-source **cburnett** piece set (white + black) with
    coordinates and spacing, fixed colors so they read on both light and dark
-   themes (toggle in the toolbar). Sidelines show only their divergent tail.
+   themes (toggle in the toolbar). Sidelines show only their divergent tail. In the table a multi-line branch
+   shows as one collapsed column of the moves its lines share; opening it
+   reveals its immediate children — lines and further branches — one level at a
+   time, the way the editor's grouped view nests, and clicking a line's column
+   folds just the group it sits in.
    Comment moves carry numbered `[n]` markers on the owning line only; a
    footnote's own notes become lettered sub-notes (a, b, c …) under its entry,
    restarting at `a` for each footnote and marked inside its move text — unless
