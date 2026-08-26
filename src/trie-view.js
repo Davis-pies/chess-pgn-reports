@@ -10,7 +10,7 @@ import {
 	getRenderHooks,
 } from "./state.js";
 import { subMaxPly } from "./print.js";
-import { setHidden, solo, isFocused } from "./visibility.js";
+import { setHidden, solo, isFocused, hideAll, showAll } from "./visibility.js";
 import { grid } from "./table.js";
 import { tracedKey, tracePath } from "./trace.js";
 import { openTableMenu } from "./table-menu.js";
@@ -52,6 +52,26 @@ export function renderTrieTable(container, g, orientation) {
 		getRenderHooks().rerenderTable();
 	};
 	controls.append(ex, col);
+	// Bulk hide/show, mirroring the editor's pair. The table is where a reader
+	// decides a line is in the way, so the control belongs here too; both call
+	// the same primitives, which refuse the mainline at the source.
+	const hideEvery = el("button", {
+		className: "chip mini",
+		textContent: "Hide all",
+		onclick: () => {
+			hideAll(getCurrent().lines);
+			getRenderHooks().renderApp();
+		},
+	});
+	const showEvery = el("button", {
+		className: "chip mini",
+		textContent: "Show all",
+		onclick: () => {
+			showAll(getCurrent().lines);
+			getRenderHooks().renderApp();
+		},
+	});
+	controls.append(" Lines: ", hideEvery, showEvery);
 	if (!mainV) {
 		container.appendChild(controls);
 		return;

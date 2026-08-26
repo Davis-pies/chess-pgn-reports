@@ -122,16 +122,57 @@ function moveSection(box, line, ply) {
 	box.append(syms.row, syms.more, commentEditor(ply, group));
 }
 
-// Build and show the menu. `target` is either { line, ply } for a line column's
-// move cell, or { lines } for a group column's — a group is not one line, so it
-// gets the group actions and no per-move section: the moves in its column
-// belong to all of its lines.
+// Build and show the menu at the cursor.
 export function openTableMenu({ x, y, target, from }) {
 	closeTableMenu();
 	lastFocus = from || null;
 	const box = el("div", { className: "tmenu" });
 	box.setAttribute("role", "menu");
+	buildInto(box, target);
+	document.body.appendChild(box);
+	place(box, x, y);
+	openMenu = box;
+	// The menu hangs off document.body, OUTSIDE the app's view root. So the
+	// renderApp() that every edit in here triggers rebuilds the table and the
+	// editor panel underneath it and leaves the menu showing the state it was
+	// opened with -- a symbol picked from here stayed unlit, a note added
+	// stayed missing. movePanel gets this for free by living inside the root.
+	//
+	// Rebuilt in place, on the same element, so the menu does not jump or lose
+	// its listeners. Only for BUTTONS inside the borrowed editor components:
+	// the note field writes on `input` and rebuilding under a keystroke would
+	// steal focus, the "More symbols" summary is not a button, and the line
+	// actions close the menu rather than updating it.
+	box.addEventListener("click", (e) => {
+		const b = e.target.closest && e.target.closest("button");
+		if (!b || !b.closest(".sympick, .cedit")) return;
+		if (openMenu !== box || !box.isConnected) return;
+		refresh(box, target);
+	});
+	document.addEventListener("keydown", onKey, true);
+	document.addEventListener("mousedown", onOutside, true);
+	const first = box.querySelector("button, input");
+	if (first) first.focus();
+	return box;
+}
 
+// Rebuild the menu's contents against current state, keeping what the reader
+// had set up around it: the symbol drawer's open state and the scroll position.
+function refresh(box, target) {
+	const drawer = box.querySelector(".symmore");
+	const wasOpen = !!(drawer && drawer.open);
+	const top = box.scrollTop;
+	buildInto(box, target);
+	const again = box.querySelector(".symmore");
+	if (again) again.open = wasOpen;
+	box.scrollTop = top;
+}
+
+// `target` is either { line, ply } for a line column's move cell, or { lines }
+// for a group column's — a group is not one line, so it gets the group actions
+// and no per-move section: the moves in its column belong to all of its lines.
+function buildInto(box, target) {
+	box.replaceChildren();
 	if (target.lines) {
 		box.appendChild(section(target.lines.length + " lines"));
 		lineActions(box, target.lines);
@@ -155,15 +196,6 @@ export function openTableMenu({ x, y, target, from }) {
 			lineActions(box, [line]);
 		}
 	}
-
-	document.body.appendChild(box);
-	place(box, x, y);
-	openMenu = box;
-	document.addEventListener("keydown", onKey, true);
-	document.addEventListener("mousedown", onOutside, true);
-	const first = box.querySelector("button, input");
-	if (first) first.focus();
-	return box;
 }
 
 // At the cursor, nudged back inside the viewport so a right-click near an edge

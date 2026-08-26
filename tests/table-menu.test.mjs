@@ -274,3 +274,106 @@ test("the header's ⋮ opens the menu without also tracing the line", () => {
 	closeTableMenu();
 	off();
 });
+
+test("the menu refreshes itself after a symbol is picked inside it", () => {
+	const off = installDom();
+	const { box } = preview();
+	const menu = rightClick(box, "d4");
+	const lit = () =>
+		[...document.querySelectorAll(".tmenu .sympick button")]
+			.filter((b) => b.className.includes("on"))
+			.map((b) => b.textContent);
+	assert.deepStrictEqual(lit(), [], "nothing set to begin with");
+	// a real dispatch, so the menu's own bubbled listener runs after the button
+	[...menu.querySelectorAll(".sympick button")]
+		.find((b) => b.textContent === "!")
+		.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+	assert.deepStrictEqual(lit(), ["!"], "the menu shows the symbol it just set");
+	closeTableMenu();
+	off();
+});
+
+test("the menu refreshes itself after a note is added inside it", () => {
+	const off = installDom();
+	const { box } = preview();
+	const menu = rightClick(box, "d4");
+	assert.strictEqual(menu.querySelectorAll(".cedit .nt").length, 0);
+	const input = menu.querySelector(".cedit input");
+	input.value = "a note";
+	input.oninput && input.oninput();
+	[...menu.querySelectorAll(".cedit button")]
+		.find((b) => b.textContent === "Add note")
+		.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+	assert.strictEqual(
+		document.querySelectorAll(".tmenu .cedit .nt").length,
+		1,
+		"the note it just added is listed",
+	);
+	closeTableMenu();
+	off();
+});
+
+test("the symbol drawer stays open across a refresh", () => {
+	const off = installDom();
+	const { box } = preview();
+	const menu = rightClick(box, "d4");
+	menu.querySelector(".symmore").open = true;
+	[...menu.querySelectorAll(".symmore .sympick button")][0].dispatchEvent(
+		new window.MouseEvent("click", { bubbles: true }),
+	);
+	assert.ok(
+		document.querySelector(".tmenu .symmore").open,
+		"picking from the drawer does not collapse it",
+	);
+	closeTableMenu();
+	off();
+});
+
+test("right-clicking a group's header opens the group menu", () => {
+	const off = installDom();
+	// GROUP_PLUS: with a branch outside the group, Focus is a real narrowing
+	const { box } = preview(GROUP_PLUS);
+	const head = [...box.querySelectorAll("th.var-head")].find((h) =>
+		h.textContent.includes("2 lines"),
+	);
+	assert.ok(head.oncontextmenu, "the group header has a menu handler");
+	head.oncontextmenu(evt(head));
+	const menu = document.querySelector(".tmenu");
+	assert.deepStrictEqual(items(menu), ["Move to footnote", "Focus", "Hide"]);
+	assert.ok(openTablePaths.has(GROUP_KEY), "and it did not fold the group");
+	closeTableMenu();
+	off();
+});
+
+test("right-clicking a line's header opens its menu without a move section", () => {
+	const off = installDom();
+	const { box } = preview();
+	const head = [...box.querySelectorAll("th.var-head")].find((h) =>
+		h.textContent.includes("Sideline"),
+	);
+	head.oncontextmenu(evt(head));
+	const menu = document.querySelector(".tmenu");
+	assert.strictEqual(menu.querySelector(".sympick"), null, "no move here");
+	assert.ok(items(menu).includes("★ Make mainline"));
+	closeTableMenu();
+	off();
+});
+
+test("the table offers Hide all and Show all", () => {
+	const off = installDom();
+	const { s, box } = preview();
+	const chip = (t) =>
+		[...box.querySelectorAll(".tbl-controls button")].find(
+			(b) => b.textContent === t,
+		);
+	assert.ok(chip("Hide all") && chip("Show all"), "both offered");
+	chip("Hide all").onclick();
+	assert.ok(
+		s.lines.filter((l) => !l.isMain).every((l) => l.hidden),
+		"every sideline hides",
+	);
+	assert.ok(!s.lines.find((l) => l.isMain).hidden, "the mainline never does");
+	chip("Show all").onclick();
+	assert.ok(s.lines.every((l) => !l.hidden), "and they all come back");
+	off();
+});

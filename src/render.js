@@ -299,6 +299,7 @@ export function renderTable(container, grid, orientation, trace) {
 		c.appendChild(document.createTextNode(" " + (v.name || "")));
 		const mb = menuButton(v);
 		if (mb) c.appendChild(mb);
+		wireMenu(c, v, null);
 		return c;
 	};
 
@@ -327,6 +328,10 @@ export function renderTable(container, grid, orientation, trace) {
 			th.textContent = cue + (v.name || v.label) + (v.eval ? " " + v.eval : "");
 			const mb = menuButton(v);
 			if (mb) th.appendChild(mb);
+			// A header has no move, so this is the line half of the menu — and
+			// on a GROUP header, the group's actions. Right-click never folds:
+			// that stays on the left-click the ▸/▾ advertises.
+			wireMenu(th, v, null);
 			head.appendChild(th);
 		});
 		table.appendChild(head);

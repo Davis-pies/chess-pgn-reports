@@ -33,7 +33,11 @@ The browser's own menu is suppressed on cells that open ours, and nowhere else.
 | --- | --- |
 | A **line** column's move cell | the move, then the line |
 | A **group** column's move cell | the group only |
-| A line header's `⋮` | the line only |
+| A **line** column's header (or its `⋮`) | the line only — a header has no move |
+| A **group** column's header | the group only |
+
+Right-click never folds. Folding stays on the left-click the `▸`/`▾` advertises,
+so the two gestures on a group header do different, predictable things.
 
 **Move section** — the symbol row and the note editor for that ply, headed the
 way `movePanel` heads it (`@ 10…Bh6 · 2 shared`).
@@ -69,6 +73,14 @@ that position.
 **No board.** `movePanel` draws the position; a board inside a popup makes it a
 window rather than a menu, and the editor panel is one click away.
 
+**Borrowing a component across flex directions costs one reset.** `.cedit` is
+`flex: 1 1 300px`, sized for `.movepanel`, a ROW flex container, where that
+reads "at least 300px wide, take any leftover width". The menu stacks its
+children, so on a vertical main axis the same declaration is a 300px-tall floor
+that then grows — one note field claiming the height of the whole menu and
+pushing the line actions off the bottom. `.tmenu .cedit { flex: 0 0 auto }`,
+and the same for `.sympick`/`.symmore`.
+
 ## 5. Getting from a cell to a line
 
 Table vars are not line objects: `grid()` builds `{tag, name, moves, marks, …}`
@@ -88,6 +100,17 @@ closeTableMenu()
 ```
 
 - One menu in the document at a time; opening closes any other.
+- **It rebuilds itself after an edit made inside it.** The menu hangs off
+  `document.body`, outside the app's view root, so the `renderApp()` every edit
+  triggers rebuilds the table and the editor panel *underneath* it and leaves
+  the menu showing the state it was opened with — a symbol picked from here
+  stayed unlit, a note added stayed missing. `movePanel` gets this free by
+  living inside the root. Rebuilt on the same element so the menu neither jumps
+  nor loses its listeners, and only for buttons inside the borrowed components:
+  the note field writes on `input` and rebuilding mid-keystroke would steal
+  focus, the "More symbols" summary is not a button, and the line actions close
+  the menu rather than update it. The drawer's open state and the scroll
+  position survive the rebuild.
 - Positioned at the cursor, then nudged back inside the viewport so a
   right-click near an edge does not open off-screen.
 - Closes on: an action, `Escape`, a click outside it, and a scroll of the table.
@@ -108,7 +131,15 @@ registry, exactly as the editor's chips do.
   menu; a group header still folds.
 - **`tests/print.test.mjs`** — no menu handlers reach the printed report.
 
-## 8. Out of scope
+## 8. Bulk hide/show in the table
+
+The editor's "Lines: Hide all / Show all" pair is mirrored into the table's own
+controls row, beside Expand all / Collapse all. The table is where a reader
+decides a line is in the way; making them cross to the editor to act on that was
+the same gap the menu closes. Both call `hideAll`/`showAll`, which refuse the
+mainline at the primitive.
+
+## 9. Out of scope
 
 - No multi-select (acting on several lines at once).
 - No drag to reorder.

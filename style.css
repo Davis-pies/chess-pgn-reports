@@ -447,6 +447,21 @@ select:focus {
 .tmenu-item.danger:hover {
   color: var(--foot);
 }
+/* The editor's note editor is sized for .movepanel, a ROW flex container, where
+   `flex: 1 1 300px` means "at least 300px WIDE, take any leftover width". The
+   menu stacks its children, so on that vertical main axis the same declaration
+   reads as a 300px-tall floor that then grows -- a single note field claiming
+   the height of the whole menu and pushing the line actions off the bottom.
+   Borrowing a component across flex directions costs exactly this one reset. */
+.tmenu .cedit {
+  flex: 0 0 auto;
+}
+/* Same reason: the symbol drawer and rows size to their content here. */
+.tmenu .sympick,
+.tmenu .symmore {
+  flex: 0 0 auto;
+}
+
 /* the ⋮ on a line column's header — the visible way in to the same menu */
 .tmenu-open {
   margin-left: 4px;

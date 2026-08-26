@@ -48,7 +48,10 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    for its line — the same controls as the editor panel, running the same code,
    so an edit made either way is the same edit. Right-clicking a group's own
    column offers those line actions over every line under it. Line headers carry
-   a **⋮** for the same menu without a move. A trace is a
+   a **⋮** for the same menu without a move, and right-clicking any header — a
+   line's or a group's — opens the same thing. Right-click never folds. The
+   table's own controls row carries **Hide all** / **Show all** beside Expand
+   all / Collapse all. A trace is a
    reading aid: it isn't saved with the notebook, and a group folding over the
    traced line simply stops showing it rather than going stale. The printed
    report is unaffected by any of this — it shows every line's full divergence,
