@@ -20,6 +20,7 @@ import {
   closedNotePaths,
   setSharedInfo,
   setRenderHooks,
+  setTraced,
 } from "./state.js";
 import { allNotes } from "./notes.js";
 import {
@@ -75,6 +76,7 @@ setCurrent(freshState());
 // from a previous test's app.js instance into this one.
 openPaths.clear();
 openTablePaths.clear();
+setTraced(null);
 closedNotePaths.clear();
 // Point the extracted view modules' callbacks at *this* app.js instance --
 // see the comment on setRenderHooks() in state.js for why this indirection
@@ -475,6 +477,7 @@ function openNotebook(id) {
     }
     openPaths.clear();
     openTablePaths.clear();
+    setTraced(null);
     closedNotePaths.clear();
     renderApp();
   });
@@ -721,6 +724,7 @@ function importPanel() {
         }
         openPaths.clear();
         openTablePaths.clear();
+        setTraced(null);
         closedNotePaths.clear();
         setCurrent(
           freshState({

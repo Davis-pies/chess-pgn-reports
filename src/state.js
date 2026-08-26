@@ -29,6 +29,18 @@ export const openPaths = new Set();
 // editor's openPaths: expanding a table branch does not expand the editor.
 export const openTablePaths = new Set();
 
+// The line the table preview is tracing — its SAN path (see trace.js), or null.
+// Session-only, like openTablePaths: a highlight is something you did a moment
+// ago, not a property of the notebook, so store.js does not save it.
+let traced = null;
+export function getTraced() {
+	return traced;
+}
+export function setTraced(v) {
+	traced = v;
+	return traced;
+}
+
 // Hidden-drawer groups the user expanded. Separate from openPaths because the
 // drawer's trie can produce the SAME node.key as the editor's for the same move
 // path -- one shared Set would make opening a drawer group open its twin above.
