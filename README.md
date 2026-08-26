@@ -34,8 +34,10 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    of its own showing the shared moves, and clicking it folds that one level;
    its block is shaded so what the fold will take is visible before the click,
    and the lines inside it start where the group's shared moves left off rather
-   than repeating them. The printed report is unaffected — it shows every line's
-   full divergence, ungrouped.
+   than repeating them. A note on one of those shared moves is marked on the
+   group's own column, which is where the move is shown — open or shut. The
+   printed report is unaffected — it shows every line's full divergence,
+   ungrouped.
    Comment moves carry numbered `[n]` markers on the owning line only; a
    footnote's own notes become lettered sub-notes (a, b, c …) under its entry,
    restarting at `a` for each footnote and marked inside its move text — unless

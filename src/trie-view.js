@@ -117,8 +117,12 @@ function tag(v, depth) {
 //
 // A line that ends AT the fork would be left with nothing, so its last move
 // stays put: an empty column reads as a bug rather than as "this line stops
-// here". Note markers are not moved — rows are plies, so a marker left on an
-// elided cell still sits at the move it annotates.
+// here" — and its marker stays with it.
+//
+// A note marker goes wherever its move went. An elided cell no longer spells
+// out the move it annotates, so a [n] left behind on the "…" pointed at
+// nothing, and repeated itself once per line in the group besides. The group
+// column shows those moves now and carries their markers (see branchVar).
 function elide(v, cut) {
 	if (cut < 0) return v;
 	const own = Object.keys(v.cells)
@@ -130,7 +134,41 @@ function elide(v, cut) {
 	const cells = {};
 	for (const [k, c] of Object.entries(v.cells))
 		cells[k] = Number(k) <= upto ? { text: "\u2026", cls: "ellip" } : c;
-	return { ...v, cells };
+	const noteByPly = {};
+	for (const [k, refs] of Object.entries(v.noteByPly || {}))
+		if (Number(k) > upto) noteByPly[k] = refs;
+	return { ...v, cells, noteByPly };
+}
+
+// Note markers for the moves a group's column shows, gathered off the lines
+// underneath it.
+//
+// The column is the only place those moves appear — open, its children elide
+// them; shut, its children are not on screen at all — so without this a note on
+// a shared move was numbered in the Notes list and referenced from nowhere in
+// the table.
+//
+// Only the plies the column actually spells out: a note deeper in a shut
+// group's lines has no cell here to sit on, and hanging it off a shared move
+// would file it under a move it does not annotate. It stays in the Notes list,
+// and reappears in the table when the group is opened far enough to show its
+// move.
+//
+// Numbers are deduped and sorted: a note shared across the group is one number
+// (numberNotes already collapses identical text at one ply), and two lines each
+// carrying a different note at the same move list both.
+function sharedNotes(node, shared) {
+	const plies = new Set(shared.map((m) => m.ply));
+	const out = {};
+	leavesOf(node).forEach((v) => {
+		for (const [k, refs] of Object.entries(v.noteByPly || {})) {
+			if (!plies.has(Number(k))) continue;
+			const into = (out[k] = out[k] || []);
+			refs.forEach((n) => into.includes(n) || into.push(n));
+		}
+	});
+	for (const k of Object.keys(out)) out[k].sort((a, b) => a - b);
+	return out;
 }
 
 // The end of a node's single-child chain — the node sharedMoves() stops at.
@@ -166,7 +204,7 @@ function branchVar(node, open) {
 		name: `${count} lines`,
 		eval: "",
 		cells,
-		noteByPly: {},
+		noteByPly: sharedNotes(node, shared),
 		collapsed: !open,
 		onclick: () => {
 			if (open) openTablePaths.delete(node.key);

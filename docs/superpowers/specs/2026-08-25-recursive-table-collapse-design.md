@@ -137,8 +137,32 @@ Two details:
 - A line that ends exactly at the fork would be elided to nothing, and an empty
   column reads as a bug rather than as "this line stops here". Its last move
   stays.
-- Note markers are not moved. Rows are plies, so a `[n]` left on an elided cell
-  still sits at the move it annotates.
+- Note markers follow their move. Leaving a `[n]` on an elided cell pointed it
+  at a move that column no longer spells out, and repeated it once per line in
+  the group besides.
+
+## 8. The group column carries its moves' notes
+
+Correction to §7 as first written, which left markers where they were.
+
+`branchVar` hardcoded `noteByPly: {}`, so a group column never marked a note
+however real the moves in its cells were. Together with §7's elision that left
+a shared move's `[n]` stranded on an ellipsis in every line of the group and
+absent from the one column actually showing the move — and while the group was
+*shut*, where its lines are not on screen at all, the marker vanished from the
+table completely: numbered in the Notes list, referenced from nowhere.
+
+`sharedNotes(node, shared)` gathers the markers off the lines underneath, for
+the plies the column spells out and no others. A note deeper in a shut group
+has no cell to sit on, and hanging it off a shared move would file it under a
+move it does not annotate; it waits in the Notes list until the group is opened
+far enough to show its move. Numbers are deduped and sorted, so a note shared
+across the group reads as one reference and two different notes at one move
+read as both.
+
+`elide` drops the markers it elides, since the column above now carries them —
+except on a line kept from being elided to nothing by the rule above, whose
+last move and marker both stay.
 
 **None of this reaches the printed report.** Grouping, tinting and elision all
 live in `pushNode`, which only `renderTrieTable` calls. `appendPrintTables`
