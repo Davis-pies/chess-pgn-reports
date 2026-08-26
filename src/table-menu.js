@@ -16,7 +16,8 @@ import { el } from "./dom.js";
 import { getCurrent, getSharedInfo, getRenderHooks } from "./state.js";
 import { symbolRow, commentEditor, promoteMainline } from "./line-editor.js";
 import { setHidden, solo, isFocused } from "./visibility.js";
-import { fullmoveLabel } from "./render.js";
+import { fullmoveLabel, appendBoard } from "./render.js";
+import { fenAt } from "./pgn.js";
 
 // One menu in the document at a time. Held module-level rather than passed
 // around because "the menu that is open" is a property of the page, not of any
@@ -117,6 +118,19 @@ function moveSection(box, line, ply) {
 				(group.length > 1 ? " · " + group.length + " shared" : ""),
 		),
 	);
+	// The position after the move. This is the thing a reader right-clicking a
+	// move deep in a wide table most wants to see, and the menu already has
+	// everything it needs to draw it.
+	//
+	// Clamped rather than taking getCurrent().boardSize: that setting goes up to
+	// 400 and belongs to the printed report and the editor's panels, where there
+	// is room for it. A menu is a menu, so it takes the smallest preset at most.
+	const fen = fenAt(line.moves, ply);
+	if (fen) {
+		const wrap = el("div", { className: "tmenu-board" });
+		appendBoard(wrap, fen, Math.min(getCurrent().boardSize || 220, 200));
+		box.appendChild(wrap);
+	}
 	const cur = (line.marks || {})[ply] || "";
 	box.append(symbolRow(ply, group, cur), commentEditor(ply, group));
 }

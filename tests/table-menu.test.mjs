@@ -3,7 +3,12 @@ import assert from "node:assert";
 import { installDom, loadState } from "./helpers.mjs";
 import { grid } from "../src/table.js";
 import { renderTrieTable } from "../src/trie-view.js";
-import { openTablePaths, setTraced, getTraced } from "../src/state.js";
+import {
+	openTablePaths,
+	setTraced,
+	getTraced,
+	getCurrent,
+} from "../src/state.js";
 import { closeTableMenu } from "../src/table-menu.js";
 
 const GROUP = "1. e4 e5 (1... c5 2. Nf3 d6 3. d4 (3. Bb5+)) 2. Nf3";
@@ -396,6 +401,43 @@ test("Enter saves a note from the menu, and the menu shows it", () => {
 		1,
 		"and the menu lists it without being reopened",
 	);
+	closeTableMenu();
+	off();
+});
+
+test("the menu draws the position after the move it was opened on", () => {
+	const off = installDom();
+	const { box } = preview();
+	const menu = rightClick(box, "d4");
+	const svg = menu.querySelector(".tmenu-board svg");
+	assert.ok(svg, "a board is drawn");
+	// clamped: boardSize goes up to 400, which belongs to the report and the
+	// editor's panels, not to a menu
+	getCurrent().boardSize = 400;
+	closeTableMenu();
+	const wide = rightClick(preview().box, "d4").querySelector(".tmenu-board svg");
+	assert.ok(Number(wide.getAttribute("width")) <= 200, "a menu stays a menu");
+	closeTableMenu();
+	off();
+});
+
+test("a group column's menu draws no board", () => {
+	const off = installDom();
+	const { box } = preview();
+	const menu = rightClick(box, "d6");
+	assert.strictEqual(menu.querySelector(".tmenu-board"), null);
+	closeTableMenu();
+	off();
+});
+
+test("a header menu draws no board — a header has no move", () => {
+	const off = installDom();
+	const { box } = preview();
+	const head = [...box.querySelectorAll("th.var-head")].find((h) =>
+		h.textContent.includes("Sideline"),
+	);
+	head.oncontextmenu(evt(head));
+	assert.strictEqual(document.querySelector(".tmenu-board"), null);
 	closeTableMenu();
 	off();
 });

@@ -442,6 +442,18 @@ select:focus {
 .tmenu .cedit {
   flex: 0 0 auto;
 }
+/* The position after the move the menu was opened on. Centred and shrink-to-fit
+   so it never widens the menu past its max-width. */
+.tmenu-board {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: center;
+  padding: 2px 0 4px;
+}
+.tmenu-board svg {
+  max-width: 100%;
+  height: auto;
+}
 /* Same reason: the symbol row sizes to its content here. */
 .tmenu .sympick {
   flex: 0 0 auto;

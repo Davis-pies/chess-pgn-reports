@@ -76,8 +76,17 @@ that position.
   `l.tag` toggle the Footnote chip uses.
 - Group actions call the same primitives over `leavesOf(node)`.
 
-**No board.** `movePanel` draws the position; a board inside a popup makes it a
-window rather than a menu, and the editor panel is one click away.
+**The board is drawn** — corrected from the first draft of this spec, which
+said a board "makes it a window rather than a menu" and left it out. That was a
+design opinion stated as a constraint. There is none: `appendBoard(container,
+fen, size)` and `fenAt(moves, ply)` take exactly what the menu already holds,
+and the position after a move is the thing a reader right-clicking deep in a
+wide table most wants to see.
+
+The size is clamped to 200px rather than taking `getCurrent().boardSize`, which
+goes up to 400 and belongs to the printed report and the editor's panels, where
+there is room for it. A group column's menu draws none: its column stands for
+several lines, and it has no single move to show a position for.
 
 **Borrowing a component across flex directions costs one reset.** `.cedit` is
 `flex: 1 1 300px`, sized for `.movepanel`, a ROW flex container, where that

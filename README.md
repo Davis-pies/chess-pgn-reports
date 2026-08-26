@@ -43,8 +43,8 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    group's stem, the path down to the moves it shares, whether the group is open
    or shut; folding stays on the ▸/▾ header, so clicking a move never reshapes
    the table. Click it again, or **Clear trace**, to stop.
-   **Right-clicking** a move opens a menu for it: the symbol picker and note
-   editor for that move, then Make mainline, Move to footnote, Focus and Hide
+   **Right-clicking** a move opens a menu for it: a board of the position after
+   it, the symbol picker and note editor for that move, then Make mainline, Move to footnote, Focus and Hide
    for its line — the same controls as the editor panel, running the same code,
    so an edit made either way is the same edit. Right-clicking a group's own
    column offers those line actions over every line under it. Line headers carry
