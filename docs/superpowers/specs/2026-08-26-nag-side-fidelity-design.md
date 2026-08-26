@@ -56,7 +56,8 @@ literal, and so does any legacy glyph.
   NAG list that our table knows.
 - **Export** (`pgn-out.js`) reads the code straight out of `"$n"`. No lookup, so
   nothing can be lost.
-- **Palette** writes `"$" + code` for the button that was clicked.
+- **Palette** writes `"$" + code` for the button that was clicked, choosing the
+  side from the move's ply (see §5).
 - **Rendering** resolves through one function, so no renderer parses `$`.
 
 ### Legacy marks
@@ -86,29 +87,40 @@ Every renderer goes through `markSym`. The call sites are known:
 renderer before `store.js` touched it — still exports as it does today rather
 than as a literal `"⨀"` comment.
 
-## 5. Picking the side
+## 5. No side control; derive it from the move
 
-The palette shows **both halves of the eight pairs**, adjacent, with a `w`/`b`
-superscript on the button only:
+The palette keeps **one button per glyph** — 27 buttons, exactly as now. No
+`w`/`b` badge, no second button that looks identical to the first. The glyph is
+side-neutral in notation and the app shows it that way.
 
-```
-… ⨀ʷ ⨀ᵇ  ○ʷ ○ᵇ  ⟳ʷ ⟳ᵇ  ↑ʷ ↑ᵇ  →ʷ →ᵇ  ⯹ʷ ⯹ᵇ  ⇆ʷ ⇆ᵇ  ⨁ʷ ⨁ᵇ  △ N TN ✕
-```
+Two consequences:
 
-35 buttons rather than 27 — about four rows where there were three. The badge is
-a `<sup>` element, not a modifier-letter codepoint, so it cannot fall back to
-tofu in a font that lacks one.
+**Labels for the eight lose their side.** "White in zugzwang" becomes
+"zugzwang", "Black has the initiative" becomes "has the initiative". The hover
+text now describes the glyph, which is what the button sets and what every view
+displays. The true side-specific labels stay in the table for the code they
+belong to; they are simply not what the palette shows.
 
-**The badge is on the button, never on the mark.** The table, the cards, the
-printed report and the PGN all show the bare glyph, because that is the
-notation. The side lives in the stored code, which is where PGN keeps it.
+**A newly set mark takes its side from the move it is on.** Clicking `⨀` on a
+White move stores `$22`, on a Black move `$23`. `ply % 2 === 0` is White here,
+the same rule `fullmoveLabel` uses.
 
-Labels stay side-specific ("Black has the initiative"), because now they are
-true. The 25 unpaired symbols get one button each, unchanged.
+This is a **guess**, and worth naming as one. `→` on a Black move usually means
+Black has the attack, but "White has the attack" is a perfectly ordinary thing
+to write after Black's move. The convention is right often, not always.
 
-`symbolRow`'s dedupe by glyph goes away — it is what collapsed each pair to its
-White half in the first place. Dedupe is now by CODE, which changes nothing for
-the 25 and is what surfaces the 8.
+Two things make it acceptable where "always White" was not:
+
+- It only ever applies to marks **set in this app**, where the user is looking
+  at a side-neutral glyph and no view claims otherwise. Nothing on screen tells
+  them a side, so nothing on screen is wrong.
+- Marks **read from a PGN keep their own code**, untouched. That is the actual
+  bug: rewriting somebody else's `$23` into `$22` in a file they may pass on.
+  A guess on a mark the user just made is a different thing from corrupting a
+  mark they imported.
+
+`symbolRow` keeps deduping by glyph. That dedupe was never the bug — storing
+the glyph was.
 
 ## 6. Testing
 
@@ -118,9 +130,10 @@ the 25 and is what surfaces the 8.
   glyph NAGs round-trips to its own code, the eight included.
 - **`tests/store.test.mjs`** — a notebook saved with legacy glyph marks loads
   as `"$n"`; `"TN"` is left alone.
-- **`tests/line-editor.test.mjs`** — the palette offers both halves of a pair;
-  clicking the Black half stores the Black code; the table renders the bare
-  glyph for both.
+- **`tests/line-editor.test.mjs`** — the palette still shows one button per
+  glyph; clicking one of the eight on a Black move stores the Black code and on
+  a White move the White code; the labels for the eight carry no side; the table
+  renders the bare glyph either way.
 - **`tests/table-menu.test.mjs`** — the menu's palette is the same one, so the
   side survives an edit made from the table.
 
