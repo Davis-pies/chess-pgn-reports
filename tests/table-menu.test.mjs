@@ -3,12 +3,7 @@ import assert from "node:assert";
 import { installDom, loadState } from "./helpers.mjs";
 import { grid } from "../src/table.js";
 import { renderTrieTable } from "../src/trie-view.js";
-import {
-	openTablePaths,
-	setTraced,
-	getTraced,
-	getCurrent,
-} from "../src/state.js";
+import { openTablePaths, setTraced, getTraced } from "../src/state.js";
 import { closeTableMenu } from "../src/table-menu.js";
 
 const GROUP = "1. e4 e5 (1... c5 2. Nf3 d6 3. d4 (3. Bb5+)) 2. Nf3";
@@ -244,17 +239,22 @@ test("left-click still traces rather than opening a menu", () => {
 test("a symbol set from the menu lands on every line sharing the move", () => {
 	const off = installDom();
 	const { s, box } = preview();
-	const menu = rightClick(box, "d6"); // shared by both lines
-	// the group column has no symbol row, so use a line's own shared move
-	closeTableMenu();
-	const m2 = rightClick(preview().box, "d4");
-	const bang = [...m2.querySelectorAll(".sympick button")].find(
-		(b) => b.textContent === "!",
+	// 1. e4 is shown on the Mainline column and reached by every line, so this
+	// is the shared-move rule the editor applies, reached from the table.
+	const menu = rightClick(box, "e4");
+	assert.match(
+		menu.querySelector(".tmenu-sec").textContent,
+		/3 shared/,
+		"the menu says how far the edit reaches",
 	);
-	bang.onclick();
-	assert.ok(menu);
-	const line = getCurrent().lines.find((l) => l.moves.some((m) => m.san === "d4"));
-	assert.strictEqual((line.marks || {})[4], "!", "written through the editor's apply");
+	[...menu.querySelectorAll(".sympick button")]
+		.find((b) => b.textContent === "!")
+		.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+	assert.deepStrictEqual(
+		s.lines.map((l) => (l.marks || {})[0]),
+		["!", "!", "!"],
+		"written to every line through the editor's own apply",
+	);
 	closeTableMenu();
 	off();
 });

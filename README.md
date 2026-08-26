@@ -79,10 +79,20 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
 ## Run locally
 
 ```bash
-npm install        # dev-only: jsdom for tests, chess.js for parsing
-python3 -m http.server  # serve the folder (ES modules need http, not file://)
-# open http://localhost:8000
+npm install    # dev-only: jsdom for tests, chess.js for parsing
+npm run dev    # http://127.0.0.1:8000, reloads the page when you save
 ```
+
+`npm run dev` is `tools/dev-server.mjs`: a dependency-free static server that
+injects a live-reload snippet into HTML **responses** — `index.html` on disk
+stays exactly what GitHub Pages serves. It watches `src/`, `assets/`,
+`index.html` and `style.css`. Pass a port if 8000 is taken: `npm run dev -- 8080`.
+
+It deliberately does not bundle. `index.html` resolves `chess.js` through an
+importmap pointing at esm.sh, and a bundling dev server would rewrite that bare
+specifier to a `node_modules` path instead — so development would load a
+different chess.js from the deployed site. Any plain static server works too
+(`python3 -m http.server`), just without the reload.
 
 Tests:
 

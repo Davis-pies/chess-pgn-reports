@@ -32,8 +32,10 @@ export function renderTrieTable(container, g, orientation) {
 	const mainV = g.vars[0]; // mainline sorts first
 	const others = g.vars.slice(1);
 	const trie = buildTrie(others, mainV);
+	// No "Branches:" label: Expand all / Collapse all sit directly under a table
+	// of branches and say what they do. "Lines:" stays on the pair below, where
+	// "Hide all" on its own would not say what it hides.
 	const controls = el("div", { className: "orow tbl-controls" });
-	controls.appendChild(el("span", { textContent: "Branches: " }));
 	const ex = el("button", {
 		className: "chip mini",
 		textContent: "Expand all",
