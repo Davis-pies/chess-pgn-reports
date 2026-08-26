@@ -313,18 +313,17 @@ test("the menu refreshes itself after a note is added inside it", () => {
 	off();
 });
 
-test("the symbol drawer stays open across a refresh", () => {
+test("the menu keeps its scroll position across a refresh", () => {
 	const off = installDom();
 	const { box } = preview();
 	const menu = rightClick(box, "d4");
-	menu.querySelector(".symmore").open = true;
-	[...menu.querySelectorAll(".symmore .sympick button")][0].dispatchEvent(
-		new window.MouseEvent("click", { bubbles: true }),
-	);
-	assert.ok(
-		document.querySelector(".tmenu .symmore").open,
-		"picking from the drawer does not collapse it",
-	);
+	// jsdom has no layout, so scrollTop stays whatever it is set to — enough to
+	// prove the rebuild restores it rather than dropping the reader to the top
+	menu.scrollTop = 40;
+	[...menu.querySelectorAll(".sympick button")]
+		.find((b) => b.textContent === "⨀")
+		.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+	assert.strictEqual(document.querySelector(".tmenu").scrollTop, 40);
 	closeTableMenu();
 	off();
 });
@@ -375,5 +374,28 @@ test("the table offers Hide all and Show all", () => {
 	assert.ok(!s.lines.find((l) => l.isMain).hidden, "the mainline never does");
 	chip("Show all").onclick();
 	assert.ok(s.lines.every((l) => !l.hidden), "and they all come back");
+	off();
+});
+
+test("Enter saves a note from the menu, and the menu shows it", () => {
+	const off = installDom();
+	const { s, box } = preview();
+	const menu = rightClick(box, "d4");
+	const add = [...menu.querySelectorAll(".cedit input")].at(-1);
+	add.value = "from the menu";
+	// a real dispatch: Enter goes through add.click(), which is what the menu's
+	// own rebuild listens for
+	add.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+	const line = s.lines.find((l) => l.moves.some((m) => m.san === "d4"));
+	assert.deepStrictEqual(
+		(line.comments || []).map((c) => c.text),
+		["from the menu"],
+	);
+	assert.strictEqual(
+		document.querySelectorAll(".tmenu .cedit .nt").length,
+		1,
+		"and the menu lists it without being reopened",
+	);
+	closeTableMenu();
 	off();
 });

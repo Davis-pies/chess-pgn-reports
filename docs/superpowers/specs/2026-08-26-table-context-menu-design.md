@@ -63,9 +63,15 @@ that position.
 - `commentEditor(ply, lines)` is already exported from `line-editor.js` and is
   used as is.
 - The symbol row is currently inline in `movePanel`. It is extracted as
-  `symbolRow(ply, lines, onChange)` and exported, and `movePanel` then calls it
-  — so the editor panel and the menu are the same code, and the extraction is
-  verified by the editor's existing tests continuing to pass.
+  `symbolRow(ply, lines, cur)` and exported, and `movePanel` then calls it — so
+  the editor panel and the menu are the same code, and the extraction is
+  verified by the editor's existing tests continuing to pass. It shows every
+  glyph on one wrapping row; the "More symbols" drawer it used to hide two
+  thirds of them behind is gone, since 25 glyphs wrap to about three short rows
+  and that is cheaper to scan than remembering what is behind a fold.
+- Enter in the add-note field saves, in both surfaces at once — routed through
+  `add.click()` so it is the same dispatched event a real click is, which is
+  what the menu's rebuild listens for.
 - Line actions call `promoteMainline`, `setHidden`, `focusLines` and the same
   `l.tag` toggle the Footnote chip uses.
 - Group actions call the same primitives over `leavesOf(node)`.
@@ -108,9 +114,8 @@ closeTableMenu()
   living inside the root. Rebuilt on the same element so the menu neither jumps
   nor loses its listeners, and only for buttons inside the borrowed components:
   the note field writes on `input` and rebuilding mid-keystroke would steal
-  focus, the "More symbols" summary is not a button, and the line actions close
-  the menu rather than update it. The drawer's open state and the scroll
-  position survive the rebuild.
+  focus, and the line actions close the menu rather than update it. The scroll
+  position survives the rebuild.
 - Positioned at the cursor, then nudged back inside the viewport so a
   right-click near an edge does not open off-screen.
 - Closes on: an action, `Escape`, a click outside it, and a scroll of the table.

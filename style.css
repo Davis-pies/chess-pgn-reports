@@ -214,20 +214,6 @@ h3 {
   align-items: center;
   margin: 0;
 }
-.symmore {
-	margin-top: 0.4rem;
-}
-.symmore > summary {
-	cursor: pointer;
-	font-size: 0.85em;
-	opacity: 0.75;
-}
-.symgroup-h {
-	display: block;
-	margin: 0.4rem 0 0.15rem;
-	font-size: 0.8em;
-	opacity: 0.7;
-}
 .symlabel {
   font-size: 0.8rem;
   color: var(--muted);
@@ -456,9 +442,8 @@ select:focus {
 .tmenu .cedit {
   flex: 0 0 auto;
 }
-/* Same reason: the symbol drawer and rows size to their content here. */
-.tmenu .sympick,
-.tmenu .symmore {
+/* Same reason: the symbol row sizes to its content here. */
+.tmenu .sympick {
   flex: 0 0 auto;
 }
 

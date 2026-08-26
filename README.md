@@ -65,7 +65,9 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    alternating by depth — `[n]`, then letters, then numbers, and so on — and a
    node's own notes taking the first labels before its branches continue the
    sequence. Lines get an
-   **evaluation/quality symbol** picker (=, ±, ∓, +=, =+, ∞, !, ?, …). The
+   **evaluation/quality symbol** picker (=, ±, ∓, +=, =+, ∞, !, ?, …), every
+   glyph on one row. Typing a note and pressing **Enter** saves it, in the
+   editor and in the table's context menu alike. The
    **Notes** section is editable — add a note at any move, or edit/delete
    existing ones. On screen the Notes list folds: a group footnote and a
    footnote's own notes collapse to a one-line header saying how much is

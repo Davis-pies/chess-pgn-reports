@@ -118,8 +118,7 @@ function moveSection(box, line, ply) {
 		),
 	);
 	const cur = (line.marks || {})[ply] || "";
-	const syms = symbolRow(ply, group, cur);
-	box.append(syms.row, syms.more, commentEditor(ply, group));
+	box.append(symbolRow(ply, group, cur), commentEditor(ply, group));
 }
 
 // Build and show the menu at the cursor.
@@ -141,8 +140,7 @@ export function openTableMenu({ x, y, target, from }) {
 	// Rebuilt in place, on the same element, so the menu does not jump or lose
 	// its listeners. Only for BUTTONS inside the borrowed editor components:
 	// the note field writes on `input` and rebuilding under a keystroke would
-	// steal focus, the "More symbols" summary is not a button, and the line
-	// actions close the menu rather than updating it.
+	// steal focus, and the line actions close the menu rather than updating it.
 	box.addEventListener("click", (e) => {
 		const b = e.target.closest && e.target.closest("button");
 		if (!b || !b.closest(".sympick, .cedit")) return;
@@ -156,15 +154,11 @@ export function openTableMenu({ x, y, target, from }) {
 	return box;
 }
 
-// Rebuild the menu's contents against current state, keeping what the reader
-// had set up around it: the symbol drawer's open state and the scroll position.
+// Rebuild the menu's contents against current state, keeping the scroll
+// position so a rebuild does not jump the reader back to the top.
 function refresh(box, target) {
-	const drawer = box.querySelector(".symmore");
-	const wasOpen = !!(drawer && drawer.open);
 	const top = box.scrollTop;
 	buildInto(box, target);
-	const again = box.querySelector(".symmore");
-	if (again) again.open = wasOpen;
 	box.scrollTop = top;
 }
 
