@@ -114,11 +114,12 @@ function branchVar(node, open) {
 	return {
 		tag: "collapse",
 		label: "",
-		// shut: how much is folded away in here. Open: nothing but the shared
-		// moves already in the cells — the lines it counts are on screen beside
-		// it, and a count repeated over every open level is what made an earlier
-		// version of this column read as clutter.
-		name: open ? "" : `${count} lines`,
+		// The same header either way, so opening a group turns its arrow and
+		// nothing else — a header that rewrote itself on click read as the
+		// column having been replaced. The shared moves are in the cells; this
+		// says how many lines are under them, open or shut, exactly as the
+		// editor's group summary does.
+		name: `${count} lines`,
 		eval: "",
 		cells,
 		noteByPly: {},

@@ -32,7 +32,7 @@ for the children:
 | ---- | ------- |
 | one leaf | that line's column, with **no** control |
 | multi-leaf, shut | its branch column, `▸ N lines`, clicking it opens one level |
-| multi-leaf, open | its branch column, `▾` and shared moves only, clicking it folds that level — then each child by this same rule |
+| multi-leaf, open | the same branch column, `▾`, clicking it folds that level — then each child by this same rule |
 
 **An open group keeps a column of its own, and it is the group's only control.**
 This was tried without one first, hanging the fold on the line columns instead,
@@ -42,10 +42,12 @@ stub's click opens rather than closes, so the group could not be folded at all
 short of Collapse all. The column is what guarantees every open level has a way
 back.
 
-It carries **no line count while open** — the lines it would count are on screen
-beside it, and a count repeated down every open level is what made the first
-version read as clutter. Shut, the count is the whole point: it says how much is
-folded away.
+**Its header is the same in both states.** Opening a group turns its arrow and
+changes nothing else. Dropping the line count on open was tried, to keep the
+column lean, and read as the column having been *replaced* rather than opened —
+the identity a reader had just clicked on disappeared from under them. The
+shared moves live in the cells; the header says how many lines are under them,
+open or shut, exactly as the editor's group summary does.
 
 Line columns carry no fold. One click therefore closes exactly one level, where
 the old code hung the *top* branch's fold on every expanded column and dropped
@@ -89,7 +91,8 @@ New coverage: a three-level tree where opening the outer branch shows an inner
 branch still shut, opening that inner one shows its lines, and folding the inner
 group leaves the outer one open; that an open group's column shows no line
 count; and — the case that put the column back — a group whose children are all
-branches, which must still be foldable.
+branches, which must still be foldable; and that opening a group leaves its
+header text alone.
 
 One fix falls out of writing those: `openTablePaths` was cleared only at module
 load, so opening a notebook or importing a PGN carried the previous notebook's

@@ -1115,10 +1115,10 @@ test("the table opens one level at a time", async () => {
 	assert.strictEqual(shut().length, 1, "its 2.Nf3 child is a branch, still shut");
 	assert.match(shut()[0].textContent, /2 lines/);
 	assert.strictEqual(live().length, 1, "the opened group is the only control");
-	assert.ok(
-		!/\d+ lines/.test(live()[0].textContent),
-		"an open group shows its shared moves, not a line count: " +
-			JSON.stringify(live()[0].textContent),
+	assert.match(
+		live()[0].textContent,
+		/▾ 3 lines/,
+		"opening turns the arrow and leaves the header otherwise alone",
 	);
 
 	shut()[0].click();
