@@ -13,6 +13,7 @@ import { subMaxPly } from "./print.js";
 import { setHidden, solo, isFocused } from "./visibility.js";
 import { grid } from "./table.js";
 import { tracedKey, tracePath } from "./trace.js";
+import { openTableMenu } from "./table-menu.js";
 
 // Shared empty default for renderTrieNode's `forks`, so the common call does
 // not allocate a Set per node.
@@ -82,6 +83,18 @@ export function renderTrieTable(container, g, orientation) {
 	// table down to the deepest hidden line
 	renderTable(container, { ...g, vars, maxPly: subMaxPly(vars) }, orientation, {
 		litByVar,
+		// Right-click acts on the move; left-click still traces. A group column
+		// stands in for several lines, so it gets the group actions and no
+		// per-move section.
+		onMenu: (v, ply, e) =>
+			openTableMenu({
+				x: e.clientX || 0,
+				y: e.clientY || 0,
+				from: e.currentTarget,
+				target: v.groupLines
+					? { lines: v.groupLines }
+					: { line: v.line, ply },
+			}),
 		onTrace: (v) => {
 			// Against the RESOLVED trace, not the stored key: clicking a line
 			// whose trace is currently invisible sets it rather than clearing
@@ -257,12 +270,17 @@ function branchVar(node, open) {
 	// cards or the printed report: those build from grid() directly, and this
 	// var only ever enters the preview's list.
 	const lastShared = shared.length ? shared[shared.length - 1].ply : -1;
-	const anyLeaf = leavesOf(node)[0];
+	const leaves = leavesOf(node);
+	const anyLeaf = leaves[0];
 	const stem = anyLeaf ? anyLeaf.moves.filter((m) => m.ply <= lastShared) : [];
+	// The lines under this column, for the context menu's group actions. Vars
+	// are copies; grid() carries the line each was built from (see table.js).
+	const groupLines = leaves.map((x) => x.line).filter(Boolean);
 	return {
 		tag: "collapse",
 		label: "",
 		moves: stem,
+		groupLines,
 		// Its own identity, not the stem's SAN path: a group whose stem is
 		// exactly some line's moves (a line ending at the fork) would otherwise
 		// share that line's key and the two would trace each other.

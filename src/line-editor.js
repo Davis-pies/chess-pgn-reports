@@ -235,6 +235,97 @@ function isAnchor(l, ply) {
 	return !!(sel && sel.ply === ply && sel.at === l);
 }
 
+// The symbol picker, as a pair of elements: the common glyphs on one row and
+// the rest in a "More symbols" drawer.
+//
+// Extracted out of movePanel so the table's context menu offers the SAME
+// control rather than a second one that could drift from it -- a symbol set
+// from either place runs this one `apply`, including the rule that a shared
+// move is marked on every line reaching that position. `ply` is null for a
+// line-end evaluation, which writes meta.eval instead of a per-move mark.
+//
+// `cur` is the symbol currently set, so the caller decides what "current"
+// means for its own scope, and this stays a pure builder.
+export function symbolRow(ply, lines, cur) {
+	const atEnd = ply == null;
+	const apply = (sym) => {
+		if (atEnd) {
+			lines.forEach((x) => {
+				x.meta = { ...(x.meta || {}), eval: cur === sym ? "" : sym };
+			});
+		} else {
+			lines.forEach((x) => {
+				x.marks = x.marks || {};
+				// an empty symbol is the clear button: always a delete, never an
+				// empty-string mark that would linger in the saved notebook
+				if (!sym || cur === sym) delete x.marks[ply];
+				else x.marks[ply] = sym;
+				if (!Object.keys(x.marks).length) x.marks = undefined;
+			});
+		}
+	};
+	const row = el("span", { className: "sympick" });
+	const symButton = (sym, title) => {
+		const b = el("button", {
+			type: "button",
+			className: "chip mini" + (cur === sym ? " on" : ""),
+			textContent: sym,
+			title: title || sym,
+		});
+		b.onclick = () => {
+			apply(sym);
+			getRenderHooks().renderApp();
+		};
+		return b;
+	};
+	// The table is large enough that showing every glyph at once would bury the
+	// handful in constant use, so the common ones stay on the visible row and
+	// the rest live in a drawer, grouped the way the PGN spec groups them.
+	const common = NAGS.filter((n) => n.common && n.sym);
+	const commonSyms = new Set(common.map((n) => n.sym));
+	common.forEach((n) => row.appendChild(symButton(n.sym, n.label)));
+	row.appendChild(symButton("TN", "theoretical novelty"));
+	const clear = el("button", {
+		type: "button",
+		className: "chip mini danger",
+		textContent: "\u2715",
+		title: "clear",
+	});
+	clear.onclick = () => {
+		apply("");
+		getRenderHooks().renderApp();
+	};
+	row.appendChild(clear);
+
+	const more = el("details", { className: "symmore" });
+	more.appendChild(el("summary", { textContent: "More symbols" }));
+	const GROUPS = [
+		["move", "Move assessment"],
+		["position", "Position"],
+		["time", "Time pressure"],
+	];
+	GROUPS.forEach(([g, title]) => {
+		const seen = new Set();
+		// a paired glyph (White's and Black's share one symbol) appears once
+		const picks = NAGS.filter(
+			(n) =>
+				n.group === g &&
+				n.sym &&
+				!commonSyms.has(n.sym) &&
+				!seen.has(n.sym) &&
+				seen.add(n.sym),
+		);
+		if (!picks.length) return;
+		more.appendChild(
+			el("span", { className: "symgroup-h", textContent: title }),
+		);
+		const grow = el("span", { className: "sympick" });
+		picks.forEach((n) => grow.appendChild(symButton(n.sym, n.label)));
+		more.appendChild(grow);
+	});
+	return { row, more };
+}
+
 // Symbol row. Applies to the selected move (a per-move mark) or, when no move
 // is selected, to the line-end evaluation.
 // Revealed when a move (or line-end) is selected on a line: symbol buttons and
@@ -265,83 +356,8 @@ export function movePanel(l) {
 		appendBoard(board, fenAt(l.moves, selPly), getCurrent().boardSize || 220);
 		box.appendChild(board);
 	}
-	const apply = (sym) => {
-		if (atEnd) {
-			lines.forEach((x) => {
-				x.meta = { ...(x.meta || {}), eval: cur === sym ? "" : sym };
-			});
-		} else {
-			lines.forEach((x) => {
-				x.marks = x.marks || {};
-				// an empty symbol is the clear button: always a delete, never an
-				// empty-string mark that would linger in the saved notebook
-				if (!sym || cur === sym) delete x.marks[selPly];
-				else x.marks[selPly] = sym;
-				if (!Object.keys(x.marks).length) x.marks = undefined;
-			});
-		}
-	};
-	const srow = el("span", { className: "sympick" });
-	const symButton = (sym, title) => {
-		const b = el("button", {
-			type: "button",
-			className: "chip mini" + (cur === sym ? " on" : ""),
-			textContent: sym,
-			title: title || sym,
-		});
-		b.onclick = () => {
-			apply(sym);
-			getRenderHooks().renderApp();
-		};
-		return b;
-	};
-	// The table is large enough that showing every glyph at once would bury the
-	// handful in constant use, so the common ones stay on the visible row and
-	// the rest live in a drawer, grouped the way the PGN spec groups them.
-	const common = NAGS.filter((n) => n.common && n.sym);
-	const commonSyms = new Set(common.map((n) => n.sym));
-	common.forEach((n) => srow.appendChild(symButton(n.sym, n.label)));
-	srow.appendChild(symButton("TN", "theoretical novelty"));
-	const clear = el("button", {
-		type: "button",
-		className: "chip mini danger",
-		textContent: "✕",
-		title: "clear",
-	});
-	clear.onclick = () => {
-		apply("");
-		getRenderHooks().renderApp();
-	};
-	srow.appendChild(clear);
-	box.appendChild(srow);
-
-	const more = el("details", { className: "symmore" });
-	more.appendChild(el("summary", { textContent: "More symbols" }));
-	const GROUPS = [
-		["move", "Move assessment"],
-		["position", "Position"],
-		["time", "Time pressure"],
-	];
-	GROUPS.forEach(([g, title]) => {
-		const seen = new Set();
-		// a paired glyph (White's and Black's share one symbol) appears once
-		const picks = NAGS.filter(
-			(n) =>
-				n.group === g &&
-				n.sym &&
-				!commonSyms.has(n.sym) &&
-				!seen.has(n.sym) &&
-				seen.add(n.sym),
-		);
-		if (!picks.length) return;
-		more.appendChild(
-			el("span", { className: "symgroup-h", textContent: title }),
-		);
-		const row = el("span", { className: "sympick" });
-		picks.forEach((n) => row.appendChild(symButton(n.sym, n.label)));
-		more.appendChild(row);
-	});
-	box.appendChild(more);
+	const syms = symbolRow(atEnd ? null : selPly, lines, cur);
+	box.append(syms.row, syms.more);
 	if (!atEnd) box.appendChild(commentEditor(selPly, lines));
 	const done = el("button", {
 		type: "button",

@@ -180,3 +180,18 @@ test("a trace does not reach the printed report", () => {
   openTablePaths.clear();
   off();
 });
+
+// The context menu is a screen affordance too: appendPrintTables passes
+// renderTable no trace object, and the menu wiring rides on the same argument.
+test("no context-menu handlers reach the printed report", () => {
+  const off = installDom();
+  openTablePaths.add("1:c5");
+  const box = printTables("1. e4 e5 (1... c5 2. Nf3 d6 3. d4 (3. Bb5+)) 2. Nf3");
+  assert.strictEqual(box.querySelectorAll(".tmenu-open").length, 0);
+  assert.strictEqual(
+    [...box.querySelectorAll("td")].filter((c) => c.oncontextmenu).length,
+    0,
+  );
+  openTablePaths.clear();
+  off();
+});
