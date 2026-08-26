@@ -310,10 +310,10 @@ test("commentEditor deduplicates a note shared across the group", () => {
 	off();
 });
 
-test("lineEditor shows the move panel only on the first line of the selected group", () => {
+test("lineEditor shows the move panel only on the line the selection is anchored to", () => {
 	const off = installDom();
 	const s = loadState(TWO_LINES);
-	s.sel = { lines: [s.lines[1]], ply: 1 };
+	s.sel = { lines: [s.lines[1]], ply: 1, at: s.lines[1] };
 	assert.strictEqual(lineEditor(s.lines[0], 0).querySelector(".movepanel"), null);
 	assert.ok(lineEditor(s.lines[1], 1).querySelector(".movepanel"));
 	off();
@@ -329,7 +329,7 @@ test("selecting a move swaps the line's end-position board for the edit board", 
 	assert.strictEqual(idle.querySelector(".mp-board"), null);
 	// a move selected on this line: the edit board REPLACES it rather than
 	// rendering a second board beside it
-	getCurrent().sel = { ply: 2, lines: [main] };
+	getCurrent().sel = { ply: 2, lines: [main], at: main };
 	const editing = lineEditor(main, 0, true);
 	assert.ok(editing.querySelector(".mp-board svg"), "edit board shown");
 	assert.strictEqual(
@@ -346,7 +346,7 @@ test("a line-end selection keeps the end-position board", () => {
 	const main = s.lines[0];
 	// ply null is the line-end selection: movePanel draws no board, so the
 	// line's own end-position board has nothing to give way to
-	getCurrent().sel = { ply: null, lines: [main] };
+	getCurrent().sel = { ply: null, lines: [main], at: main };
 	const box = lineEditor(main, 0, true);
 	assert.strictEqual(box.querySelector(".mp-board"), null);
 	assert.ok(box.querySelector(".ledge-board"), "end-position board kept");
@@ -357,9 +357,9 @@ test("a sibling sharing the selection keeps its own end-position board", () => {
 	const off = installDom();
 	const s = loadState(TWO_LINES);
 	const [main, other] = s.lines;
-	// the panel renders only on sel.lines[0]; the sibling shows no edit board,
+	// the panel renders only on sel.at; the sibling shows no edit board,
 	// so hiding its end-position board would leave it with none at all
-	getCurrent().sel = { ply: 2, lines: [main, other] };
+	getCurrent().sel = { ply: 2, lines: [main, other], at: main };
 	const box = lineEditor(other, 1, true);
 	assert.strictEqual(box.querySelector(".mp-board"), null);
 	assert.ok(box.querySelector(".ledge-board"), "sibling keeps its board");
@@ -452,5 +452,110 @@ test("Focus hides every other line but keeps the mainline", () => {
 	assert.strictEqual(shown.length, 2, "mainline plus the focused line");
 	assert.ok(shown.includes(keep));
 	assert.ok(shown.some((l) => l.isMain));
+	off();
+});
+
+// --- the panel follows the line you clicked, not the group's first line -----
+// A shared move belongs to every line reaching the same position, and
+// annotating it annotates them all. That group is built in notebook order and
+// has no memory of the click, so anchoring the panel to it put the board and
+// notes on a line the user had not touched -- and, once that line was hidden,
+// inside the collapsed hidden drawer where nothing was visible at all.
+//
+// Two sidelines that share 1...c5 2. Nf3 d6 and split on move 3. Both diverge
+// from the mainline at c5, so both STRIPS render the shared d6 chip -- unlike
+// TWO_LINES, where the sideline's shared prefix is elided.
+const SHARED_SIBLINGS = "1. e4 e5 (1... c5 2. Nf3 d6 3. d4 (3. Bb5+)) 2. Nf3";
+// notebook order puts the Bb5+ line first, so it is the shared group's [0]
+const siblings = (s) => [
+	s.lines.find((l) => l.moves.some((m) => m.san === "Bb5+")),
+	s.lines.find((l) => l.moves.some((m) => m.san === "d4")),
+];
+// the shared d6 chip: index 2 of the strip (c5, Nf3, d6, ...)
+const sharedChip = (l) => chips(moveStrip(l))[2];
+
+test("the move panel opens on the clicked line, not the group's first line", () => {
+	const off = installDom();
+	const s = loadState(SHARED_SIBLINGS);
+	const [first, second] = siblings(s);
+	sharedChip(second).onclick();
+	assert.strictEqual(getCurrent().sel.ply, 3, "d6 selected");
+	assert.strictEqual(getCurrent().sel.at, second, "the clicked line is the anchor");
+	assert.strictEqual(getCurrent().sel.lines.length, 2, "both lines still targeted");
+	assert.ok(
+		lineEditor(second, 2).querySelector(".movepanel"),
+		"panel on the clicked line",
+	);
+	assert.strictEqual(
+		lineEditor(first, 1).querySelector(".movepanel"),
+		null,
+		"no panel on the sibling",
+	);
+	off();
+});
+
+test("a hidden sibling does not swallow the panel for a shared move", () => {
+	const off = installDom();
+	const s = loadState(SHARED_SIBLINGS);
+	const [first, second] = siblings(s);
+	// the group's first line is hidden, so a panel anchored to it would render
+	// only inside the collapsed hidden drawer
+	first.hidden = true;
+	sharedChip(second).onclick();
+	assert.strictEqual(getCurrent().sel.at, second);
+	assert.ok(
+		lineEditor(second, 1).querySelector(".movepanel .mp-board svg"),
+		"the visible line shows the board",
+	);
+	off();
+});
+
+test("a note on a shared move is reachable from a visible sibling", () => {
+	const off = installDom();
+	const s = loadState(SHARED_SIBLINGS);
+	const [first, second] = siblings(s);
+	// the note was written on the group, then the line it was written on hid
+	[first, second].forEach((l) => (l.comments = [{ ply: 3, text: "Hmmmmm" }]));
+	first.hidden = true;
+	sharedChip(second).onclick();
+	const notes = [...lineEditor(second, 1).querySelectorAll(".movepanel .nt input")];
+	assert.deepStrictEqual(
+		notes.map((i) => i.value),
+		["Hmmmmm"],
+		"the shared note is editable on the visible line",
+	);
+	off();
+});
+
+test("clicking a shared move on a sibling moves the panel rather than clearing it", () => {
+	const off = installDom();
+	const s = loadState(SHARED_SIBLINGS);
+	const [first, second] = siblings(s);
+	sharedChip(first).onclick();
+	assert.strictEqual(getCurrent().sel.at, first);
+	// the same shared move on the other line: re-anchor, do not toggle off
+	sharedChip(second).onclick();
+	assert.ok(getCurrent().sel, "selection survives");
+	assert.strictEqual(getCurrent().sel.at, second, "anchor moved to the sibling");
+	// clicking it again on the line it is anchored to does clear it
+	sharedChip(second).onclick();
+	assert.strictEqual(getCurrent().sel, null);
+	off();
+});
+
+test("a sibling's shared chip is marked shared, not selected", () => {
+	const off = installDom();
+	const s = loadState(SHARED_SIBLINGS);
+	const [first, second] = siblings(s);
+	sharedChip(second).onclick();
+	const picked = sharedChip(second);
+	const sibling = sharedChip(first);
+	assert.ok(picked.classList.contains("on"), "the clicked chip is selected");
+	assert.ok(!picked.classList.contains("on-shared"));
+	assert.ok(!sibling.classList.contains("on"), "the sibling is not selected");
+	assert.ok(sibling.classList.contains("on-shared"), "the sibling is marked shared");
+	// an unshared move on the same strip stays plain
+	const solo = chips(moveStrip(first))[3];
+	assert.ok(!solo.classList.contains("on") && !solo.classList.contains("on-shared"));
 	off();
 });

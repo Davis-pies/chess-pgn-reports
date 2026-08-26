@@ -75,9 +75,15 @@ export function lineEditor(l, idx, showBoard = false) {
 	head.append(name, tags);
 	row.appendChild(head);
 	row.appendChild(moveStrip(l));
-	// the symbol/comment panel appears once, on the first line of the group
+	// The symbol/comment panel appears once, on the line whose chip was
+	// clicked -- sel.at, not sel.lines[0]. A shared move is annotated across
+	// its whole group, but that group is built in notebook order by
+	// computeShared() and knows nothing about the click, so anchoring to its
+	// first line put the board and notes on a line the user never touched --
+	// and, when that line was hidden, inside the collapsed hidden drawer,
+	// where the selection appeared to do nothing at all.
 	const sel = getCurrent().sel;
-	const panelHere = !!(sel && sel.lines && sel.lines[0] === l);
+	const panelHere = !!(sel && sel.at === l);
 	// movePanel draws the selected move's position, and that board REPLACES the
 	// line's end-position board rather than sitting beside it — two boards for
 	// one line reads as a rendering glitch. Only the panel's own line swaps: a
@@ -180,15 +186,17 @@ export function moveStrip(l) {
 		);
 		// numbered note references for this move's chip (superscript numbers, no brackets)
 		const noteNums = marksByPly[m.ply] || [];
-		const sel =
-			getCurrent().sel &&
-			getCurrent().sel.ply === m.ply &&
-			getCurrent().sel.lines &&
-			getCurrent().sel.lines.includes(l);
+		// Two levels of highlight: `on` is the move actually selected, here on
+		// this line; `on-shared` is the same move on a sibling that the edit
+		// will also reach. One highlight for both read as two selections.
+		const inSel = inSelection(l, m.ply);
+		const sel = inSel && isAnchor(l, m.ply);
 		const b = el("button", {
 			type: "button",
 			className:
-				"move-chip" + (sel ? " on" : "") + (hasNote ? " has-note" : ""),
+				"move-chip" +
+				(sel ? " on" : inSel ? " on-shared" : "") +
+				(hasNote ? " has-note" : ""),
 			textContent: num + m.san + (mark ? " · " + mark : ""),
 		});
 		if (noteNums.length) {
@@ -197,19 +205,34 @@ export function moveStrip(l) {
 			b.appendChild(sup);
 		}
 		b.onclick = () => {
-			// annotating a shared move targets the whole identical group
-			getCurrent().sel =
-				getCurrent().sel &&
-				getCurrent().sel.ply === m.ply &&
-				getCurrent().sel.lines &&
-				getCurrent().sel.lines.includes(l)
-					? null
-					: { lines: group, ply: m.ply };
+			// Annotating a shared move targets the whole identical group, but
+			// the panel belongs to the line clicked. Clicking the same move on
+			// a SIBLING therefore re-anchors the panel there rather than
+			// toggling the selection off -- only a second click on the line
+			// already holding the panel clears it.
+			getCurrent().sel = isAnchor(l, m.ply)
+				? null
+				: { lines: group, ply: m.ply, at: l };
 			getRenderHooks().renderApp();
 		};
 		wrap.appendChild(b);
 	});
 	return wrap;
+}
+
+// Is `ply` on line `l` part of the current selection -- i.e. will an edit in
+// the panel reach it? True on every line of a shared move's group.
+function inSelection(l, ply) {
+	const sel = getCurrent().sel;
+	return !!(sel && sel.ply === ply && sel.lines && sel.lines.includes(l));
+}
+
+// Is `l` the line the selection is ANCHORED to -- the one whose chip was
+// clicked, and so the one the panel opens under? Read live rather than closed
+// over at render time, so a handler can never act on a stale selection.
+function isAnchor(l, ply) {
+	const sel = getCurrent().sel;
+	return !!(sel && sel.ply === ply && sel.at === l);
 }
 
 // Symbol row. Applies to the selected move (a per-move mark) or, when no move

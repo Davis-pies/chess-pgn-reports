@@ -60,7 +60,7 @@ function freshState(overrides = {}) {
     showFirstDivBoard: false,
     showFootNames: false, // footnote entries lead with their line's name
     sideWidth: 420, // px; the drag-resized table panel width
-    sel: null, // { l: line, ply } — the move the symbol row targets (null = line-end)
+    sel: null, // { lines: shared group, ply, at: line the panel opens on }
     ...overrides,
   };
 }

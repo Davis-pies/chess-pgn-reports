@@ -474,6 +474,13 @@ select:focus {
   color: #fff;
   border-color: var(--main);
 }
+/* the same shared move on a sibling line: it will receive the edit too, but
+   the panel is not here, so it reads as an echo rather than a second selection */
+.move-chip.on-shared {
+  border-color: var(--main);
+  box-shadow: inset 0 0 0 1px var(--main);
+  color: var(--main);
+}
 .move-chip.has-note::after {
   content: " ¶";
   color: var(--foot);
