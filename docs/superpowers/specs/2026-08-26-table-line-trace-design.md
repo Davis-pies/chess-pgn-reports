@@ -1,0 +1,147 @@
+# Tracing a Line Through the Table — Design
+
+**Goal:** Clicking a line's column in the table preview highlights every cell
+that makes up that line, wherever those cells live, and fades the rest.
+
+---
+
+## 1. What is wrong today
+
+Reading one line off the grouped table means stitching three places together.
+After `elide()` (see the recursive-table-collapse design, §7), a line's own
+column carries only its tail; the moves before it live in the Mainline column
+and in each enclosing open group's column:
+
+```
+ply  Mainline  ▾ 2 lines  Line A   Line B
+1.   e4        …          …        …
+     e5        c5         …        …
+2.   Nf3       Nf3        …        …
+               d6¹        …        …
+3.             …          Bb5+     d4     ← Line B is: e4 · c5 Nf3 d6 · d4
+```
+
+The elision is right — repeating the shared moves on every line pushed each
+line's own continuation off to the right — but it leaves the reader to
+reassemble the line by eye, across columns that are not adjacent and at nesting
+depths that change as branches open and shut.
+
+## 2. Naming
+
+**Trace**, not focus. `visibility.js` already owns **Focus**, which hides every
+other line. This hides nothing: it highlights in place. Reusing the word in the
+UI or the code would make two unrelated behaviours share a name.
+
+## 3. The rule
+
+A cell is on the trace if **it belongs to a column in the line's chain AND it
+spells that line's move at that ply.** The chain is:
+
+```
+[ Mainline column, …enclosing open group columns, the line's own column ]
+```
+
+Both halves are load-bearing:
+
+- **Chain membership** stops an unrelated branch that happens to play the same
+  move at the same ply from lighting up.
+- **The SAN check** is what lights the Mainline column for the shared prefix
+  and darkens it the moment the line diverges. No divergence index is consulted
+  and none is stored; the moves either match or they do not.
+
+Nested groups need no extra rule: each contributes its own shared range, and an
+elided `…` is not a move, so it is never lit.
+
+A line that ends exactly at its group's fork keeps its last move (that rule
+predates this work), so that move is spelled twice — once on the group column,
+once on the line's. Both light. Lighting one and not the other would read as a
+bug, since they are the same move.
+
+## 4. Where the chain comes from
+
+`pushNode` in `trie-view.js` already threads `depth` and `cut` down the
+recursion. It gains a `trail`: the group vars enclosing the node, stashed on
+each leaf var it pushes. That is the only change to the trie walk.
+
+The Mainline column is `vars[0]` and is not produced by `pushNode`, so the
+chain is assembled as `[mainV, ...v.trail, v]` at trace time.
+
+## 5. `src/trace.js`
+
+A new module, pure and DOM-free so the path logic is testable on its own:
+
+```js
+tracedKey(v)          // the var's SAN path — "e4 c5 Nf3 d6 d4"
+tracePath(vars, key)  // -> Map(var -> Set(ply)), or null
+```
+
+**Keyed by SAN path, not object identity.** `grid()` rebuilds every var on every
+render, so a stored var reference would be stale before the next click.
+
+**Unresolvable keys return `null`.** If the traced line's column is gone — its
+group folded, the line hidden or focused away — there is nothing to dim and no
+stale state to clean up. Re-opening the group brings the trace back. This is
+why no clearing hook is needed in the fold, hide, or focus handlers.
+
+## 6. Rendering
+
+`renderTable(container, grid, orientation, trace)` takes a 4th argument,
+`{ litByVar, onTrace }`, **supplied only by `renderTrieTable`**.
+
+- Each move cell gets `traced` or `faded`.
+- A column header gets `traced` when its column contributes at least one lit
+  cell, `faded` otherwise. Derived from `litByVar`, so the header cannot
+  disagree with the cells under it.
+
+`appendPrintTables` passes nothing, so the printed report has no dimming and no
+click handlers — the same containment the grouping already has, pinned by a
+test that sets a trace and asserts print emits neither class.
+
+## 7. Interaction
+
+| Target | Behaviour |
+| --- | --- |
+| Any cell or header of a **line** column | toggle the trace on that line |
+| A **group** column | unchanged — expand/collapse. A group is not one line |
+| **Clear trace** chip in `.tbl-controls` | clears; shown only while a trace is resolved |
+
+The toggle compares against the **resolved** trace rather than the stored key,
+so clicking a line whose trace is currently invisible sets it rather than
+clearing it. That is the only reading under which the click always does what it
+appears to do.
+
+Keyboard access follows `wireExpandControl`: focusable, `role="button"`,
+Enter/Space, with `aria-pressed` for the toggle state.
+
+No global Esc listener. The chip is discoverable, needs no teardown across
+re-renders, and sits with the Expand all / Collapse all controls a reader is
+already using.
+
+## 8. Styling
+
+A new `--trace` variable in both themes.
+
+`.tbl tr td.traced` / `.tbl tr th.traced` take a filled accent background,
+written at `tr td` specificity so they outrank the zebra striping and the group
+shading — the same trick `.grp` uses for the same reason.
+
+**`.faded` dims with `color` only, never `opacity`.** The sticky Mainline and
+ply columns have opaque backgrounds that scrolled content would show through if
+the cell were made translucent. The traced cells' fill carries the contrast, so
+color-dimming is sufficient.
+
+## 9. Testing
+
+- **`tests/trace.test.mjs`** — chain resolution; the mainline prefix lights and
+  stops at divergence; group columns light; nested groups; no cross-branch
+  bleed; an unresolvable key returns `null`; a line ending at its fork lights
+  both copies of its last move.
+- **`tests/trie-view.test.mjs`** — cell and header classes; toggle on and off;
+  a group column still folds rather than tracing.
+- **`tests/print.test.mjs`** — print emits no trace classes with a trace active.
+
+## 10. Out of scope
+
+- No sync with the line editor's move selection.
+- No persistence: session-only, like `openTablePaths`.
+- No trace on group columns.
