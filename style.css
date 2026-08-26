@@ -18,6 +18,8 @@
   --grp-a: #eaf0fa;
   --grp-b: #dbe5f6;
   --grp-edge: #9db8e0;
+  /* the traced line's fill in the table preview */
+  --trace: #cfe0fb;
   --lift: #ffffff;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
@@ -40,6 +42,7 @@
   --grp-a: #1d2331;
   --grp-b: #262f42;
   --grp-edge: #4a5f85;
+  --trace: #2f4470;
   --lift: #23262d;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
@@ -360,6 +363,33 @@ select:focus {
 .tbl:not(.tbl-h) tr td.grp-start,
 .tbl:not(.tbl-h) tr th.grp-start {
   border-top: 2px solid var(--grp-edge);
+}
+
+/* Tracing one line through the table: the cells that make up it are filled and
+   everything else drops back. Written as `tr td` / `tr th` for the same reason
+   the group shading above is — it has to outrank the zebra striping and the
+   group tint, which are otherwise more specific. */
+.tbl tr td.traced,
+.tbl tr th.traced {
+  background: var(--trace);
+  color: var(--text);
+  font-weight: 700;
+}
+/* Dimmed with color, never opacity: the sticky mainline and ply columns have
+   opaque backgrounds that scrolled content would show through if the cell were
+   made translucent. The traced cells' fill carries the contrast anyway. */
+.tbl tr td.faded,
+.tbl tr th.faded {
+  color: var(--muted);
+}
+/* A line column is clickable to trace it. Kept apart from .clickable, which
+   means "this folds a branch" everywhere else in the table. */
+.tbl .traceable {
+  cursor: pointer;
+}
+.tbl .traceable:hover {
+  outline: 1px solid var(--grp-edge);
+  outline-offset: -1px;
 }
 
 .tbl-controls {

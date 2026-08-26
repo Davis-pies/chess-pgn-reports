@@ -185,8 +185,47 @@ function moveCell(c, ply, noteByPly) {
 }
 
 // Populates `container` with the table (+ optional board diagrams).
-export function renderTable(container, grid, orientation) {
+// `trace` is the line the preview is highlighting: { litByVar, onTrace }, where
+// litByVar is trace.js's Map(var -> Set(ply)) — or null when nothing is traced,
+// which leaves the columns as click targets without dimming anything. Supplied
+// ONLY by renderTrieTable; appendPrintTables passes nothing, so the printed
+// report carries no dimming and no click handlers, the same containment the
+// grouping itself has.
+export function renderTable(container, grid, orientation, trace) {
 	const { vars, maxPly } = grid;
+	const lit = trace && trace.litByVar;
+	// A column's header follows its cells: lit when the column contributes at
+	// least one move to the traced line, so the two can never disagree.
+	const traceClass = (v) => (!lit ? "" : lit.has(v) ? " traced" : " faded");
+	const cellTrace = (c, v, ply) => {
+		if (!lit) return;
+		c.classList.add(lit.get(v)?.has(ply) ? "traced" : "faded");
+	};
+	// A line column is a trace target: clicking any of its cells or its header
+	// toggles the highlight. Group columns are left alone — their click folds a
+	// level, and a group stands in for several lines rather than being one.
+	//
+	// `traceable`, not `clickable`: the latter means "this folds a branch"
+	// everywhere else in the table, and quietly widening it to cover a second,
+	// unrelated affordance would make every count of fold controls wrong.
+	const wireTrace = (el, v) => {
+		if (!trace || !v.moves || v.onclick) return;
+		el.classList.add("traceable");
+		el.tabIndex = 0;
+		el.setAttribute("role", "button");
+		el.setAttribute("aria-pressed", String(!!lit?.has(v)));
+		const go = (e) => {
+			if (e && e.stopPropagation) e.stopPropagation();
+			trace.onTrace(v);
+		};
+		el.onclick = go;
+		el.onkeydown = (e) => {
+			if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") {
+				e.preventDefault();
+				go(e);
+			}
+		};
+	};
 	const labels = {};
 	// number every WHITE (even) ply, not just the mainline's — rows that only
 	// exist because of a side line keep their move number
@@ -202,7 +241,9 @@ export function renderTable(container, grid, orientation) {
 			"var-head" +
 			(v.onclick ? " clickable" : "") +
 			(v.collapsed ? " collapsed" : "") +
-			groupClass(v);
+			groupClass(v) +
+			traceClass(v);
+		wireTrace(c, v);
 		if (v.onclick) {
 			wireExpandControl(c, v.onclick, !v.collapsed);
 			c.title = v.collapsed ? v.name || "expand branch" : "collapse branch";
@@ -242,7 +283,9 @@ export function renderTable(container, grid, orientation) {
 				(i === 0 ? " main-col sticky-col" : "") +
 				(v.onclick ? " clickable" : "") +
 				(v.collapsed ? " collapsed" : "") +
-				groupClass(v);
+				groupClass(v) +
+				traceClass(v);
+			wireTrace(th, v);
 			if (v.onclick) {
 				wireExpandControl(th, v.onclick, !v.collapsed);
 				th.title = v.collapsed ? v.name || "expand branch" : "collapse branch";
@@ -266,6 +309,8 @@ export function renderTable(container, grid, orientation) {
 					c.classList.add("clickable");
 					wireExpandControl(c, v.onclick, false);
 				}
+				cellTrace(c, v, ply);
+				wireTrace(c, v);
 				tr.appendChild(c);
 			}
 			table.appendChild(tr);
@@ -296,6 +341,8 @@ export function renderTable(container, grid, orientation) {
 					c.classList.add("clickable");
 					wireExpandControl(c, v.onclick, false);
 				}
+				cellTrace(c, v, ply);
+				wireTrace(c, v);
 				tr.appendChild(c);
 			}
 			tr.appendChild(td(v.eval, "eval"));

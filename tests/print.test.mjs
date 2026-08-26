@@ -3,7 +3,7 @@ import assert from "node:assert";
 import { installDom, loadState } from "./helpers.mjs";
 import { appendPrintTables } from "../src/print.js";
 import { grid } from "../src/table.js";
-import { getCurrent, openTablePaths } from "../src/state.js";
+import { getCurrent, openTablePaths, setTraced } from "../src/state.js";
 
 // A long mainline plus enough shallow sidelines to force packForPrint to emit
 // more than one table (each diverges at ply 1, so each becomes its own chunk).
@@ -162,6 +162,21 @@ test("the printed table is untouched by the preview's grouping", () => {
     "print keeps each line's whole divergence",
   );
   assert.deepStrictEqual(col(3), ["\u2026", "c5", "Nf3", "Nc6", "a4"]);
+  openTablePaths.clear();
+  off();
+});
+
+// Tracing is a screen affordance. appendPrintTables builds from grid() and
+// passes renderTable no trace object, so a trace left on when the reader hits
+// Print cannot dim the report or leave click handlers in the printed DOM.
+test("a trace does not reach the printed report", () => {
+  const off = installDom();
+  setTraced("e4 c5 Nf3 d6 d4");
+  openTablePaths.add("1:c5");
+  const box = printTables("1. e4 e5 (1... c5 2. Nf3 d6 3. d4 (3. Bb5+)) 2. Nf3");
+  assert.strictEqual(box.querySelectorAll(".traced, .faded").length, 0);
+  assert.strictEqual(box.querySelectorAll(".traceable").length, 0);
+  setTraced(null);
   openTablePaths.clear();
   off();
 });

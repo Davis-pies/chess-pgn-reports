@@ -119,6 +119,11 @@ so clicking a line whose trace is currently invisible sets it rather than
 clearing it. That is the only reading under which the click always does what it
 appears to do.
 
+Trace targets get their own `traceable` class rather than reusing `clickable`.
+`clickable` means "this folds a branch" everywhere else in the table, and
+quietly widening it to a second, unrelated affordance made three existing tests
+fail — they count fold controls through it. Both classes set `cursor: pointer`.
+
 Keyboard access follows `wireExpandControl`: focusable, `role="button"`,
 Enter/Space, with `aria-pressed` for the toggle state.
 

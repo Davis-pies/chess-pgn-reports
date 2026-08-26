@@ -3,7 +3,7 @@ import assert from "node:assert";
 import { installDom, loadState } from "./helpers.mjs";
 import { grid } from "../src/table.js";
 import { renderTrieTable } from "../src/trie-view.js";
-import { openTablePaths } from "../src/state.js";
+import { openTablePaths, getTraced, setTraced } from "../src/state.js";
 
 // Two sidelines sharing 1...c5 2. Nf3 d6 and forking on move 3, so the trie
 // has one group whose column carries c5, Nf3 and d6 -- the shape the note
@@ -132,5 +132,136 @@ test("the vertical layout marks the group row the same way", () => {
 	assert.ok(row, "the group row is on screen");
 	const d6 = [...row.children].find((c) => moveOf(c) === "d6");
 	assert.strictEqual(refsOf(d6), "1");
+	off();
+});
+
+// --- tracing one line through the table -------------------------------------
+// A line's moves are split across the Mainline column, the group columns
+// enclosing it and its own tail, so reading one line means stitching three
+// places together. Tracing lights exactly the cells that make up it.
+
+const traceBox = (s, orientation = "horizontal") => {
+	const box = document.createElement("div");
+	renderTrieTable(box, grid(s.lines), orientation);
+	return box;
+};
+
+test("a traced line's cells are lit and the rest fade", () => {
+	const off = installDom();
+	const s = loadState(GROUP);
+	openTablePaths.clear();
+	openTablePaths.add(GROUP_KEY);
+	setTraced("e4 c5 Nf3 d6 d4");
+	const box = traceBox(s);
+	const lit = [...box.querySelectorAll("td.traced")].map(moveOf).sort();
+	assert.deepStrictEqual(lit, ["Nf3", "c5", "d4", "d6", "e4"].sort());
+	assert.ok(box.querySelector("td.faded"), "the rest of the table drops back");
+	setTraced(null);
+	off();
+});
+
+test("a column contributing no move to the line has a faded header", () => {
+	const off = installDom();
+	const s = loadState(GROUP);
+	openTablePaths.clear();
+	openTablePaths.add(GROUP_KEY);
+	setTraced("e4 c5 Nf3 d6 d4");
+	const heads = [...traceBox(s).querySelectorAll("th.var-head")];
+	assert.strictEqual(
+		heads.filter((h) => h.classList.contains("traced")).length,
+		3,
+		"mainline, the group column and the line's own header",
+	);
+	assert.strictEqual(
+		heads.filter((h) => h.classList.contains("faded")).length,
+		1,
+		"the sibling line's header fades",
+	);
+	setTraced(null);
+	off();
+});
+
+test("clicking a line column starts a trace, clicking it again clears it", () => {
+	const off = installDom();
+	const s = loadState(GROUP);
+	openTablePaths.clear();
+	openTablePaths.add(GROUP_KEY);
+	setTraced(null);
+	const cell = (box, san) =>
+		[...box.querySelectorAll("td")].find((c) => moveOf(c) === san);
+	cell(traceBox(s), "d4").onclick({});
+	assert.strictEqual(getTraced(), "e4 c5 Nf3 d6 d4");
+	// re-render against the new state, then click the same cell again
+	cell(traceBox(s), "d4").onclick({});
+	assert.strictEqual(getTraced(), null, "clicking the traced line clears it");
+	off();
+});
+
+test("a group column folds rather than tracing", () => {
+	const off = installDom();
+	const s = loadState(GROUP);
+	openTablePaths.clear();
+	openTablePaths.add(GROUP_KEY);
+	setTraced(null);
+	const head = [...traceBox(s).querySelectorAll("th.var-head")].find((h) =>
+		h.textContent.includes("2 lines"),
+	);
+	head.onclick({});
+	assert.strictEqual(getTraced(), null, "no trace started");
+	assert.ok(!openTablePaths.has(GROUP_KEY), "the group folded instead");
+	off();
+});
+
+test("Clear trace is offered only while a line is traced", () => {
+	const off = installDom();
+	const s = loadState(GROUP);
+	openTablePaths.clear();
+	openTablePaths.add(GROUP_KEY);
+	const chip = (n) =>
+		[...n.querySelectorAll("button")].find((b) => b.textContent === "Clear trace");
+	setTraced(null);
+	assert.strictEqual(chip(traceBox(s)), undefined, "nothing to clear");
+	setTraced("e4 c5 Nf3 d6 d4");
+	const on = traceBox(s);
+	assert.ok(chip(on), "offered while tracing");
+	chip(on).onclick();
+	assert.strictEqual(getTraced(), null);
+	off();
+});
+
+test("a trace a fold has hidden stops showing rather than going stale", () => {
+	const off = installDom();
+	const s = loadState(GROUP);
+	setTraced("e4 c5 Nf3 d6 d4");
+	openTablePaths.clear(); // the group shuts over the traced line's column
+	const box = traceBox(s);
+	assert.strictEqual(box.querySelectorAll(".traced, .faded").length, 0);
+	assert.strictEqual(getTraced(), "e4 c5 Nf3 d6 d4", "the key is kept");
+	// re-opening brings it back, with no clearing hook in the fold handler
+	openTablePaths.add(GROUP_KEY);
+	assert.ok(traceBox(s).querySelector("td.traced"), "the trace returns");
+	setTraced(null);
+	off();
+});
+
+test("the vertical layout traces the same cells", () => {
+	const off = installDom();
+	const s = loadState(GROUP);
+	openTablePaths.clear();
+	openTablePaths.add(GROUP_KEY);
+	setTraced("e4 c5 Nf3 d6 d4");
+	// vertical puts each variation on a row, so its row header is a td too —
+	// exclude the headers and compare the move cells
+	const box = traceBox(s, "vertical");
+	const lit = [...box.querySelectorAll("td.traced:not(.var-head)")]
+		.map(moveOf)
+		.sort();
+	assert.deepStrictEqual(lit, ["Nf3", "c5", "d4", "d6", "e4"].sort());
+	assert.strictEqual(
+		box.querySelectorAll("td.var-head.traced").length,
+		3,
+		"and the three contributing rows are headed as traced",
+	);
+	setTraced(null);
 	off();
 });

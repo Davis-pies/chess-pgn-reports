@@ -35,9 +35,15 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    its block is shaded so what the fold will take is visible before the click,
    and the lines inside it start where the group's shared moves left off rather
    than repeating them. A note on one of those shared moves is marked on the
-   group's own column, which is where the move is shown — open or shut. The
-   printed report is unaffected — it shows every line's full divergence,
-   ungrouped.
+   group's own column, which is where the move is shown — open or shut.
+   Clicking a line's column **traces** it: every cell that makes up that line
+   lights up — its opening moves in the Mainline column, the shared moves in
+   whatever group columns enclose it, and its own tail — and the rest of the
+   table drops back. Click it again, or **Clear trace**, to stop. A trace is a
+   reading aid: it isn't saved with the notebook, and a group folding over the
+   traced line simply stops showing it rather than going stale. The printed
+   report is unaffected by any of this — it shows every line's full divergence,
+   ungrouped, with no shading, folds or trace.
    Comment moves carry numbered `[n]` markers on the owning line only; a
    footnote's own notes become lettered sub-notes (a, b, c …) under its entry,
    restarting at `a` for each footnote and marked inside its move text — unless

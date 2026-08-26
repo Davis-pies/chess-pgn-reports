@@ -5,11 +5,14 @@ import {
 	getCurrent,
 	openPaths,
 	openTablePaths,
+	getTraced,
+	setTraced,
 	getRenderHooks,
 } from "./state.js";
 import { subMaxPly } from "./print.js";
 import { setHidden, solo, isFocused } from "./visibility.js";
 import { grid } from "./table.js";
+import { tracedKey, tracePath } from "./trace.js";
 
 // Shared empty default for renderTrieNode's `forks`, so the common call does
 // not allocate a Set per node.
@@ -48,14 +51,45 @@ export function renderTrieTable(container, g, orientation) {
 		getRenderHooks().rerenderTable();
 	};
 	controls.append(ex, col);
-	container.appendChild(controls);
-	if (!mainV) return;
+	if (!mainV) {
+		container.appendChild(controls);
+		return;
+	}
 	// build the single table's var list: mainline + each branch, one level of
 	// the trie at a time (see pushNode)
 	const vars = pushVars(g);
+	// The traced line, resolved against the columns actually on screen. A key
+	// that no longer names a visible column resolves to null, so a trace a fold
+	// has hidden simply stops showing rather than leaving stale state behind --
+	// which is why folding, hiding and focusing need no hook into the trace.
+	const litByVar = tracePath(vars, getTraced());
+	// Offered only while a trace is actually showing: a control for something
+	// that is not happening is noise, and clicking the traced column clears it
+	// anyway.
+	if (litByVar) {
+		const clear = el("button", {
+			className: "chip mini",
+			textContent: "Clear trace",
+		});
+		clear.onclick = () => {
+			setTraced(null);
+			getRenderHooks().rerenderTable();
+		};
+		controls.append(" ", clear);
+	}
+	container.appendChild(controls);
 	// rows span only the VISIBLE columns — collapsed branches don't stretch the
 	// table down to the deepest hidden line
-	renderTable(container, { ...g, vars, maxPly: subMaxPly(vars) }, orientation);
+	renderTable(container, { ...g, vars, maxPly: subMaxPly(vars) }, orientation, {
+		litByVar,
+		onTrace: (v) => {
+			// Against the RESOLVED trace, not the stored key: clicking a line
+			// whose trace is currently invisible sets it rather than clearing
+			// it, so the click always does what it looks like it will do.
+			setTraced(litByVar && litByVar.has(v) ? null : tracedKey(v));
+			getRenderHooks().rerenderTable();
+		},
+	});
 }
 
 // A trie node's contribution to the column list, one level at a time.
