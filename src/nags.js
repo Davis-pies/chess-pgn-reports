@@ -58,8 +58,8 @@ export const NAGS = [
 	{ code: 37, sym: "↑", label: "Black has the initiative", group: "position", neutral: "the initiative", side: "b" },
 	{ code: 40, sym: "→", label: "White has the attack", group: "position", neutral: "with an attack", side: "w" },
 	{ code: 41, sym: "→", label: "Black has the attack", group: "position", neutral: "with an attack", side: "b" },
-	{ code: 44, sym: "=/∞", label: "White has compensation", group: "position", neutral: "compensation", side: "w" },
-	{ code: 45, sym: "=/∞", label: "Black has compensation", group: "position", neutral: "compensation", side: "b" },
+	{ code: 44, sym: "⯹", label: "White has compensation", group: "position", neutral: "compensation", side: "w" },
+	{ code: 45, sym: "⯹", label: "Black has compensation", group: "position", neutral: "compensation", side: "b" },
 	{ code: 132, sym: "⇄", label: "White has counterplay", group: "position", neutral: "counterplay", side: "w" },
 	{ code: 133, sym: "⇄", label: "Black has counterplay", group: "position", neutral: "counterplay", side: "b" },
 	{ code: 136, sym: "", label: "White in moderate time trouble", group: "time", neutral: "moderate time trouble", side: "w" },
@@ -75,14 +75,17 @@ export const NAGS = [
 // CODE, so that a legacy glyph mark still migrates when the glyph it was
 // written as is no longer the one we render.
 //
-// The five below were changed because of how they RENDER, not what they mean.
-// U+2A00 and U+2A01 are n-ary large operators, sized to stand next to a ∑, so
-// they came out oversized and off-baseline in a chip; U+2299/U+2295 are the
-// normal-size circled dot and plus the notation actually calls for. U+2BF9 was
-// added in Unicode 8 and almost no font ships it, so compensation rendered as
-// tofu; "=/∞" is the spelling the standard lists beside it and every font can
-// draw it. U+27F3 is the gapped circle arrow, much thinner on the ground than
-// U+21BB. U+21C6 and U+21C4 are the same arrows in the other order.
+// Four of the entries below were changed because of how they RENDER, not what
+// they mean. U+2A00 and U+2A01 are n-ary large operators, sized to stand next
+// to a ∑, so they came out oversized and off-baseline in a chip; U+2299/U+2295
+// are the normal-size circled dot and plus the notation actually calls for.
+// U+27F3 is the gapped circle arrow, thinner on the ground than U+21BB, and
+// U+21C6/U+21C4 are the same arrows in the other order.
+//
+// Compensation stays U+2BF9. It was briefly swapped for the ASCII "=/∞" on the
+// assumption that a Unicode 8 codepoint would be missing from most fonts; it
+// renders fine where it was actually looked at, and "=/∞" is kept only as an
+// alias for anyone who types it that way.
 const ALIASES = {
 	"+=": "⩲",
 	"=+": "⩱",
@@ -90,7 +93,7 @@ const ALIASES = {
 	"\u2a01": "\u2295",
 	"\u27f3": "\u21bb",
 	"\u21c6": "\u21c4",
-	"\u2bf9": "=/\u221e",
+	"=/\u221e": "\u2bf9",
 };
 
 const BY_SYM = new Map();

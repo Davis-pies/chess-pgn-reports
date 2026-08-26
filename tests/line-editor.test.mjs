@@ -589,7 +589,7 @@ test("Enter with an empty add-note field adds nothing", () => {
 
 
 // --- the eight glyphs a White/Black pair shares ------------------------------
-// ⊙ ○ ↻ ↑ → =/∞ ⇄ ⊕ carry no side in the glyph, so the palette shows one button
+// ⊙ ○ ↻ ↑ → ⯹ ⇄ ⊕ carry no side in the glyph, so the palette shows one button
 // and the side comes from the move the mark is set on.
 
 test("a paired glyph takes its side from the move it is set on", () => {

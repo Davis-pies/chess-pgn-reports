@@ -74,11 +74,11 @@ test("marks a small common set for the palette's default row", () => {
 });
 
 // --- glyphs are a rendering choice, codes are the data ----------------------
-// Five glyphs were changed for how they RENDER, not what they mean: two n-ary
-// large operators sized to stand next to a ∑, one codepoint from Unicode 8 that
-// almost no font ships, and two arrows in a better-supported spelling. Marks
-// store the code, so nothing saved had to change -- but a notebook written
-// before the swap still holds the old glyph, and must still migrate.
+// Four glyphs were changed for how they RENDER, not what they mean: two n-ary
+// large operators sized to stand next to a ∑, and two arrows in a
+// better-supported spelling. Marks store the code, so nothing saved had to
+// change -- but a notebook written before the swap still holds the old glyph,
+// and must still migrate.
 
 test("a mark written with a superseded glyph still maps to its code", () => {
 	const old = {
@@ -86,7 +86,6 @@ test("a mark written with a superseded glyph still maps to its code", () => {
 		"⨁": 138, // n-ary circled plus -> ⊕ severe time trouble
 		"⟳": 32, // gapped circle arrow -> ↻ lead in development
 		"⇆": 132, // the arrows the other way round -> ⇄ counterplay
-		"⯹": 44, // Unicode 8, near-zero font coverage -> "=/∞"
 	};
 	for (const [glyph, code] of Object.entries(old))
 		assert.strictEqual(nagFor(glyph), code, glyph + " still maps");
@@ -94,7 +93,8 @@ test("a mark written with a superseded glyph still maps to its code", () => {
 
 test("a superseded glyph renders as the glyph we draw now", () => {
 	assert.strictEqual(markSym(markOf(nagFor("⨀"))), "⊙");
-	assert.strictEqual(markSym(markOf(nagFor("⯹"))), "=/∞");
+	assert.strictEqual(markSym(markOf(nagFor("⯹"))), "⯹", "compensation is unchanged");
+	assert.strictEqual(markSym(markOf(nagFor("=/∞"))), "⯹", "and the ASCII spelling maps to it");
 });
 
 test("no glyph is an n-ary large operator", () => {
