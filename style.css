@@ -214,6 +214,27 @@ h3 {
   align-items: center;
   margin: 0;
 }
+/* The symbol buttons hold glyphs of wildly different optical width -- "!" beside
+   "=/∞", a circled dot beside "??" -- so left to themselves they made a ragged
+   row of chips that were hard to aim at. A min-width squares them up without
+   forcing the wide ones to fit.
+
+   The font stack leads with faces that actually carry the arrows and circled
+   operators; the UI font is not asked to draw a glyph it may only have as a
+   fallback, which is what made some of them look thin or mis-sized. `line-height:
+   1` with padding, rather than a tall line box, keeps a circled operator on the
+   same baseline as "!". */
+.sympick .chip.mini {
+  min-width: 2em;
+  padding: 3px 6px;
+  text-align: center;
+  font-size: 0.92rem;
+  line-height: 1;
+  font-family:
+    "DejaVu Sans", "Noto Sans Symbols 2", "Noto Sans Symbols",
+    "Segoe UI Symbol", system-ui, sans-serif;
+  font-variant-ligatures: none;
+}
 .symlabel {
   font-size: 0.8rem;
   color: var(--muted);

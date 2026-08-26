@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { NAGS, nagFor, symFor } from "../src/nags.js";
+import { NAGS, nagFor, symFor, markSym, markOf } from "../src/nags.js";
 
 test("maps the traditional move assessments", () => {
 	assert.equal(nagFor("!"), 1);
@@ -12,12 +12,12 @@ test("maps the traditional move assessments", () => {
 });
 
 test("maps both halves of the paired positional glyphs", () => {
-	assert.equal(symFor(22), "⨀");
-	assert.equal(symFor(23), "⨀");
+	assert.equal(symFor(22), "⊙");
+	assert.equal(symFor(23), "⊙");
 	assert.equal(symFor(36), "↑");
 	assert.equal(symFor(37), "↑");
-	assert.equal(symFor(132), "⇆");
-	assert.equal(symFor(133), "⇆");
+	assert.equal(symFor(132), "⇄");
+	assert.equal(symFor(133), "⇄");
 });
 
 test("maps the advantage glyphs", () => {
@@ -71,4 +71,57 @@ test("marks a small common set for the palette's default row", () => {
 	assert.ok(common.length >= 10 && common.length <= 18, common.length);
 	assert.ok(common.some((n) => n.sym === "="));
 	assert.ok(common.some((n) => n.sym === "!"));
+});
+
+// --- glyphs are a rendering choice, codes are the data ----------------------
+// Five glyphs were changed for how they RENDER, not what they mean: two n-ary
+// large operators sized to stand next to a ∑, one codepoint from Unicode 8 that
+// almost no font ships, and two arrows in a better-supported spelling. Marks
+// store the code, so nothing saved had to change -- but a notebook written
+// before the swap still holds the old glyph, and must still migrate.
+
+test("a mark written with a superseded glyph still maps to its code", () => {
+	const old = {
+		"⨀": 22, // n-ary circled dot -> ⊙ zugzwang
+		"⨁": 138, // n-ary circled plus -> ⊕ severe time trouble
+		"⟳": 32, // gapped circle arrow -> ↻ lead in development
+		"⇆": 132, // the arrows the other way round -> ⇄ counterplay
+		"⯹": 44, // Unicode 8, near-zero font coverage -> "=/∞"
+	};
+	for (const [glyph, code] of Object.entries(old))
+		assert.strictEqual(nagFor(glyph), code, glyph + " still maps");
+});
+
+test("a superseded glyph renders as the glyph we draw now", () => {
+	assert.strictEqual(markSym(markOf(nagFor("⨀"))), "⊙");
+	assert.strictEqual(markSym(markOf(nagFor("⯹"))), "=/∞");
+});
+
+test("no glyph is an n-ary large operator", () => {
+	// U+2A00-U+2AFF are sized to stand beside a ∑, so they came out oversized
+	// and off-baseline in a chip. ⩲ (U+2A72) and ⩱ (U+2A71) are the exception:
+	// they are the notation's own symbols and have no smaller equivalent.
+	const keep = new Set(["⩱", "⩲"]);
+	const bad = NAGS.filter(
+		(n) =>
+			n.sym &&
+			[...n.sym].some(
+				(c) =>
+					c.codePointAt(0) >= 0x2a00 &&
+					c.codePointAt(0) <= 0x2aff &&
+					!keep.has(c),
+			),
+	);
+	assert.deepStrictEqual(bad.map((n) => n.sym), []);
+});
+
+test("the crushing advantage pair is offered alongside the decisive one", () => {
+	const sym = (code) => NAGS.find((n) => n.code === code).sym;
+	assert.strictEqual(sym(18), "+−", "White winning");
+	assert.strictEqual(sym(19), "−+", "Black winning");
+	assert.strictEqual(sym(20), "+−−", "White crushing");
+	assert.strictEqual(sym(21), "−−+", "Black crushing");
+	// distinct codes, so the two are never confused on export
+	assert.strictEqual(nagFor("+−"), 18);
+	assert.strictEqual(nagFor("+−−"), 20);
 });

@@ -77,7 +77,7 @@ test("carries a move's imported NAGs onto the line's marks, as codes", () => {
 });
 
 test("an imported mark keeps the side its file carried", () => {
-	// $23 is "Black in zugzwang"; $22 is White's. Both render "⨀".
+	// $23 is "Black in zugzwang"; $22 is White's. Both render "⊙".
 	const lines = collectLines(parsePgn("1. e4 $23 *").nodes);
 	assert.deepEqual(lines[0].marks, { 0: "$23" });
 });

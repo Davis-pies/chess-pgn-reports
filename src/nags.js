@@ -10,7 +10,10 @@
 //
 // `group` is the PGN spec's own classification: $1-$9 move assessments,
 // $10-$135 positional assessments, $136-$139 time pressure.
-// `common` marks the entries the palette shows without opening its drawer.
+// `common` is vestigial: it marked the entries the palette showed without
+// opening its "More symbols" drawer, and the drawer is gone -- every glyph is
+// on the row now. Left on the entries it was set on rather than stripped,
+// since it still records which ones are in constant use.
 //
 // Eight glyphs come in White/Black pairs sharing one symbol ($22/$23 zugzwang,
 // both "⨀", and likewise ○ ⟳ ↑ → ⯹ ⇆ ⨁). The glyph is side-neutral in notation
@@ -43,31 +46,52 @@ export const NAGS = [
 	{ code: 17, sym: "∓", label: "Black clearly better", group: "position", common: true },
 	{ code: 18, sym: "+−", label: "White winning", group: "position", common: true },
 	{ code: 19, sym: "−+", label: "Black winning", group: "position", common: true },
-	{ code: 22, sym: "⨀", label: "White in zugzwang", group: "position", neutral: "zugzwang", side: "w" },
-	{ code: 23, sym: "⨀", label: "Black in zugzwang", group: "position", neutral: "zugzwang", side: "b" },
+	{ code: 20, sym: "+−−", label: "White crushing", group: "position" },
+	{ code: 21, sym: "−−+", label: "Black crushing", group: "position" },
+	{ code: 22, sym: "⊙", label: "White in zugzwang", group: "position", neutral: "zugzwang", side: "w" },
+	{ code: 23, sym: "⊙", label: "Black in zugzwang", group: "position", neutral: "zugzwang", side: "b" },
 	{ code: 26, sym: "○", label: "White has space", group: "position", neutral: "space advantage", side: "w" },
 	{ code: 27, sym: "○", label: "Black has space", group: "position", neutral: "space advantage", side: "b" },
-	{ code: 32, sym: "⟳", label: "White ahead in development", group: "position", neutral: "lead in development", side: "w" },
-	{ code: 33, sym: "⟳", label: "Black ahead in development", group: "position", neutral: "lead in development", side: "b" },
+	{ code: 32, sym: "↻", label: "White ahead in development", group: "position", neutral: "lead in development", side: "w" },
+	{ code: 33, sym: "↻", label: "Black ahead in development", group: "position", neutral: "lead in development", side: "b" },
 	{ code: 36, sym: "↑", label: "White has the initiative", group: "position", neutral: "the initiative", side: "w" },
 	{ code: 37, sym: "↑", label: "Black has the initiative", group: "position", neutral: "the initiative", side: "b" },
 	{ code: 40, sym: "→", label: "White has the attack", group: "position", neutral: "with an attack", side: "w" },
 	{ code: 41, sym: "→", label: "Black has the attack", group: "position", neutral: "with an attack", side: "b" },
-	{ code: 44, sym: "⯹", label: "White has compensation", group: "position", neutral: "compensation", side: "w" },
-	{ code: 45, sym: "⯹", label: "Black has compensation", group: "position", neutral: "compensation", side: "b" },
-	{ code: 132, sym: "⇆", label: "White has counterplay", group: "position", neutral: "counterplay", side: "w" },
-	{ code: 133, sym: "⇆", label: "Black has counterplay", group: "position", neutral: "counterplay", side: "b" },
+	{ code: 44, sym: "=/∞", label: "White has compensation", group: "position", neutral: "compensation", side: "w" },
+	{ code: 45, sym: "=/∞", label: "Black has compensation", group: "position", neutral: "compensation", side: "b" },
+	{ code: 132, sym: "⇄", label: "White has counterplay", group: "position", neutral: "counterplay", side: "w" },
+	{ code: 133, sym: "⇄", label: "Black has counterplay", group: "position", neutral: "counterplay", side: "b" },
 	{ code: 136, sym: "", label: "White in moderate time trouble", group: "time", neutral: "moderate time trouble", side: "w" },
 	{ code: 137, sym: "", label: "Black in moderate time trouble", group: "time", neutral: "moderate time trouble", side: "b" },
-	{ code: 138, sym: "⨁", label: "White in severe time trouble", group: "time", neutral: "severe time trouble", side: "w" },
-	{ code: 139, sym: "⨁", label: "Black in severe time trouble", group: "time", neutral: "severe time trouble", side: "b" },
+	{ code: 138, sym: "⊕", label: "White in severe time trouble", group: "time", neutral: "severe time trouble", side: "w" },
+	{ code: 139, sym: "⊕", label: "Black in severe time trouble", group: "time", neutral: "severe time trouble", side: "b" },
 	{ code: 140, sym: "△", label: "with the idea", group: "position", common: true },
 	{ code: 146, sym: "N", label: "novelty", group: "position", common: true },
 ];
 
-// Older palette spellings that mean an existing glyph. Kept so notebooks saved
-// before the table existed still export their marks.
-const ALIASES = { "+=": "⩲", "=+": "⩱" };
+// Older spellings that mean an existing glyph, kept so a notebook saved before
+// the table existed still exports its marks -- and, since marks now store the
+// CODE, so that a legacy glyph mark still migrates when the glyph it was
+// written as is no longer the one we render.
+//
+// The five below were changed because of how they RENDER, not what they mean.
+// U+2A00 and U+2A01 are n-ary large operators, sized to stand next to a ∑, so
+// they came out oversized and off-baseline in a chip; U+2299/U+2295 are the
+// normal-size circled dot and plus the notation actually calls for. U+2BF9 was
+// added in Unicode 8 and almost no font ships it, so compensation rendered as
+// tofu; "=/∞" is the spelling the standard lists beside it and every font can
+// draw it. U+27F3 is the gapped circle arrow, much thinner on the ground than
+// U+21BB. U+21C6 and U+21C4 are the same arrows in the other order.
+const ALIASES = {
+	"+=": "⩲",
+	"=+": "⩱",
+	"\u2a00": "\u2299",
+	"\u2a01": "\u2295",
+	"\u27f3": "\u21bb",
+	"\u21c6": "\u21c4",
+	"\u2bf9": "=/\u221e",
+};
 
 const BY_SYM = new Map();
 const BY_CODE = new Map();

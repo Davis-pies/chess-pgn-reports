@@ -331,7 +331,7 @@ test("the menu keeps its scroll position across a refresh", () => {
 	// prove the rebuild restores it rather than dropping the reader to the top
 	menu.scrollTop = 40;
 	[...menu.querySelectorAll(".sympick button")]
-		.find((b) => b.textContent === "⨀")
+		.find((b) => b.textContent === "⊙")
 		.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
 	assert.strictEqual(document.querySelector(".tmenu").scrollTop, 40);
 	closeTableMenu();

@@ -445,7 +445,7 @@ test("a hidden line is not exported", () => {
 	assert.equal(pgn.includes("e6"), false, "the hidden variation is gone");
 });
 
-// Eight NAGs come in White/Black pairs that share one glyph (⨀ ○ ⟳ ↑ → ⯹ ⇆ ⨁).
+// Eight NAGs come in White/Black pairs that share one glyph (⊙ ○ ↻ ↑ → =/∞ ⇄ ⊕).
 // Marks used to store the glyph, so the side was gone before export could read
 // it and nagFor could only return the first (White) code of the pair -- an
 // imported $23 "Black in zugzwang" came back as $22 "White in zugzwang".

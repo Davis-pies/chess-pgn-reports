@@ -393,8 +393,8 @@ test("movePanel shows every symbol on one row, each glyph once", () => {
 	// the common ones a reader reaches for first
 	assert.ok(shown.includes("!") && shown.includes("±"));
 	// and what used to sit behind the fold
-	assert.ok(shown.includes("⨀"), "zugzwang is on the row now");
-	assert.ok(shown.includes("⇆") && shown.includes("↑"));
+	assert.ok(shown.includes("⊙"), "zugzwang is on the row now");
+	assert.ok(shown.includes("⇄") && shown.includes("↑"));
 	assert.ok(shown.includes("TN") && shown.includes("✕"));
 	// several NAGs share a glyph (White's and Black's halves of a pair); the
 	// mark stored is the glyph, so a second button would be a duplicate that
@@ -589,7 +589,7 @@ test("Enter with an empty add-note field adds nothing", () => {
 
 
 // --- the eight glyphs a White/Black pair shares ------------------------------
-// ⨀ ○ ⟳ ↑ → ⯹ ⇆ ⨁ carry no side in the glyph, so the palette shows one button
+// ⊙ ○ ↻ ↑ → =/∞ ⇄ ⊕ carry no side in the glyph, so the palette shows one button
 // and the side comes from the move the mark is set on.
 
 test("a paired glyph takes its side from the move it is set on", () => {
@@ -604,7 +604,7 @@ test("a paired glyph takes its side from the move it is set on", () => {
 	};
 	assert.strictEqual(pick(0, "↑"), "$36", "ply 0 is White's move");
 	assert.strictEqual(pick(1, "↑"), "$37", "ply 1 is Black's");
-	assert.strictEqual(pick(3, "⨀"), "$23", "and zugzwang likewise");
+	assert.strictEqual(pick(3, "⊙"), "$23", "and zugzwang likewise");
 	// an unpaired glyph is the same code either way
 	assert.strictEqual(pick(0, "±"), "$16");
 	assert.strictEqual(pick(1, "±"), "$16");
@@ -619,7 +619,7 @@ test("the palette shows one button per glyph, with no side in its label", () => 
 	assert.strictEqual(arrows.length, 1, "one ↑ button, not a White and a Black");
 	assert.strictEqual(arrows[0].title, "the initiative", "and no side claimed");
 	assert.strictEqual(
-		buttons.find((b) => b.textContent === "⨀").title,
+		buttons.find((b) => b.textContent === "⊙").title,
 		"zugzwang",
 	);
 	// an unpaired glyph keeps its side-specific label, which is true of it
