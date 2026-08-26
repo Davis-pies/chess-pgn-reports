@@ -52,8 +52,7 @@ export function renderTrieTable(container, g, orientation) {
 	if (!mainV) return;
 	// build the single table's var list: mainline + each branch, one level of
 	// the trie at a time (see pushNode)
-	const vars = [mainV];
-	trie.children.forEach((c) => pushNode(c, vars));
+	const vars = pushVars(g);
 	// rows span only the VISIBLE columns — collapsed branches don't stretch the
 	// table down to the deepest hidden line
 	renderTable(container, { ...g, vars, maxPly: subMaxPly(vars) }, orientation);
@@ -74,10 +73,21 @@ export function renderTrieTable(container, g, orientation) {
 // `depth` tints the block: an open group and everything beneath it carry the
 // same depth, so the shading marks exactly what that group's ▾ will fold, and a
 // group nested inside another shades one step further.
-function pushNode(node, vars, depth = 0, cut = -1) {
+// The var list the screen preview renders: the mainline column, then each
+// top-level branch by pushNode's rule. Exported so the trace rules can be
+// tested against the same columns the view builds, without a DOM.
+export function pushVars(g) {
+	const mainV = g.vars[0];
+	const trie = buildTrie(g.vars.slice(1), mainV);
+	const vars = [mainV];
+	trie.children.forEach((c) => pushNode(c, vars));
+	return vars;
+}
+
+function pushNode(node, vars, depth = 0, cut = -1, trail = []) {
 	// one line under it: just that line's column, with nothing to fold
 	if (countLeaves(node) === 1) {
-		leavesOf(node).forEach((l) => vars.push(tag(elide(l, cut), depth)));
+		leavesOf(node).forEach((l) => vars.push(tag(elide(l, cut), depth, trail)));
 		return;
 	}
 	const open = openTablePaths.has(node.key);
@@ -97,13 +107,17 @@ function pushNode(node, vars, depth = 0, cut = -1) {
 	// ...and the group column is now carrying those shared moves on screen, so
 	// everything under it starts where the group left off.
 	const inner = fork.move.ply;
+	// An open group's column is where its shared moves are spelled out, so it
+	// joins the trail of everything beneath it: a line traced from here has to
+	// light cells in this column, not just in its own.
+	const below = [...trail, v];
 	// a line ending exactly at the fork is a column beside its continuations
-	if (fork.leaf) vars.push(tag(elide(fork.leaf, inner), d));
-	fork.children.forEach((c) => pushNode(c, vars, d, inner));
+	if (fork.leaf) vars.push(tag(elide(fork.leaf, inner), d, below));
+	fork.children.forEach((c) => pushNode(c, vars, d, inner, below));
 }
 
-function tag(v, depth) {
-	return depth ? { ...v, gdepth: depth } : v;
+function tag(v, depth, trail) {
+	return { ...v, ...(depth ? { gdepth: depth } : {}), trail };
 }
 
 // Elide the moves an open ancestor group's column is already showing.

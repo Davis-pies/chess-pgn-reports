@@ -34,23 +34,32 @@ UI or the code would make two unrelated behaviours share a name.
 
 ## 3. The rule
 
-A cell is on the trace if **it belongs to a column in the line's chain AND it
-spells that line's move at that ply.** The chain is:
+The chain is ordered, and each link spells a **contiguous run** of the line's
+moves:
 
 ```
 [ Mainline column, …enclosing open group columns, the line's own column ]
 ```
 
-Both halves are load-bearing:
+So the plies are handed out in order: each column claims from where the one
+above it left off, for as long as it keeps spelling the line's moves.
 
-- **Chain membership** stops an unrelated branch that happens to play the same
-  move at the same ply from lighting up.
-- **The SAN check** is what lights the Mainline column for the shared prefix
-  and darkens it the moment the line diverges. No divergence index is consulted
-  and none is stored; the moves either match or they do not.
+**A per-ply SAN match is not enough**, and this is the whole reason for the
+running index. The mainline of `1. e4 e5 2. Nf3` and the sideline
+`1. e4 c5 2. Nf3` both play `Nf3` at ply 2, from different positions. Matching
+ply by ply lights the Mainline column *again* after the line has already left
+it. Claiming a run stops the Mainline column at the divergence with no index
+stored anywhere — the moves simply stop matching. (Found by the first test
+written against this rule; the earlier draft of this section had it wrong.)
 
 Nested groups need no extra rule: each contributes its own shared range, and an
 elided `…` is not a move, so it is never lit.
+
+A line that ends exactly at its group's fork keeps its last move (elide's rule,
+so the column is not empty), which means that move is spelled twice — once on
+the group column, once on the line's own. Both light, via a one-ply look-back
+before each column's run. Lighting only one would leave a lone unlit cell in a
+traced line's own column, which reads as a bug.
 
 A line that ends exactly at its group's fork keeps its last move (that rule
 predates this work), so that move is spelled twice — once on the group column,
