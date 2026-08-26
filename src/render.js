@@ -228,6 +228,35 @@ export function renderTable(container, grid, orientation, trace) {
 			}
 		};
 	};
+	// Right-click opens the context menu on the move under the cursor. The
+	// browser's own menu is suppressed only where ours takes over. `contextmenu`
+	// is also what the keyboard Menu key and Shift+F10 fire, so this is not a
+	// mouse-only affordance on cells wireTrace has already made focusable.
+	// The discoverable half of a gesture that is otherwise invisible. It sits on
+	// a LINE column's header only: a group header is already the fold control,
+	// and a header has no move, so this opens the line half of the menu.
+	const menuButton = (v) => {
+		if (!trace || !trace.onMenu || !v.moves || v.onclick) return null;
+		const b = document.createElement("button");
+		b.type = "button";
+		b.className = "tmenu-open";
+		b.textContent = "\u22ee";
+		b.title = "actions for this line";
+		b.onclick = (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			trace.onMenu(v, null, e);
+		};
+		return b;
+	};
+	const wireMenu = (el, v, ply) => {
+		if (!trace || !trace.onMenu || !v.moves) return;
+		el.oncontextmenu = (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			trace.onMenu(v, ply, e);
+		};
+	};
 	const labels = {};
 	// number every WHITE (even) ply, not just the mainline's — rows that only
 	// exist because of a side line keep their move number
@@ -268,6 +297,9 @@ export function renderTable(container, grid, orientation, trace) {
 			c.appendChild(tag);
 		}
 		c.appendChild(document.createTextNode(" " + (v.name || "")));
+		const mb = menuButton(v);
+		if (mb) c.appendChild(mb);
+		wireMenu(c, v, null);
 		return c;
 	};
 
@@ -294,6 +326,12 @@ export function renderTable(container, grid, orientation, trace) {
 			}
 			const cue = v.collapsed ? "\u25b8 " : v.onclick ? "\u25be " : "";
 			th.textContent = cue + (v.name || v.label) + (v.eval ? " " + v.eval : "");
+			const mb = menuButton(v);
+			if (mb) th.appendChild(mb);
+			// A header has no move, so this is the line half of the menu — and
+			// on a GROUP header, the group's actions. Right-click never folds:
+			// that stays on the left-click the ▸/▾ advertises.
+			wireMenu(th, v, null);
 			head.appendChild(th);
 		});
 		table.appendChild(head);
@@ -309,6 +347,8 @@ export function renderTable(container, grid, orientation, trace) {
 				if (v === vars[0]) c.classList.add("main-col", "sticky-col");
 				cellTrace(c, v, ply);
 				wireTrace(c, v);
+				// only where the column actually has a move at this ply
+				if (v.cells[ply]) wireMenu(c, v, ply);
 				tr.appendChild(c);
 			}
 			table.appendChild(tr);
@@ -337,6 +377,8 @@ export function renderTable(container, grid, orientation, trace) {
 				c.className += groupClass(v);
 				cellTrace(c, v, ply);
 				wireTrace(c, v);
+				// only where the column actually has a move at this ply
+				if (v.cells[ply]) wireMenu(c, v, ply);
 				tr.appendChild(c);
 			}
 			tr.appendChild(td(v.eval, "eval"));

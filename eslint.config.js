@@ -36,4 +36,19 @@ export default [
     files: ['*.config.js'],
     languageOptions: { globals: globals.node },
   },
+
+  {
+    // Dev tooling: plain Node, never shipped to the browser.
+    files: ['tools/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: globals.node,
+    },
+    rules: {
+      // the watcher skips a path that isn't in this checkout; there is nothing
+      // useful to do about it
+      'no-empty': ['error', { allowEmptyCatch: true }],
+    },
+  },
 ];

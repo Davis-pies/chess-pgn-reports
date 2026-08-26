@@ -10,9 +10,10 @@ import {
 	getRenderHooks,
 } from "./state.js";
 import { subMaxPly } from "./print.js";
-import { setHidden, solo, isFocused } from "./visibility.js";
+import { setHidden, solo, isFocused, hideAll, showAll } from "./visibility.js";
 import { grid } from "./table.js";
 import { tracedKey, tracePath } from "./trace.js";
+import { openTableMenu } from "./table-menu.js";
 
 // Shared empty default for renderTrieNode's `forks`, so the common call does
 // not allocate a Set per node.
@@ -31,8 +32,10 @@ export function renderTrieTable(container, g, orientation) {
 	const mainV = g.vars[0]; // mainline sorts first
 	const others = g.vars.slice(1);
 	const trie = buildTrie(others, mainV);
+	// No "Branches:" label: Expand all / Collapse all sit directly under a table
+	// of branches and say what they do. "Lines:" stays on the pair below, where
+	// "Hide all" on its own would not say what it hides.
 	const controls = el("div", { className: "orow tbl-controls" });
-	controls.appendChild(el("span", { textContent: "Branches: " }));
 	const ex = el("button", {
 		className: "chip mini",
 		textContent: "Expand all",
@@ -51,6 +54,26 @@ export function renderTrieTable(container, g, orientation) {
 		getRenderHooks().rerenderTable();
 	};
 	controls.append(ex, col);
+	// Bulk hide/show, mirroring the editor's pair. The table is where a reader
+	// decides a line is in the way, so the control belongs here too; both call
+	// the same primitives, which refuse the mainline at the source.
+	const hideEvery = el("button", {
+		className: "chip mini",
+		textContent: "Hide all",
+		onclick: () => {
+			hideAll(getCurrent().lines);
+			getRenderHooks().renderApp();
+		},
+	});
+	const showEvery = el("button", {
+		className: "chip mini",
+		textContent: "Show all",
+		onclick: () => {
+			showAll(getCurrent().lines);
+			getRenderHooks().renderApp();
+		},
+	});
+	controls.append(" Lines: ", hideEvery, showEvery);
 	if (!mainV) {
 		container.appendChild(controls);
 		return;
@@ -82,6 +105,19 @@ export function renderTrieTable(container, g, orientation) {
 	// table down to the deepest hidden line
 	renderTable(container, { ...g, vars, maxPly: subMaxPly(vars) }, orientation, {
 		litByVar,
+		// Right-click acts on the move; left-click still traces. A group column
+		// gets the group's line actions and the move section both -- its moves
+		// are shared by every line under it, so annotating one there is the same
+		// edit the shared-move rule already makes from a line column.
+		onMenu: (v, ply, e) =>
+			openTableMenu({
+				x: e.clientX || 0,
+				y: e.clientY || 0,
+				from: e.currentTarget,
+				target: v.groupLines
+					? { lines: v.groupLines, ply }
+					: { line: v.line, ply },
+			}),
 		onTrace: (v) => {
 			// Against the RESOLVED trace, not the stored key: clicking a line
 			// whose trace is currently invisible sets it rather than clearing
@@ -257,12 +293,17 @@ function branchVar(node, open) {
 	// cards or the printed report: those build from grid() directly, and this
 	// var only ever enters the preview's list.
 	const lastShared = shared.length ? shared[shared.length - 1].ply : -1;
-	const anyLeaf = leavesOf(node)[0];
+	const leaves = leavesOf(node);
+	const anyLeaf = leaves[0];
 	const stem = anyLeaf ? anyLeaf.moves.filter((m) => m.ply <= lastShared) : [];
+	// The lines under this column, for the context menu's group actions. Vars
+	// are copies; grid() carries the line each was built from (see table.js).
+	const groupLines = leaves.map((x) => x.line).filter(Boolean);
 	return {
 		tag: "collapse",
 		label: "",
 		moves: stem,
+		groupLines,
 		// Its own identity, not the stem's SAN path: a group whose stem is
 		// exactly some line's moves (a line ending at the fork) would otherwise
 		// share that line's key and the two would trace each other.
@@ -412,12 +453,25 @@ export function renderTrieNode(
 		? path + "  " + branchLabel(node.move)
 		: branchLabel(node.move);
 	const boards = getCurrent().showBoards; // inline-boards master toggle
-	// single-child chain: inline it, accumulating the path so a long shared
+	// Single-child chain: inline it, accumulating the path so a long shared
 	// continuation shows as one compressed header, not nested single groups.
+	//
 	// A real fork left with one visible child is NOT such a chain: Focus and
 	// Hide are meant to narrow what is under a group, not to dissolve the group
-	// into what survived, so a forking node keeps its own level.
-	if (!node.leaf && node.children.size === 1 && !forks.has(node.key)) {
+	// into what survived, so a forking node keeps its own level -- but only
+	// while it still has something to separate. A group level says "several
+	// things share this prefix"; with ONE visible line under it there is
+	// nothing left to say, and the header is pure indirection. That rule had no
+	// floor, so Focus -- which hides everything but one line -- turned every
+	// fork along that line's path into a single-child wrapper, seven of them
+	// nested around one row in a real notebook.
+	//
+	// countLeaves runs on the VISIBLE trie, so this counts what is on screen.
+	if (
+		!node.leaf &&
+		node.children.size === 1 &&
+		(!forks.has(node.key) || countLeaves(node) < 2)
+	) {
 		node.children.forEach((c) =>
 			renderTrieNode(container, c, nameCounter, nextPath, allOpen, paths, forks),
 		);

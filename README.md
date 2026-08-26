@@ -42,7 +42,18 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    of the table drops back. Clicking a move in a group's own column traces that
    group's stem, the path down to the moves it shares, whether the group is open
    or shut; folding stays on the ▸/▾ header, so clicking a move never reshapes
-   the table. Click it again, or **Clear trace**, to stop. A trace is a
+   the table. Click it again, or **Clear trace**, to stop.
+   **Right-clicking** a move opens a menu for it: a board of the position after
+   it, the symbol picker and note editor for that move, then Make mainline, Move to footnote, Focus and Hide
+   for its line — the same controls as the editor panel, running the same code,
+   so an edit made either way is the same edit. Right-clicking a group's own
+   column offers the same for its shared move — an edit there reaches every line
+   under the group, which is what annotating a shared move has always done — plus
+   those line actions over all of them. Line headers carry
+   a **⋮** for the same menu without a move, and right-clicking any header — a
+   line's or a group's — opens the same thing. Right-click never folds. The
+   table's own controls row carries **Hide all** / **Show all** beside Expand
+   all / Collapse all. A trace is a
    reading aid: it isn't saved with the notebook, and a group folding over the
    traced line simply stops showing it rather than going stale. The printed
    report is unaffected by any of this — it shows every line's full divergence,
@@ -56,7 +67,9 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    alternating by depth — `[n]`, then letters, then numbers, and so on — and a
    node's own notes taking the first labels before its branches continue the
    sequence. Lines get an
-   **evaluation/quality symbol** picker (=, ±, ∓, +=, =+, ∞, !, ?, …). The
+   **evaluation/quality symbol** picker (=, ±, ∓, +=, =+, ∞, !, ?, …), every
+   glyph on one row. Typing a note and pressing **Enter** saves it, in the
+   editor and in the table's context menu alike. The
    **Notes** section is editable — add a note at any move, or edit/delete
    existing ones. On screen the Notes list folds: a group footnote and a
    footnote's own notes collapse to a one-line header saying how much is
@@ -70,10 +83,20 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
 ## Run locally
 
 ```bash
-npm install        # dev-only: jsdom for tests, chess.js for parsing
-python3 -m http.server  # serve the folder (ES modules need http, not file://)
-# open http://localhost:8000
+npm install    # dev-only: jsdom for tests, chess.js for parsing
+npm run dev    # http://127.0.0.1:8000, reloads the page when you save
 ```
+
+`npm run dev` is `tools/dev-server.mjs`: a dependency-free static server that
+injects a live-reload snippet into HTML **responses** — `index.html` on disk
+stays exactly what GitHub Pages serves. It watches `src/`, `assets/`,
+`index.html` and `style.css`. Pass a port if 8000 is taken: `npm run dev -- 8080`.
+
+It deliberately does not bundle. `index.html` resolves `chess.js` through an
+importmap pointing at esm.sh, and a bundling dev server would rewrite that bare
+specifier to a `node_modules` path instead — so development would load a
+different chess.js from the deployed site. Any plain static server works too
+(`python3 -m http.server`), just without the reload.
 
 Tests:
 

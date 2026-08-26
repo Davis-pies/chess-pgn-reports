@@ -53,6 +53,12 @@ export function grid(all) {
 		});
 		const noteByPly = byLine.get(l);
 		const base = {
+			// Back-reference to the line this var was built from. The table's
+			// context menu mutates lines, and a var is a copy: {tag, name,
+			// moves, marks, ...}. Nothing else reads it -- store.js saves lines
+			// and never vars, and the card and print renderers read named
+			// fields -- so it stays a one-way pointer for the menu's benefit.
+			line: l,
 			tag,
 			label: TAG_META[tag].label,
 			name: l.name || "",

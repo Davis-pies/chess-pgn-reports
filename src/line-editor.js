@@ -235,6 +235,77 @@ function isAnchor(l, ply) {
 	return !!(sel && sel.ply === ply && sel.at === l);
 }
 
+// The symbol picker: every glyph on one wrapping row.
+//
+// There used to be a "More symbols" drawer holding everything past the common
+// seventeen. Twenty-five unique glyphs plus TN and clear wrap to about three
+// short rows, which is cheaper to scan than remembering that the one you want
+// is behind a fold — and the drawer cost a click on every use of anything in
+// it. Order follows nags.js, which is the PGN spec's own grouping, so the
+// move assessments a reader reaches for most are still first.
+//
+// Extracted out of movePanel so the table's context menu offers the SAME
+// control rather than a second one that could drift from it -- a symbol set
+// from either place runs this one `apply`, including the rule that a shared
+// move is marked on every line reaching that position. `ply` is null for a
+// line-end evaluation, which writes meta.eval instead of a per-move mark.
+//
+// `cur` is the symbol currently set, so the caller decides what "current"
+// means for its own scope, and this stays a pure builder.
+export function symbolRow(ply, lines, cur) {
+	const atEnd = ply == null;
+	const apply = (sym) => {
+		if (atEnd) {
+			lines.forEach((x) => {
+				x.meta = { ...(x.meta || {}), eval: cur === sym ? "" : sym };
+			});
+		} else {
+			lines.forEach((x) => {
+				x.marks = x.marks || {};
+				// an empty symbol is the clear button: always a delete, never an
+				// empty-string mark that would linger in the saved notebook
+				if (!sym || cur === sym) delete x.marks[ply];
+				else x.marks[ply] = sym;
+				if (!Object.keys(x.marks).length) x.marks = undefined;
+			});
+		}
+	};
+	const row = el("span", { className: "sympick" });
+	const symButton = (sym, title) => {
+		const b = el("button", {
+			type: "button",
+			className: "chip mini" + (cur === sym ? " on" : ""),
+			textContent: sym,
+			title: title || sym,
+		});
+		b.onclick = () => {
+			apply(sym);
+			getRenderHooks().renderApp();
+		};
+		return b;
+	};
+	// One of each glyph: several NAGs share a symbol (White's and Black's halves
+	// of a paired assessment), and the mark stored is the glyph, so the second
+	// button would be a duplicate that looks like a different choice.
+	const seen = new Set();
+	NAGS.filter((n) => n.sym && !seen.has(n.sym) && seen.add(n.sym)).forEach((n) =>
+		row.appendChild(symButton(n.sym, n.label)),
+	);
+	row.appendChild(symButton("TN", "theoretical novelty"));
+	const clear = el("button", {
+		type: "button",
+		className: "chip mini danger",
+		textContent: "\u2715",
+		title: "clear",
+	});
+	clear.onclick = () => {
+		apply("");
+		getRenderHooks().renderApp();
+	};
+	row.appendChild(clear);
+	return row;
+}
+
 // Symbol row. Applies to the selected move (a per-move mark) or, when no move
 // is selected, to the line-end evaluation.
 // Revealed when a move (or line-end) is selected on a line: symbol buttons and
@@ -265,83 +336,7 @@ export function movePanel(l) {
 		appendBoard(board, fenAt(l.moves, selPly), getCurrent().boardSize || 220);
 		box.appendChild(board);
 	}
-	const apply = (sym) => {
-		if (atEnd) {
-			lines.forEach((x) => {
-				x.meta = { ...(x.meta || {}), eval: cur === sym ? "" : sym };
-			});
-		} else {
-			lines.forEach((x) => {
-				x.marks = x.marks || {};
-				// an empty symbol is the clear button: always a delete, never an
-				// empty-string mark that would linger in the saved notebook
-				if (!sym || cur === sym) delete x.marks[selPly];
-				else x.marks[selPly] = sym;
-				if (!Object.keys(x.marks).length) x.marks = undefined;
-			});
-		}
-	};
-	const srow = el("span", { className: "sympick" });
-	const symButton = (sym, title) => {
-		const b = el("button", {
-			type: "button",
-			className: "chip mini" + (cur === sym ? " on" : ""),
-			textContent: sym,
-			title: title || sym,
-		});
-		b.onclick = () => {
-			apply(sym);
-			getRenderHooks().renderApp();
-		};
-		return b;
-	};
-	// The table is large enough that showing every glyph at once would bury the
-	// handful in constant use, so the common ones stay on the visible row and
-	// the rest live in a drawer, grouped the way the PGN spec groups them.
-	const common = NAGS.filter((n) => n.common && n.sym);
-	const commonSyms = new Set(common.map((n) => n.sym));
-	common.forEach((n) => srow.appendChild(symButton(n.sym, n.label)));
-	srow.appendChild(symButton("TN", "theoretical novelty"));
-	const clear = el("button", {
-		type: "button",
-		className: "chip mini danger",
-		textContent: "✕",
-		title: "clear",
-	});
-	clear.onclick = () => {
-		apply("");
-		getRenderHooks().renderApp();
-	};
-	srow.appendChild(clear);
-	box.appendChild(srow);
-
-	const more = el("details", { className: "symmore" });
-	more.appendChild(el("summary", { textContent: "More symbols" }));
-	const GROUPS = [
-		["move", "Move assessment"],
-		["position", "Position"],
-		["time", "Time pressure"],
-	];
-	GROUPS.forEach(([g, title]) => {
-		const seen = new Set();
-		// a paired glyph (White's and Black's share one symbol) appears once
-		const picks = NAGS.filter(
-			(n) =>
-				n.group === g &&
-				n.sym &&
-				!commonSyms.has(n.sym) &&
-				!seen.has(n.sym) &&
-				seen.add(n.sym),
-		);
-		if (!picks.length) return;
-		more.appendChild(
-			el("span", { className: "symgroup-h", textContent: title }),
-		);
-		const row = el("span", { className: "sympick" });
-		picks.forEach((n) => row.appendChild(symButton(n.sym, n.label)));
-		more.appendChild(row);
-	});
-	box.appendChild(more);
+	box.appendChild(symbolRow(atEnd ? null : selPly, lines, cur));
 	if (!atEnd) box.appendChild(commentEditor(selPly, lines));
 	const done = el("button", {
 		type: "button",
@@ -423,6 +418,17 @@ export function commentEditor(ply, lines) {
 			addInp.value = "";
 			getRenderHooks().renderApp();
 		}
+	};
+	// Enter saves, so a note can be typed and committed without leaving the
+	// keyboard. Routed through add.click() rather than calling the handler
+	// directly, so it is the same DISPATCHED event as a real click: the table's
+	// context menu rebuilds itself on clicks inside .cedit, and a handler called
+	// straight would add the note but leave the menu still showing the empty
+	// field it was typed into.
+	addInp.onkeydown = (e) => {
+		if (e.key !== "Enter") return;
+		e.preventDefault();
+		add.click();
 	};
 	wrap.append(addInp, add);
 	return wrap;

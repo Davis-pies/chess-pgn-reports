@@ -382,40 +382,35 @@ test("a footnote line's move chip shows its sub-note letter", () => {
 	off();
 });
 
-test("movePanel's default row shows only the common symbols", () => {
+test("movePanel shows every symbol on one row, each glyph once", () => {
 	const off = installDom();
 	const s = loadState(TWO_LINES);
 	s.sel = { lines: [s.lines[0]], ply: 0 };
-	// the first .sympick is the default row; the drawer's rows reuse the class
-	const shown = [
-		...movePanel(s.lines[0]).querySelector(".sympick").children,
-	].map((b) => b.textContent);
-	assert.ok(shown.includes("!"));
-	assert.ok(shown.includes("±"));
-	assert.ok(!shown.includes("⨀"), "zugzwang belongs in the drawer");
+	const rows = movePanel(s.lines[0]).querySelectorAll(".sympick");
+	assert.strictEqual(rows.length, 1, "one row, no drawer");
+	const shown = [...rows[0].children].map((b) => b.textContent);
+	// the common ones a reader reaches for first
+	assert.ok(shown.includes("!") && shown.includes("±"));
+	// and what used to sit behind the fold
+	assert.ok(shown.includes("⨀"), "zugzwang is on the row now");
+	assert.ok(shown.includes("⇆") && shown.includes("↑"));
+	assert.ok(shown.includes("TN") && shown.includes("✕"));
+	// several NAGs share a glyph (White's and Black's halves of a pair); the
+	// mark stored is the glyph, so a second button would be a duplicate that
+	// looked like a different choice
+	assert.strictEqual(
+		new Set(shown).size,
+		shown.length,
+		"no glyph appears twice",
+	);
 	off();
 });
 
-test("movePanel's drawer holds the rest, grouped, and starts closed", () => {
+test("a symbol that used to live in the drawer still applies its mark", () => {
 	const off = installDom();
 	const s = loadState(TWO_LINES);
 	s.sel = { lines: [s.lines[0]], ply: 0 };
-	const drawer = movePanel(s.lines[0]).querySelector("details.symmore");
-	assert.ok(drawer, "no drawer rendered");
-	assert.strictEqual(drawer.open, false);
-	const more = [...drawer.querySelectorAll("button")].map((b) => b.textContent);
-	assert.ok(more.includes("⨀"));
-	assert.ok(more.includes("⇆"));
-	assert.ok(drawer.querySelectorAll(".symgroup-h").length >= 2);
-	off();
-});
-
-test("a drawer symbol applies the mark like a common one", () => {
-	const off = installDom();
-	const s = loadState(TWO_LINES);
-	s.sel = { lines: [s.lines[0]], ply: 0 };
-	const panel = movePanel(s.lines[0]);
-	[...panel.querySelectorAll("details.symmore button")]
+	[...movePanel(s.lines[0]).querySelectorAll(".sympick button")]
 		.find((b) => b.textContent === "↑")
 		.onclick();
 	assert.strictEqual(s.lines[0].marks[0], "↑");
@@ -557,5 +552,35 @@ test("a sibling's shared chip is marked shared, not selected", () => {
 	// an unshared move on the same strip stays plain
 	const solo = chips(moveStrip(first))[3];
 	assert.ok(!solo.classList.contains("on") && !solo.classList.contains("on-shared"));
+	off();
+});
+
+test("Enter in the add-note field saves the note", () => {
+	const off = installDom();
+	const s = loadState(TWO_LINES);
+	const main = s.lines[0];
+	const box = commentEditor(0, [main]);
+	document.body.appendChild(box);
+	const add = [...box.querySelectorAll("input")].at(-1);
+	add.value = "typed and entered";
+	add.onkeydown({ key: "Enter", preventDefault() {} });
+	assert.deepStrictEqual(
+		(main.comments || []).map((c) => c.text),
+		["typed and entered"],
+	);
+	assert.strictEqual(add.value, "", "and the field is cleared for the next one");
+	off();
+});
+
+test("Enter with an empty add-note field adds nothing", () => {
+	const off = installDom();
+	const s = loadState(TWO_LINES);
+	const main = s.lines[0];
+	const box = commentEditor(0, [main]);
+	document.body.appendChild(box);
+	const add = [...box.querySelectorAll("input")].at(-1);
+	add.value = "   ";
+	add.onkeydown({ key: "Enter", preventDefault() {} });
+	assert.deepStrictEqual(main.comments || [], []);
 	off();
 });

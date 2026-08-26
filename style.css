@@ -214,20 +214,6 @@ h3 {
   align-items: center;
   margin: 0;
 }
-.symmore {
-	margin-top: 0.4rem;
-}
-.symmore > summary {
-	cursor: pointer;
-	font-size: 0.85em;
-	opacity: 0.75;
-}
-.symgroup-h {
-	display: block;
-	margin: 0.4rem 0 0.15rem;
-	font-size: 0.8em;
-	opacity: 0.7;
-}
 .symlabel {
   font-size: 0.8rem;
   color: var(--muted);
@@ -389,6 +375,103 @@ select:focus {
 .tbl .traceable:hover {
   outline: 1px solid var(--grp-edge);
   outline-offset: -1px;
+}
+
+/* The table's context menu. A panel rather than a list of verbs: the symbol
+   picker and note editor inside it are the editor panel's own components, so it
+   has to give them room. */
+.tmenu {
+  z-index: 50;
+  min-width: 240px;
+  max-width: 340px;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+}
+.tmenu-sec {
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 4px 4px 0;
+  border-top: 1px solid var(--line);
+}
+.tmenu-sec:first-child {
+  border-top: none;
+}
+.tmenu-note {
+  color: var(--muted);
+  padding: 2px 4px 4px;
+  font-style: italic;
+}
+.tmenu-item {
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 5px;
+  color: var(--text);
+  padding: 5px 6px;
+  cursor: pointer;
+  font: inherit;
+}
+.tmenu-item:hover,
+.tmenu-item:focus-visible {
+  background: var(--head-bg);
+}
+.tmenu-item.on {
+  color: var(--main);
+  font-weight: 600;
+}
+.tmenu-item.danger:hover {
+  color: var(--foot);
+}
+/* The editor's note editor is sized for .movepanel, a ROW flex container, where
+   `flex: 1 1 300px` means "at least 300px WIDE, take any leftover width". The
+   menu stacks its children, so on that vertical main axis the same declaration
+   reads as a 300px-tall floor that then grows -- a single note field claiming
+   the height of the whole menu and pushing the line actions off the bottom.
+   Borrowing a component across flex directions costs exactly this one reset. */
+.tmenu .cedit {
+  flex: 0 0 auto;
+}
+/* The position after the move the menu was opened on. Centred and shrink-to-fit
+   so it never widens the menu past its max-width. */
+.tmenu-board {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: center;
+  padding: 2px 0 4px;
+}
+.tmenu-board svg {
+  max-width: 100%;
+  height: auto;
+}
+/* Same reason: the symbol row sizes to its content here. */
+.tmenu .sympick {
+  flex: 0 0 auto;
+}
+
+/* the ⋮ on a line column's header — the visible way in to the same menu */
+.tmenu-open {
+  margin-left: 4px;
+  padding: 0 3px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  line-height: 1;
+}
+.tmenu-open:hover {
+  color: var(--main);
 }
 
 .tbl-controls {
