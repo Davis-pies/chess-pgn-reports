@@ -281,9 +281,13 @@ export function symbolRow(ply, lines, cur) {
 	};
 	const row = el("span", { className: "sympick" });
 	const symButton = (sym, title) => {
+		// Geometric Shapes are drawn smaller than letters at the same font-size
+		// (see the .geo rule): flag them so the row evens up optically.
+		const cp = sym.codePointAt(0);
+		const geo = cp >= 0x25a0 && cp <= 0x25ff ? " geo" : "";
 		const b = el("button", {
 			type: "button",
-			className: "chip mini" + (curSym === sym ? " on" : ""),
+			className: "chip mini" + geo + (curSym === sym ? " on" : ""),
 			textContent: sym,
 			title: title || sym,
 		});

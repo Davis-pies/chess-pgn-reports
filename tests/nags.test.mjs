@@ -74,9 +74,9 @@ test("marks a small common set for the palette's default row", () => {
 });
 
 // --- glyphs are a rendering choice, codes are the data ----------------------
-// Four glyphs were changed for how they RENDER, not what they mean: two n-ary
-// large operators sized to stand next to a ∑, and two arrows in a
-// better-supported spelling. Marks store the code, so nothing saved had to
+// Three glyphs were changed for how they RENDER, not what they mean: two n-ary
+// large operators sized to stand next to a ∑, and a pair of arrows written the
+// other way round. Marks store the code, so nothing saved had to
 // change -- but a notebook written before the swap still holds the old glyph,
 // and must still migrate.
 
@@ -84,7 +84,6 @@ test("a mark written with a superseded glyph still maps to its code", () => {
 	const old = {
 		"⨀": 22, // n-ary circled dot -> ⊙ zugzwang
 		"⨁": 138, // n-ary circled plus -> ⊕ severe time trouble
-		"⟳": 32, // gapped circle arrow -> ↻ lead in development
 		"⇆": 132, // the arrows the other way round -> ⇄ counterplay
 	};
 	for (const [glyph, code] of Object.entries(old))

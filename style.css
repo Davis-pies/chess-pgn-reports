@@ -214,27 +214,44 @@ h3 {
   align-items: center;
   margin: 0;
 }
-/* The symbol buttons hold glyphs of wildly different optical width -- "!" beside
-   "=/∞", a circled dot beside "??" -- so left to themselves they made a ragged
-   row of chips that were hard to aim at. A min-width squares them up without
-   forcing the wide ones to fit.
+/* The symbol buttons hold glyphs of wildly different optical width and vertical
+   metric -- "!" beside "+−−", a circled dot beside "??" -- so left alone they
+   made a ragged row that was hard to aim at, with the taller glyphs riding high
+   in their chip.
+
+   `text-align` and `line-height` cannot fix the vertical half of that: they
+   position a LINE BOX, and each glyph sits differently inside its own. Making
+   the button a flex container centres the glyph itself, on both axes, against a
+   fixed height.
 
    The font stack leads with faces that actually carry the arrows and circled
-   operators; the UI font is not asked to draw a glyph it may only have as a
-   fallback, which is what made some of them look thin or mis-sized. `line-height:
-   1` with padding, rather than a tall line box, keeps a circled operator on the
-   same baseline as "!". */
+   operators, so the UI font is not asked for a glyph it only has by fallback --
+   which is what had ± and ∓ rendering at two different sizes.
+
+   The three numbers below are the ones to turn if the row wants tuning. */
 .sympick .chip.mini {
-  min-width: 2em;
-  padding: 3px 6px;
-  text-align: center;
-  font-size: 0.92rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 2.2em;
+  height: 2em;
+  padding: 0 6px;
+  font-size: 1.05rem;
   line-height: 1;
   font-family:
     "DejaVu Sans", "Noto Sans Symbols 2", "Noto Sans Symbols",
     "Segoe UI Symbol", system-ui, sans-serif;
   font-variant-ligatures: none;
 }
+/* Geometric Shapes (U+25A0-U+25FF: □ ○ △) are drawn to a smaller optical size
+   than text in every font -- they are shapes, not letters -- so at a shared
+   font-size they read as undersized next to "!" or "±". A bump just for that
+   block evens them up without touching anything else. */
+.sympick .chip.mini.geo {
+  font-size: 1.3rem;
+}
+
 .symlabel {
   font-size: 0.8rem;
   color: var(--muted);

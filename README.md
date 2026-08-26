@@ -68,7 +68,7 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    node's own notes taking the first labels before its branches continue the
    sequence. Lines get an
    **evaluation/quality symbol** picker (=, ±, ∓, +=, =+, ∞, !, ?, …), every
-   glyph on one row. Eight glyphs (⊙ ○ ↻ ↑ → ⯹ ⇄ ⊕) are shared by a White and a
+   glyph on one row. Eight glyphs (⊙ ○ ⟳ ↑ → ⯹ ⇄ ⊕) are shared by a White and a
    Black NAG, so the picker offers one button and takes the side from the move
    you set it on; a symbol read from an imported PGN keeps whichever side that
    file recorded. Typing a note and pressing **Enter** saves it, in the

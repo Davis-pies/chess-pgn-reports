@@ -589,7 +589,7 @@ test("Enter with an empty add-note field adds nothing", () => {
 
 
 // --- the eight glyphs a White/Black pair shares ------------------------------
-// ⊙ ○ ↻ ↑ → ⯹ ⇄ ⊕ carry no side in the glyph, so the palette shows one button
+// ⊙ ○ ⟳ ↑ → ⯹ ⇄ ⊕ carry no side in the glyph, so the palette shows one button
 // and the side comes from the move the mark is set on.
 
 test("a paired glyph takes its side from the move it is set on", () => {
@@ -640,5 +640,15 @@ test("a coded mark lights its own button and toggles off", () => {
 	assert.match(up.className, /\bon\b/, "the ↑ button is lit by $37");
 	up.onclick();
 	assert.strictEqual(main.marks, undefined, "clicking it again clears the mark");
+	off();
+});
+
+test("geometric-shape glyphs are flagged for their own optical size", () => {
+	const off = installDom();
+	const s = loadState(TWO_LINES);
+	const buttons = [...symbolRow(0, [s.lines[0]], "").querySelectorAll("button")];
+	const geo = buttons.filter((b) => b.className.includes("geo")).map((b) => b.textContent);
+	// U+25A1 □, U+25CB ○, U+25B3 △ — shapes, not letters, and drawn smaller
+	assert.deepStrictEqual(geo.sort(), ["△", "○", "□"].sort());
 	off();
 });

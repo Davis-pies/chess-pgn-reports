@@ -52,8 +52,8 @@ export const NAGS = [
 	{ code: 23, sym: "⊙", label: "Black in zugzwang", group: "position", neutral: "zugzwang", side: "b" },
 	{ code: 26, sym: "○", label: "White has space", group: "position", neutral: "space advantage", side: "w" },
 	{ code: 27, sym: "○", label: "Black has space", group: "position", neutral: "space advantage", side: "b" },
-	{ code: 32, sym: "↻", label: "White ahead in development", group: "position", neutral: "lead in development", side: "w" },
-	{ code: 33, sym: "↻", label: "Black ahead in development", group: "position", neutral: "lead in development", side: "b" },
+	{ code: 32, sym: "⟳", label: "White ahead in development", group: "position", neutral: "lead in development", side: "w" },
+	{ code: 33, sym: "⟳", label: "Black ahead in development", group: "position", neutral: "lead in development", side: "b" },
 	{ code: 36, sym: "↑", label: "White has the initiative", group: "position", neutral: "the initiative", side: "w" },
 	{ code: 37, sym: "↑", label: "Black has the initiative", group: "position", neutral: "the initiative", side: "b" },
 	{ code: 40, sym: "→", label: "White has the attack", group: "position", neutral: "with an attack", side: "w" },
@@ -79,8 +79,12 @@ export const NAGS = [
 // they mean. U+2A00 and U+2A01 are n-ary large operators, sized to stand next
 // to a ∑, so they came out oversized and off-baseline in a chip; U+2299/U+2295
 // are the normal-size circled dot and plus the notation actually calls for.
-// U+27F3 is the gapped circle arrow, thinner on the ground than U+21BB, and
 // U+21C6/U+21C4 are the same arrows in the other order.
+//
+// Lead in development stays U+27F3, the gapped circle arrow. It was briefly
+// U+21BB on a font-coverage argument; U+27F3 is the better-drawn of the two
+// where it was actually looked at, which is the only test that counts for a
+// glyph.
 //
 // Compensation stays U+2BF9. It was briefly swapped for the ASCII "=/∞" on the
 // assumption that a Unicode 8 codepoint would be missing from most fonts; it
@@ -91,7 +95,7 @@ const ALIASES = {
 	"=+": "⩱",
 	"\u2a00": "\u2299",
 	"\u2a01": "\u2295",
-	"\u27f3": "\u21bb",
+	"\u21bb": "\u27f3",
 	"\u21c6": "\u21c4",
 	"=/\u221e": "\u2bf9",
 };
