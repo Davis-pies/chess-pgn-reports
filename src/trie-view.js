@@ -50,33 +50,60 @@ export function renderTrieTable(container, g, orientation) {
 	controls.append(ex, col);
 	container.appendChild(controls);
 	if (!mainV) return;
-	// build the single table's var list: mainline + each branch. A branch with
-	// ONE line is a plain column (no collapse affordance). A multi-line branch
-	// collapses to a single compact column ("▸ N lines" header, shared moves in
-	// its cells); its expanded lines are clickable to collapse the branch again.
+	// build the single table's var list: mainline + each branch, one level of
+	// the trie at a time (see pushNode)
 	const vars = [mainV];
-	trie.children.forEach((c) => {
-		if (countLeaves(c) === 1) {
-			vars.push(...leavesOf(c));
-		} else if (openTablePaths.has(c.key)) {
-			const collapse = () => {
-				openTablePaths.delete(c.key);
-				getRenderHooks().rerenderTable();
-			};
-			leavesOf(c).forEach((l) => vars.push({ ...l, onclick: collapse }));
-		} else {
-			vars.push(collapsedVar(c));
-		}
-	});
+	trie.children.forEach((c) => pushNode(c, vars));
 	// rows span only the VISIBLE columns — collapsed branches don't stretch the
 	// table down to the deepest hidden line
 	renderTable(container, { ...g, vars, maxPly: subMaxPly(vars) }, orientation);
 }
 
-// A collapsed trie branch as a single column/row of its shared continuation:
-// the moves common to all its lines up to the first fork, with divergent cells
-// empty. Its header is clickable to expand.
-function collapsedVar(node) {
+// A trie node's contribution to the column list, one level at a time.
+//
+// An open group has NO column of its own. The editor can afford a header per
+// group because a group there costs a row; here it would cost a column at every
+// open level, repeating the prefix its own children already spell out. So the
+// group's fold lives on its line columns instead: `fold` collapses the nearest
+// open group a column sits in, which keeps a click to exactly one level rather
+// than dropping however many the reader had opened.
+function pushNode(node, vars, fold) {
+	// one line under it: just that line's column, folding the group it sits in
+	if (countLeaves(node) === 1) {
+		leavesOf(node).forEach((l) =>
+			vars.push(fold ? { ...l, onclick: fold } : l),
+		);
+		return;
+	}
+	if (!openTablePaths.has(node.key)) {
+		vars.push(branchVar(node));
+		return;
+	}
+	const foldThis = () => {
+		openTablePaths.delete(node.key);
+		getRenderHooks().rerenderTable();
+	};
+	// Down to the first real fork before recursing: sharedMoves already put the
+	// single-child chain in the stub above, so opening one level per shared move
+	// would reveal nothing new. It also means an open group never has a single
+	// child — the fork has at least two things under it.
+	const fork = forkOf(node);
+	// a line ending exactly at the fork is a column beside its continuations
+	if (fork.leaf) vars.push({ ...fork.leaf, onclick: foldThis });
+	fork.children.forEach((c) => pushNode(c, vars, foldThis));
+}
+
+// The end of a node's single-child chain — the node sharedMoves() stops at.
+function forkOf(node) {
+	let n = node;
+	while (!n.leaf && n.children.size === 1) n = [...n.children.values()][0];
+	return n;
+}
+
+// A shut trie branch as a single column/row of its shared continuation: the
+// moves common to all its lines up to the first fork, with divergent cells
+// empty. Its header is clickable to open it one level.
+function branchVar(node) {
 	const shared = sharedMoves(node); // [{ ply, san }] down the single-child chain
 	const cells = {};
 	shared.forEach((m) => {

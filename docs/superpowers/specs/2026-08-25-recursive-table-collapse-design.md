@@ -30,38 +30,37 @@ for the children:
 
 | Node | Columns |
 | ---- | ------- |
-| one leaf | that line's column, with **no** control |
-| multi-leaf, closed | its branch column, `▸`, clickable to open |
-| multi-leaf, open | its branch column, `▾`, clickable to close, then each child by this same rule |
+| one leaf | that line's column, clicking it folds the group it sits in |
+| multi-leaf, shut | its branch column, `▸ N lines`, clicking it opens one level |
+| multi-leaf, open | no column of its own — each child by this same rule |
 
-**An open group keeps a column of its own.** It holds the moves its lines share
-and it is the only control in the group, which is what makes a click fold
-exactly one level: leaf columns are never clickable, so there is no way to
-collapse three levels by clicking the wrong thing. It is also the table's
-equivalent of the editor's `<summary>` — a group is a row you can see and act on
-whether it is open or shut.
+**An open group has no column of its own.** A header column was tried and
+dropped: the editor can afford one per group because a group there costs a row,
+while here it costs a column at every open level, repeating the prefix its own
+children already spell out. Table width is the scarce thing.
+
+**So the fold lives on the line columns.** Each column carries the fold of the
+nearest open group it sits in, which is what keeps a click to exactly one level
+— the old code hung the *top* branch's fold on every expanded column, so one
+click dropped however many levels the reader had opened. A shut branch's own
+column still opens it; that is the one control that is not a fold.
 
 **Single-child chains are inlined.** `sharedMoves()` already walks a node's
-single-child chain to build the header, so expanding jumps to the first real
-fork rather than opening one pointless level per shared move. `forkOf(node)`
-walks that same chain, and the recursion runs over the fork's children (plus its
-own leaf, when a line ends exactly there).
+single-child chain to build the stub, so opening jumps to the first real fork
+rather than revealing one pointless level per shared move. `forkOf(node)` walks
+that same chain, and the recursion runs over the fork's children plus its own
+leaf, when a line ends exactly there. Together these mean an open group never
+renders a single child: the fork has at least two things under it.
 
-Together these mean an open group never renders a child that is its only child:
-the fork it recurses into has at least two things under it.
+## 3. `pushNode(node, vars, fold)`
 
-## 3. `branchVar(node, open)`
+Replaces the three-branch loop in `renderTrieTable`. `fold` is the handler for
+the nearest enclosing open group, absent at the top level. `collapsedVar` is
+renamed `branchVar` and otherwise unchanged — it is only ever built for a shut
+branch now.
 
-Replaces `collapsedVar(node)`. Same synthetic column as today — the shared
-continuation in its cells, `…` before its divergence, `N lines` for a name — with
-two differences:
-
-- `collapsed: !open`, so an open group renders `▾` and "collapse branch"
-- `onclick` toggles `openTablePaths` in whichever direction the node is not
-
-No change to `src/render.js`. `varHead` already gives a clickable non-collapsed
-column a `▾` cue and the "collapse branch" title; the old code simply never
-produced one, because it hung `onclick` on the expanded leaf columns instead.
+No change to `src/render.js`. It already draws a clickable column with the right
+cue and title in both states.
 
 ## 4. Expand all / Collapse all
 

@@ -4,7 +4,7 @@
 
 **Goal:** Expanding a table branch reveals its immediate children rather than every leaf, and clicking folds exactly one level.
 
-**Architecture:** All of it lands in `renderTrieTable` in `src/trie-view.js`. `collapsedVar(node)` becomes `branchVar(node, open)`, which renders a group's column in either state; a new `pushNode(node, vars)` recurses one level at a time; `forkOf(node)` skips single-child chains so expanding never opens a pointless level. `src/render.js` is untouched — `varHead` already draws a clickable non-collapsed column as `▾ … collapse branch`.
+**Architecture:** All of it lands in `renderTrieTable` in `src/trie-view.js`. `pushNode(node, vars, fold)` recurses one level at a time; `forkOf(node)` skips single-child chains so opening never reveals a pointless level; `collapsedVar` is renamed `branchVar` and still only ever built for a shut branch. An open group deliberately gets NO column of its own — that was tried during implementation and dropped as clutter, since a header column costs table width at every open level to repeat what its children already show. The fold lives on the line columns instead, each closing the nearest open group it sits in. `src/render.js` is untouched.
 
 **Tech Stack:** Vanilla ES modules, no build step. Tests are `node --test` with jsdom.
 
@@ -20,7 +20,7 @@
 - Modify: `src/trie-view.js` (`renderTrieTable`'s var loop, `collapsedVar`)
 - Test: `tests/app.test.mjs`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `tests/app.test.mjs`:
 
@@ -107,12 +107,12 @@ test("a line column is never a fold control", async () => {
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `npm test`
 Expected: FAIL — opening the c5 branch currently produces three clickable leaf columns and no group column, so "the opened group is the only ▾ control" fails.
 
-- [ ] **Step 3: Implement the recursion**
+- [x] **Step 3: Implement the recursion**
 
 In `src/trie-view.js`, replace the var-building loop in `renderTrieTable`:
 
@@ -186,7 +186,7 @@ function branchVar(node, open) {
 }
 ```
 
-- [ ] **Step 4: Update the test that pins the old shape**
+- [x] **Step 4: Update the test that pins the old shape**
 
 `tests/app.test.mjs`, "table preview: mainline always visible, branches collapsed by default". After the fork is expanded, the two assertions about its leaf headers become one about the group column:
 
@@ -204,12 +204,12 @@ function branchVar(node, open) {
 Leave every other assertion in that test alone — the collapsed-by-default shape,
 the single-line plain column, Expand all and Collapse all are all unchanged.
 
-- [ ] **Step 5: Run the whole suite**
+- [x] **Step 5: Run the whole suite**
 
 Run: `npm test && npm run lint && npm run knip`
 Expected: all pass. In particular `tests/render.test.mjs`'s keyboard-accessibility tests must pass untouched — `render.js` did not change.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/trie-view.js tests/app.test.mjs
@@ -223,7 +223,7 @@ git commit -m "Open the table one level at a time"
 **Files:**
 - Modify: `README.md`
 
-- [ ] **Step 1: Document it**
+- [x] **Step 1: Document it**
 
 In `README.md`'s step-3 "Render" paragraph, the sentence about the table's
 branches becomes:
@@ -233,7 +233,7 @@ branches becomes:
 > — one level at a time, the way the editor's grouped view nests. The group
 > keeps a column of its own while open, and clicking it folds that one level.
 
-- [ ] **Step 2: Full verification**
+- [x] **Step 2: Full verification**
 
 ```bash
 npm test          # every test passes
@@ -241,7 +241,7 @@ npm run lint      # no errors
 npm run knip      # no unused files or exports
 ```
 
-- [ ] **Step 3: Commit, merge and close**
+- [x] **Step 3: Commit, merge and close**
 
 ```bash
 git add README.md

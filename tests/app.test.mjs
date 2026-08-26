@@ -1079,3 +1079,79 @@ test("a focused group that is tagged Footnote stays out of the table", async () 
 		"it is in the Notes instead",
 	);
 });
+
+// c5 forks into Nf3 and Nc3; the Nf3 side forks again into Nc6 and Nf6, so the
+// tree is deep enough to open one level at a time.
+const DEEP_PGN =
+	"1. e4 e5 (1... c5 2. Nf3 Nc6) (1... c5 2. Nf3 Nf6) (1... c5 2. Nc3 d6) " +
+	"2. Nf3";
+
+const pvHeads = () =>
+	[...doc("view").querySelectorAll(".pv-table table.tbl tr:first-child th")];
+const openable = () =>
+	pvHeads().filter((h) => h.classList.contains("clickable"));
+
+async function loadDeepPgn() {
+	app.reset();
+	doc("view").querySelector("textarea.pgnin").value = DEEP_PGN;
+	[...doc("view").querySelectorAll("button")]
+		.find((b) => b.textContent.includes("Load"))
+		.click();
+	await tick();
+}
+
+test("the table opens one level at a time", async () => {
+	await loadDeepPgn();
+
+	const shut = () => openable().filter((h) => h.classList.contains("collapsed"));
+	const live = () => openable().filter((h) => !h.classList.contains("collapsed"));
+
+	assert.strictEqual(shut().length, 1, "the c5 branch starts shut");
+	assert.match(shut()[0].textContent, /3 lines/);
+
+	shut()[0].click();
+	// one level down: the 2.Nf3 fork is a stub of its own, and 2.Nc3's lone line
+	// is a plain column — the branch did not explode into all three lines
+	assert.strictEqual(shut().length, 1, "its 2.Nf3 child is a branch, still shut");
+	assert.match(shut()[0].textContent, /2 lines/);
+	assert.strictEqual(live().length, 1, "2.Nc3's single line got its own column");
+
+	shut()[0].click();
+	assert.strictEqual(shut().length, 0, "nothing left shut");
+	assert.strictEqual(live().length, 3, "all three lines have columns now");
+
+	// folding from inside the inner group closes THAT group only
+	live()[0].click();
+	assert.strictEqual(shut().length, 1, "the inner group folded");
+	assert.match(shut()[0].textContent, /2 lines/);
+	assert.strictEqual(
+		openable().length,
+		2,
+		"the outer branch is still open, so its other column is still there",
+	);
+});
+
+test("Expand all reaches every level; Collapse all returns to one stub", async () => {
+	await loadDeepPgn();
+	const bulk = (txt) =>
+		[...doc("view").querySelectorAll(".pv-table button")]
+			.find((b) => b.textContent === txt)
+			.click();
+
+	bulk("Expand all");
+	assert.strictEqual(
+		openable().filter((h) => h.classList.contains("collapsed")).length,
+		0,
+		"no stub survives Expand all, at any depth",
+	);
+	assert.strictEqual(
+		pvHeads().length,
+		5,
+		"ply + mainline + one column per line",
+	);
+
+	bulk("Collapse all");
+	const shut = openable().filter((h) => h.classList.contains("collapsed"));
+	assert.strictEqual(shut.length, 1, "back to the one outermost stub");
+	assert.match(shut[0].textContent, /3 lines/);
+});
