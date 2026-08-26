@@ -126,6 +126,12 @@ function pushNode(node, vars, depth = 0, cut = -1, trail = []) {
 	}
 	const open = openTablePaths.has(node.key);
 	const v = branchVar(node, open);
+	// A group column is traceable in its own right (its stem), so it needs the
+	// same trail its children get. It does not go through tag(), which is where
+	// a line column picks one up -- without this a NESTED group's chain lost the
+	// group above it and its trace died at the mainline prefix, while a
+	// top-level group, whose trail is empty anyway, looked fine.
+	v.trail = trail;
 	// A shut branch belongs to whatever block encloses it; an open one opens a
 	// block of its own and shares that block with its children.
 	const d = open ? depth + 1 : depth;

@@ -70,7 +70,15 @@ bug, since they are the same move.
 
 `pushNode` in `trie-view.js` already threads `depth` and `cut` down the
 recursion. It gains a `trail`: the group vars enclosing the node, stashed on
-each leaf var it pushes. That is the only change to the trie walk.
+each var it pushes. That is the only change to the trie walk.
+
+**Group columns need the trail too**, not just leaves. A group column is
+traceable in its own right (its stem), but it does not go through `tag()`,
+which is where a line column picks its trail up. Without an explicit
+`v.trail = trail` a NESTED group's chain lost the group above it and its trace
+died at the mainline prefix — while a top-level group, whose trail is empty
+anyway, looked correct. Fixed after the feature shipped; the nested case is now
+pinned by three tests.
 
 The Mainline column is `vars[0]` and is not produced by `pushNode`, so the
 chain is assembled as `[mainV, ...v.trail, v]` at trace time.

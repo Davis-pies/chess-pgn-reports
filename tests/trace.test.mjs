@@ -106,3 +106,47 @@ test("a line ending at its fork lights both copies of its last move", () => {
 	assert.deepStrictEqual([...lit.get(short)], [1], "and on its own column");
 	off();
 });
+
+// A group nested inside another: 1...c5 2. Nf3 is shared by four lines, which
+// then split into a d6 group and an Nc6 group, each with two lines of its own.
+const NESTED =
+	"1. e4 e5 (1... c5 2. Nf3 d6 3. d4 Nf6 (3... a6)) (1... c5 2. Nf3 Nc6 3. d4 (3. Bb5)) 2. Nf3";
+const NESTED_KEYS = ["1:c5", "1:c5/2:Nf3/3:d6", "1:c5/2:Nf3/3:Nc6"];
+
+test("a nested group column knows the group enclosing it", () => {
+	const off = installDom();
+	const vars = cols(NESTED, NESTED_KEYS);
+	const outer = vars.find((v) => v.traceKey === "@1:c5");
+	const inner = vars.find((v) => v.traceKey === "@1:c5/2:Nf3/3:d6");
+	assert.deepStrictEqual(outer.trail, [], "the outer group encloses nothing");
+	assert.deepStrictEqual(inner.trail, [outer], "the inner one sits inside it");
+	off();
+});
+
+test("tracing a nested group lights the whole path down to it", () => {
+	const off = installDom();
+	const vars = cols(NESTED, NESTED_KEYS);
+	const outer = vars.find((v) => v.traceKey === "@1:c5");
+	const inner = vars.find((v) => v.traceKey === "@1:c5/2:Nf3/3:d6");
+	const lit = tracePath(vars, tracedKey(inner));
+	assert.deepStrictEqual([...lit.get(vars[0])], [0], "1. e4 off the mainline");
+	assert.deepStrictEqual([...lit.get(outer)], [1, 2], "c5 Nf3 off the outer group");
+	assert.deepStrictEqual([...lit.get(inner)], [3, 4], "d6 d4, its own moves");
+	off();
+});
+
+test("tracing a line under nested groups lights every column above it", () => {
+	const off = installDom();
+	const vars = cols(NESTED, NESTED_KEYS);
+	const outer = vars.find((v) => v.traceKey === "@1:c5");
+	const inner = vars.find((v) => v.traceKey === "@1:c5/2:Nf3/3:d6");
+	const line = named(vars, "Nf6");
+	const lit = tracePath(vars, tracedKey(line));
+	assert.deepStrictEqual([...lit.get(vars[0])], [0]);
+	assert.deepStrictEqual([...lit.get(outer)], [1, 2]);
+	assert.deepStrictEqual([...lit.get(inner)], [3, 4]);
+	assert.deepStrictEqual([...lit.get(line)], [5], "its own tail");
+	// the sibling group is untouched
+	assert.ok(!lit.has(vars.find((v) => v.traceKey === "@1:c5/2:Nf3/3:Nc6")));
+	off();
+});
