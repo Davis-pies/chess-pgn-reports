@@ -221,23 +221,33 @@ h3 {
 
    `text-align` and `line-height` cannot fix the vertical half of that: they
    position a LINE BOX, and each glyph sits differently inside its own. Making
-   the button a flex container centres the glyph itself, on both axes, against a
-   fixed height.
+   the button a flex container centres the glyph itself against a fixed height.
+
+   Sizes are in REM, not em. An em is relative to the element's OWN font-size,
+   so `height: 2em` on a row where .geo below runs a larger font-size gave those
+   buttons a taller box than their neighbours -- a row of chips at two different
+   heights. rem is relative to the root, so every button matches whatever its
+   glyph is set in.
+
+   The padding-top is a nudge, not a mistake. A font reserves descender space
+   below the baseline; these glyphs have no descender ink, so centring the box
+   leaves the ink sitting visibly above centre. Half a descender of top padding
+   puts it back.
 
    The font stack leads with faces that actually carry the arrows and circled
    operators, so the UI font is not asked for a glyph it only has by fallback --
    which is what had ± and ∓ rendering at two different sizes.
 
-   The three numbers below are the ones to turn if the row wants tuning. */
+   font-size, height and min-width are the three to turn if the row wants tuning. */
 .sympick .chip.mini {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  min-width: 2.2em;
-  height: 2em;
-  padding: 0 6px;
-  font-size: 1.05rem;
+  min-width: 2.1rem;
+  height: 1.85rem;
+  padding: 0.18rem 6px 0;
+  font-size: 0.92rem;
   line-height: 1;
   font-family:
     "DejaVu Sans", "Noto Sans Symbols 2", "Noto Sans Symbols",
@@ -247,9 +257,10 @@ h3 {
 /* Geometric Shapes (U+25A0-U+25FF: □ ○ △) are drawn to a smaller optical size
    than text in every font -- they are shapes, not letters -- so at a shared
    font-size they read as undersized next to "!" or "±". A bump just for that
-   block evens them up without touching anything else. */
+   block evens them up. It changes the font-size only: the box around it is in
+   rem, so the button stays the same size as every other. */
 .sympick .chip.mini.geo {
-  font-size: 1.3rem;
+  font-size: 1.14rem;
 }
 
 .symlabel {
