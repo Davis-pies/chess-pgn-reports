@@ -6,6 +6,7 @@ import {
 	promoteMainline,
 	moveStrip,
 	movePanel,
+	symbolRow,
 	commentEditor,
 	EVAL_SYMBOLS,
 } from "../src/line-editor.js";
@@ -173,7 +174,7 @@ test("movePanel applies a symbol to the selected move and toggles it off again",
 	const s = loadState(TWO_LINES, { renderHooks: { renderApp: () => renders++ } });
 	s.sel = { lines: [s.lines[0]], ply: 0 };
 	byText(movePanel(s.lines[0]), "button.chip.mini", "!").onclick();
-	assert.strictEqual(s.lines[0].marks[0], "!");
+	assert.strictEqual(s.lines[0].marks[0], "$1", "stored as a NAG code");
 	// rebuilt against the new state, the same button now clears the mark
 	const again = movePanel(s.lines[0]);
 	assert.match(byText(again, "button.chip.mini", "!").className, /\bon\b/);
@@ -413,7 +414,8 @@ test("a symbol that used to live in the drawer still applies its mark", () => {
 	[...movePanel(s.lines[0]).querySelectorAll(".sympick button")]
 		.find((b) => b.textContent === "↑")
 		.onclick();
-	assert.strictEqual(s.lines[0].marks[0], "↑");
+	// ply 0 is a White move, so the White half of the ↑ pair
+	assert.strictEqual(s.lines[0].marks[0], "$36");
 	off();
 });
 
@@ -582,5 +584,61 @@ test("Enter with an empty add-note field adds nothing", () => {
 	add.value = "   ";
 	add.onkeydown({ key: "Enter", preventDefault() {} });
 	assert.deepStrictEqual(main.comments || [], []);
+	off();
+});
+
+
+// --- the eight glyphs a White/Black pair shares ------------------------------
+// ⨀ ○ ⟳ ↑ → ⯹ ⇆ ⨁ carry no side in the glyph, so the palette shows one button
+// and the side comes from the move the mark is set on.
+
+test("a paired glyph takes its side from the move it is set on", () => {
+	const off = installDom();
+	const s = loadState(TWO_LINES);
+	const main = s.lines[0];
+	const pick = (ply, sym) => {
+		main.marks = {};
+		const row = symbolRow(ply, [main], "");
+		[...row.querySelectorAll("button")].find((b) => b.textContent === sym).onclick();
+		return main.marks[ply];
+	};
+	assert.strictEqual(pick(0, "↑"), "$36", "ply 0 is White's move");
+	assert.strictEqual(pick(1, "↑"), "$37", "ply 1 is Black's");
+	assert.strictEqual(pick(3, "⨀"), "$23", "and zugzwang likewise");
+	// an unpaired glyph is the same code either way
+	assert.strictEqual(pick(0, "±"), "$16");
+	assert.strictEqual(pick(1, "±"), "$16");
+	off();
+});
+
+test("the palette shows one button per glyph, with no side in its label", () => {
+	const off = installDom();
+	const s = loadState(TWO_LINES);
+	const buttons = [...symbolRow(0, [s.lines[0]], "").querySelectorAll("button")];
+	const arrows = buttons.filter((b) => b.textContent === "↑");
+	assert.strictEqual(arrows.length, 1, "one ↑ button, not a White and a Black");
+	assert.strictEqual(arrows[0].title, "the initiative", "and no side claimed");
+	assert.strictEqual(
+		buttons.find((b) => b.textContent === "⨀").title,
+		"zugzwang",
+	);
+	// an unpaired glyph keeps its side-specific label, which is true of it
+	assert.strictEqual(
+		buttons.find((b) => b.textContent === "±").title,
+		"White clearly better",
+	);
+	off();
+});
+
+test("a coded mark lights its own button and toggles off", () => {
+	const off = installDom();
+	const s = loadState(TWO_LINES);
+	const main = s.lines[0];
+	main.marks = { 1: "$37" }; // Black has the initiative
+	const row = symbolRow(1, [main], "$37");
+	const up = [...row.querySelectorAll("button")].find((b) => b.textContent === "↑");
+	assert.match(up.className, /\bon\b/, "the ↑ button is lit by $37");
+	up.onclick();
+	assert.strictEqual(main.marks, undefined, "clicking it again clears the mark");
 	off();
 });

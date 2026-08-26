@@ -2,7 +2,7 @@ import { fenAt } from "./pgn.js";
 import { appendBoard, fullmoveLabel } from "./render.js";
 import { el } from "./dom.js";
 import { getCurrent, getSharedInfo, getRenderHooks } from "./state.js";
-import { NAGS } from "./nags.js";
+import { NAGS, markSym, markOf, nagFor } from "./nags.js";
 import { numberNotes } from "./notes.js";
 import { branchContext } from "./export.js";
 import { visibleLines, setHidden, isFocused } from "./visibility.js";
@@ -176,7 +176,7 @@ export function moveStrip(l) {
 		numberNotes(visibleLines(getCurrent().lines)).byLine.get(l) || {};
 	owned.forEach((m) => {
 		const num = m.ply % 2 === 0 ? Math.floor(m.ply / 2) + 1 + ". " : "";
-		const mark = (l.marks || {})[m.ply];
+		const mark = markSym((l.marks || {})[m.ply]);
 		// this move's shared group: every line reaching the identical position
 		const gid = getSharedInfo().byLine.get(l)?.get(m.ply);
 		const group = gid ? getSharedInfo().idLines.get(gid) : [l];
@@ -254,18 +254,27 @@ function isAnchor(l, ply) {
 // means for its own scope, and this stays a pure builder.
 export function symbolRow(ply, lines, cur) {
 	const atEnd = ply == null;
+	// `cur` is a stored mark ("$23"); the buttons are glyphs. Compare what is
+	// displayed, so a coded mark and a legacy glyph both light the same button.
+	const curSym = markSym(cur);
 	const apply = (sym) => {
 		if (atEnd) {
 			lines.forEach((x) => {
-				x.meta = { ...(x.meta || {}), eval: cur === sym ? "" : sym };
+				x.meta = { ...(x.meta || {}), eval: curSym === sym ? "" : sym };
 			});
 		} else {
+			// Store the CODE. For the eight glyphs shared by a White/Black pair
+			// the side comes from the move this mark sits on (see nagFor) --
+			// a guess, but one confined to marks made here: an imported mark
+			// keeps the code its file carried.
+			const code = nagFor(sym, ply);
+			const mark = code === undefined ? sym : markOf(code);
 			lines.forEach((x) => {
 				x.marks = x.marks || {};
 				// an empty symbol is the clear button: always a delete, never an
 				// empty-string mark that would linger in the saved notebook
-				if (!sym || cur === sym) delete x.marks[ply];
-				else x.marks[ply] = sym;
+				if (!sym || curSym === sym) delete x.marks[ply];
+				else x.marks[ply] = mark;
 				if (!Object.keys(x.marks).length) x.marks = undefined;
 			});
 		}
@@ -274,7 +283,7 @@ export function symbolRow(ply, lines, cur) {
 	const symButton = (sym, title) => {
 		const b = el("button", {
 			type: "button",
-			className: "chip mini" + (cur === sym ? " on" : ""),
+			className: "chip mini" + (curSym === sym ? " on" : ""),
 			textContent: sym,
 			title: title || sym,
 		});
@@ -289,7 +298,10 @@ export function symbolRow(ply, lines, cur) {
 	// button would be a duplicate that looks like a different choice.
 	const seen = new Set();
 	NAGS.filter((n) => n.sym && !seen.has(n.sym) && seen.add(n.sym)).forEach((n) =>
-		row.appendChild(symButton(n.sym, n.label)),
+		// `neutral` where the glyph is shared by a White/Black pair: the button
+		// sets a side-neutral glyph, so "White in zugzwang" was a claim the UI
+		// could not keep.
+		row.appendChild(symButton(n.sym, n.neutral || n.label)),
 	);
 	row.appendChild(symButton("TN", "theoretical novelty"));
 	const clear = el("button", {

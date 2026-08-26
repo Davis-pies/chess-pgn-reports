@@ -1,4 +1,5 @@
 import { test } from "node:test";
+import * as nags from "../src/nags.js";
 import assert from "node:assert/strict";
 import { Chess } from "chess.js";
 import { readFileSync } from "node:fs";
@@ -305,10 +306,10 @@ for (const [name, pgn, opts = {}] of CASES) {
 
 test("marks survive a round-trip", () => {
 	const lines = linesOf("1. e4 e5 2. Nf3 *");
-	lines[0].marks = { 0: "!", 2: "\u00b1" };
+	lines[0].marks = { 0: "$1", 2: "$16" };
 	const out = buildPgn({ name: "T", lines });
 	const back = collectLines(parsePgn(out).nodes);
-	assert.deepEqual(back[0].marks, { 0: "!", 2: "\u00b1" });
+	assert.deepEqual(back[0].marks, { 0: "$1", 2: "$16" });
 });
 
 test("a null move survives the export", () => {
@@ -442,4 +443,20 @@ test("a hidden line is not exported", () => {
 	const pgn = buildPgn({ name: "t", lines });
 	assert.ok(pgn.includes("e5"), "the visible variation survives");
 	assert.equal(pgn.includes("e6"), false, "the hidden variation is gone");
+});
+
+// Eight NAGs come in White/Black pairs that share one glyph (⨀ ○ ⟳ ↑ → ⯹ ⇆ ⨁).
+// Marks used to store the glyph, so the side was gone before export could read
+// it and nagFor could only return the first (White) code of the pair -- an
+// imported $23 "Black in zugzwang" came back as $22 "White in zugzwang".
+test("every NAG with a glyph round-trips to its own code", () => {
+	const wrong = [];
+	for (const n of nags.NAGS.filter((x) => x.sym)) {
+		const lines = collectLines(parsePgn("1. e4 $" + n.code + " *").nodes);
+		const out = buildPgn({ lines, result: "*", name: "t" });
+		const got = (out.match(/\$(\d+)/) || [])[1];
+		if (String(n.code) !== got)
+			wrong.push(`$${n.code} (${n.sym} ${n.label}) -> $${got}`);
+	}
+	assert.deepEqual(wrong, [], "these lost their side:\n" + wrong.join("\n"));
 });

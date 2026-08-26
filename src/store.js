@@ -2,6 +2,8 @@
 // PGN plus per-line annotations keyed by the line's move string, so a notebook
 // can be reopened and re-parsed/re-tagged.
 
+import { migrateMarks } from "./nags.js";
+
 const PREFIX = "ott:";
 
 export function keyFor(moves) {
@@ -57,11 +59,20 @@ export function listNotebooks() {
 }
 
 export function loadNotebook(id) {
+  let d;
   try {
-    return JSON.parse(localStorage.getItem(PREFIX + id));
+    d = JSON.parse(localStorage.getItem(PREFIX + id));
   } catch {
     return null;
   }
+  // Notebooks saved before marks carried NAG codes hold bare glyphs. Convert
+  // them on the way in so the app has one representation rather than two
+  // forever. Lossy for the eight glyphs a White/Black pair shares, in exactly
+  // the way the app already was -- the side was never in the glyph to recover
+  // -- but every mark set from here on is exact.
+  if (d && Array.isArray(d.tags))
+    d.tags = d.tags.map((t) => ({ ...t, marks: migrateMarks(t.marks) }));
+  return d;
 }
 
 export function deleteNotebook(id) {

@@ -262,8 +262,8 @@ test("a symbol set from the menu lands on every line sharing the move", () => {
 		.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
 	assert.deepStrictEqual(
 		s.lines.map((l) => (l.marks || {})[0]),
-		["!", "!", "!"],
-		"written to every line through the editor's own apply",
+		["$1", "$1", "$1"],
+		"written to every line through the editor's own apply, as a NAG code",
 	);
 	closeTableMenu();
 	off();
@@ -444,7 +444,7 @@ test("a symbol set on a group's move reaches every line under it", () => {
 	const under = s.lines.filter((l) => l.moves.some((m) => m.san === "d6"));
 	assert.strictEqual(under.length, 2);
 	assert.ok(
-		under.every((l) => (l.marks || {})[3] === "!"),
+		under.every((l) => (l.marks || {})[3] === "$1"),
 		"the shared-move rule, reached from the group column",
 	);
 	closeTableMenu();

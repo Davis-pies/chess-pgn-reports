@@ -6,6 +6,7 @@
 
 import { fenAt } from "./pgn.js";
 import { el, renderInline } from "./dom.js";
+import { markSym } from "./nags.js";
 
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -415,7 +416,9 @@ export function cardMovesText(v) {
 		// first move reads as its natural pair and needs no forced number
 		const n = moveNum(m.ply, i === 0 && !ctx);
 		const num = n ? n + " " : "";
-		const mark = v.marks && v.marks[m.ply] ? " " + v.marks[m.ply] : "";
+		// the space is the separator in plain text, where no CSS makes the gap
+		const sym = markSym(v.marks && v.marks[m.ply]);
+		const mark = sym ? " " + sym : "";
 		const refs = ((v.noteByPly && v.noteByPly[m.ply]) || [])
 			.map((n) => "[" + n + "]")
 			.join("");
@@ -443,7 +446,8 @@ function buildCardMoves(container, v) {
 		const n = moveNum(m.ply, i === 0 && !ctx);
 		const num = n ? n + " " : "";
 		seg(num + m.san);
-		if (v.marks && v.marks[m.ply]) container.appendChild(markEl(v.marks[m.ply]));
+		if (markSym(v.marks && v.marks[m.ply]))
+			container.appendChild(markEl(markSym(v.marks[m.ply])));
 		const refs = (v.noteByPly && v.noteByPly[m.ply]) || [];
 		if (refs.length) {
 			const sup = document.createElement("sup");
@@ -597,7 +601,7 @@ export function fullMovesText(moves, marks) {
 			return (
 				(n ? n + " " : "") +
 				m.san +
-				(marks && marks[m.ply] ? " " + marks[m.ply] : "")
+				(markSym(marks && marks[m.ply]) ? " " + markSym(marks[m.ply]) : "")
 			);
 		})
 		.join(" ");
@@ -656,8 +660,8 @@ function appendFootMoves(container, foot) {
 	tail.forEach((m, i) => {
 		if (i) t(" ");
 		t(moveNum(m.ply, i === 0) + m.san);
-		if (foot.marks && foot.marks[m.ply])
-			container.appendChild(markEl(foot.marks[m.ply]));
+		if (markSym(foot.marks && foot.marks[m.ply]))
+			container.appendChild(markEl(markSym(foot.marks[m.ply])));
 		const refs = (foot.noteByPly && foot.noteByPly[m.ply]) || [];
 		if (refs.length) {
 			const sup = document.createElement("sup");
@@ -741,7 +745,7 @@ export function footnoteText(foot) {
 			(m, i) =>
 				moveNum(m.ply, i === 0) +
 				m.san +
-				(foot.marks && foot.marks[m.ply] ? " " + foot.marks[m.ply] : ""),
+				(markSym(foot.marks && foot.marks[m.ply]) ? " " + markSym(foot.marks[m.ply]) : ""),
 		)
 		.join(" ");
 	const body = [moves, foot.eval].filter(Boolean).join(" ");

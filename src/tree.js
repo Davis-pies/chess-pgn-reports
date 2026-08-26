@@ -4,7 +4,7 @@
 // comments owned by it (mainline owns trunk comments; a variation owns only
 // its own nodes' comments), so note markers render without row duplication.
 
-import { symFor } from "./nags.js";
+import { symFor, markOf } from "./nags.js";
 
 function chainToMoves(chain) {
 	return chain
@@ -21,9 +21,11 @@ function chainToMarks(chain) {
 	chain.forEach((x) => {
 		if (!x || !x.san || !x.nags) return;
 		for (const code of x.nags) {
-			const sym = symFor(code);
-			if (sym) {
-				marks[x.ply] = sym;
+			// The CODE, not the glyph. Eight glyphs are shared by a White/Black
+			// pair, so collapsing to one here threw the side away before the
+			// exporter could read it back -- an imported $23 left as $22.
+			if (symFor(code)) {
+				marks[x.ply] = markOf(code);
 				break;
 			}
 		}
