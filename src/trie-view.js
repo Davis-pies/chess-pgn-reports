@@ -453,12 +453,25 @@ export function renderTrieNode(
 		? path + "  " + branchLabel(node.move)
 		: branchLabel(node.move);
 	const boards = getCurrent().showBoards; // inline-boards master toggle
-	// single-child chain: inline it, accumulating the path so a long shared
+	// Single-child chain: inline it, accumulating the path so a long shared
 	// continuation shows as one compressed header, not nested single groups.
+	//
 	// A real fork left with one visible child is NOT such a chain: Focus and
 	// Hide are meant to narrow what is under a group, not to dissolve the group
-	// into what survived, so a forking node keeps its own level.
-	if (!node.leaf && node.children.size === 1 && !forks.has(node.key)) {
+	// into what survived, so a forking node keeps its own level -- but only
+	// while it still has something to separate. A group level says "several
+	// things share this prefix"; with ONE visible line under it there is
+	// nothing left to say, and the header is pure indirection. That rule had no
+	// floor, so Focus -- which hides everything but one line -- turned every
+	// fork along that line's path into a single-child wrapper, seven of them
+	// nested around one row in a real notebook.
+	//
+	// countLeaves runs on the VISIBLE trie, so this counts what is on screen.
+	if (
+		!node.leaf &&
+		node.children.size === 1 &&
+		(!forks.has(node.key) || countLeaves(node) < 2)
+	) {
 		node.children.forEach((c) =>
 			renderTrieNode(container, c, nameCounter, nextPath, allOpen, paths, forks),
 		);

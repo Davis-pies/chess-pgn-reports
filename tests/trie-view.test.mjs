@@ -2,7 +2,11 @@ import { test } from "node:test";
 import assert from "node:assert";
 import { installDom, loadState } from "./helpers.mjs";
 import { grid } from "../src/table.js";
-import { renderTrieTable } from "../src/trie-view.js";
+import { buildTrie, forkKeys } from "../src/tree.js";
+import { visibleLines, solo } from "../src/visibility.js";
+import { lineEditor } from "../src/line-editor.js";
+import { openPaths, setRenderHooks, getRenderHooks } from "../src/state.js";
+import { renderTrieTable, renderTrieNode } from "../src/trie-view.js";
 import { openTablePaths, getTraced, setTraced } from "../src/state.js";
 
 // Two sidelines sharing 1...c5 2. Nf3 d6 and forking on move 3, so the trie
@@ -335,5 +339,72 @@ test("tracing a group column and then a line under it swaps cleanly", () => {
 	cellOf(traceBox(s), "d4").onclick({}); // now a line under it
 	assert.strictEqual(getTraced(), "e4 c5 Nf3 d6 d4");
 	setTraced(null);
+	off();
+});
+
+// --- a group with one visible line left has nothing to group -----------------
+// A forking node keeps its own level when hiding narrows what is under it, so
+// that a group does not dissolve into the one child that survived. That rule
+// had no floor: Focus hides everything but one line, and every fork along its
+// path became a single-child wrapper -- seven "· 1 line" groups nested around
+// one row in a real notebook.
+
+// Two forks on the way down to Nf6, plus a branch off to the side.
+const FORKED =
+	"1. e4 e5 (1... c5 2. Nf3 d6 3. d4 Nf6 (3... a6)) (1... c5 2. Nf3 Nc6) (1... e6) 2. Nf3";
+
+function editorTrie(s) {
+	setRenderHooks({ ...getRenderHooks(), lineEditor });
+	const main = s.lines.find((l) => l.isMain);
+	const box = document.createElement("div");
+	const trie = buildTrie(visibleLines(s.lines), main);
+	// forks over EVERY line, hidden included — this is what app.js passes
+	const forks = forkKeys(s.lines, main);
+	openPaths.clear();
+	trie.children.forEach((c) =>
+		renderTrieNode(box, c, { n: 1 }, "", true, openPaths, forks),
+	);
+	return box;
+}
+const groupsIn = (box) => [...box.querySelectorAll("details.lgroup")];
+
+test("focusing one line does not wrap it in a ladder of single-line groups", () => {
+	const off = installDom();
+	const s = loadState(FORKED);
+	const target = s.lines.find((l) => l.moves.some((m) => m.san === "Nf6"));
+	solo(s.lines, [target]);
+	const box = editorTrie(s);
+	assert.strictEqual(
+		visibleLines(s.lines).filter((l) => !l.isMain).length,
+		1,
+		"the fixture really is focused on one line",
+	);
+	assert.strictEqual(
+		groupsIn(box).length,
+		1,
+		"the line's own group, and no fork wrappers above it",
+	);
+	// and the one group left still states the whole path down to it
+	const head = groupsIn(box)[0].querySelector("summary").textContent;
+	assert.match(head, /c5/);
+	assert.match(head, /Nf6/);
+	off();
+});
+
+test("a fork with several visible lines still keeps its level", () => {
+	const off = installDom();
+	const s = loadState(FORKED);
+	// hide ONE of the two lines under the inner d4 fork: the outer fork still
+	// separates the d6 branch from Nc6, so it must not dissolve
+	s.lines.find((l) => l.moves.some((m) => m.san === "a6")).hidden = true;
+	s.lines.find((l) => l.moves.some((m) => m.san === "e6")).hidden = true;
+	const box = editorTrie(s);
+	const heads = groupsIn(box).map((g) =>
+		g.querySelector("summary").textContent.replace(/\s+/g, " "),
+	);
+	assert.ok(
+		heads.some((h) => /2 lines/.test(h)),
+		"the fork that still has two lines under it keeps its group: " + heads,
+	);
 	off();
 });

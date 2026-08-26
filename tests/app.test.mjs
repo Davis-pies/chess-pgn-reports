@@ -965,15 +965,12 @@ const groupNamed = (txt) =>
 		d.querySelector("summary").firstChild.textContent.includes(txt),
 	);
 
-test("focusing a child group keeps its parent standing as a group", async () => {
-	app.reset();
-	const view = doc("view");
-	view.querySelector("textarea.pgnin").value = NESTED_PGN;
-	[...view.querySelectorAll("button")]
-		.find((b) => b.textContent.includes("Load"))
-		.click();
-	await tick();
-
+// A forking node keeps its own level while it still has SEVERAL visible lines
+// under it -- hiding a sibling must not dissolve a group into what survived.
+// With one visible line left there is nothing to group, and keeping the level
+// anyway stacked a wrapper per fork along that line's path.
+test("focusing a child group that still holds several lines keeps its parent", async () => {
+	await loadFocusPgn(); // 4...g6 holds two lines here
 	const parent = groupNamed("4.Nxd4");
 	assert.ok(parent, "the 2...Nc6 … 4.Nxd4 group is there to start");
 	const child = [...parent.querySelectorAll("details.lgroup")].find((d) =>
@@ -984,18 +981,11 @@ test("focusing a child group keeps its parent standing as a group", async () => 
 	child.querySelector("summary .chip.groupsolo").click();
 	await tick();
 
-	// the siblings and the 2...e6 branch are hidden — that part already worked
-	const hidden = getCurrent().lines.filter((l) => l.hidden);
-	assert.ok(
-		hidden.some((l) => l.moves.some((m) => m.san === "e5")),
-		"a sibling of the focused child is hidden",
+	assert.strictEqual(
+		getCurrent().lines.filter((l) => !l.hidden && !l.isMain).length,
+		2,
+		"two lines survive, so the fork still separates something",
 	);
-	assert.ok(
-		hidden.some((l) => l.moves.some((m) => m.san === "Bd3")),
-		"the unrelated 2...e6 branch is hidden",
-	);
-
-	// …and the parent is still its own level rather than merged into the child
 	const after = groupNamed("4.Nxd4");
 	assert.ok(after, "the parent group survives the focus");
 	assert.ok(
@@ -1008,6 +998,47 @@ test("focusing a child group keeps its parent standing as a group", async () => 
 		),
 		"the focused child is nested inside it",
 	);
+});
+
+test("focusing down to ONE line leaves it one group, not a ladder", async () => {
+	app.reset();
+	const view = doc("view");
+	view.querySelector("textarea.pgnin").value = NESTED_PGN;
+	[...view.querySelectorAll("button")]
+		.find((b) => b.textContent.includes("Load"))
+		.click();
+	await tick();
+
+	// 4...g6 holds a single line here, so focusing it leaves nothing to group
+	const child = [...doc("view").querySelectorAll(".markup details.lgroup")].find(
+		(d) => d.querySelector("summary").firstChild.textContent.includes("4...g6"),
+	);
+	assert.ok(child, "the 4...g6 group is there to start");
+	child.querySelector("summary .chip.groupsolo").click();
+	await tick();
+
+	assert.strictEqual(
+		getCurrent().lines.filter((l) => !l.hidden && !l.isMain).length,
+		1,
+		"one line survives the focus",
+	);
+	// the hidden drawer keeps its own trie of the 288 lines Focus put away, so
+	// count only the groups in the editor list itself
+	const groups = [
+		...doc("view").querySelectorAll(".markup details.lgroup"),
+	].filter((g) => !g.closest(".hidden-drawer"));
+	assert.strictEqual(
+		groups.length,
+		1,
+		"one group for the line, no fork wrappers above it:\n" +
+			groups
+				.map((g) => g.querySelector("summary").firstChild.textContent)
+				.join("\n"),
+	);
+	// and the surviving header still states the whole path down to the line
+	const head = groups[0].querySelector("summary").firstChild.textContent;
+	assert.match(head, /4\.Nxd4/);
+	assert.match(head, /4\.\.\.g6/);
 });
 
 // 4.Nxd4 forks into 4...e5 and 4...g6; the 4...g6 group itself holds two lines,
