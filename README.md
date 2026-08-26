@@ -47,7 +47,9 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    it, the symbol picker and note editor for that move, then Make mainline, Move to footnote, Focus and Hide
    for its line — the same controls as the editor panel, running the same code,
    so an edit made either way is the same edit. Right-clicking a group's own
-   column offers those line actions over every line under it. Line headers carry
+   column offers the same for its shared move — an edit there reaches every line
+   under the group, which is what annotating a shared move has always done — plus
+   those line actions over all of them. Line headers carry
    a **⋮** for the same menu without a move, and right-clicking any header — a
    line's or a group's — opens the same thing. Right-click never folds. The
    table's own controls row carries **Hide all** / **Show all** beside Expand

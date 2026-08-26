@@ -182,7 +182,14 @@ function refresh(box, target) {
 function buildInto(box, target) {
 	box.replaceChildren();
 	if (target.lines) {
+		// A group column's moves are shared by every line under it, and
+		// annotating a shared move already annotates all of them -- that is the
+		// rule everywhere else. So the move section belongs here too: any of the
+		// group's lines reaches the position, and moveSection resolves the
+		// shared group off it exactly as it would from a line column.
+		if (target.ply != null) moveSection(box, target.lines[0], target.ply);
 		box.appendChild(section(target.lines.length + " lines"));
+		// Still no Make mainline: a group is not one line.
 		lineActions(box, target.lines);
 	} else {
 		const { line, ply } = target;

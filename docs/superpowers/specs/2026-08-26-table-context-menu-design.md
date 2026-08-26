@@ -32,7 +32,7 @@ The browser's own menu is suppressed on cells that open ours, and nowhere else.
 | Right-click on | Sections |
 | --- | --- |
 | A **line** column's move cell | the move, then the line |
-| A **group** column's move cell | the group only |
+| A **group** column's move cell | the move, then the group |
 | A **line** column's header (or its `⋮`) | the line only — a header has no move |
 | A **group** column's header | the group only |
 
@@ -45,9 +45,16 @@ way `movePanel` heads it (`@ 10…Bh6 · 2 shared`).
 **Line section** — Make mainline · Move to footnote · Focus · Hide.
 
 **Group section** — Move to footnote · Focus · Hide, over every line under the
-group. No Make mainline: a group is not one line. No move section either — the
-moves in a group's column belong to all of its lines, and the editor's group
-chips have never offered per-move annotation for the same reason.
+group. No Make mainline: a group is not one line.
+
+**A group's move cell gets the move section too** — corrected from the first
+draft, which withheld it on the grounds that "the moves in a group's column
+belong to all of its lines". That is an argument *for* offering it, not against:
+annotating a shared move already annotates every line reaching that position,
+which is the rule the editor applies everywhere else. `moveSection` resolves the
+shared group off any of the group's lines and gets the same answer it would from
+a line column, so the group column is simply another place to reach an edit that
+was always available. It works with the group open or shut.
 
 The mainline column offers no Hide, Focus, Make mainline or footnote controls,
 matching `lineEditor`, which renders none of them for `isMain` — the mainline is
@@ -85,8 +92,8 @@ wide table most wants to see.
 
 The size is clamped to 200px rather than taking `getCurrent().boardSize`, which
 goes up to 400 and belongs to the printed report and the editor's panels, where
-there is room for it. A group column's menu draws none: its column stands for
-several lines, and it has no single move to show a position for.
+there is room for it. A group column's menu draws one for its move like any other; only a
+header's has none, having no move at all.
 
 **Borrowing a component across flex directions costs one reset.** `.cedit` is
 `flex: 1 1 300px`, sized for `.movepanel`, a ROW flex container, where that

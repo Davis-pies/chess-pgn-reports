@@ -106,15 +106,16 @@ export function renderTrieTable(container, g, orientation) {
 	renderTable(container, { ...g, vars, maxPly: subMaxPly(vars) }, orientation, {
 		litByVar,
 		// Right-click acts on the move; left-click still traces. A group column
-		// stands in for several lines, so it gets the group actions and no
-		// per-move section.
+		// gets the group's line actions and the move section both -- its moves
+		// are shared by every line under it, so annotating one there is the same
+		// edit the shared-move rule already makes from a line column.
 		onMenu: (v, ply, e) =>
 			openTableMenu({
 				x: e.clientX || 0,
 				y: e.clientY || 0,
 				from: e.currentTarget,
 				target: v.groupLines
-					? { lines: v.groupLines }
+					? { lines: v.groupLines, ply }
 					: { line: v.line, ply },
 			}),
 		onTrace: (v) => {

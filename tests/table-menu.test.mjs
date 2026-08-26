@@ -83,8 +83,9 @@ test("a shared move's menu says how many lines the edit reaches", () => {
 	const { box } = preview();
 	// d6 sits on the group column and is shared by both lines beneath it
 	const menu = rightClick(box, "d6");
-	const head = menu.querySelector(".tmenu-sec").textContent;
-	assert.match(head, /2 lines/, "group column: scoped to its lines");
+	const secs = [...menu.querySelectorAll(".tmenu-sec")].map((x) => x.textContent);
+	assert.match(secs[0], /^@ 2\.\.\.d6 · 2 shared/, "the move, and its reach");
+	assert.match(secs[1], /2 lines/, "then the group's own actions");
 	closeTableMenu();
 	off();
 });
@@ -93,8 +94,12 @@ test("a group column's menu acts on every line under it and offers no promote", 
 	const off = installDom();
 	const { s, box } = preview(GROUP_PLUS);
 	const menu = rightClick(box, "d6");
-	assert.deepStrictEqual(items(menu), ["Move to footnote", "Focus", "Hide"]);
-	assert.ok(!menu.querySelector(".sympick"), "no per-move section for a group");
+	assert.deepStrictEqual(
+		items(menu),
+		["Move to footnote", "Focus", "Hide"],
+		"no Make mainline: a group is not one line",
+	);
+	assert.ok(menu.querySelector(".sympick"), "but its shared move is editable");
 	click(menu, "Hide");
 	const inGroup = s.lines.filter((l) => l.moves.some((m) => m.san === "d6"));
 	const outside = s.lines.find((l) => l.moves.some((m) => m.san === "e6"));
@@ -421,11 +426,46 @@ test("the menu draws the position after the move it was opened on", () => {
 	off();
 });
 
-test("a group column's menu draws no board", () => {
+test("a group column's move gets a board like any other", () => {
 	const off = installDom();
 	const { box } = preview();
+	assert.ok(rightClick(box, "d6").querySelector(".tmenu-board svg"));
+	closeTableMenu();
+	off();
+});
+
+test("a symbol set on a group's move reaches every line under it", () => {
+	const off = installDom();
+	const { s, box } = preview();
+	const menu = rightClick(box, "d6"); // shared by both lines in the group
+	[...menu.querySelectorAll(".sympick button")]
+		.find((b) => b.textContent === "!")
+		.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+	const under = s.lines.filter((l) => l.moves.some((m) => m.san === "d6"));
+	assert.strictEqual(under.length, 2);
+	assert.ok(
+		under.every((l) => (l.marks || {})[3] === "!"),
+		"the shared-move rule, reached from the group column",
+	);
+	closeTableMenu();
+	off();
+});
+
+test("a note on a group's move lands on every line under it", () => {
+	const off = installDom();
+	const { s, box } = preview();
 	const menu = rightClick(box, "d6");
-	assert.strictEqual(menu.querySelector(".tmenu-board"), null);
+	const add = [...menu.querySelectorAll(".cedit input")].at(-1);
+	add.value = "shared from the group column";
+	add.dispatchEvent(
+		new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+	);
+	const under = s.lines.filter((l) => l.moves.some((m) => m.san === "d6"));
+	assert.ok(
+		under.every((l) =>
+			(l.comments || []).some((c) => c.text === "shared from the group column"),
+		),
+	);
 	closeTableMenu();
 	off();
 });
