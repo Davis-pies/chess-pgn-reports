@@ -149,7 +149,12 @@ test("collapse/expand variation headers are keyboard accessible", () => {
 	delete global.document;
 });
 
-test("collapsed branch cells (horizontal + vertical) are keyboard accessible and marked not-expanded", () => {
+// A collapsed branch's HEADER is its fold control, in both layouts, and is
+// operable from the keyboard. Its move cells deliberately do not fold: clicking
+// a move to see where it sits used to reshape the table under the reader, so
+// cells trace the line instead (see the trace tests in tests/trie-view.test.mjs)
+// and folding stays with the labelled ▸/▾ header.
+test("a collapsed branch folds from its header, not from its move cells", () => {
 	const { window } = dom();
 	global.document = window.document;
 
@@ -157,43 +162,32 @@ test("collapsed branch cells (horizontal + vertical) are keyboard accessible and
 		parsePgn("1. e4 e5 (1... c5 2. Nf3 Nc6) 2. Nf3 Nc6").nodes,
 	);
 
-	// vertical: a collapsed row's move cells are clickable to re-expand
-	let vCalled = 0;
-	const gv = grid(lines);
-	gv.vars[1].onclick = () => {
-		vCalled++;
-	};
-	gv.vars[1].collapsed = true;
-	const vContainer = document.createElement("div");
-	renderTable(vContainer, gv, "vertical");
-	const vCell = vContainer.querySelector("td.clickable:not(.var-head)");
-	assert.ok(vCell, "expected a clickable collapsed move cell (vertical)");
-	assert.strictEqual(vCell.tabIndex, 0);
-	assert.strictEqual(vCell.getAttribute("role"), "button");
-	assert.strictEqual(vCell.getAttribute("aria-expanded"), "false");
-	vCell.dispatchEvent(
-		new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
-	);
-	assert.strictEqual(vCalled, 1);
+	for (const orientation of ["vertical", "horizontal"]) {
+		let called = 0;
+		const g = grid(lines);
+		g.vars[1].onclick = () => {
+			called++;
+		};
+		g.vars[1].collapsed = true;
+		const container = document.createElement("div");
+		renderTable(container, g, orientation);
 
-	// horizontal: same, but the collapsed column's per-ply cells
-	let hCalled = 0;
-	const gh = grid(lines);
-	gh.vars[1].onclick = () => {
-		hCalled++;
-	};
-	gh.vars[1].collapsed = true;
-	const hContainer = document.createElement("div");
-	renderTable(hContainer, gh, "horizontal");
-	const hCell = hContainer.querySelector("td.clickable");
-	assert.ok(hCell, "expected a clickable collapsed move cell (horizontal)");
-	assert.strictEqual(hCell.tabIndex, 0);
-	assert.strictEqual(hCell.getAttribute("role"), "button");
-	assert.strictEqual(hCell.getAttribute("aria-expanded"), "false");
-	hCell.dispatchEvent(
-		new window.KeyboardEvent("keydown", { key: " ", bubbles: true }),
-	);
-	assert.strictEqual(hCalled, 1);
+		const head = container.querySelector(".var-head.clickable.collapsed");
+		assert.ok(head, `expected a clickable collapsed header (${orientation})`);
+		assert.strictEqual(head.tabIndex, 0);
+		assert.strictEqual(head.getAttribute("role"), "button");
+		assert.strictEqual(head.getAttribute("aria-expanded"), "false");
+		head.dispatchEvent(
+			new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+		);
+		assert.strictEqual(called, 1, `header folds (${orientation})`);
+
+		assert.strictEqual(
+			container.querySelector("td.clickable:not(.var-head)"),
+			null,
+			`move cells do not fold (${orientation})`,
+		);
+	}
 
 	delete global.document;
 });

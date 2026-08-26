@@ -241,9 +241,26 @@ function branchVar(node, open) {
 	for (let ply = 0; ply < d; ply++)
 		cells[ply] = { text: "…", cls: "ellip" };
 	const count = countLeaves(node);
+	// The path this column shows, as a line: every move from ply 0 down to the
+	// last one it spells out. Tracing a group column highlights how the reader
+	// GETS here -- the mainline prefix, any enclosing groups, and this column's
+	// own shared moves -- which is the only well-defined answer for a column
+	// that stands in for several lines.
+	//
+	// Named `moves` because that is what tracePath reads. It cannot reach the
+	// cards or the printed report: those build from grid() directly, and this
+	// var only ever enters the preview's list.
+	const lastShared = shared.length ? shared[shared.length - 1].ply : -1;
+	const anyLeaf = leavesOf(node)[0];
+	const stem = anyLeaf ? anyLeaf.moves.filter((m) => m.ply <= lastShared) : [];
 	return {
 		tag: "collapse",
 		label: "",
+		moves: stem,
+		// Its own identity, not the stem's SAN path: a group whose stem is
+		// exactly some line's moves (a line ending at the fork) would otherwise
+		// share that line's key and the two would trace each other.
+		traceKey: "@" + node.key,
 		// The same header either way, so opening a group turns its arrow and
 		// nothing else — a header that rewrote itself on click read as the
 		// column having been replaced. The shared moves are in the cells; this

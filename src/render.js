@@ -201,15 +201,17 @@ export function renderTable(container, grid, orientation, trace) {
 		if (!lit) return;
 		c.classList.add(lit.get(v)?.has(ply) ? "traced" : "faded");
 	};
-	// A line column is a trace target: clicking any of its cells or its header
-	// toggles the highlight. Group columns are left alone — their click folds a
-	// level, and a group stands in for several lines rather than being one.
+	// Move cells trace; headers fold. A group column's cells used to expand it,
+	// which meant a reader clicking a move to see where it sits got the table
+	// reshaped under them instead. Its ▸/▾ header is the fold control, and its
+	// cells trace the stem — how the reader gets to that group — like any other
+	// column.
 	//
 	// `traceable`, not `clickable`: the latter means "this folds a branch"
 	// everywhere else in the table, and quietly widening it to cover a second,
 	// unrelated affordance would make every count of fold controls wrong.
 	const wireTrace = (el, v) => {
-		if (!trace || !v.moves || v.onclick) return;
+		if (!trace || !v.moves) return;
 		el.classList.add("traceable");
 		el.tabIndex = 0;
 		el.setAttribute("role", "button");
@@ -243,7 +245,7 @@ export function renderTable(container, grid, orientation, trace) {
 			(v.collapsed ? " collapsed" : "") +
 			groupClass(v) +
 			traceClass(v);
-		wireTrace(c, v);
+		if (!v.onclick) wireTrace(c, v);
 		if (v.onclick) {
 			wireExpandControl(c, v.onclick, !v.collapsed);
 			c.title = v.collapsed ? v.name || "expand branch" : "collapse branch";
@@ -285,7 +287,7 @@ export function renderTable(container, grid, orientation, trace) {
 				(v.collapsed ? " collapsed" : "") +
 				groupClass(v) +
 				traceClass(v);
-			wireTrace(th, v);
+			if (!v.onclick) wireTrace(th, v);
 			if (v.onclick) {
 				wireExpandControl(th, v.onclick, !v.collapsed);
 				th.title = v.collapsed ? v.name || "expand branch" : "collapse branch";
@@ -305,10 +307,6 @@ export function renderTable(container, grid, orientation, trace) {
 				const c = moveCell(v.cells[ply], ply, v.noteByPly);
 				c.className += groupClass(v);
 				if (v === vars[0]) c.classList.add("main-col", "sticky-col");
-				if (v.onclick && v.collapsed) {
-					c.classList.add("clickable");
-					wireExpandControl(c, v.onclick, false);
-				}
 				cellTrace(c, v, ply);
 				wireTrace(c, v);
 				tr.appendChild(c);
@@ -337,10 +335,6 @@ export function renderTable(container, grid, orientation, trace) {
 			for (let ply = 0; ply <= maxPly; ply++) {
 				const c = moveCell(v.cells[ply], ply, v.noteByPly);
 				c.className += groupClass(v);
-				if (v.onclick && v.collapsed) {
-					c.classList.add("clickable");
-					wireExpandControl(c, v.onclick, false);
-				}
 				cellTrace(c, v, ply);
 				wireTrace(c, v);
 				tr.appendChild(c);

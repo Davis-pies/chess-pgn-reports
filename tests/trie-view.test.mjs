@@ -265,3 +265,75 @@ test("the vertical layout traces the same cells", () => {
 	setTraced(null);
 	off();
 });
+
+test("clicking a move in a collapsed group traces it instead of expanding", () => {
+	const off = installDom();
+	const s = loadState(GROUP);
+	openTablePaths.clear(); // the group starts shut
+	setTraced(null);
+	const box = traceBox(s);
+	const d6 = [...box.querySelectorAll("td")].find((c) => moveOf(c) === "d6");
+	d6.onclick({});
+	assert.ok(!openTablePaths.has(GROUP_KEY), "the group stays shut");
+	assert.ok(getTraced(), "a trace started instead");
+	// the traced stem: the mainline's e4, then the moves the column shows
+	const lit = [...traceBox(s).querySelectorAll("td.traced")].map(moveOf).sort();
+	assert.deepStrictEqual(lit, ["Nf3", "c5", "d6", "e4"].sort());
+	setTraced(null);
+	off();
+});
+
+test("a group's header still folds while its cells trace", () => {
+	const off = installDom();
+	const s = loadState(GROUP);
+	openTablePaths.clear();
+	openTablePaths.add(GROUP_KEY);
+	setTraced(null);
+	const head = [...traceBox(s).querySelectorAll("th.var-head")].find((h) =>
+		h.textContent.includes("2 lines"),
+	);
+	head.onclick({});
+	assert.ok(!openTablePaths.has(GROUP_KEY), "the header folded the group");
+	assert.strictEqual(getTraced(), null, "and started no trace");
+	off();
+});
+
+test("a group column's trace is its own, not a line's that ends at the fork", () => {
+	const off = installDom();
+	// a bare 1...c5 line beside 1...c5 2.Nf3 and 1...c5 2.Nc3: the group's stem
+	// is exactly the short line's moves, so a SAN-path key would collide
+	const s = loadState("1. e4 e5 (1... c5) (1... c5 2. Nf3) (1... c5 2. Nc3) 2. Nf3");
+	openTablePaths.clear();
+	openTablePaths.add("1:c5");
+	setTraced(null);
+	const box = traceBox(s);
+	const groupCell = [...box.querySelectorAll("td")].find(
+		(c) => moveOf(c) === "c5" && c.className.includes("collapsed"),
+	);
+	groupCell.onclick({});
+	assert.strictEqual(getTraced(), "@1:c5", "the group traces by its own key");
+	// the short line's own column is NOT part of the group's stem
+	const after = traceBox(s);
+	const shortCol = [...after.querySelectorAll("td.traced")].filter(
+		(c) => moveOf(c) === "c5",
+	);
+	assert.strictEqual(shortCol.length, 1, "only the group column's c5 lights");
+	setTraced(null);
+	off();
+});
+
+test("tracing a group column and then a line under it swaps cleanly", () => {
+	const off = installDom();
+	const s = loadState(GROUP);
+	openTablePaths.clear();
+	openTablePaths.add(GROUP_KEY);
+	setTraced(null);
+	const cellOf = (box, san) =>
+		[...box.querySelectorAll("td")].find((c) => moveOf(c) === san);
+	cellOf(traceBox(s), "d6").onclick({}); // a group-column cell
+	assert.strictEqual(getTraced(), "@" + GROUP_KEY);
+	cellOf(traceBox(s), "d4").onclick({}); // now a line under it
+	assert.strictEqual(getTraced(), "e4 c5 Nf3 d6 d4");
+	setTraced(null);
+	off();
+});

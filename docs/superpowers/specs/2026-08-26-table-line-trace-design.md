@@ -108,11 +108,32 @@ test that sets a trace and asserts print emits neither class.
 
 ## 7. Interaction
 
+**Move cells trace; headers fold.**
+
 | Target | Behaviour |
 | --- | --- |
-| Any cell or header of a **line** column | toggle the trace on that line |
-| A **group** column | unchanged — expand/collapse. A group is not one line |
+| Any move cell, in any column | toggle the trace on that column's line |
+| A **line** column's header | toggle the trace on that line |
+| A **group** column's header | expand/collapse, unchanged |
 | **Clear trace** chip in `.tbl-controls` | clears; shown only while a trace is resolved |
+
+A collapsed group's move cells used to expand it. That made clicking a move to
+see where it sits reshape the table under the reader — the one thing a reading
+aid should not do. The ▸/▾ header is the labelled fold control and keeps that
+job alone.
+
+**What a group column traces: its stem** — every move from ply 0 down to the
+last one the column spells out. A group stands in for several lines, so "that
+line" has no other well-defined answer; the stem is how the reader *gets* to
+the group, which is what the column is showing. It works the same open or shut.
+
+A group column carries `traceKey` (its trie node key) rather than being keyed
+by its stem's SAN path: a group whose stem is exactly some line's moves — a
+line ending at the fork — would otherwise share that line's key and the two
+would trace each other. The stem itself lives on the group var as `moves`,
+which is what `tracePath` reads; it cannot reach the cards or the printed
+report, because those build from `grid()` directly and this var only ever
+enters the preview's list.
 
 The toggle compares against the **resolved** trace rather than the stored key,
 so clicking a line whose trace is currently invisible sets it rather than

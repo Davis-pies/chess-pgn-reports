@@ -14,7 +14,12 @@
 // survives. Group columns stand in for several lines and have no `moves` of
 // their own, so they have no key and can never be traced.
 export function tracedKey(v) {
-	return v && v.moves ? v.moves.map((m) => m.san).join(" ") : null;
+	if (!v) return null;
+	// A group column carries its own key: its stem can be exactly some line's
+	// moves (a line ending at the fork), and a shared key would make the two
+	// trace each other.
+	if (v.traceKey) return v.traceKey;
+	return v.moves ? v.moves.map((m) => m.san).join(" ") : null;
 }
 
 // Which cells make up the line `key` names: Map(var -> Set(ply)).

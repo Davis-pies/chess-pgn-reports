@@ -36,10 +36,13 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    and the lines inside it start where the group's shared moves left off rather
    than repeating them. A note on one of those shared moves is marked on the
    group's own column, which is where the move is shown — open or shut.
-   Clicking a line's column **traces** it: every cell that makes up that line
-   lights up — its opening moves in the Mainline column, the shared moves in
-   whatever group columns enclose it, and its own tail — and the rest of the
-   table drops back. Click it again, or **Clear trace**, to stop. A trace is a
+   Clicking any move in the table **traces** its line: every cell that makes up
+   that line lights up — its opening moves in the Mainline column, the shared
+   moves in whatever group columns enclose it, and its own tail — and the rest
+   of the table drops back. Clicking a move in a group's own column traces that
+   group's stem, the path down to the moves it shares, whether the group is open
+   or shut; folding stays on the ▸/▾ header, so clicking a move never reshapes
+   the table. Click it again, or **Clear trace**, to stop. A trace is a
    reading aid: it isn't saved with the notebook, and a group folding over the
    traced line simply stops showing it rather than going stale. The printed
    report is unaffected by any of this — it shows every line's full divergence,
