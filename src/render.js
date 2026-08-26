@@ -140,6 +140,17 @@ function wireExpandControl(el, handler, expanded) {
 	};
 }
 
+// The shading that marks an open group's block: every column (or row) the
+// group's ▾ would fold shares one class, and a group nested inside another
+// alternates to the second shade so the nesting reads. `grp-start` is the
+// group's own column, where the control lives.
+function groupClass(v) {
+	if (!v.gdepth) return "";
+	return (
+		" grp g" + (((v.gdepth - 1) % 2) + 1) + (v.gstart ? " grp-start" : "")
+	);
+}
+
 function td(text, cls) {
 	const e = document.createElement("td");
 	if (text) e.textContent = text;
@@ -190,7 +201,8 @@ export function renderTable(container, grid, orientation) {
 		c.className =
 			"var-head" +
 			(v.onclick ? " clickable" : "") +
-			(v.collapsed ? " collapsed" : "");
+			(v.collapsed ? " collapsed" : "") +
+			groupClass(v);
 		if (v.onclick) {
 			wireExpandControl(c, v.onclick, !v.collapsed);
 			c.title = v.collapsed ? v.name || "expand branch" : "collapse branch";
@@ -229,7 +241,8 @@ export function renderTable(container, grid, orientation) {
 				"var-head" +
 				(i === 0 ? " main-col sticky-col" : "") +
 				(v.onclick ? " clickable" : "") +
-				(v.collapsed ? " collapsed" : "");
+				(v.collapsed ? " collapsed" : "") +
+				groupClass(v);
 			if (v.onclick) {
 				wireExpandControl(th, v.onclick, !v.collapsed);
 				th.title = v.collapsed ? v.name || "expand branch" : "collapse branch";
@@ -247,6 +260,7 @@ export function renderTable(container, grid, orientation) {
 			tr.appendChild(num);
 			for (const v of vars) {
 				const c = moveCell(v.cells[ply], ply, v.noteByPly);
+				c.className += groupClass(v);
 				if (v === vars[0]) c.classList.add("main-col", "sticky-col");
 				if (v.onclick && v.collapsed) {
 					c.classList.add("clickable");
@@ -277,6 +291,7 @@ export function renderTable(container, grid, orientation) {
 			tr.appendChild(vh);
 			for (let ply = 0; ply <= maxPly; ply++) {
 				const c = moveCell(v.cells[ply], ply, v.noteByPly);
+				c.className += groupClass(v);
 				if (v.onclick && v.collapsed) {
 					c.classList.add("clickable");
 					wireExpandControl(c, v.onclick, false);

@@ -357,6 +357,80 @@ test("table preview: rows span only visible columns, no trailing empty rows", as
 
 });
 
+test("table preview: an open group's lines don't repeat its shared moves", async () => {
+	app.reset();
+
+	const textarea = doc("view").querySelector("textarea.pgnin");
+	textarea.value =
+		"1. e4 e5 (1... c5 2. Nf3 Nc6 3. Bb5) (1... c5 2. Nf3 Nc6 3. a4) 2. Nf3";
+	[...doc("view").querySelectorAll("button")]
+		.find((b) => b.textContent.includes("Load"))
+		.click();
+	await tick();
+
+	// shut, the group column is the only thing carrying the shared moves
+	assert.deepStrictEqual(
+		[...doc("view").querySelectorAll(".pv-table table.tbl td.collapsed")].map(
+			(c) => c.textContent,
+		),
+		["c5", "Nf3", "Nc6"],
+		"collapsed group shows the shared continuation",
+	);
+
+	doc("view").querySelector(".pv-table th.clickable.collapsed").click();
+	const rows = [...doc("view").querySelectorAll(".pv-table table.tbl tr")];
+	// header + ply 0..4; columns are: ply | mainline | group | Bb5 | a4
+	const col = (i) => rows.slice(1).map((tr) => tr.children[i].textContent);
+	assert.deepStrictEqual(
+		col(2),
+		["\u2026", "c5", "Nf3", "Nc6", ""],
+		"the open group keeps the shared moves in its own column",
+	);
+	assert.deepStrictEqual(
+		col(3),
+		["\u2026", "\u2026", "\u2026", "\u2026", "Bb5"],
+		"a line under it starts where the group left off",
+	);
+	assert.deepStrictEqual(col(4), ["\u2026", "\u2026", "\u2026", "\u2026", "a4"]);
+
+	// the block a click would fold is shaded, group column included
+	assert.strictEqual(
+		rows[1].querySelectorAll("td.grp.g1").length,
+		3,
+		"group column and both lines share one shade",
+	);
+	assert.strictEqual(
+		rows[0].querySelectorAll("th.grp.g1.grp-start").length,
+		1,
+		"only the group's own column starts the block",
+	);
+
+});
+
+test("table preview: a line ending at the fork keeps its last move", async () => {
+	app.reset();
+
+	const textarea = doc("view").querySelector("textarea.pgnin");
+	textarea.value =
+		"1. e4 e5 (1... c5 2. Nf3) (1... c5 2. Nf3 Nc6) (1... c5 2. Nf3 Nf6) 2. Nf3";
+	[...doc("view").querySelectorAll("button")]
+		.find((b) => b.textContent.includes("Load"))
+		.click();
+	await tick();
+	doc("view").querySelector(".pv-table th.clickable.collapsed").click();
+
+	const rows = [...doc("view").querySelectorAll(".pv-table table.tbl tr")];
+	const col = (i) => rows.slice(1).map((tr) => tr.children[i].textContent);
+	// columns: ply | mainline | group | 2.Nf3 (stops at the fork) | Nc6 | Nf6
+	assert.deepStrictEqual(
+		col(3),
+		["\u2026", "\u2026", "Nf3", ""],
+		"eliding everything would leave an empty column, so the last move stays",
+	);
+	assert.deepStrictEqual(col(4), ["\u2026", "\u2026", "\u2026", "Nc6"]);
+
+});
+
 test("deleting one saved workbook removes only its row, not the whole list", async () => {
 	app.reset();
 	// pre-seed two saved notebooks directly via store.js (avoids a

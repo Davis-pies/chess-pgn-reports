@@ -3,7 +3,7 @@ import assert from "node:assert";
 import { installDom, loadState } from "./helpers.mjs";
 import { appendPrintTables } from "../src/print.js";
 import { grid } from "../src/table.js";
-import { getCurrent } from "../src/state.js";
+import { getCurrent, openTablePaths } from "../src/state.js";
 
 // A long mainline plus enough shallow sidelines to force packForPrint to emit
 // more than one table (each diverges at ply 1, so each becomes its own chunk).
@@ -135,5 +135,33 @@ test("the print notes block renders a group's nested members", () => {
     1,
     "one [n] marker for the whole group",
   );
+  off();
+});
+
+// The screen preview folds branches into group columns, tints the block a fold
+// would take, and elides the moves that block's header already shows. None of
+// that is allowed to reach the printed report: appendPrintTables builds from
+// grid() straight, so every line prints its full divergence from the mainline.
+test("the printed table is untouched by the preview's grouping", () => {
+  const off = installDom();
+  openTablePaths.add("1:c5");
+  openTablePaths.add("1:c5/2:Nf3");
+  const box = printTables(
+    "1. e4 e5 (1... c5 2. Nf3 Nc6 3. Bb5) (1... c5 2. Nf3 Nc6 3. a4) 2. Nf3",
+  );
+  assert.strictEqual(
+    box.querySelectorAll(".grp, .collapsed, .clickable").length,
+    0,
+    "no group shading, stubs or fold controls in print",
+  );
+  const rows = [...box.querySelectorAll("table.tbl tr")];
+  const col = (i) => rows.slice(1).map((tr) => tr.children[i].textContent);
+  assert.deepStrictEqual(
+    col(2),
+    ["\u2026", "c5", "Nf3", "Nc6", "Bb5"],
+    "print keeps each line's whole divergence",
+  );
+  assert.deepStrictEqual(col(3), ["\u2026", "c5", "Nf3", "Nc6", "a4"]);
+  openTablePaths.clear();
   off();
 });

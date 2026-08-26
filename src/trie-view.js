@@ -70,23 +70,67 @@ export function renderTrieTable(container, g, orientation) {
 // It carries no line count while open (the lines are right there) and no fold
 // lives on the line columns, so one click closes exactly one level instead of
 // however many the reader had opened.
-function pushNode(node, vars) {
+//
+// `depth` tints the block: an open group and everything beneath it carry the
+// same depth, so the shading marks exactly what that group's ▾ will fold, and a
+// group nested inside another shades one step further.
+function pushNode(node, vars, depth = 0, cut = -1) {
 	// one line under it: just that line's column, with nothing to fold
 	if (countLeaves(node) === 1) {
-		vars.push(...leavesOf(node));
+		leavesOf(node).forEach((l) => vars.push(tag(elide(l, cut), depth)));
 		return;
 	}
 	const open = openTablePaths.has(node.key);
-	vars.push(branchVar(node, open));
+	const v = branchVar(node, open);
+	// A shut branch belongs to whatever block encloses it; an open one opens a
+	// block of its own and shares that block with its children.
+	const d = open ? depth + 1 : depth;
+	if (d) v.gdepth = d;
+	if (open) v.gstart = true;
+	vars.push(v);
 	if (!open) return;
 	// Down to the first real fork before recursing: sharedMoves already put the
 	// single-child chain in the column above, so opening one level per shared
 	// move would reveal nothing new. It also means an open group never has a
 	// single child — the fork has at least two things under it.
 	const fork = forkOf(node);
+	// ...and the group column is now carrying those shared moves on screen, so
+	// everything under it starts where the group left off.
+	const inner = fork.move.ply;
 	// a line ending exactly at the fork is a column beside its continuations
-	if (fork.leaf) vars.push(fork.leaf);
-	fork.children.forEach((c) => pushNode(c, vars));
+	if (fork.leaf) vars.push(tag(elide(fork.leaf, inner), d));
+	fork.children.forEach((c) => pushNode(c, vars, d, inner));
+}
+
+function tag(v, depth) {
+	return depth ? { ...v, gdepth: depth } : v;
+}
+
+// Elide the moves an open ancestor group's column is already showing.
+//
+// A line column only has to say how it differs from the column above it; while
+// the group is shut there is no such column, so the line spells its whole
+// divergence out, but once the group is open repeating its shared moves in
+// every child just pushes each line's own continuation off to the right.
+// Elided moves become the same "…" the mainline prefix already uses, so the
+// column still starts at ply 0 and the rows stay aligned.
+//
+// A line that ends AT the fork would be left with nothing, so its last move
+// stays put: an empty column reads as a bug rather than as "this line stops
+// here". Note markers are not moved — rows are plies, so a marker left on an
+// elided cell still sits at the move it annotates.
+function elide(v, cut) {
+	if (cut < 0) return v;
+	const own = Object.keys(v.cells)
+		.map(Number)
+		.filter((p) => v.cells[p].cls !== "ellip");
+	if (!own.length) return v;
+	const last = Math.max(...own);
+	const upto = last <= cut ? last - 1 : cut;
+	const cells = {};
+	for (const [k, c] of Object.entries(v.cells))
+		cells[k] = Number(k) <= upto ? { text: "\u2026", cls: "ellip" } : c;
+	return { ...v, cells };
 }
 
 // The end of a node's single-child chain — the node sharedMoves() stops at.

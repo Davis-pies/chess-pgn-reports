@@ -99,3 +99,50 @@ load, so opening a notebook or importing a PGN carried the previous notebook's
 open branches over. Its keys are move paths, so an unrelated notebook sharing a
 path opened branches nobody asked for. It now clears alongside `openPaths` and
 `closedNotePaths` at both reset sites in `app.js`.
+
+---
+
+## 6. Showing what a fold will take
+
+Nesting is only usable if a reader can see, before clicking, which columns a
+`▾` will fold. Indentation is the editor's answer, but a table has no indent to
+give: every column starts at ply 0.
+
+So the block is **tinted**. `pushNode` carries a `depth`: an open group and
+everything beneath it share one value, a shut branch inherits whatever block
+encloses it, and a group nested inside another takes the next value up.
+`render.js` turns that into `grp g1`/`grp g2` on the cells and header — two
+shades alternating by depth, so a nested block separates from its parent — plus
+`grp-start` on the group's own column, which draws the edge the block begins at
+(a left border in the horizontal layout, a top border in the vertical one).
+
+Two shades rather than one per level: the tint is a quiet cue, and a scale of
+five ever-darker greys would compete with the moves for attention while still
+running out at depth six.
+
+## 7. An open group's column is the block's prefix
+
+Once a group's column is on screen carrying the shared moves, every line under
+it repeating those same moves is noise — and worse, it pushes each line's own
+continuation to the right of a run of cells the reader has already read.
+
+So `elide(v, cut)` rewrites a line's cells at or before the group's fork ply
+into the same `…` the mainline prefix already uses. Columns still start at ply
+0 and rows stay aligned; the line simply begins where its group left off. While
+the group is *shut* there is no column carrying those moves, so nothing is
+elided and the line spells its whole divergence out as before.
+
+Two details:
+
+- A line that ends exactly at the fork would be elided to nothing, and an empty
+  column reads as a bug rather than as "this line stops here". Its last move
+  stays.
+- Note markers are not moved. Rows are plies, so a `[n]` left on an elided cell
+  still sits at the move it annotates.
+
+**None of this reaches the printed report.** Grouping, tinting and elision all
+live in `pushNode`, which only `renderTrieTable` calls. `appendPrintTables`
+builds from `grid()` directly, so the PDF still prints every line's full
+divergence from the mainline, with no stubs, shading or fold controls —
+`tests/print.test.mjs` pins that with the preview's branches deliberately left
+open.

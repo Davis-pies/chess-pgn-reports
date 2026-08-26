@@ -14,6 +14,10 @@
   --muted: #6b7280;
   --line: #e5e7eb;
   --head-bg: #f3f4f6;
+  /* open-group shading in the table; two shades so nesting reads */
+  --grp-a: #eaf0fa;
+  --grp-b: #dbe5f6;
+  --grp-edge: #9db8e0;
   --lift: #ffffff;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
@@ -33,6 +37,9 @@
   --muted: #9aa2b1;
   --line: #33363f;
   --head-bg: #23262d;
+  --grp-a: #1d2331;
+  --grp-b: #262f42;
+  --grp-edge: #4a5f85;
   --lift: #23262d;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
@@ -331,6 +338,30 @@ select:focus {
 .lgroup-body {
   margin-top: 4px;
 }
+/* An open group's block: the columns (horizontal) or rows (vertical) that its
+   ▾ will fold, shaded as one so what a click takes away is visible before the
+   click. Written as `tr td` / `tr th` so it outranks the zebra striping below,
+   which is otherwise more specific. */
+.tbl tr td.grp.g1,
+.tbl tr th.grp.g1 {
+  background: var(--grp-a);
+}
+.tbl tr td.grp.g2,
+.tbl tr th.grp.g2 {
+  background: var(--grp-b);
+}
+/* The group's own column/row — the one carrying the control — opens the block
+   with an edge. Horizontal lays the block out across columns, vertical down
+   rows, so the edge turns with it. */
+.tbl-h tr td.grp-start,
+.tbl-h tr th.grp-start {
+  border-left: 2px solid var(--grp-edge);
+}
+.tbl:not(.tbl-h) tr td.grp-start,
+.tbl:not(.tbl-h) tr th.grp-start {
+  border-top: 2px solid var(--grp-edge);
+}
+
 .tbl-controls {
   margin: 4px 0;
 }
