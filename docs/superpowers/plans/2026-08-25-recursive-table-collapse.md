@@ -4,7 +4,7 @@
 
 **Goal:** Expanding a table branch reveals its immediate children rather than every leaf, and clicking folds exactly one level.
 
-**Architecture:** All of it lands in `renderTrieTable` in `src/trie-view.js`. `pushNode(node, vars, fold)` recurses one level at a time; `forkOf(node)` skips single-child chains so opening never reveals a pointless level; `collapsedVar` is renamed `branchVar` and still only ever built for a shut branch. An open group deliberately gets NO column of its own — that was tried during implementation and dropped as clutter, since a header column costs table width at every open level to repeat what its children already show. The fold lives on the line columns instead, each closing the nearest open group it sits in. `src/render.js` is untouched.
+**Architecture:** All of it lands in `renderTrieTable` in `src/trie-view.js`. `pushNode(node, vars, fold)` recurses one level at a time; `forkOf(node)` skips single-child chains so opening never reveals a pointless level; `collapsedVar` is renamed `branchVar` and still only ever built for a shut branch. An open group keeps a column of its own — dropped mid-implementation as clutter, then restored: without it a group whose children are all branches has only shut stubs beneath it and cannot be folded at all. It shows the shared moves alone while open (no line count) and is the group's only control, so a click closes exactly one level. `src/render.js` is untouched.
 
 **Tech Stack:** Vanilla ES modules, no build step. Tests are `node --test` with jsdom.
 

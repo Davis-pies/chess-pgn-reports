@@ -474,6 +474,7 @@ function openNotebook(id) {
       alert("Could not open workbook: " + e.message);
     }
     openPaths.clear();
+    openTablePaths.clear();
     closedNotePaths.clear();
     renderApp();
   });
@@ -719,6 +720,7 @@ function importPanel() {
           return;
         }
         openPaths.clear();
+        openTablePaths.clear();
         closedNotePaths.clear();
         setCurrent(
           freshState({

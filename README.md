@@ -30,8 +30,8 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    themes (toggle in the toolbar). Sidelines show only their divergent tail. In the table a multi-line branch
    shows as one collapsed column of the moves its lines share; opening it
    reveals its immediate children — lines and further branches — one level at a
-   time, the way the editor's grouped view nests, and clicking a line's column
-   folds just the group it sits in.
+   time, the way the editor's grouped view nests. An open group keeps a column
+   of its own showing the shared moves, and clicking it folds that one level.
    Comment moves carry numbered `[n]` markers on the owning line only; a
    footnote's own notes become lettered sub-notes (a, b, c …) under its entry,
    restarting at `a` for each footnote and marked inside its move text — unless

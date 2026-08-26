@@ -61,36 +61,32 @@ export function renderTrieTable(container, g, orientation) {
 
 // A trie node's contribution to the column list, one level at a time.
 //
-// An open group has NO column of its own. The editor can afford a header per
-// group because a group there costs a row; here it would cost a column at every
-// open level, repeating the prefix its own children already spell out. So the
-// group's fold lives on its line columns instead: `fold` collapses the nearest
-// open group a column sits in, which keeps a click to exactly one level rather
-// than dropping however many the reader had opened.
-function pushNode(node, vars, fold) {
-	// one line under it: just that line's column, folding the group it sits in
+// An open group keeps a column of its own: the moves its lines share, and the
+// only control in the group. That column is not decoration — without it a group
+// whose children are ALL branches would be unfoldable, since every column under
+// it would be a shut stub whose click opens rather than closes, leaving
+// Collapse all as the only way back out.
+//
+// It carries no line count while open (the lines are right there) and no fold
+// lives on the line columns, so one click closes exactly one level instead of
+// however many the reader had opened.
+function pushNode(node, vars) {
+	// one line under it: just that line's column, with nothing to fold
 	if (countLeaves(node) === 1) {
-		leavesOf(node).forEach((l) =>
-			vars.push(fold ? { ...l, onclick: fold } : l),
-		);
+		vars.push(...leavesOf(node));
 		return;
 	}
-	if (!openTablePaths.has(node.key)) {
-		vars.push(branchVar(node));
-		return;
-	}
-	const foldThis = () => {
-		openTablePaths.delete(node.key);
-		getRenderHooks().rerenderTable();
-	};
+	const open = openTablePaths.has(node.key);
+	vars.push(branchVar(node, open));
+	if (!open) return;
 	// Down to the first real fork before recursing: sharedMoves already put the
-	// single-child chain in the stub above, so opening one level per shared move
-	// would reveal nothing new. It also means an open group never has a single
-	// child — the fork has at least two things under it.
+	// single-child chain in the column above, so opening one level per shared
+	// move would reveal nothing new. It also means an open group never has a
+	// single child — the fork has at least two things under it.
 	const fork = forkOf(node);
 	// a line ending exactly at the fork is a column beside its continuations
-	if (fork.leaf) vars.push({ ...fork.leaf, onclick: foldThis });
-	fork.children.forEach((c) => pushNode(c, vars, foldThis));
+	if (fork.leaf) vars.push(fork.leaf);
+	fork.children.forEach((c) => pushNode(c, vars));
 }
 
 // The end of a node's single-child chain — the node sharedMoves() stops at.
@@ -100,10 +96,11 @@ function forkOf(node) {
 	return n;
 }
 
-// A shut trie branch as a single column/row of its shared continuation: the
-// moves common to all its lines up to the first fork, with divergent cells
-// empty. Its header is clickable to open it one level.
-function branchVar(node) {
+// A trie branch as a single column/row of its shared continuation: the moves
+// common to all its lines up to the first fork, with divergent cells empty.
+// Shut, it stands in for the lines underneath and says how many there are;
+// open, it is the group's header and shows the shared moves alone.
+function branchVar(node, open) {
 	const shared = sharedMoves(node); // [{ ply, san }] down the single-child chain
 	const cells = {};
 	shared.forEach((m) => {
@@ -117,13 +114,18 @@ function branchVar(node) {
 	return {
 		tag: "collapse",
 		label: "",
-		name: `${count} lines`, // compact: the shared moves are in the column cells
+		// shut: how much is folded away in here. Open: nothing but the shared
+		// moves already in the cells — the lines it counts are on screen beside
+		// it, and a count repeated over every open level is what made an earlier
+		// version of this column read as clutter.
+		name: open ? "" : `${count} lines`,
 		eval: "",
 		cells,
 		noteByPly: {},
-		collapsed: true,
+		collapsed: !open,
 		onclick: () => {
-			openTablePaths.add(node.key);
+			if (open) openTablePaths.delete(node.key);
+			else openTablePaths.add(node.key);
 			getRenderHooks().rerenderTable();
 		},
 	};

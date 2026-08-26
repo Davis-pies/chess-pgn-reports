@@ -292,11 +292,11 @@ test("table preview: mainline always visible, branches collapsed by default", as
 	);
 	assert.strictEqual(
 		pv2.querySelectorAll("table.tbl th.clickable:not(.collapsed)").length,
-		2,
-		"fork's two line headers are clickable (to collapse)",
+		1,
+		"the opened group keeps one column, and it is the only control",
 	);
 
-	// clicking an expanded line collapses the fork again
+	// clicking the group's column folds the fork again
 	pv2.querySelector("table.tbl th.clickable:not(.collapsed)").click();
 	assert.strictEqual(
 		doc("view").querySelectorAll(".pv-table th.clickable.collapsed").length,
@@ -971,9 +971,9 @@ test("group Focus shows the focused lines in the table, not a collapsed stub", a
 	const visible = getCurrent().lines.filter((l) => !l.hidden && !l.isMain);
 	assert.strictEqual(visible.length, 2, "two lines survive the focus");
 	assert.strictEqual(
-		doc("view").querySelectorAll(".pv-table .collapsed").length,
+		doc("view").querySelectorAll(".pv-table th.clickable.collapsed").length,
 		0,
-		"the focused branch is not shown as an 'N lines' stub:\n" +
+		"the focused branch is not left shut as an 'N lines' stub:\n" +
 			tableRows().join("\n"),
 	);
 	// both focused lines have a row of their own, so their divergent moves show
@@ -994,9 +994,9 @@ test("per-line Focus shows that line in the table", async () => {
 	await tick();
 
 	assert.strictEqual(
-		doc("view").querySelectorAll(".pv-table .collapsed").length,
+		doc("view").querySelectorAll(".pv-table th.clickable.collapsed").length,
 		0,
-		"no collapsed stub:\n" + tableRows().join("\n"),
+		"no shut stub:\n" + tableRows().join("\n"),
 	);
 	assert.ok(
 		doc("view").querySelector(".pv-table").textContent.includes("Nb5"),
@@ -1110,25 +1110,51 @@ test("the table opens one level at a time", async () => {
 	assert.match(shut()[0].textContent, /3 lines/);
 
 	shut()[0].click();
-	// one level down: the 2.Nf3 fork is a stub of its own, and 2.Nc3's lone line
+	// one level down: the 2.Nf3 fork is a stub of its own and 2.Nc3's lone line
 	// is a plain column — the branch did not explode into all three lines
 	assert.strictEqual(shut().length, 1, "its 2.Nf3 child is a branch, still shut");
 	assert.match(shut()[0].textContent, /2 lines/);
-	assert.strictEqual(live().length, 1, "2.Nc3's single line got its own column");
+	assert.strictEqual(live().length, 1, "the opened group is the only control");
+	assert.ok(
+		!/\d+ lines/.test(live()[0].textContent),
+		"an open group shows its shared moves, not a line count: " +
+			JSON.stringify(live()[0].textContent),
+	);
 
 	shut()[0].click();
 	assert.strictEqual(shut().length, 0, "nothing left shut");
-	assert.strictEqual(live().length, 3, "all three lines have columns now");
+	assert.strictEqual(live().length, 2, "one control per open group");
 
-	// folding from inside the inner group closes THAT group only
-	live()[0].click();
+	// folding the inner group closes THAT group only
+	live()[1].click();
 	assert.strictEqual(shut().length, 1, "the inner group folded");
 	assert.match(shut()[0].textContent, /2 lines/);
-	assert.strictEqual(
-		openable().length,
-		2,
-		"the outer branch is still open, so its other column is still there",
-	);
+	assert.strictEqual(live().length, 1, "the outer group is still open");
+});
+
+test("a group whose children are all branches can still be folded", async () => {
+	// c5 forks into 2.Nf3 and 2.Nc3, and BOTH of those fork again — so every
+	// column inside the opened c5 group is a shut stub whose click opens it.
+	// Without the group's own column there would be nothing left to close it.
+	app.reset();
+	doc("view").querySelector("textarea.pgnin").value =
+		"1. e4 e5 (1... c5 2. Nf3 Nc6) (1... c5 2. Nf3 Nf6) " +
+		"(1... c5 2. Nc3 d6) (1... c5 2. Nc3 e6) 2. Nf3";
+	[...doc("view").querySelectorAll("button")]
+		.find((b) => b.textContent.includes("Load"))
+		.click();
+	await tick();
+
+	openable()[0].click(); // open c5
+	const shut = openable().filter((h) => h.classList.contains("collapsed"));
+	assert.strictEqual(shut.length, 2, "both children are shut branches");
+	const live = openable().filter((h) => !h.classList.contains("collapsed"));
+	assert.strictEqual(live.length, 1, "the group's own column is the way back");
+
+	live[0].click();
+	const back = openable().filter((h) => h.classList.contains("collapsed"));
+	assert.strictEqual(back.length, 1, "folded back to the one outer stub");
+	assert.match(back[0].textContent, /4 lines/);
 });
 
 test("Expand all reaches every level; Collapse all returns to one stub", async () => {
@@ -1146,8 +1172,8 @@ test("Expand all reaches every level; Collapse all returns to one stub", async (
 	);
 	assert.strictEqual(
 		pvHeads().length,
-		5,
-		"ply + mainline + one column per line",
+		7,
+		"ply + mainline + one column per line + one per open group",
 	);
 
 	bulk("Collapse all");

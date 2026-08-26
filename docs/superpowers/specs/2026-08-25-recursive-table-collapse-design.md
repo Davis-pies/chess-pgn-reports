@@ -30,37 +30,43 @@ for the children:
 
 | Node | Columns |
 | ---- | ------- |
-| one leaf | that line's column, clicking it folds the group it sits in |
+| one leaf | that line's column, with **no** control |
 | multi-leaf, shut | its branch column, `▸ N lines`, clicking it opens one level |
-| multi-leaf, open | no column of its own — each child by this same rule |
+| multi-leaf, open | its branch column, `▾` and shared moves only, clicking it folds that level — then each child by this same rule |
 
-**An open group has no column of its own.** A header column was tried and
-dropped: the editor can afford one per group because a group there costs a row,
-while here it costs a column at every open level, repeating the prefix its own
-children already spell out. Table width is the scarce thing.
+**An open group keeps a column of its own, and it is the group's only control.**
+This was tried without one first, hanging the fold on the line columns instead,
+to save the table width a header per open level costs. That is unsound: a group
+whose children are *all* branches has nothing but shut stubs beneath it, and a
+stub's click opens rather than closes, so the group could not be folded at all
+short of Collapse all. The column is what guarantees every open level has a way
+back.
 
-**So the fold lives on the line columns.** Each column carries the fold of the
-nearest open group it sits in, which is what keeps a click to exactly one level
-— the old code hung the *top* branch's fold on every expanded column, so one
-click dropped however many levels the reader had opened. A shut branch's own
-column still opens it; that is the one control that is not a fold.
+It carries **no line count while open** — the lines it would count are on screen
+beside it, and a count repeated down every open level is what made the first
+version read as clutter. Shut, the count is the whole point: it says how much is
+folded away.
+
+Line columns carry no fold. One click therefore closes exactly one level, where
+the old code hung the *top* branch's fold on every expanded column and dropped
+however many levels the reader had opened.
 
 **Single-child chains are inlined.** `sharedMoves()` already walks a node's
-single-child chain to build the stub, so opening jumps to the first real fork
+single-child chain to build the column, so opening jumps to the first real fork
 rather than revealing one pointless level per shared move. `forkOf(node)` walks
 that same chain, and the recursion runs over the fork's children plus its own
 leaf, when a line ends exactly there. Together these mean an open group never
 renders a single child: the fork has at least two things under it.
 
-## 3. `pushNode(node, vars, fold)`
+## 3. `pushNode(node, vars)` and `branchVar(node, open)`
 
-Replaces the three-branch loop in `renderTrieTable`. `fold` is the handler for
-the nearest enclosing open group, absent at the top level. `collapsedVar` is
-renamed `branchVar` and otherwise unchanged — it is only ever built for a shut
-branch now.
+`pushNode` replaces the three-branch loop in `renderTrieTable`. `branchVar` is
+`collapsedVar` renamed, plus the `open` parameter that decides `collapsed`, the
+name, and which way the click goes.
 
-No change to `src/render.js`. It already draws a clickable column with the right
-cue and title in both states.
+No change to `src/render.js`. `varHead` already gives a clickable non-collapsed
+column a `▾` cue and the "collapse branch" title; the old code simply never
+produced one, because it hung `onclick` on the expanded leaf columns instead.
 
 ## 4. Expand all / Collapse all
 
@@ -80,5 +86,13 @@ fork now yields **one** clickable non-collapsed column (the group) rather than
 two (the lines), and it is that column which folds the branch again.
 
 New coverage: a three-level tree where opening the outer branch shows an inner
-branch still shut, opening that inner one shows its lines, and clicking the
-inner group column folds only that level, leaving the outer one open.
+branch still shut, opening that inner one shows its lines, and folding the inner
+group leaves the outer one open; that an open group's column shows no line
+count; and — the case that put the column back — a group whose children are all
+branches, which must still be foldable.
+
+One fix falls out of writing those: `openTablePaths` was cleared only at module
+load, so opening a notebook or importing a PGN carried the previous notebook's
+open branches over. Its keys are move paths, so an unrelated notebook sharing a
+path opened branches nobody asked for. It now clears alongside `openPaths` and
+`closedNotePaths` at both reset sites in `app.js`.
