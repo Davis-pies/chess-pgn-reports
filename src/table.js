@@ -8,6 +8,7 @@
 
 import { divergence } from "./tree.js";
 import { numberNotes } from "./notes.js";
+import { markSym } from "./nags.js";
 import { visibleLines } from "./visibility.js";
 
 const TAG_META = {
@@ -49,7 +50,8 @@ export function grid(all) {
 				text = m.san;
 				cls = tag;
 			}
-			cells[m.ply] = { text, cls, mark: marks[m.ply] || "" };
+			// resolved here so every table renderer keeps reading a plain glyph
+			cells[m.ply] = { text, cls, mark: markSym(marks[m.ply]) };
 		});
 		const noteByPly = byLine.get(l);
 		const base = {

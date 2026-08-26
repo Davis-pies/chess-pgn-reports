@@ -1,5 +1,5 @@
 import { divergence } from "./tree.js";
-import { nagFor } from "./nags.js";
+import { markNag, markSym } from "./nags.js";
 import { numberNotes } from "./notes.js";
 import { visibleLines } from "./visibility.js";
 
@@ -188,12 +188,13 @@ export function annotate({ trunk, byLine, ownFirst }, lines, notes, opts = {}) {
 	for (const l of lines) {
 		// per-move symbols
 		const per = idx.get(l);
-		for (const [ply, sym] of Object.entries(l.marks || {})) {
+		for (const [ply, mark] of Object.entries(l.marks || {})) {
 			const n = per && per.get(Number(ply));
 			if (!n) continue;
-			const code = nagFor(sym);
+			const code = markNag(mark, Number(ply));
 			if (code === undefined) {
-				if (!n.comments.includes(sym)) n.comments.push(sym);
+				const sym = markSym(mark);
+				if (sym && !n.comments.includes(sym)) n.comments.push(sym);
 			} else if (!n.nags.includes(code)) n.nags.push(code);
 		}
 		// the line's own name and evaluation, on its first divergent move

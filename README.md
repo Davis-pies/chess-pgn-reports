@@ -68,7 +68,10 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    node's own notes taking the first labels before its branches continue the
    sequence. Lines get an
    **evaluation/quality symbol** picker (=, ±, ∓, +=, =+, ∞, !, ?, …), every
-   glyph on one row. Typing a note and pressing **Enter** saves it, in the
+   glyph on one row. Eight glyphs (⨀ ○ ⟳ ↑ → ⯹ ⇆ ⨁) are shared by a White and a
+   Black NAG, so the picker offers one button and takes the side from the move
+   you set it on; a symbol read from an imported PGN keeps whichever side that
+   file recorded. Typing a note and pressing **Enter** saves it, in the
    editor and in the table's context menu alike. The
    **Notes** section is editable — add a note at any move, or edit/delete
    existing ones. On screen the Notes list folds: a group footnote and a

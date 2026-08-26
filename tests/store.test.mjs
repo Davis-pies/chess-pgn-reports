@@ -33,7 +33,7 @@ test("saveNotebook / loadNotebook round-trip", () => {
         ],
         name: "Sicilian",
         meta: { note: "spicy" },
-        marks: { 1: "!" },
+        marks: { 1: "$1" },
         comments: [{ ply: 1, text: "sharp" }],
       },
     ];
@@ -51,7 +51,7 @@ test("saveNotebook / loadNotebook round-trip", () => {
     assert.strictEqual(side.tag, "sideline");
     assert.strictEqual(side.name, "Sicilian");
     assert.deepStrictEqual(side.meta, { note: "spicy" });
-    assert.deepStrictEqual(side.marks, { 1: "!" });
+    assert.deepStrictEqual(side.marks, { 1: "$1" });
     assert.deepStrictEqual(side.comments, [{ ply: 1, text: "sharp" }]);
   });
 });
@@ -174,5 +174,28 @@ test("saveNotebook records a line's hidden flag", () => {
     const nb = loadNotebook("n1");
     assert.strictEqual(nb.tags[0].hidden, false);
     assert.strictEqual(nb.tags[1].hidden, true);
+  });
+});
+
+test("a notebook saved with bare glyph marks loads as NAG codes", () => {
+  withStorage(() => {
+    // written before marks carried codes: the glyph was all there was
+    localStorage.setItem(
+      "ott:legacy",
+      JSON.stringify({
+        name: "Old",
+        pgn: "1. e4 c5",
+        main: "e4",
+        view: {},
+        tags: [{ key: "e4 c5", marks: { 1: "!", 2: "\u2a00", 3: "TN" } }],
+      }),
+    );
+    const { marks } = loadNotebook("legacy").tags[0];
+    assert.strictEqual(marks[1], "$1", "an unpaired glyph maps exactly");
+    // \u2a00 is shared by $22/$23; ply 2 is a White move, so the White half.
+    // Lossy in exactly the way the app already was -- the side was never in
+    // the glyph to recover -- but it converges the data.
+    assert.strictEqual(marks[2], "$22");
+    assert.strictEqual(marks[3], "TN", "a mark with no NAG code is left alone");
   });
 });

@@ -69,9 +69,17 @@ test("buildTrie groups lines by their shared divergent tail", () => {
 	assert.deepStrictEqual(leavesOf(c5), [a, b]);
 });
 
-test("carries a move's imported NAGs onto the line's marks", () => {
+test("carries a move's imported NAGs onto the line's marks, as codes", () => {
 	const lines = collectLines(parsePgn("1. e4 $1 e5 $16 *").nodes);
-	assert.deepEqual(lines[0].marks, { 0: "!", 1: "±" });
+	// the CODE, not the glyph: eight glyphs are shared by a White/Black pair,
+	// so collapsing to one here threw the side away before export could read it
+	assert.deepEqual(lines[0].marks, { 0: "$1", 1: "$16" });
+});
+
+test("an imported mark keeps the side its file carried", () => {
+	// $23 is "Black in zugzwang"; $22 is White's. Both render "⨀".
+	const lines = collectLines(parsePgn("1. e4 $23 *").nodes);
+	assert.deepEqual(lines[0].marks, { 0: "$23" });
 });
 
 test("ignores a NAG code outside the table", () => {
