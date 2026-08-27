@@ -33,6 +33,7 @@ const moveOf = (td) =>
 		? td.childNodes[0].textContent
 		: "";
 const refsOf = (td) => (td.querySelector("sup") || {}).textContent || "";
+const markOf = (td) => (td.querySelector(".mv-mark") || {}).textContent || "";
 
 // Columns of the horizontal table, by header text, each with its ply cells.
 function columns(box) {
@@ -119,6 +120,79 @@ test("distinct notes at one shared move are all listed on the group column", () 
 	});
 	const grp = column(box, "2 lines");
 	assert.strictEqual(refsOf(cell(grp, "d6")), "1,2");
+	off();
+});
+
+const markOnShared = (s) =>
+	s.lines
+		.filter((l) => !l.isMain)
+		.forEach((l) => (l.marks = { 3: "$14" }));
+
+test("an open group's column carries the symbols for the moves it shows", () => {
+	const off = installDom();
+	const box = preview(GROUP, { note: markOnShared, open: [GROUP_KEY] });
+	const grp = column(box, "2 lines");
+	assert.strictEqual(markOf(cell(grp, "d6")), "\u2a72", "the group column marks d6");
+	off();
+});
+
+test("a shut group's column shows symbols on the moves it displays", () => {
+	const off = installDom();
+	// shut, the group column is the ONLY thing on screen carrying d6 -- with no
+	// symbol on it the mark was in the notebook and on screen nowhere
+	const box = preview(GROUP, { note: markOnShared, open: [] });
+	const grp = column(box, "2 lines");
+	assert.strictEqual(markOf(cell(grp, "d6")), "\u2a72");
+	off();
+});
+
+test("a symbol below the fork stays on its own line's column", () => {
+	const off = installDom();
+	const box = preview(GROUP, {
+		note: (s) => {
+			const bb5 = s.lines.find((l) => l.moves.some((m) => m.san === "Bb5+"));
+			bb5.marks = { 4: "$16" };
+		},
+		open: [GROUP_KEY],
+	});
+	const grp = column(box, "2 lines");
+	assert.strictEqual(
+		grp.cells.filter((c) => markOf(c)).length,
+		0,
+		"the group column claims no symbol it does not show a move for",
+	);
+	const own = columns(box).find((c) => c.cells.some((x) => moveOf(x) === "Bb5+"));
+	assert.strictEqual(markOf(cell(own, "Bb5+")), "\u00b1");
+	off();
+});
+
+test("members disagreeing on a shared move's symbol resolve in reading order", () => {
+	const off = installDom();
+	const box = preview(GROUP, {
+		note: (s) => {
+			const [a, b] = s.lines.filter((l) => !l.isMain);
+			a.marks = { 3: "$14" };
+			b.marks = { 3: "$16" };
+		},
+		open: [GROUP_KEY],
+	});
+	const grp = column(box, "2 lines");
+	assert.strictEqual(markOf(cell(grp, "d6")), "\u2a72", "first line wins");
+	off();
+});
+
+test("the vertical layout shows the group row's symbols the same way", () => {
+	const off = installDom();
+	const box = preview(GROUP, {
+		note: markOnShared,
+		open: [GROUP_KEY],
+		orientation: "vertical",
+	});
+	const row = [...box.querySelectorAll("tr")].find((r) =>
+		[...r.children].some((c) => moveOf(c) === "d6" && c.className.includes("collapsed")),
+	);
+	assert.ok(row, "the group row is on screen");
+	assert.strictEqual(markOf([...row.children].find((c) => moveOf(c) === "d6")), "\u2a72");
 	off();
 });
 

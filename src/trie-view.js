@@ -1,4 +1,5 @@
 import { buildTrie, leavesOf, countLeaves } from "./tree.js";
+import { markSym } from "./nags.js";
 import { renderTable, fullmoveLabel } from "./render.js";
 import { el } from "./dom.js";
 import {
@@ -261,6 +262,32 @@ function sharedNotes(node, shared) {
 	return out;
 }
 
+// Per-move symbols for the moves a group's column shows, merged off the lines
+// underneath it — the same job sharedNotes does for [n] markers, and the same
+// job foot-nodes.js's mergeMarks does inside a group footnote.
+//
+// The column is the only place those moves appear — open, its children elide
+// them; shut, its children are not on screen at all — so without this a ⩲ set
+// on a shared move was saved in the notebook, exported to the PGN as its NAG,
+// and shown nowhere in the table.
+//
+// Only the plies the column actually spells out, for the same reason: a symbol
+// deeper in a shut group's lines has no cell here to sit on, and hanging it off
+// a shared move would file it under a move it does not annotate.
+//
+// First line wins, so members disagreeing about a shared move are resolved in
+// reading order rather than by whichever leaf was visited last — matching
+// mergeMarks, so a group reads the same in the table and in its footnote.
+function sharedMarks(node, shared) {
+	const plies = new Set(shared.map((m) => m.ply));
+	const out = {};
+	leavesOf(node).forEach((v) => {
+		for (const [k, mark] of Object.entries(v.marks || {}))
+			if (plies.has(Number(k)) && out[k] === undefined) out[k] = mark;
+	});
+	return out;
+}
+
 // The end of a node's single-child chain — the node sharedMoves() stops at.
 function forkOf(node) {
 	let n = node;
@@ -274,9 +301,11 @@ function forkOf(node) {
 // open, it is the group's header and shows the shared moves alone.
 function branchVar(node, open) {
 	const shared = sharedMoves(node); // [{ ply, san }] down the single-child chain
+	const marks = sharedMarks(node, shared);
 	const cells = {};
 	shared.forEach((m) => {
-		cells[m.ply] = { text: m.san, cls: "collapsed" };
+		// resolved to a glyph here, exactly as grid() does for a line's own cells
+		cells[m.ply] = { text: m.san, cls: "collapsed", mark: markSym(marks[m.ply]) };
 	});
 	// ellipsis prefix before the branch's first shared move, like a sideline
 	const d = shared.length ? shared[0].ply : 0;
