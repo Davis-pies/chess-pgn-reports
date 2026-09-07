@@ -461,3 +461,40 @@ test("editing the PGN after a preview withdraws it", async () => {
   );
   assert.ok(u.btn("Preview changes"), "the button asks to be run again");
 });
+
+test("there is no preview button until there is a PGN to preview", async () => {
+  app.reset();
+  await app.loadPgn(PGN);
+  const u = updateDialog("");
+
+  const btn = [...u.dlg.querySelectorAll("button")].find((b) =>
+    /preview/i.test(b.textContent),
+  );
+  assert.ok(btn, "the button exists in the markup");
+  assert.ok(btn.hidden, "but is not shown over an empty box");
+
+  const ta = u.dlg.querySelector("textarea");
+  ta.value = "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6";
+  ta.dispatchEvent(new app.dom.window.Event("input"));
+  assert.ok(!btn.hidden, "typing a PGN brings it out");
+
+  ta.value = "   ";
+  ta.dispatchEvent(new app.dom.window.Event("input"));
+  assert.ok(btn.hidden, "and emptying the box puts it away again");
+});
+
+test("choosing a PGN file in the dialog brings the preview button out", async () => {
+  app.reset();
+  await app.loadPgn(PGN);
+  const u = updateDialog("");
+  const btn = [...u.dlg.querySelectorAll("button")].find((b) =>
+    /preview/i.test(b.textContent),
+  );
+  assert.ok(btn.hidden, "hidden to start");
+
+  choose(u.dlg.querySelector("input.filein"), "next.pgn", PGN);
+  await app.settle();
+
+  assert.strictEqual(u.dlg.querySelector("textarea").value, PGN);
+  assert.ok(!btn.hidden, "the loaded file brings the button out");
+});

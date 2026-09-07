@@ -883,7 +883,11 @@ function openUpdateDialog() {
   // is not cancelling: the merge it described is still what Apply will do.
   let shown = false; // is the report on screen
   let ran = false; // has a preview ever been produced, to word the button
+  // There is nothing to preview until a PGN is in the box, so until then the
+  // button is not there to be clicked -- a control whose only outcome is "No
+  // moves found in PGN" is an invitation to a dead end.
   const label = () => {
+    preview.hidden = !ta.value.trim();
     preview.textContent = shown
       ? "Hide preview"
       : ran
@@ -932,7 +936,7 @@ function openUpdateDialog() {
   // fact would leave Apply ready to install a merge of the OLD text, since
   // `pending` carries its own copy -- so an edit withdraws the preview.
   ta.oninput = () => {
-    if (!ran) return;
+    if (!ran) return label();
     pending = null;
     apply.disabled = true;
     ran = false;
@@ -963,6 +967,17 @@ function openUpdateDialog() {
       renderApp();
     });
   };
+  // Assigning ta.value fires no `input` event, so the picker re-syncs the
+  // button itself rather than relying on the handler above.
+  file.onchange = () => {
+    const f = file.files[0];
+    if (f)
+      f.text().then((t) => {
+        ta.value = t;
+        label();
+      });
+  };
+  label();
   const cancel = el("button", {
     className: "chip",
     textContent: "Cancel",
