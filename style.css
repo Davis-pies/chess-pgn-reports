@@ -1115,12 +1115,13 @@ sup {
   color: var(--ok);
 }
 /* the import panel's two file sources, stacked under the paste-PGN box. They
-   are alternatives, so they read down the page rather than across it, and each
-   button is full width so neither looks subordinate to the other. */
+   are alternatives, so they read down the page rather than across it. They sit
+   to the left at their natural width: stretching them across the panel made
+   two buttons look like a banner, and the panel is as wide as the PGN box. */
 .filestack {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
+  align-items: flex-start;
   gap: 8px;
   margin-top: 14px;
   padding-top: 14px;
