@@ -166,38 +166,6 @@ test("lone-line editor groups are collapsible details, closed by default", async
 
 });
 
-test("print table: split-by-trie checkbox toggles per-branch tables", async () => {
-	app.reset();
-
-	const textarea = doc("view").querySelector("textarea.pgnin");
-	// two variations with DIFFERENT first moves = two top-level branches
-	textarea.value = "1. e4 e5 (1... c5 2. Nf3) (1... e6 2. d4) 2. Nf3";
-	[...doc("view").querySelectorAll("button")]
-		.find((b) => b.textContent.includes("Load"))
-		.click();
-	await tick();
-
-	// default: split off, fits -> one print table
-	assert.strictEqual(
-		doc("view").querySelectorAll(".pv-htable table.tbl").length,
-		1,
-		"one table when split-by-trie is off",
-	);
-
-	const lab = [...doc("view").querySelectorAll("label")].find((l) =>
-		l.textContent.includes("split table by trie"),
-	);
-	lab.querySelector("input").click();
-
-	// split ON still packs tiny branches into ONE shared table (no per-branch
-	// tables for single-line tries) — compactness over per-branch sections
-	assert.strictEqual(
-		doc("view").querySelectorAll(".pv-htable table.tbl").length,
-		1,
-		"single-line branches pack into one table even with split on",
-	);
-
-});
 
 test("print table: wide notebooks pack into multiple tables, oversized forks chunk at sub-forks", async () => {
 	app.reset();

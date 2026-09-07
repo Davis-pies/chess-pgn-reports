@@ -3,7 +3,7 @@ import assert from "node:assert";
 import { installDom, loadState } from "./helpers.mjs";
 import { appendPrintTables } from "../src/print.js";
 import { grid } from "../src/table.js";
-import { getCurrent, openTablePaths, setTraced } from "../src/state.js";
+import { openTablePaths, setTraced } from "../src/state.js";
 
 // A long mainline plus enough shallow sidelines to force packForPrint to emit
 // more than one table (each diverges at ply 1, so each becomes its own chunk).
@@ -16,7 +16,6 @@ const MAIN =
 
 function printTables(pgn) {
   const s = loadState(pgn);
-  getCurrent().showSplitTrie = true;
   const box = document.createElement("div");
   appendPrintTables(box, grid(s.lines));
   return box;
@@ -42,7 +41,6 @@ test("the first print table runs the mainline out to its full length", () => {
 test("the mainline's notes print under the first table only", () => {
   const off = installDom();
   const st = loadState(`1. e4 e5 ${ALTS} ${MAIN}`);
-  getCurrent().showSplitTrie = true;
   // The editor shares a note by writing it onto every line in an equal-position
   // group, so the mainline's note also lives on sidelines. Reproduce that here:
   // raw PGN comments never end up on more than one line.
@@ -351,16 +349,14 @@ test("a line alone on a later print table keeps its whole divergence", () => {
   off();
 });
 
-// showSplitTrie is off by default, so this narrow path — one table, no packing —
-// is the one most reports take. It groups too; the cascade is a property of the
-// printed table, not of the splitting.
+// A report narrow enough for one table: the commonest case, and the one the
+// packer produces without splitting anything. It groups like any other.
 test("a report that fits one table cascades without the trie split", () => {
   const off = installDom();
   const st = loadState(
     "1. e4 c5 2. Nf3 d6 3. d4 (3. Bb5+ Bd7 4. Bxd7+ Qxd7)" +
       " (3. Bb5+ Bd7 4. Bxd7+ Nxd7) 3... cxd4 *",
   );
-  getCurrent().showSplitTrie = false;
   const box = document.createElement("div");
   appendPrintTables(box, grid(st.lines));
   assert.strictEqual(
@@ -402,7 +398,6 @@ test("a printed line's header carries its name, not the Sideline tag", () => {
     "1. e4 c5 2. Nf3 (2. Nc3 Nc6) (2. d4 cxd4) (2. c3 d5) 2... d6 *",
   );
   st.lines[1].name = "Closed Sicilian";
-  getCurrent().showSplitTrie = false;
   const box = document.createElement("div");
   appendPrintTables(box, grid(st.lines));
   const heads = [...box.querySelectorAll("table.tbl tr:first-child th")].map(
@@ -592,5 +587,74 @@ test("pages are cut from the ordered report, not from PGN order", () => {
     firstPage.includes("c6"),
     "the latest-leaving branch is on the first page, though written last",
   );
+  off();
+});
+
+// ---------------------------------------------------------------------------
+// Annotations reaching the TABLE, as opposed to the notes block below it. The
+// editor writes a shared move's note and symbol onto every line through that
+// position, so several columns hold the same annotation on the same ply -- and
+// only the column that actually states the move should show it. That used to
+// be the group's own column, which the column builder gathered them onto;
+// with no group column in print it is the group's first line.
+// ---------------------------------------------------------------------------
+
+const SHARED = "1. e4 e5 (1... c5 2. Nf3 Nc6 3. Bb5) (1... c5 2. Nf3 Nc6 3. a4) 2. Nf3";
+
+// Notes are set directly: inside a variation a {comment} swallows the moves
+// after it, so a PGN-built fixture would not have the shape under test.
+function annotateShared(s, ply, { text, mark }) {
+  s.lines
+    .filter((l) => !l.isMain && l.moves.some((m) => m.ply === ply))
+    .forEach((l) => {
+      if (text) l.comments = [{ ply, text }];
+      if (mark) l.marks = { ...(l.marks || {}), [ply]: mark };
+    });
+}
+
+test("a shared move's note marker prints once, beside the move itself", () => {
+  const off = installDom();
+  const s = loadState(SHARED);
+  annotateShared(s, 3, { text: "the main tabiya" });
+  const box = document.createElement("div");
+  appendPrintTables(box, grid(s.lines));
+
+  const marks = [...box.querySelectorAll("table.tbl td sup")];
+  assert.strictEqual(marks.length, 1, "one marker, not one per line sharing it");
+  // and it sits in the cell holding the move it annotates
+  assert.match(marks[0].parentElement.textContent, /^Nc6/, "on the Nc6 cell");
+  off();
+});
+
+test("a shared move's symbol prints once, beside the move itself", () => {
+  const off = installDom();
+  const s = loadState(SHARED);
+  annotateShared(s, 3, { mark: "$1" });
+  const box = document.createElement("div");
+  appendPrintTables(box, grid(s.lines));
+
+  const syms = [...box.querySelectorAll("table.tbl td .mv-mark")];
+  assert.strictEqual(syms.length, 1, "one symbol, not one per line sharing it");
+  assert.strictEqual(syms[0].textContent, "!");
+  assert.match(syms[0].parentElement.textContent, /^Nc6/);
+  off();
+});
+
+test("an annotation on a line's own move prints on that line's column", () => {
+  const off = installDom();
+  const s = loadState(SHARED);
+  // ply 4 is Bb5 / a4 -- each line's own move, shared with nobody
+  const line = s.lines.find((l) => l.moves.some((m) => m.san === "a4"));
+  line.comments = [{ ply: 4, text: "a sideline of its own" }];
+  line.marks = { 4: "$1" };
+  const box = document.createElement("div");
+  appendPrintTables(box, grid(s.lines));
+
+  const sup = [...box.querySelectorAll("table.tbl td sup")];
+  assert.strictEqual(sup.length, 1);
+  assert.match(sup[0].parentElement.textContent, /^a4/, "on the a4 cell");
+  const sym = [...box.querySelectorAll("table.tbl td .mv-mark")];
+  assert.strictEqual(sym.length, 1);
+  assert.match(sym[0].parentElement.textContent, /^a4/);
   off();
 });

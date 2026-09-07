@@ -85,30 +85,24 @@ export function appendPrintTables(box, g) {
     box.appendChild(wrap);
     return;
   }
-  const split = getCurrent().showSplitTrie === true;
-  if (!split && printWidth(mainV, others) <= size) {
-    const pv = printVars(mainV, others);
-    renderTable(wrap, { ...g, vars: pv, spans: pv.spans });
-    // Notes are collected off the LINES, not the columns: a group column is
-    // synthesised and matches no line, and its shared moves' notes are already
-    // gathered onto it by the column builder.
-    renderTableNotes(wrap, g.vars, true);
-  } else {
-    // pack branches into tables of up to `size` COLUMNS: tiny branches share
-    // a table, and an oversized fork spills into the next one — every table
-    // spans only the deepest line it actually covers (the mainline reference
-    // column stops there too). Each table's notes render under it; the
-    // mainline's notes only under the first table.
-    packForPrint(mainV, others, size).forEach((lines, i) => {
-      // Later tables stop at the deepest line they actually cover. The FIRST
-      // table is the reader's reference for the whole opening, so it runs the
-      // mainline out to its full length even when its own branches are short.
-      const maxPly = i === 0 ? subMaxPly([mainV, ...lines]) : subMaxPly(lines);
-      const pv = printVars(mainV, lines);
-      renderTable(wrap, { ...g, vars: pv, spans: pv.spans, maxPly });
-      renderTableNotes(wrap, [mainV, ...lines], i === 0);
-    });
-  }
+  // pack branches into tables of up to `size` COLUMNS: tiny branches share
+  // a table, and an oversized fork spills into the next one — every table
+  // spans only the deepest line it actually covers (the mainline reference
+  // column stops there too). Each table's notes render under it; the
+  // mainline's notes only under the first table.
+  // A report with no side lines packs into nothing, but it still has a
+  // mainline to print and notes to print under it -- so it gets one table of
+  // its own rather than no table at all.
+  const packs = packForPrint(mainV, others, size);
+  (packs.length ? packs : [[]]).forEach((lines, i) => {
+    // Later tables stop at the deepest line they actually cover. The FIRST
+    // table is the reader's reference for the whole opening, so it runs the
+    // mainline out to its full length even when its own branches are short.
+    const maxPly = i === 0 ? subMaxPly([mainV, ...lines]) : subMaxPly(lines);
+    const pv = printVars(mainV, lines);
+    renderTable(wrap, { ...g, vars: pv, spans: pv.spans, maxPly });
+    renderTableNotes(wrap, [mainV, ...lines], i === 0);
+  });
   box.appendChild(wrap);
 }
 
