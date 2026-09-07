@@ -365,3 +365,40 @@ test("the paste box still loads through Load & Tag", async () => {
   await app.loadPgn(PGN);
   assert.strictEqual(getCurrent().pgn, PGN, "the pasted path is untouched");
 });
+
+test("removing unannotated lines is stated, not passed off as an all-clear", async () => {
+  app.reset();
+  await app.loadPgn(PGN); // has a 2... Nf6 3. d4 sideline, unannotated
+
+  app.clickText("Update PGN");
+  const dlg = app.dom.window.document.getElementById("updpgn");
+  dlg.querySelector("textarea").value = "1. e4 e5 2. Nf3 Nc6 3. Bb5";
+  [...dlg.querySelectorAll("button")]
+    .find((b) => b.textContent.includes("Preview"))
+    .click();
+
+  const rep = dlg.querySelector(".mergerep").textContent;
+  assert.ok(
+    !/nothing would be lost/i.test(rep),
+    "a line IS being removed, so the all-clear must not appear:\n" + rep,
+  );
+  assert.match(rep, /1 line/, "it says how many go");
+  assert.match(rep, /no notes or symbols/i, "and what is safe about it");
+});
+
+test("the all-clear appears only when nothing is removed at all", async () => {
+  app.reset();
+  await app.loadPgn(PGN);
+
+  app.clickText("Update PGN");
+  const dlg = app.dom.window.document.getElementById("updpgn");
+  // purely additive: the same lines, one of them deeper
+  dlg.querySelector("textarea").value =
+    "1. e4 e5 2. Nf3 Nc6 (2... Nf6 3. d4) 3. Bb5 a6";
+  [...dlg.querySelectorAll("button")]
+    .find((b) => b.textContent.includes("Preview"))
+    .click();
+
+  const rep = dlg.querySelector(".mergerep").textContent;
+  assert.match(rep, /nothing would be lost/i, rep);
+});

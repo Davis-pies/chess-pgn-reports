@@ -1006,8 +1006,19 @@ function reportNodes(r) {
       ),
     );
   }
+  // The all-clear is only honest when nothing goes at all. Lines being removed
+  // is itself a loss the user should see, even when none of them was annotated
+  // -- saying "nothing would be lost" over 72 departing lines reads as a
+  // promise about the lines, not about the notes on them.
   if (!r.droppedLines.length && !r.droppedNotes.length)
-    out.push(el("p", { className: "good", textContent: "Nothing would be lost." }));
+    out.push(
+      r.removed
+        ? el("p", {
+            className: "warn",
+            textContent: `${r.removed} line${r.removed === 1 ? "" : "s"} will be removed — none of them annotated, so no notes or symbols are lost.`,
+          })
+        : el("p", { className: "good", textContent: "Nothing would be lost." }),
+    );
   return out;
 }
 

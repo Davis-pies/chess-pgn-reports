@@ -22,6 +22,7 @@
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   /* merge-report verdicts: what an update would lose, and the all-clear */
   --danger: #b91c1c;
+  --warn: #b45309;
   --ok: #15803d;
 }
 
@@ -47,6 +48,7 @@
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
   /* lightened for contrast against the dark panel, same roles as above */
   --danger: #f87171;
+  --warn: #fbbf24;
   --ok: #4ade80;
 }
 
@@ -1109,6 +1111,10 @@ sup {
   margin: 10px 0 0;
   color: var(--danger);
   font-weight: 600;
+}
+.mergerep .warn {
+  margin: 10px 0 0;
+  color: var(--warn);
 }
 .mergerep .good {
   margin: 8px 0 0;
