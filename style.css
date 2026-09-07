@@ -20,6 +20,9 @@
   --grp-edge: #9db8e0;
   --lift: #ffffff;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  /* merge-report verdicts: what an update would lose, and the all-clear */
+  --danger: #b91c1c;
+  --ok: #15803d;
 }
 
 [data-theme="dark"] {
@@ -42,6 +45,9 @@
   --grp-edge: #4a5f85;
   --lift: #23262d;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  /* lightened for contrast against the dark panel, same roles as above */
+  --danger: #f87171;
+  --ok: #4ade80;
 }
 
 * {
@@ -1032,8 +1038,100 @@ sup {
   }
 }
 
+/* ---- Update PGN dialog + its merge report ---- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+  z-index: 60;
+}
+.modal {
+  width: min(680px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  padding: 18px 20px 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+.modal h3 {
+  margin: 0 0 4px;
+}
+.modal-sub {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.modal .pgnin {
+  width: 100%;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.mergerep:not(:empty) {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: var(--zebra);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+.mergecounts,
+.mergelost {
+  margin: 0;
+  padding-left: 20px;
+}
+.mergecounts + .bad {
+  margin-top: 10px;
+}
+.mergelost {
+  margin-top: 4px;
+}
+/* the move string that identifies a line being lost: long, and monospaced so
+   it reads as notation rather than prose */
+.mergelost li span {
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
+  overflow-wrap: anywhere;
+}
+.mergerep .bad {
+  margin: 10px 0 0;
+  color: var(--danger);
+  font-weight: 600;
+}
+.mergerep .good {
+  margin: 8px 0 0;
+  color: var(--ok);
+}
+/* reopening a saved workbook, under the paste-PGN box on the import panel */
+.wbrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
 /* ---- print: table hidden, linear cards shown ---- */
 @media print {
+  .modal-overlay {
+    display: none !important;
+  }
   /* force dark-on-white, printable text colors */
   :root {
     --text: #111;

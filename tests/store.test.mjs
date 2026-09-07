@@ -6,7 +6,12 @@ import {
   loadNotebook,
   listNotebooks,
   deleteNotebook,
+  toNotebook,
+  applyNotebook,
+  parseWorkbook,
 } from "../src/store.js";
+import { parsePgn } from "../src/pgn.js";
+import { collectLines } from "../src/tree.js";
 
 // store.js reads/writes the bare `localStorage` global, same as the browser;
 // stand one up via jsdom for each test so entries don't leak between tests.
@@ -198,4 +203,108 @@ test("a notebook saved with bare glyph marks loads as NAG codes", () => {
     assert.strictEqual(marks[2], "$22");
     assert.strictEqual(marks[3], "TN", "a mark with no NAG code is left alone");
   });
+});
+
+// ---------------------------------------------------------------------------
+// The format itself, independent of localStorage: toNotebook/applyNotebook are
+// what the file save/open path and the localStorage path both go through.
+// ---------------------------------------------------------------------------
+
+const linesOf = (pgn) => collectLines(parsePgn(pgn).nodes);
+const keyOf = (l) => l.moves.map((m) => m.san).join(" ");
+const findLine = (lines, k) => lines.find((l) => keyOf(l) === k);
+
+test("toNotebook stamps the format and version a file needs", () => {
+  const nb = toNotebook({
+    name: "Book",
+    pgn: "1. e4",
+    lines: linesOf("1. e4"),
+    view: {},
+  });
+  assert.strictEqual(nb.format, "ott-workbook");
+  assert.strictEqual(typeof nb.version, "number");
+});
+
+test("applyNotebook restores tags, marks, notes and hidden onto fresh lines", () => {
+  const pgn = "1. e4 e5 2. Nf3 Nc6 (2... Nf6 3. d4)";
+  const saved = linesOf(pgn);
+  const side = findLine(saved, "e4 e5 Nf3 Nf6 d4");
+  side.name = "Petroff";
+  side.tag = "foot";
+  side.meta = { eval: "=" };
+  side.marks = { 4: "$1" };
+  side.comments = [{ ply: 4, text: "central break" }];
+  side.hidden = true;
+
+  const nb = toNotebook({ name: "B", pgn, lines: saved, view: {} });
+  const fresh = linesOf(pgn);
+  applyNotebook(nb, fresh);
+
+  const l = findLine(fresh, "e4 e5 Nf3 Nf6 d4");
+  assert.strictEqual(l.name, "Petroff");
+  assert.strictEqual(l.tag, "foot");
+  assert.deepStrictEqual(l.meta, { eval: "=" });
+  assert.deepStrictEqual(l.marks, { 4: "$1" });
+  assert.deepStrictEqual(l.comments, [{ ply: 4, text: "central break" }]);
+  assert.strictEqual(l.hidden, true);
+});
+
+test("applyNotebook restores a promoted mainline", () => {
+  const pgn = "1. e4 e5 2. Nf3 Nc6 (2... Nf6 3. d4)";
+  const saved = linesOf(pgn);
+  const promoted = findLine(saved, "e4 e5 Nf3 Nf6 d4");
+  saved.forEach((l) => (l.isMain = l === promoted));
+
+  const nb = toNotebook({ name: "B", pgn, lines: saved, view: {} });
+  const fresh = linesOf(pgn);
+  applyNotebook(nb, fresh);
+
+  const main = fresh.filter((l) => l.isMain);
+  assert.strictEqual(main.length, 1);
+  assert.strictEqual(keyOf(main[0]), "e4 e5 Nf3 Nf6 d4");
+  assert.strictEqual(main[0].tag, undefined);
+});
+
+test("parseWorkbook reads back what toNotebook wrote", () => {
+  const pgn = "1. e4 c5";
+  const lines = linesOf(pgn);
+  lines[0].name = "Sicilian";
+  const text = JSON.stringify(toNotebook({ name: "B", pgn, lines, view: {} }));
+
+  const nb = parseWorkbook(text);
+  assert.strictEqual(nb.pgn, pgn);
+  assert.strictEqual(nb.tags[0].name, "Sicilian");
+});
+
+test("parseWorkbook converts a file's legacy glyph marks to NAG codes", () => {
+  const nb = parseWorkbook(
+    JSON.stringify({
+      format: "ott-workbook",
+      version: 1,
+      name: "Old",
+      pgn: "1. e4 c5",
+      main: "e4 c5",
+      view: {},
+      tags: [{ key: "e4 c5", marks: { 1: "!" } }],
+    }),
+  );
+  assert.strictEqual(nb.tags[0].marks[1], "$1");
+});
+
+test("parseWorkbook rejects JSON that is not a workbook", () => {
+  assert.throws(() => parseWorkbook('{"hello":"world"}'), /not a workbook/i);
+});
+
+test("parseWorkbook rejects malformed JSON with a readable message", () => {
+  assert.throws(() => parseWorkbook("{not json"), /could not be read/i);
+});
+
+test("parseWorkbook refuses a file written by a newer version", () => {
+  const text = JSON.stringify({
+    format: "ott-workbook",
+    version: 99,
+    pgn: "1. e4",
+    tags: [],
+  });
+  assert.throws(() => parseWorkbook(text), /newer version/i);
 });

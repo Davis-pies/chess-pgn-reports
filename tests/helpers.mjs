@@ -167,3 +167,38 @@ export async function bootApp({ onAlert } = {}) {
 		},
 	};
 }
+
+// The download path builds a Blob and clicks a synthetic <a>. Stubbing
+// URL.createObjectURL is enough to observe filename, MIME type and payload
+// without a real download. `doc` defaults to the ambient global `document`,
+// which is what installDom() sets up; bootApp callers pass their own.
+export function captureDownloads(doc = globalThis.document) {
+	const seen = [];
+	// download() calls the bare `URL` global, which resolves to Node's URL
+	// here rather than the jsdom window's.
+	const origUrl = { c: URL.createObjectURL, r: URL.revokeObjectURL };
+	URL.createObjectURL = (blob) => {
+		seen.push(blob);
+		return "blob:stub";
+	};
+	URL.revokeObjectURL = () => {};
+	const origCreate = doc.createElement.bind(doc);
+	const anchors = [];
+	doc.createElement = (tag) => {
+		const node = origCreate(tag);
+		if (tag === "a") {
+			node.click = () => {};
+			anchors.push(node);
+		}
+		return node;
+	};
+	return {
+		blobs: seen,
+		anchors,
+		restore: () => {
+			doc.createElement = origCreate;
+			URL.createObjectURL = origUrl.c;
+			URL.revokeObjectURL = origUrl.r;
+		},
+	};
+}

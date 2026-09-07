@@ -148,7 +148,7 @@ export function exportBar() {
   return bar;
 }
 
-function slug() {
+export function slug() {
   return (getCurrent().name || "opening-table")
     .replace(/[^a-z0-9_-]+/gi, "-")
     .replace(/^-+|-+$/g, "");
@@ -173,7 +173,7 @@ async function copyToClipboard(text, btn, label) {
   setTimeout(() => (btn.textContent = label), 1500);
 }
 
-function download(filename, text, mime) {
+export function download(filename, text, mime) {
   const blob = new Blob([text], { type: mime });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);

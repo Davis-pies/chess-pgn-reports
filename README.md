@@ -91,6 +91,23 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    **Export Markdown** (paste into Google Docs/Word), or **Print → Save as
    PDF** (always the linear card view). Saved workbooks (`localStorage`) are
    listed under **My saved workbooks** on the import screen to reopen/delete.
+5. **Save and reload as a file** — **Save to file** writes the whole workbook,
+   PGN and all annotations together, to one `.json` you can back up, share or
+   keep in version control; the import screen reopens one. It's the same format
+   `localStorage` holds, so nothing is lost either way. A file opens with no
+   `localStorage` id of its own — pressing **Save** files it as a new entry
+   rather than overwriting one.
+6. **Update the PGN under your annotations** — **Update PGN…** replaces the
+   moves without throwing the markup away. Notes and symbols are re-attached by
+   **move path**, so a note on a move several lines share reaches all of them,
+   however the new PGN re-cuts the lines around it; a line's own name, tag,
+   evaluation and hidden flag go to the line sharing the longest prefix with
+   it, so analysis pushed four moves deeper keeps everything it had. It
+   **previews first**: how many lines were unchanged, extended, cut short,
+   added or removed, and — spelled out, since this part cannot be undone —
+   every annotated line and every note the new PGN leaves no home for. Apply
+   or cancel. Applying keeps the workbook's name, id and view settings; only
+   the moves change.
 
 ## Run locally
 
@@ -136,7 +153,8 @@ Because it's fully client-side, the same URL works on your phone's browser.
 | `src/group-cols.js` | grid -> grouped columns (a branch's shared moves in a column of their own), shared by the editor's table and the printed one |
 | `src/render.js` | grid -> DOM table (vertical/horizontal) + SVG board diagrams from FEN |
 | `src/notes-view.js` | the on-screen Notes list, grouped into collapsible `<details>` |
-| `src/store.js` | `localStorage` notebook persistence |
+| `src/store.js` | the workbook format: `localStorage` and `.json` file persistence, and re-applying a saved workbook's annotations to freshly parsed lines |
+| `src/merge.js` | re-homing a workbook's annotations onto a NEW PGN — move-path matching for notes/symbols, longest-prefix matching for line attributes, plus the report of what could not be carried |
 | `src/app.js` | browser glue: import, tag buttons, orientation toggle, print |
 
 A variation's first move is an **alternative at the same ply** as the move it

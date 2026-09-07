@@ -1,0 +1,205 @@
+// Re-homing a workbook's annotations onto a freshly parsed PGN.
+//
+// store.js re-applies tags by EXACT line key, which is right when the PGN is
+// the one the workbook was built from. It is wrong when the PGN has moved on:
+// a line whose analysis grew four moves deeper has a different key and would
+// come back bare. This module matches the old lines to the new ones instead,
+// so annotating work survives a repertoire update.
+//
+// Two scopes, because the app itself has two:
+//
+//   * marks and comments are MOVE-scoped. symbolRow() and commentEditor() in
+//     line-editor.js both write onto every line reaching a position, so "a
+//     note on a shared move lives on every line through it" is an invariant
+//     the editor maintains everywhere. Re-homing them by move path upholds it,
+//     which matters because three consumers read a line's own copy: table.js
+//     builds each line's cells from `l.marks`, allNotes() filters to the
+//     VISIBLE lines (so a note carried by one line vanishes when that line is
+//     hidden), and pgn-out.js writes comments per line.
+//
+//   * name, tag, meta and hidden are LINE-scoped -- they describe a whole
+//     continuation, so they go to a single line even when one old line now
+//     prefixes several new ones.
+
+const sanKey = (line) => line.moves.map((m) => m.san).join(" ");
+
+// How many leading moves two lines agree on.
+function commonPrefix(a, b) {
+	let d = 0;
+	while (d < a.moves.length && d < b.moves.length && a.moves[d].san === b.moves[d].san)
+		d++;
+	return d;
+}
+
+// The move paths a line spells out, one per move: ["e4", "e4 e5", ...].
+// Index i is the path ending at moves[i], which is what a mark or comment at
+// that move is really attached to.
+function pathsOf(line) {
+	const out = [];
+	const acc = [];
+	line.moves.forEach((m) => {
+		acc.push(m.san);
+		out.push(acc.join(" "));
+	});
+	return out;
+}
+
+// Every move-scoped annotation in the old workbook, keyed by the move path it
+// sits on. A mark is single-valued (the first line carrying it wins, exactly
+// as sharedMarks() in group-cols.js already resolves a group's column); notes
+// are a set, since several distinct notes can share a move.
+function moveAnnotations(oldLines) {
+	const out = new Map();
+	const at = (path) => {
+		let e = out.get(path);
+		if (!e) out.set(path, (e = { mark: undefined, comments: [] }));
+		return e;
+	};
+	oldLines.forEach((l) => {
+		const paths = pathsOf(l);
+		const indexOfPly = new Map(l.moves.map((m, i) => [m.ply, i]));
+		Object.entries(l.marks || {}).forEach(([ply, mark]) => {
+			const i = indexOfPly.get(Number(ply));
+			if (i === undefined) return;
+			const e = at(paths[i]);
+			if (e.mark === undefined) e.mark = mark;
+		});
+		(l.comments || []).forEach((c) => {
+			const i = indexOfPly.get(c.ply);
+			if (i === undefined) return;
+			const e = at(paths[i]);
+			if (!e.comments.includes(c.text)) e.comments.push(c.text);
+		});
+	});
+	return out;
+}
+
+// Which new line inherits each old line's line-scoped attributes.
+//
+// A new line is a candidate only when one line's moves are a prefix of the
+// other's -- that is what "the same line, continued (or cut short)" means.
+// Longest shared prefix wins, ties broken by the new PGN's own order. Old
+// lines are matched longest-first and each new line is claimed once, so two
+// old lines that both prefix the same new line cannot both take it: the more
+// specific one does, and the other is reported as dropped.
+function matchLines(oldLines, newLines) {
+	const claimed = new Set();
+	const matched = new Map();
+	const byLength = oldLines
+		.map((l, i) => ({ l, i }))
+		.sort((a, b) => b.l.moves.length - a.l.moves.length || a.i - b.i);
+	byLength.forEach(({ l: old }) => {
+		let best = null;
+		let bestD = -1;
+		newLines.forEach((n) => {
+			if (claimed.has(n)) return;
+			const d = commonPrefix(old, n);
+			if (d !== Math.min(old.moves.length, n.moves.length)) return;
+			if (d > bestD) {
+				best = n;
+				bestD = d;
+			}
+		});
+		if (best) {
+			claimed.add(best);
+			matched.set(old, best);
+		}
+	});
+	return matched;
+}
+
+// Line-scoped work the old line put on the record. A line carrying none of
+// this loses nothing by disappearing, so it is not worth reporting.
+function lineWork(l) {
+	const meta = l.meta || {};
+	return !!(l.name || l.tag === "foot" || meta.eval || meta.note || l.hidden);
+}
+
+/**
+ * Carry `oldLines`' annotations onto `newLines`, which are mutated in place
+ * the way store.js's tag re-application already mutates freshly parsed lines.
+ *
+ * Returns a report for the preview: how many lines matched unchanged, were
+ * extended or shortened, and arrived new, plus the two kinds of annotation
+ * that could not be re-homed -- `droppedLines` (a line's own name/tag/eval,
+ * when the line itself is gone) and `droppedNotes` (a note or mark whose move
+ * path the new PGN no longer contains).
+ */
+export function mergeAnnotations(oldLines, newLines) {
+	// Move-scoped pass, first: every new line through a remembered move path
+	// picks the annotation up, however the lines were re-cut around it.
+	const anno = moveAnnotations(oldLines);
+	const rehomed = new Set();
+	newLines.forEach((l) => {
+		const paths = pathsOf(l);
+		l.moves.forEach((m, i) => {
+			const e = anno.get(paths[i]);
+			if (!e) return;
+			rehomed.add(paths[i]);
+			if (e.mark !== undefined) {
+				l.marks = l.marks || {};
+				l.marks[m.ply] = e.mark;
+			}
+			if (!e.comments.length) return;
+			l.comments = l.comments || [];
+			e.comments.forEach((text) => {
+				// The new PGN may already carry this note as a {comment}; keep one.
+				if (!l.comments.some((c) => c.ply === m.ply && c.text === text))
+					l.comments.push({ ply: m.ply, text });
+			});
+		});
+	});
+
+	// Line-scoped pass.
+	const matched = matchLines(oldLines, newLines);
+	matched.forEach((n, old) => {
+		n.name = old.name || "";
+		n.meta = { ...(old.meta || {}) };
+		n.tag = old.tag;
+		n.hidden = !!old.hidden;
+	});
+
+	// A user-promoted mainline is re-promoted onto whatever it became. Done
+	// after the attribute copy so the normalisation below has the final answer.
+	const oldMain = oldLines.find((l) => l.isMain);
+	const newMain = oldMain && matched.get(oldMain);
+	if (newMain) newLines.forEach((x) => (x.isMain = x === newMain));
+
+	// Same normalisation store.js applies on load: the mainline is structural,
+	// so it carries no tag and is never hidden.
+	newLines.forEach((l) => {
+		l.tag = l.isMain ? undefined : l.tag === "foot" ? "foot" : "sideline";
+		l.hidden = !l.isMain && !!l.hidden;
+	});
+
+	let exact = 0;
+	let extended = 0;
+	let shortened = 0;
+	matched.forEach((n, old) => {
+		if (n.moves.length === old.moves.length) exact++;
+		else if (n.moves.length > old.moves.length) extended++;
+		else shortened++;
+	});
+	const droppedLines = oldLines
+		.filter((l) => !matched.has(l) && lineWork(l))
+		.map((l) => ({
+			key: sanKey(l),
+			name: l.name || "",
+			tag: l.tag === "foot" ? "foot" : "sideline",
+			eval: (l.meta || {}).eval || "",
+			note: (l.meta || {}).note || "",
+		}));
+	const droppedNotes = [...anno.entries()]
+		.filter(([path]) => !rehomed.has(path))
+		.map(([path, e]) => ({ path, comments: e.comments, mark: e.mark }));
+
+	return {
+		exact,
+		extended,
+		shortened,
+		removed: oldLines.filter((l) => !matched.has(l)).length,
+		added: newLines.filter((n) => ![...matched.values()].includes(n)).length,
+		droppedLines,
+		droppedNotes,
+	};
+}

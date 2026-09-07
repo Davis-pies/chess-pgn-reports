@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { installDom, loadState } from "./helpers.mjs";
+import { installDom, loadState, captureDownloads } from "./helpers.mjs";
 import { renderInline } from "../src/dom.js";
 import {
   buildMarkdown,
@@ -206,40 +206,6 @@ test("exportBar's print options toggle state and trigger a re-render", () => {
   assert.strictEqual(renders, 1);
   off();
 });
-
-// The download path builds a Blob and clicks a synthetic <a>. Stubbing
-// URL.createObjectURL is enough to observe filename, MIME type and payload
-// without a real download.
-function captureDownloads() {
-  const seen = [];
-  // download() calls the bare `URL` global, which resolves to Node's URL
-  // here rather than the jsdom window's.
-  const origUrl = { c: URL.createObjectURL, r: URL.revokeObjectURL };
-  URL.createObjectURL = (blob) => {
-    seen.push(blob);
-    return "blob:stub";
-  };
-  URL.revokeObjectURL = () => {};
-  const origCreate = document.createElement.bind(document);
-  const anchors = [];
-  document.createElement = (tag) => {
-    const node = origCreate(tag);
-    if (tag === "a") {
-      node.click = () => {};
-      anchors.push(node);
-    }
-    return node;
-  };
-  return {
-    blobs: seen,
-    anchors,
-    restore: () => {
-      document.createElement = origCreate;
-      URL.createObjectURL = origUrl.c;
-      URL.revokeObjectURL = origUrl.r;
-    },
-  };
-}
 
 test("exportBar's PGN export downloads the current state under a slugged filename", async () => {
   const off = installDom();

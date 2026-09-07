@@ -8,8 +8,11 @@ import {
   listNotebooks,
   loadNotebook,
   deleteNotebook,
-  keyFor,
+  toNotebook,
+  applyNotebook,
+  parseWorkbook,
 } from "./store.js";
+import { mergeAnnotations } from "./merge.js";
 import { el } from "./dom.js";
 import {
   getCurrent,
@@ -36,7 +39,7 @@ import {
   renderTrieNode,
 } from "./trie-view.js";
 import { lineEditor } from "./line-editor.js";
-import { exportBar } from "./export.js";
+import { exportBar, download, slug } from "./export.js";
 import { notesPanel } from "./notes-view.js";
 
 // Canonical reset for `current`. Every "start over" path (New/Import, Load &
@@ -221,6 +224,28 @@ function cardFont() {
   return getCurrent().cardFont || 100;
 }
 
+// What both stores persist: the PGN, the annotated lines, and the layout
+// settings that change what a print looks like. Shared so a workbook written
+// to a file and one written to localStorage can never carry different fields.
+function workbookState() {
+  const c = getCurrent();
+  return {
+    name: c.name,
+    pgn: c.pgn,
+    lines: c.lines,
+    view: {
+      boardSize: c.boardSize,
+      cardFont: c.cardFont,
+      printCards: c.printCards,
+      printTables: c.printTables,
+      showBoards: c.showBoards,
+      showFinalBoard: c.showFinalBoard,
+      showFirstDivBoard: c.showFirstDivBoard,
+      showFootNames: c.showFootNames,
+    },
+  };
+}
+
 function themeBtn() {
   const target = currentTheme() === "light" ? "dark" : "light";
   const b = el("button", {
@@ -279,21 +304,7 @@ function viewRoot() {
     if (!getCurrent().name) getCurrent().name = "Untitled";
     const ok = saveNotebook(
       getCurrent().id || (getCurrent().id = "n" + Date.now()),
-      {
-        name: getCurrent().name,
-        pgn: getCurrent().pgn,
-        lines: getCurrent().lines,
-        view: {
-          boardSize: getCurrent().boardSize,
-          cardFont: getCurrent().cardFont,
-          printCards: getCurrent().printCards,
-          printTables: getCurrent().printTables,
-          showBoards: getCurrent().showBoards,
-          showFinalBoard: getCurrent().showFinalBoard,
-          showFirstDivBoard: getCurrent().showFirstDivBoard,
-          showFootNames: getCurrent().showFootNames,
-        },
-      },
+      workbookState(),
     );
     if (ok) {
       save.textContent = "Saved ✓";
@@ -303,6 +314,26 @@ function viewRoot() {
     }
   };
   top.appendChild(save);
+  // The same workbook, as a file rather than a localStorage entry: something to
+  // back up, share, or keep in version control. Deliberately does NOT also save
+  // to localStorage -- the two stores are the user's to choose between.
+  const toFile = el("button", { className: "chip", textContent: "Save to file" });
+  toFile.onclick = () => {
+    if (!getCurrent().name) getCurrent().name = "Untitled";
+    download(
+      slug() + ".json",
+      JSON.stringify(toNotebook(workbookState()), null, 2),
+      "application/json",
+    );
+  };
+  top.appendChild(toFile);
+  top.appendChild(
+    el("button", {
+      className: "chip",
+      textContent: "Update PGN…",
+      onclick: () => openUpdateDialog(),
+    }),
+  );
   top.appendChild(themeBtn());
   const layout = el("div", { className: "app-layout" });
   const side = el("aside", { className: "side-panel" });
@@ -402,6 +433,51 @@ function notebookList() {
   return box;
 }
 
+// Every "the notebook changed underneath you" path clears the same session-only
+// view state: which trie groups are open, what is traced, which notes are
+// folded. None of it survives a different set of lines.
+function clearViewState() {
+  openPaths.clear();
+  openTablePaths.clear();
+  setTraced(null);
+  closedNotePaths.clear();
+}
+
+// Parse a workbook's PGN, re-apply its annotations, and make it the open
+// notebook. Shared by the localStorage list and the "open a workbook file"
+// input, which differ only in where the object came from and whether it has an
+// id in this browser's store. Throws on an unusable PGN so each caller can
+// word its own failure.
+function installNotebook(nb, id) {
+  const { nodes } = parsePgn(nb.pgn);
+  if (!nodes.length) throw new Error("that workbook has no moves.");
+  const lines = applyNotebook(nb, collectLines(nodes));
+  const view = nb.view || {};
+  setCurrent(
+    freshState({
+      id,
+      name: nb.name || "",
+      pgn: nb.pgn,
+      lines,
+      orientation: getCurrent().orientation,
+      // a saved notebook carries its own board settings; fall back to the
+      // session's for notebooks saved before `view` existed
+      showBoards: view.showBoards ?? getCurrent().showBoards,
+      boardSize: view.boardSize || getCurrent().boardSize,
+      cardFont: view.cardFont || getCurrent().cardFont,
+      printCards: view.printCards ?? getCurrent().printCards,
+      printTables: view.printTables ?? getCurrent().printTables,
+      showFinalBoard:
+        (view.showFinalBoard ?? getCurrent().showFinalBoard) !== false,
+      showFirstDivBoard: !!(
+        view.showFirstDivBoard ?? getCurrent().showFirstDivBoard
+      ),
+      showFootNames: !!(view.showFootNames ?? getCurrent().showFootNames),
+      sideWidth: getCurrent().sideWidth,
+    }),
+  );
+}
+
 function openNotebook(id) {
   withLoading(() => {
     const nb = loadNotebook(id);
@@ -410,61 +486,7 @@ function openNotebook(id) {
       return;
     }
     try {
-      const { nodes } = parsePgn(nb.pgn);
-      if (!nodes.length) {
-        alert("That workbook has no moves.");
-        return;
-      }
-      const lines = collectLines(nodes);
-      const view = nb.view || {};
-      // re-apply tags
-      lines.forEach((l) => {
-        const k = keyFor(l.moves);
-        const t = (nb.tags || []).find((x) => x.key === k);
-        if (t) {
-          l.name = t.name;
-          l.meta = t.meta || {};
-          l.marks = t.marks || {};
-          l.comments = t.comments || [];
-          // legacy notebooks used 'main'/'minor'; mainline is now structural
-          l.tag = l.isMain ? undefined : t.tag === "foot" ? "foot" : "sideline";
-          // notebooks saved before hidden existed have no field and load visible
-          l.hidden = !l.isMain && !!t.hidden;
-        }
-      });
-      // restore a user-promoted mainline, if any
-      if (nb.main) {
-        const target = lines.find((l) => keyFor(l.moves) === nb.main);
-        if (target) {
-          lines.forEach((x) => {
-            x.isMain = x === target;
-            if (x === target) x.tag = undefined;
-          });
-        }
-      }
-      setCurrent(
-        freshState({
-          id,
-          name: nb.name,
-          pgn: nb.pgn,
-          lines,
-          orientation: getCurrent().orientation,
-          // a saved notebook carries its own board settings; fall back to the
-          // session's for notebooks saved before `view` existed
-          showBoards: view.showBoards ?? getCurrent().showBoards,
-          boardSize: view.boardSize || getCurrent().boardSize,
-          cardFont: view.cardFont || getCurrent().cardFont,
-          printCards: view.printCards ?? getCurrent().printCards,
-          printTables: view.printTables ?? getCurrent().printTables,
-          showFinalBoard:
-            (view.showFinalBoard ?? getCurrent().showFinalBoard) !== false,
-          showFirstDivBoard: !!(
-            view.showFirstDivBoard ?? getCurrent().showFirstDivBoard
-          ),
-          showFootNames: !!(view.showFootNames ?? getCurrent().showFootNames),
-          sideWidth: getCurrent().sideWidth,
-        }),
-      );
+      installNotebook(nb, id);
     } catch (e) {
       setCurrent(
         freshState({
@@ -475,10 +497,23 @@ function openNotebook(id) {
       );
       alert("Could not open workbook: " + e.message);
     }
-    openPaths.clear();
-    openTablePaths.clear();
-    setTraced(null);
-    closedNotePaths.clear();
+    clearViewState();
+    renderApp();
+  });
+}
+
+// A workbook opened from a `.json` file. It has no id in this browser's store
+// until the user presses Save, so it opens with id null -- saving then files it
+// as a new entry rather than silently overwriting one.
+function openWorkbookFile(text) {
+  withLoading(() => {
+    try {
+      installNotebook(parseWorkbook(text), null);
+      clearViewState();
+    } catch (e) {
+      alert("Could not open that workbook: " + e.message);
+      return;
+    }
     renderApp();
   });
 }
@@ -743,7 +778,184 @@ function importPanel() {
     });
   };
   box.append(ta, el("div", { className: "importbar" }, [file, go]));
+  // Reopening a workbook saved as a file, as opposed to importing raw PGN.
+  // Its own row: the PGN box above starts a new workbook, this restores a
+  // finished one, and putting them side by side read as alternatives.
+  const wb = el("input", {
+    type: "file",
+    accept: ".json,application/json",
+    className: "wbin",
+  });
+  wb.onchange = () => {
+    const f = wb.files[0];
+    if (f) f.text().then(openWorkbookFile);
+  };
+  box.append(
+    el("div", { className: "wbrow" }, [
+      el("span", { textContent: "…or reopen a saved workbook file: " }),
+      wb,
+    ]),
+  );
   return box;
+}
+
+// Replacing the PGN under an annotated workbook.
+//
+// Previews before it applies: an update can drop lines, and the annotations on
+// a dropped line cannot survive -- lines exist only because the PGN has them.
+// Seeing that cost before paying it is the whole point of the dialog, so the
+// merged lines are computed on Preview and installed only on Apply.
+function openUpdateDialog() {
+  const prev = $("updpgn");
+  if (prev) prev.remove();
+  let pending = null; // { pgn, lines } from the last successful preview
+
+  const ov = el("div", { id: "updpgn", className: "modal-overlay" });
+  const box = el("div", { className: "modal" });
+  box.appendChild(el("h3", { textContent: "Update PGN" }));
+  box.appendChild(
+    el("p", {
+      className: "modal-sub",
+      textContent:
+        "Paste the new PGN. Annotations are carried over onto the lines it still plays.",
+    }),
+  );
+  const ta = el("textarea", { className: "pgnin", rows: 8 });
+  const file = el("input", {
+    type: "file",
+    accept: ".pgn,text/plain",
+    className: "filein",
+  });
+  file.onchange = () => {
+    const f = file.files[0];
+    if (f)
+      f.text().then((t) => {
+        ta.value = t;
+      });
+  };
+  const report = el("div", { className: "mergerep" });
+  const apply = el("button", {
+    className: "chip primary",
+    textContent: "Apply",
+    disabled: true,
+  });
+  const preview = el("button", {
+    className: "chip",
+    textContent: "Preview changes",
+  });
+  preview.onclick = () => {
+    pending = null;
+    apply.disabled = true;
+    try {
+      const { nodes } = parsePgn(ta.value);
+      if (!nodes.length) {
+        report.replaceChildren(
+          el("p", { className: "bad", textContent: "No moves found in PGN." }),
+        );
+        return;
+      }
+      const lines = collectLines(nodes);
+      const r = mergeAnnotations(getCurrent().lines, lines);
+      pending = { pgn: ta.value, lines };
+      apply.disabled = false;
+      report.replaceChildren(...reportNodes(r));
+    } catch (e) {
+      report.replaceChildren(
+        el("p", { className: "bad", textContent: "Could not read PGN: " + e.message }),
+      );
+    }
+  };
+  apply.onclick = () => {
+    if (!pending) return;
+    const { pgn, lines } = pending;
+    ov.remove();
+    withLoading(() => {
+      // Everything but the moves survives: this is the same workbook, under a
+      // newer PGN, so its id, name and view settings are left exactly as they
+      // were and only `pgn`/`lines` are swapped.
+      getCurrent().pgn = pgn;
+      getCurrent().lines = lines;
+      getCurrent().sel = null;
+      clearViewState();
+      renderApp();
+    });
+  };
+  const cancel = el("button", {
+    className: "chip",
+    textContent: "Cancel",
+    onclick: () => ov.remove(),
+  });
+  box.append(
+    ta,
+    el("div", { className: "importbar" }, [file, preview]),
+    report,
+    el("div", { className: "modal-actions" }, [cancel, apply]),
+  );
+  ov.appendChild(box);
+  document.body.appendChild(ov);
+  ta.focus();
+}
+
+// The merge report, as the dialog shows it: the counts first, then — spelled
+// out, because this is the part that cannot be undone — what would be lost.
+function reportNodes(r) {
+  const out = [
+    el("ul", { className: "mergecounts" }, [
+      el("li", { textContent: `${r.exact} lines unchanged` }),
+      el("li", { textContent: `${r.extended} lines extended (annotations kept)` }),
+      el("li", { textContent: `${r.shortened} lines cut short (annotations kept)` }),
+      el("li", { textContent: `${r.added} new lines` }),
+      el("li", { textContent: `${r.removed} lines no longer present` }),
+    ]),
+  ];
+  if (r.droppedLines.length) {
+    out.push(
+      el("p", {
+        className: "bad",
+        textContent: `${r.droppedLines.length} annotated line(s) would be lost:`,
+      }),
+    );
+    out.push(
+      el(
+        "ul",
+        { className: "mergelost" },
+        r.droppedLines.map((d) =>
+          el("li", {}, [
+            el("strong", { textContent: d.name || "(unnamed)" }),
+            el("span", {
+              textContent:
+                [d.tag === "foot" ? "footnote" : "", d.eval, d.note]
+                  .filter(Boolean)
+                  .map((x) => " " + x)
+                  .join("") + " — " + d.key,
+            }),
+          ]),
+        ),
+      ),
+    );
+  }
+  if (r.droppedNotes.length) {
+    out.push(
+      el("p", {
+        className: "bad",
+        textContent: `${r.droppedNotes.length} note(s) sit on moves the new PGN no longer plays:`,
+      }),
+    );
+    out.push(
+      el(
+        "ul",
+        { className: "mergelost" },
+        r.droppedNotes.map((d) =>
+          el("li", {
+            textContent: (d.comments.join(" / ") || d.mark || "") + " — " + d.path,
+          }),
+        ),
+      ),
+    );
+  }
+  if (!r.droppedLines.length && !r.droppedNotes.length)
+    out.push(el("p", { className: "good", textContent: "Nothing would be lost." }));
+  return out;
 }
 
 document.addEventListener("DOMContentLoaded", () => {
