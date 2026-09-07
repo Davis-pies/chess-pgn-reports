@@ -883,6 +883,7 @@ function openUpdateDialog() {
   // is not cancelling: the merge it described is still what Apply will do.
   let shown = false; // is the report on screen
   let ran = false; // has a preview ever been produced, to word the button
+  let byHand = false; // the user closed it; don't reopen until the PGN changes
   // There is nothing to preview until a PGN is in the box, so until then the
   // button is not there to be clicked -- a control whose only outcome is "No
   // moves found in PGN" is an invitation to a dead end.
@@ -928,14 +929,31 @@ function openUpdateDialog() {
   };
   preview.onclick = () => {
     if (!shown) return runPreview();
+    // Hidden by hand stays hidden: re-previewing on every edit is helpful,
+    // reopening a panel the user just closed is not. Only a change to the PGN
+    // itself lifts this, by way of the withdrawal below.
+    byHand = true;
     shown = false;
     report.hidden = true;
     label();
+  };
+  // Supplying a PGN is itself the request for a report -- that is what the
+  // dialog is for -- so the preview runs on its own and the button exists to
+  // put it away. Debounced, because a repertoire of a few hundred lines is a
+  // real parse and this fires while the user is still typing or pasting.
+  let timer = null;
+  const schedulePreview = () => {
+    clearTimeout(timer);
+    if (!ta.value.trim() || byHand) return;
+    timer = setTimeout(runPreview, 300);
   };
   // A preview describes the text it was run on. Editing that text after the
   // fact would leave Apply ready to install a merge of the OLD text, since
   // `pending` carries its own copy -- so an edit withdraws the preview.
   ta.oninput = () => {
+    // a new PGN is a new question, so a report put away by hand comes back
+    byHand = false;
+    schedulePreview();
     if (!ran) return label();
     pending = null;
     apply.disabled = true;
@@ -952,6 +970,7 @@ function openUpdateDialog() {
   apply.onclick = () => {
     if (!pending) return;
     const { pgn, lines, keepDropped } = pending;
+    clearTimeout(timer);
     ov.remove();
     withLoading(() => {
       // Everything but the moves survives: this is the same workbook, under a
@@ -974,14 +993,19 @@ function openUpdateDialog() {
     if (f)
       f.text().then((t) => {
         ta.value = t;
+        byHand = false;
         label();
+        runPreview(); // a picked file is not typing: report it at once
       });
   };
   label();
   const cancel = el("button", {
     className: "chip",
     textContent: "Cancel",
-    onclick: () => ov.remove(),
+    onclick: () => {
+      clearTimeout(timer);
+      ov.remove();
+    },
   });
   box.append(
     ta,

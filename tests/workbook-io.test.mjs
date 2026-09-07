@@ -498,3 +498,50 @@ test("choosing a PGN file in the dialog brings the preview button out", async ()
   assert.strictEqual(u.dlg.querySelector("textarea").value, PGN);
   assert.ok(!btn.hidden, "the loaded file brings the button out");
 });
+
+// Auto-preview. The report is the reason the dialog exists, so supplying a PGN
+// is enough to ask for it -- the button is only there to put it away again.
+const settleDebounce = () => new Promise((r) => setTimeout(r, 400));
+
+test("pasting a PGN previews it without a click", async () => {
+  app.reset();
+  await app.loadPgn(PGN);
+  const u = updateDialog("");
+
+  const ta = u.dlg.querySelector("textarea");
+  ta.value = "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6";
+  ta.dispatchEvent(new app.dom.window.Event("input"));
+  await settleDebounce();
+
+  assert.ok(!u.report().hidden, "the report came up on its own");
+  assert.match(u.report().textContent, /extended/i);
+  assert.ok(u.btn("Hide preview"), "the button is only there to put it away");
+  assert.ok(!u.btn("Hide preview").hidden);
+  assert.ok(!u.btn("Apply").disabled, "and it is ready to apply");
+});
+
+test("choosing a file in the dialog previews it without a click", async () => {
+  app.reset();
+  await app.loadPgn(PGN);
+  const u = updateDialog("");
+
+  choose(u.dlg.querySelector("input.filein"), "next.pgn", "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6");
+  await app.settle();
+
+  assert.ok(!u.report().hidden, "no click needed after picking a file");
+  assert.ok(!u.btn("Apply").disabled);
+});
+
+test("a preview hidden by hand stays hidden while the PGN is unchanged", async () => {
+  app.reset();
+  await app.loadPgn(PGN);
+  const u = updateDialog("");
+  const ta = u.dlg.querySelector("textarea");
+  ta.value = "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6";
+  ta.dispatchEvent(new app.dom.window.Event("input"));
+  await settleDebounce();
+
+  u.btn("Hide preview").click();
+  await settleDebounce();
+  assert.ok(u.report().hidden, "it does not reopen itself behind the user");
+});
