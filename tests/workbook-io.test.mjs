@@ -31,6 +31,12 @@ test("Save to file downloads the workbook as JSON under a slugged filename", asy
   app.clickText("Save to file");
   cap.restore();
 
+  assert.strictEqual(
+    app.prompts[0].def,
+    "My Great Book!",
+    "the prompt is prefilled with the name the workbook already has",
+  );
+
   assert.strictEqual(cap.anchors.length, 1);
   assert.strictEqual(cap.anchors[0].download, "My-Great-Book.json");
   assert.strictEqual(cap.blobs[0].type, "application/json");
@@ -198,4 +204,51 @@ test("Update PGN reports movetext with no moves in it", async () => {
 
   assert.match(dlg.textContent, /no moves/i);
   assert.strictEqual(getCurrent().pgn, PGN);
+});
+
+test("Save to file asks for a name, and uses it for the file and the workbook", async () => {
+  app.reset();
+  await app.loadPgn(PGN);
+
+  app.answerPrompt("Najdorf Repertoire");
+  const cap = captureDownloads(app.dom.window.document);
+  app.clickText("Save to file");
+  cap.restore();
+
+  assert.strictEqual(cap.anchors[0].download, "Najdorf-Repertoire.json");
+  assert.strictEqual(
+    getCurrent().name,
+    "Najdorf Repertoire",
+    "the name entered is the workbook's name from now on",
+  );
+  const nb = JSON.parse(await cap.blobs[0].text());
+  assert.strictEqual(nb.name, "Najdorf Repertoire");
+});
+
+test("cancelling the name prompt downloads nothing", async () => {
+  app.reset();
+  await app.loadPgn(PGN);
+  getCurrent().name = "Keep This";
+
+  app.answerPrompt(null);
+  const cap = captureDownloads(app.dom.window.document);
+  app.clickText("Save to file");
+  cap.restore();
+
+  assert.strictEqual(cap.anchors.length, 0, "no file is written");
+  assert.strictEqual(getCurrent().name, "Keep This", "the name is untouched");
+});
+
+test("a blank name at the prompt is refused rather than saved as Untitled", async () => {
+  app.reset();
+  await app.loadPgn(PGN);
+  getCurrent().name = "Keep This";
+
+  app.answerPrompt("   ");
+  const cap = captureDownloads(app.dom.window.document);
+  app.clickText("Save to file");
+  cap.restore();
+
+  assert.strictEqual(cap.anchors.length, 0, "no file is written");
+  assert.strictEqual(getCurrent().name, "Keep This");
 });

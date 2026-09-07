@@ -319,12 +319,22 @@ function viewRoot() {
   // to localStorage -- the two stores are the user's to choose between.
   const toFile = el("button", { className: "chip", textContent: "Save to file" });
   toFile.onclick = () => {
-    if (!getCurrent().name) getCurrent().name = "Untitled";
+    // Ask for the name rather than defaulting to "Untitled": the filename is
+    // how the user will find this workbook again on disk, and it is the one
+    // moment they are certainly thinking about which workbook this is. The
+    // current name is prefilled, so keeping it is a single Enter.
+    const name = prompt("Name for this workbook (used as the filename):", getCurrent().name || "");
+    // Cancel returns null; a blank or all-space name would slug to nothing, so
+    // both back out and leave the workbook exactly as it was.
+    if (name === null || !name.trim()) return;
+    getCurrent().name = name.trim();
     download(
       slug() + ".json",
       JSON.stringify(toNotebook(workbookState()), null, 2),
       "application/json",
     );
+    // the toolbar's name field shows the old value until it is rebuilt
+    renderApp();
   };
   top.appendChild(toFile);
   top.appendChild(

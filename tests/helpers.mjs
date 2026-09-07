@@ -101,6 +101,17 @@ export async function bootApp({ onAlert } = {}) {
 		if (onAlert) onAlert(m);
 	};
 	global.confirm = () => true;
+	// Answers whatever the app asks for next via prompt(); `null` stands for
+	// the user pressing Cancel. Defaults to echoing the prefilled value, which
+	// is what pressing Enter on an untouched prompt does.
+	let promptReply;
+	global.prompt = (_msg, def) => (promptReply === undefined ? def : promptReply);
+	const prompts = [];
+	const origPrompt = global.prompt;
+	global.prompt = (msg, def) => {
+		prompts.push({ msg, def });
+		return origPrompt(msg, def);
+	};
 
 	await import("../src/app.js");
 	dom.window.document.dispatchEvent(new dom.window.Event("DOMContentLoaded"));
@@ -140,6 +151,8 @@ export async function bootApp({ onAlert } = {}) {
 	// Back to the import panel, as the user would via the toolbar button.
 	const reset = () => {
 		alerts.length = 0;
+		promptReply = undefined;
+		prompts.length = 0;
 		dom.window.localStorage.clear();
 		const b = [...view().querySelectorAll("button")].find(
 			(x) => x.textContent === "New / Import",
@@ -157,6 +170,10 @@ export async function bootApp({ onAlert } = {}) {
 		clickText,
 		settle,
 		loadPgn,
+		prompts,
+		answerPrompt(v) {
+			promptReply = v;
+		},
 		teardown() {
 			delete global.window;
 			delete global.document;
@@ -164,6 +181,7 @@ export async function bootApp({ onAlert } = {}) {
 			delete global.requestAnimationFrame;
 			delete global.alert;
 			delete global.confirm;
+			delete global.prompt;
 		},
 	};
 }

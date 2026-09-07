@@ -91,9 +91,10 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    **Export Markdown** (paste into Google Docs/Word), or **Print → Save as
    PDF** (always the linear card view). Saved workbooks (`localStorage`) are
    listed under **My saved workbooks** on the import screen to reopen/delete.
-5. **Save and reload as a file** — **Save to file** writes the whole workbook,
-   PGN and all annotations together, to one `.json` you can back up, share or
-   keep in version control; the import screen reopens one. It's the same format
+5. **Save and reload as a file** — **Save to file** asks for a name (prefilled
+   with the workbook's current one) and writes the whole workbook, PGN and all
+   annotations together, to one `.json` you can back up, share or keep in
+   version control; the import screen reopens one. It's the same format
    `localStorage` holds, so nothing is lost either way. A file opens with no
    `localStorage` id of its own — pressing **Save** files it as a new entry
    rather than overwriting one.
