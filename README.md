@@ -8,7 +8,8 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
 
 ## What it does
 
-1. **Import** — paste PGN or drop a `.pgn` file. Parenthesized variations
+1. **Import** — paste PGN and press **Load & Tag**, or use **Load PGN file**
+   / **Load Workbook file** to open one from disk. Parenthesized variations
    `(...)` are parsed into separate taggable lines; PGN `{...}` comments are
    captured as numbered **Notes**.
 2. **Tag** — the mainline is the reference row. For each other line choose

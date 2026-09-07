@@ -310,3 +310,58 @@ test("without the additive option the stored PGN is exactly what was pasted", as
 
   assert.strictEqual(getCurrent().pgn, NEXT);
 });
+
+// ---------------------------------------------------------------------------
+// The import panel's two file buttons. The raw <input type=file> pair read as
+// one control with a stray label; each now has its own button saying what it
+// loads, stacked so neither looks like an afterthought of the other.
+// ---------------------------------------------------------------------------
+
+test("Load PGN file reads the file and goes straight to the editor", async () => {
+  app.reset();
+  const btn = app.view().querySelector("button.loadpgn");
+  assert.ok(btn, "the import panel offers a Load PGN file button");
+  assert.match(btn.textContent, /Load PGN file/);
+
+  choose(app.view().querySelector("input.filein"), "rep.pgn", PGN);
+  await app.settle();
+
+  assert.ok(
+    !app.view().querySelector("textarea.pgnin"),
+    "the import panel is gone -- the file loaded rather than filling the box",
+  );
+  assert.strictEqual(getCurrent().pgn, PGN);
+  assert.ok(find("e4 e5 Nf3 Nf6 d4"), "its lines are parsed");
+});
+
+test("Load Workbook file has its own button beside the PGN one", () => {
+  app.reset();
+  const pgn = app.view().querySelector("button.loadpgn");
+  const wb = app.view().querySelector("button.loadwb");
+  assert.ok(wb, "the import panel offers a Load Workbook file button");
+  assert.match(wb.textContent, /Load Workbook file/);
+  // stacked: same parent, PGN first
+  assert.strictEqual(wb.parentElement, pgn.parentElement, "one stack");
+  assert.ok(
+    pgn.compareDocumentPosition(wb) & 4,
+    "PGN sits above Workbook",
+  );
+});
+
+test("each file button opens its own picker, not the other's", () => {
+  app.reset();
+  const opened = [];
+  ["filein", "wbin"].forEach((c) => {
+    const inp = app.view().querySelector("input." + c);
+    inp.click = () => opened.push(c);
+  });
+  app.view().querySelector("button.loadpgn").click();
+  app.view().querySelector("button.loadwb").click();
+  assert.deepStrictEqual(opened, ["filein", "wbin"]);
+});
+
+test("the paste box still loads through Load & Tag", async () => {
+  app.reset();
+  await app.loadPgn(PGN);
+  assert.strictEqual(getCurrent().pgn, PGN, "the pasted path is untouched");
+});

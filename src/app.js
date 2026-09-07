@@ -513,6 +513,35 @@ function openNotebook(id) {
   });
 }
 
+// Import raw PGN and open it as a new workbook. Shared by the paste box's
+// "Load & Tag" and the "Load PGN file" button, which differ only in where the
+// text came from.
+function loadPgnText(text) {
+  withLoading(() => {
+    try {
+      const { nodes } = parsePgn(text);
+      if (!nodes.length) {
+        alert("No moves found in PGN");
+        return;
+      }
+      clearViewState();
+      setCurrent(
+        freshState({
+          id: getCurrent().id,
+          pgn: text,
+          lines: collectLines(nodes),
+          boardSize: getCurrent().boardSize,
+          cardFont: getCurrent().cardFont,
+          sideWidth: getCurrent().sideWidth,
+        }),
+      );
+      renderApp();
+    } catch (e) {
+      alert("Could not read PGN: " + e.message);
+    }
+  });
+}
+
 // A workbook opened from a `.json` file. It has no id in this browser's store
 // until the user presses Save, so it opens with id null -- saving then files it
 // as a new entry rather than silently overwriting one.
@@ -744,67 +773,53 @@ function importPanel() {
     rows: 10,
     placeholder: "1. e4 e5 2. Nf3 Nc6 (2... Nf6 3. d4) 3. Bb5",
   });
-  const file = el("input", {
-    type: "file",
-    accept: ".pgn,text/plain",
-    className: "filein",
-  });
-  file.onchange = () => {
-    const f = file.files[0];
-    if (f)
-      f.text().then((t) => {
-        ta.value = t;
-      });
-  };
   const go = el("button", {
     className: "chip primary",
     textContent: "Load & Tag",
+    onclick: () => loadPgnText(ta.value),
   });
-  go.onclick = () => {
-    withLoading(() => {
-      try {
-        const { nodes } = parsePgn(ta.value);
-        if (!nodes.length) {
-          alert("No moves found in PGN");
-          return;
-        }
-        openPaths.clear();
-        openTablePaths.clear();
-        setTraced(null);
-        closedNotePaths.clear();
-        setCurrent(
-          freshState({
-            id: getCurrent().id,
-            pgn: ta.value,
-            lines: collectLines(nodes),
-            boardSize: getCurrent().boardSize,
-            cardFont: getCurrent().cardFont,
-            sideWidth: getCurrent().sideWidth,
-          }),
-        );
-        renderApp();
-      } catch (e) {
-        alert("Could not read PGN: " + e.message);
-      }
-    });
+  box.append(ta, el("div", { className: "importbar" }, [go]));
+
+  // Loading from a file. Two sources, so two buttons that say which is which,
+  // stacked rather than side by side: they are alternatives, not a pair of
+  // controls that work together, and a row read as one widget with a stray
+  // label. The <input>s themselves are hidden -- a bare file input shows the
+  // browser's own "No file chosen" text, which said nothing useful twice over.
+  const pickPgn = el("input", {
+    type: "file",
+    accept: ".pgn,text/plain",
+    className: "filein",
+    hidden: true,
+  });
+  // Straight into the editor rather than filling the box above: the button
+  // says Load, and a file the user picked by name needs no second confirmation.
+  pickPgn.onchange = () => {
+    const f = pickPgn.files[0];
+    if (f) f.text().then(loadPgnText);
   };
-  box.append(ta, el("div", { className: "importbar" }, [file, go]));
-  // Reopening a workbook saved as a file, as opposed to importing raw PGN.
-  // Its own row: the PGN box above starts a new workbook, this restores a
-  // finished one, and putting them side by side read as alternatives.
-  const wb = el("input", {
+  const pickWb = el("input", {
     type: "file",
     accept: ".json,application/json",
     className: "wbin",
+    hidden: true,
   });
-  wb.onchange = () => {
-    const f = wb.files[0];
+  pickWb.onchange = () => {
+    const f = pickWb.files[0];
     if (f) f.text().then(openWorkbookFile);
   };
+  const fileBtn = (cls, label, input) =>
+    el("button", {
+      className: "chip filebtn " + cls,
+      textContent: label,
+      onclick: () => input.click(),
+    });
   box.append(
-    el("div", { className: "wbrow" }, [
-      el("span", { textContent: "…or reopen a saved workbook file: " }),
-      wb,
+    el("div", { className: "filestack" }, [
+      el("span", { className: "filestack-h", textContent: "or load from a file" }),
+      fileBtn("loadpgn", "Load PGN file", pickPgn),
+      fileBtn("loadwb", "Load Workbook file", pickWb),
+      pickPgn,
+      pickWb,
     ]),
   );
   return box;
