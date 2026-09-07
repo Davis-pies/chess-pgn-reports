@@ -402,3 +402,62 @@ test("the all-clear appears only when nothing is removed at all", async () => {
   const rep = dlg.querySelector(".mergerep").textContent;
   assert.match(rep, /nothing would be lost/i, rep);
 });
+
+// Preview toggling. The report is the biggest thing in the dialog, so once it
+// has been read it should be possible to put it away without losing the merge
+// it describes.
+function updateDialog(text) {
+  app.clickText("Update PGN");
+  const dlg = app.dom.window.document.getElementById("updpgn");
+  dlg.querySelector("textarea").value = text;
+  const btn = (t) =>
+    [...dlg.querySelectorAll("button")].find((b) => b.textContent === t);
+  return { dlg, btn, report: () => dlg.querySelector(".mergerep") };
+}
+
+test("the preview button becomes Hide preview once the report is showing", async () => {
+  app.reset();
+  await app.loadPgn(PGN);
+  const u = updateDialog("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6");
+
+  u.btn("Preview changes").click();
+  assert.ok(!u.report().hidden, "the report shows straight away");
+  assert.ok(u.btn("Hide preview"), "and the button offers to put it away");
+});
+
+test("hiding the preview keeps the merge it described", async () => {
+  app.reset();
+  await app.loadPgn(PGN);
+  const u = updateDialog("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6");
+  u.btn("Preview changes").click();
+  u.btn("Hide preview").click();
+
+  assert.ok(u.report().hidden, "the report is put away");
+  assert.ok(u.btn("Show preview"), "the button offers it back");
+  assert.ok(
+    !u.btn("Apply").disabled,
+    "Apply still stands -- hiding is not cancelling",
+  );
+
+  u.btn("Show preview").click();
+  assert.ok(!u.report().hidden, "and it comes back");
+  assert.match(u.report().textContent, /extended/i);
+});
+
+test("editing the PGN after a preview withdraws it", async () => {
+  app.reset();
+  await app.loadPgn(PGN);
+  const u = updateDialog("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6");
+  u.btn("Preview changes").click();
+  assert.ok(!u.btn("Apply").disabled);
+
+  const ta = u.dlg.querySelector("textarea");
+  ta.value = "1. d4 d5 2. c4";
+  ta.dispatchEvent(new app.dom.window.Event("input"));
+
+  assert.ok(
+    u.btn("Apply").disabled,
+    "the old preview cannot be applied to new text",
+  );
+  assert.ok(u.btn("Preview changes"), "the button asks to be run again");
+});

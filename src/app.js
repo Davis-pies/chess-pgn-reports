@@ -878,9 +878,24 @@ function openUpdateDialog() {
     className: "chip",
     textContent: "Preview changes",
   });
-  preview.onclick = () => {
+  // The report is the tallest thing in the dialog, so once it has been read
+  // the button puts it away rather than only ever producing it again. Hiding
+  // is not cancelling: the merge it described is still what Apply will do.
+  let shown = false; // is the report on screen
+  let ran = false; // has a preview ever been produced, to word the button
+  const label = () => {
+    preview.textContent = shown
+      ? "Hide preview"
+      : ran
+        ? "Show preview"
+        : "Preview changes";
+  };
+  const runPreview = () => {
     pending = null;
     apply.disabled = true;
+    ran = true;
+    shown = true;
+    report.hidden = false;
     try {
       const { nodes } = parsePgn(ta.value);
       if (!nodes.length) {
@@ -898,12 +913,37 @@ function openUpdateDialog() {
       report.replaceChildren(...reportNodes(r));
     } catch (e) {
       report.replaceChildren(
-        el("p", { className: "bad", textContent: "Could not read PGN: " + e.message }),
+        el("p", {
+          className: "bad",
+          textContent: "Could not read PGN: " + e.message,
+        }),
       );
+    } finally {
+      label();
     }
   };
+  preview.onclick = () => {
+    if (!shown) return runPreview();
+    shown = false;
+    report.hidden = true;
+    label();
+  };
+  // A preview describes the text it was run on. Editing that text after the
+  // fact would leave Apply ready to install a merge of the OLD text, since
+  // `pending` carries its own copy -- so an edit withdraws the preview.
+  ta.oninput = () => {
+    if (!ran) return;
+    pending = null;
+    apply.disabled = true;
+    ran = false;
+    shown = false;
+    report.replaceChildren();
+    report.hidden = true;
+    label();
+  };
+  // The report describes one mode; switching modes must re-describe it.
   keep.onchange = () => {
-    if (pending) preview.onclick();
+    if (ran) runPreview();
   };
   apply.onclick = () => {
     if (!pending) return;
