@@ -851,7 +851,7 @@ function openUpdateDialog() {
   const keep = el("input", { type: "checkbox", className: "keepdropped" });
   const keepRow = el("label", { className: "opt" }, [
     keep,
-    " Keep lines the new PGN drops (nothing is lost; the workbook's PGN is rebuilt from its lines)",
+    " Additive only — keep lines the new PGN drops",
   ]);
   const report = el("div", { className: "mergerep" });
   const apply = el("button", {
