@@ -1,12 +1,32 @@
 // Print/PDF horizontal table. The mainline is always shown as the reference
-// column; the side lines are split into vertical slices of ~16 columns so the
+// column; the side lines are split into vertical slices of ~14 columns so the
 // table wraps across pages instead of being cut off or scaled.
+//
+// The side lines are GROUPED, the way the editor's table groups them: lines
+// sharing a run of moves below their divergence from the mainline state that
+// run once, in a column of their own, and pick up from where it ends. Every
+// group is open (nothing folds on paper) and every table is self-contained,
+// so a slice never refers back to a column on the page before it.
 import { renderTable, appendFootnote } from "./render.js";
 import { el, renderInline } from "./dom.js";
 import { getCurrent } from "./state.js";
 import { allNotes } from "./notes.js";
 import { buildTrie, leavesOf } from "./tree.js";
 import { moveRef } from "./export.js";
+import { groupedVars } from "./group-cols.js";
+
+// The columns one printed table renders: the same grouping the editor's table
+// builds, with every group open — there is nothing to click on paper, so a
+// folded group would just withhold moves from the reader.
+//
+// Built from THAT TABLE's lines, not the notebook's: a group whose lines were
+// split across a page boundary is re-derived on the far side from the lines
+// that landed there, so it restates its shared moves instead of pointing back
+// at a column on the previous page. A line that arrives alone has no group
+// above it and spells its whole divergence out. Every table stands on its own.
+function printVars(mainV, lines) {
+  return groupedVars(mainV, lines, { isOpen: () => true });
+}
 
 // Highest ply present in a subset of table vars — so a per-branch print table
 // doesn't render empty rows down to the notebook's global max.
@@ -34,23 +54,26 @@ export function appendPrintTables(box, g) {
     return;
   }
   const split = getCurrent().showSplitTrie === true;
-  if (!split && others.length <= size) {
-    renderTable(wrap, g, "horizontal");
+  if (!split && printWidth(mainV, others) <= size) {
+    renderTable(wrap, { ...g, vars: printVars(mainV, others) }, "horizontal");
+    // Notes are collected off the LINES, not the columns: a group column is
+    // synthesised and matches no line, and its shared moves' notes are already
+    // gathered onto it by the column builder.
     renderTableNotes(wrap, g.vars, true);
   } else {
-    // pack branches into tables of up to `size` lines: tiny branches share
-    // a table, and an oversized fork is cut at its own sub-forks — every
-    // table spans only the deepest line it actually covers (the mainline
-    // reference column stops there too). Each table's notes render under
-    // it; the mainline's notes only under the first table.
-    packForPrint(buildTrie(others, mainV), size).forEach((lines, i) => {
+    // pack branches into tables of up to `size` COLUMNS: tiny branches share
+    // a table, and an oversized fork spills into the next one — every table
+    // spans only the deepest line it actually covers (the mainline reference
+    // column stops there too). Each table's notes render under it; the
+    // mainline's notes only under the first table.
+    packForPrint(mainV, others, size).forEach((lines, i) => {
       // Later tables stop at the deepest line they actually cover. The FIRST
       // table is the reader's reference for the whole opening, so it runs the
       // mainline out to its full length even when its own branches are short.
       const maxPly = i === 0 ? subMaxPly([mainV, ...lines]) : subMaxPly(lines);
       renderTable(
         wrap,
-        { ...g, vars: [mainV, ...lines], maxPly },
+        { ...g, vars: printVars(mainV, lines), maxPly },
         "horizontal",
       );
       renderTableNotes(wrap, [mainV, ...lines], i === 0);
@@ -137,35 +160,38 @@ function renderTableNotes(wrap, vars, showMain) {
   });
 }
 
-// Greedily pack trie branches into print-table line groups, targeting FULL
-// tables. Coherent chunks (a fork's lines, kept together while they fit the
-// cap) fill each table to the cap; only the final table may be sparse. A fork
-// bigger than the cap is split at its own sub-forks first.
-function packForPrint(trie, size) {
-  const chunks = [];
-  const collect = (node) => {
-    const lines = leavesOf(node);
-    if (lines.length <= size) {
-      chunks.push(lines);
-      return;
-    }
-    // too big for one table: split at the real sub-forks
-    if (node.leaf) chunks.push([node.leaf]);
-    node.children.forEach((c) => collect(c));
-  };
-  trie.children.forEach((c) => collect(c));
-  // fill every table to the cap, splitting a chunk at the boundary so no
-  // table is left sparse except the last one
+// How wide a table of these lines comes out, in columns beside the mainline.
+// NOT the line count: a group costs a column of its own for the moves its
+// lines share, so a table of eight lines can be eleven columns wide.
+function printWidth(mainV, lines) {
+  return printVars(mainV, lines).length - 1; // less the mainline reference
+}
+
+// Greedily pack lines into print tables, targeting FULL tables: walk them in
+// trie order, which keeps a fork's lines adjacent, and start a new table as
+// soon as the next line would push this one past the cap. Only the last table
+// is sparse.
+//
+// The cap is measured in COLUMNS, not lines. Counting lines was right while
+// every line was a column of its own; now that a group takes a column too, a
+// line-counted table of 13 could render 20 columns wide and run off the page.
+// The measurement is the same builder that renders the table, so the two
+// cannot disagree about what fits.
+function packForPrint(mainV, lines, size) {
   const tables = [];
   let cur = [];
-  for (const chunk of chunks) {
-    if (cur.length + chunk.length <= size) {
-      cur.push(...chunk);
-    } else {
-      const take = size - cur.length;
-      cur.push(...chunk.slice(0, take));
+  for (const l of leavesOf(buildTrie(lines, mainV))) {
+    // a lone line is one column: it always fits, and this keeps a table from
+    // being closed empty
+    if (!cur.length) {
+      cur = [l];
+      continue;
+    }
+    const next = [...cur, l];
+    if (printWidth(mainV, next) <= size) cur = next;
+    else {
       tables.push(cur);
-      cur = chunk.slice(take);
+      cur = [l];
     }
   }
   if (cur.length) tables.push(cur);

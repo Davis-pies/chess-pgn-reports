@@ -142,27 +142,56 @@ test("the print notes block renders a group's nested members", () => {
 // would take, and elides the moves that block's header already shows. None of
 // that is allowed to reach the printed report: appendPrintTables builds from
 // grid() straight, so every line prints its full divergence from the mainline.
-test("the printed table is untouched by the preview's grouping", () => {
+// Print groups its lines, but it is not showing the reader's table: whatever
+// they left folded on screen, the report opens every group, because there is
+// nothing to click on paper. The shading, stubs and fold controls stay off.
+test("the printed table opens every group whatever the preview has folded", () => {
   const off = installDom();
   openTablePaths.add("1:c5");
   openTablePaths.add("1:c5/2:Nf3");
   const box = printTables(
     "1. e4 e5 (1... c5 2. Nf3 Nc6 3. Bb5) (1... c5 2. Nf3 Nc6 3. a4) 2. Nf3",
   );
+  // A group's shared moves keep the muted italic the editor gives them — that
+  // is typography, and it says the same thing on paper. What stays off is the
+  // interactive chrome: block shading, the ▸/▾ cue, the fold handler, and the
+  // "N lines" stub a shut group shows in its place.
   assert.strictEqual(
-    box.querySelectorAll(".grp, .collapsed, .clickable").length,
+    box.querySelectorAll(".grp, .clickable, .collapse-cue, .var-head.collapsed")
+      .length,
     0,
     "no group shading, stubs or fold controls in print",
   );
   const rows = [...box.querySelectorAll("table.tbl tr")];
   const col = (i) => rows.slice(1).map((tr) => tr.children[i].textContent);
-  assert.deepStrictEqual(
-    col(2),
-    ["\u2026", "c5", "Nf3", "Nc6", "Bb5"],
-    "print keeps each line's whole divergence",
-  );
-  assert.deepStrictEqual(col(3), ["\u2026", "c5", "Nf3", "Nc6", "a4"]);
+  // the group's own column carries the moves both lines share...
+  assert.deepStrictEqual(col(2), ["\u2026", "c5", "Nf3", "Nc6", ""]);
+  // ...and each line picks up where that column left off
+  assert.deepStrictEqual(col(3), ["\u2026", "\u2026", "\u2026", "\u2026", "Bb5"]);
+  assert.deepStrictEqual(col(4), ["\u2026", "\u2026", "\u2026", "\u2026", "a4"]);
   openTablePaths.clear();
+  off();
+});
+
+// The bug this whole change is about: two lines sharing a run of moves BELOW
+// their divergence from the mainline each spelled that run out in full, so the
+// reader read "Bb5+ Bd7 Bxd7+" three times across the page instead of once.
+test("the printed table states a group's shared moves once", () => {
+  const off = installDom();
+  const box = printTables(
+    "1. e4 c5 2. Nf3 d6 3. d4 (3. Bb5+ Bd7 4. Bxd7+ Qxd7 5. O-O Nc6)" +
+      " (3. Bb5+ Bd7 4. Bxd7+ Nxd7 5. c4 Ngf6) (3. Bb5+ Nd7 4. d4 cxd4)" +
+      " 3... cxd4 4. Nxd4 Nf6 *",
+  );
+  const cells = [...box.querySelectorAll("table.tbl td")].map(
+    (c) => c.textContent,
+  );
+  const times = (san) => cells.filter((t) => t === san).length;
+  assert.strictEqual(times("Bb5+"), 1, "the move all three lines share");
+  assert.strictEqual(times("Bxd7+"), 1, "the move the first two share");
+  // the moves that genuinely differ are still each line's own
+  assert.strictEqual(times("Qxd7"), 1);
+  assert.strictEqual(times("Nxd7"), 1);
   off();
 });
 
@@ -193,5 +222,82 @@ test("no context-menu handlers reach the printed report", () => {
     0,
   );
   openTablePaths.clear();
+  off();
+});
+
+// A King's Indian stem (1... Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6) shared by many
+// lines that fork at White's 5th. "Bg7" is in the stem and nowhere in the
+// mainline, so counting it counts the stem.
+const KID_FIFTHS = [
+  "Nf3", "f3", "Be2", "f4", "h3", "g3", "Bd3", "Bg5",
+  "Nge2", "a3", "b3", "h4", "Rb1", "Qd2", "Bd2", "Be3",
+];
+function kid(n) {
+  return (
+    "1. d4 d5 " +
+    KID_FIFTHS.slice(0, n)
+      .map((m) => `(1... Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. ${m})`)
+      .join(" ") +
+    " 2. c4 e6 3. Nc3 *"
+  );
+}
+
+// The pagination half of the same problem. A group wide enough to spill onto a
+// second table must say its shared moves AGAIN there: a reader holding page two
+// cannot see a column on page one, so an elided line would leave them with a
+// row of "…" and nowhere to look it up.
+test("a group split across print tables restates its shared moves", () => {
+  const off = installDom();
+  const box = printTables(kid(16));
+  const tables = [...box.querySelectorAll("table.tbl")];
+  assert.ok(tables.length > 1, "the fixture packs into several tables");
+  tables.forEach((t, i) => {
+    const stem = [...t.querySelectorAll("td")].filter(
+      (c) => c.textContent === "Bg7",
+    );
+    assert.strictEqual(stem.length, 1, `table ${i} states the stem exactly once`);
+  });
+  off();
+});
+
+// The same rule where the spill is a single line: alone on its table it has no
+// group above it to have said the moves, so it goes back to spelling its whole
+// divergence out rather than eliding against a column that isn't there.
+test("a line alone on a later print table keeps its whole divergence", () => {
+  const off = installDom();
+  // 13 lines: 12 fill the first table to the column cap, the 13th spills alone
+  const box = printTables(kid(13));
+  const tables = [...box.querySelectorAll("table.tbl")];
+  const last = tables[tables.length - 1];
+  const rows = [...last.querySelectorAll("tr")];
+  const cols = rows[0].querySelectorAll("th").length;
+  assert.strictEqual(cols, 3, "ply label + mainline + the one spilled line");
+  const own = rows
+    .slice(1)
+    .map((tr) => tr.children[2].textContent)
+    .filter((t) => t && t !== "\u2026");
+  assert.deepStrictEqual(own, ["Nf6", "c4", "g6", "Nc3", "Bg7", "e4", "d6", "Rb1"]);
+  off();
+});
+
+// showSplitTrie is off by default, so this narrow path — one table, no packing —
+// is the one most reports take. It groups too; the cascade is a property of the
+// printed table, not of the splitting.
+test("a report that fits one table cascades without the trie split", () => {
+  const off = installDom();
+  const st = loadState(
+    "1. e4 c5 2. Nf3 d6 3. d4 (3. Bb5+ Bd7 4. Bxd7+ Qxd7)" +
+      " (3. Bb5+ Bd7 4. Bxd7+ Nxd7) 3... cxd4 *",
+  );
+  getCurrent().showSplitTrie = false;
+  const box = document.createElement("div");
+  appendPrintTables(box, grid(st.lines));
+  assert.strictEqual(
+    box.querySelectorAll("table.tbl").length,
+    1,
+    "the fixture fits a single table",
+  );
+  const cells = [...box.querySelectorAll("td")].map((c) => c.textContent);
+  assert.strictEqual(cells.filter((t) => t === "Bxd7+").length, 1);
   off();
 });

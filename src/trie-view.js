@@ -1,5 +1,5 @@
 import { buildTrie, leavesOf, countLeaves } from "./tree.js";
-import { markSym } from "./nags.js";
+
 import { renderTable, fullmoveLabel } from "./render.js";
 import { el } from "./dom.js";
 import {
@@ -11,6 +11,7 @@ import {
 	getRenderHooks,
 } from "./state.js";
 import { subMaxPly } from "./print.js";
+import { groupedVars } from "./group-cols.js";
 import { setHidden, solo, isFocused, hideAll, showAll } from "./visibility.js";
 import { grid } from "./table.js";
 import { tracedKey, tracePath } from "./trace.js";
@@ -128,231 +129,21 @@ export function renderTrieTable(container, g, orientation) {
 		},
 	});
 }
-
-// A trie node's contribution to the column list, one level at a time.
-//
-// An open group keeps a column of its own: the moves its lines share, and the
-// only control in the group. That column is not decoration — without it a group
-// whose children are ALL branches would be unfoldable, since every column under
-// it would be a shut stub whose click opens rather than closes, leaving
-// Collapse all as the only way back out.
-//
-// It carries no line count while open (the lines are right there) and no fold
-// lives on the line columns, so one click closes exactly one level instead of
-// however many the reader had opened.
-//
-// `depth` tints the block: an open group and everything beneath it carry the
-// same depth, so the shading marks exactly what that group's ▾ will fold, and a
-// group nested inside another shades one step further.
-// The var list the screen preview renders: the mainline column, then each
-// top-level branch by pushNode's rule. Exported so the trace rules can be
+// The var list the screen preview renders. Exported so the trace rules can be
 // tested against the same columns the view builds, without a DOM.
+//
+// The columns themselves come from group-cols.js, which print.js builds from
+// too; what belongs to the screen is the pair of hooks passed in — which groups
+// the reader has open, and what a click on a group's header does.
 export function pushVars(g) {
-	const mainV = g.vars[0];
-	const trie = buildTrie(g.vars.slice(1), mainV);
-	const vars = [mainV];
-	trie.children.forEach((c) => pushNode(c, vars));
-	return vars;
-}
-
-function pushNode(node, vars, depth = 0, cut = -1, trail = []) {
-	// one line under it: just that line's column, with nothing to fold
-	if (countLeaves(node) === 1) {
-		leavesOf(node).forEach((l) => vars.push(tag(elide(l, cut), depth, trail)));
-		return;
-	}
-	const open = openTablePaths.has(node.key);
-	const v = branchVar(node, open);
-	// A group column is traceable in its own right (its stem), so it needs the
-	// same trail its children get. It does not go through tag(), which is where
-	// a line column picks one up -- without this a NESTED group's chain lost the
-	// group above it and its trace died at the mainline prefix, while a
-	// top-level group, whose trail is empty anyway, looked fine.
-	v.trail = trail;
-	// A shut branch belongs to whatever block encloses it; an open one opens a
-	// block of its own and shares that block with its children.
-	const d = open ? depth + 1 : depth;
-	if (d) v.gdepth = d;
-	if (open) v.gstart = true;
-	vars.push(v);
-	if (!open) return;
-	// Down to the first real fork before recursing: sharedMoves already put the
-	// single-child chain in the column above, so opening one level per shared
-	// move would reveal nothing new. It also means an open group never has a
-	// single child — the fork has at least two things under it.
-	const fork = forkOf(node);
-	// ...and the group column is now carrying those shared moves on screen, so
-	// everything under it starts where the group left off.
-	const inner = fork.move.ply;
-	// An open group's column is where its shared moves are spelled out, so it
-	// joins the trail of everything beneath it: a line traced from here has to
-	// light cells in this column, not just in its own.
-	const below = [...trail, v];
-	// a line ending exactly at the fork is a column beside its continuations
-	if (fork.leaf) vars.push(tag(elide(fork.leaf, inner), d, below));
-	fork.children.forEach((c) => pushNode(c, vars, d, inner, below));
-}
-
-function tag(v, depth, trail) {
-	return { ...v, ...(depth ? { gdepth: depth } : {}), trail };
-}
-
-// Elide the moves an open ancestor group's column is already showing.
-//
-// A line column only has to say how it differs from the column above it; while
-// the group is shut there is no such column, so the line spells its whole
-// divergence out, but once the group is open repeating its shared moves in
-// every child just pushes each line's own continuation off to the right.
-// Elided moves become the same "…" the mainline prefix already uses, so the
-// column still starts at ply 0 and the rows stay aligned.
-//
-// A line that ends AT the fork would be left with nothing, so its last move
-// stays put: an empty column reads as a bug rather than as "this line stops
-// here" — and its marker stays with it.
-//
-// A note marker goes wherever its move went. An elided cell no longer spells
-// out the move it annotates, so a [n] left behind on the "…" pointed at
-// nothing, and repeated itself once per line in the group besides. The group
-// column shows those moves now and carries their markers (see branchVar).
-function elide(v, cut) {
-	if (cut < 0) return v;
-	const own = Object.keys(v.cells)
-		.map(Number)
-		.filter((p) => v.cells[p].cls !== "ellip");
-	if (!own.length) return v;
-	const last = Math.max(...own);
-	const upto = last <= cut ? last - 1 : cut;
-	const cells = {};
-	for (const [k, c] of Object.entries(v.cells))
-		cells[k] = Number(k) <= upto ? { text: "\u2026", cls: "ellip" } : c;
-	const noteByPly = {};
-	for (const [k, refs] of Object.entries(v.noteByPly || {}))
-		if (Number(k) > upto) noteByPly[k] = refs;
-	return { ...v, cells, noteByPly };
-}
-
-// Note markers for the moves a group's column shows, gathered off the lines
-// underneath it.
-//
-// The column is the only place those moves appear — open, its children elide
-// them; shut, its children are not on screen at all — so without this a note on
-// a shared move was numbered in the Notes list and referenced from nowhere in
-// the table.
-//
-// Only the plies the column actually spells out: a note deeper in a shut
-// group's lines has no cell here to sit on, and hanging it off a shared move
-// would file it under a move it does not annotate. It stays in the Notes list,
-// and reappears in the table when the group is opened far enough to show its
-// move.
-//
-// Numbers are deduped and sorted: a note shared across the group is one number
-// (numberNotes already collapses identical text at one ply), and two lines each
-// carrying a different note at the same move list both.
-function sharedNotes(node, shared) {
-	const plies = new Set(shared.map((m) => m.ply));
-	const out = {};
-	leavesOf(node).forEach((v) => {
-		for (const [k, refs] of Object.entries(v.noteByPly || {})) {
-			if (!plies.has(Number(k))) continue;
-			const into = (out[k] = out[k] || []);
-			refs.forEach((n) => into.includes(n) || into.push(n));
-		}
-	});
-	for (const k of Object.keys(out)) out[k].sort((a, b) => a - b);
-	return out;
-}
-
-// Per-move symbols for the moves a group's column shows, merged off the lines
-// underneath it — the same job sharedNotes does for [n] markers, and the same
-// job foot-nodes.js's mergeMarks does inside a group footnote.
-//
-// The column is the only place those moves appear — open, its children elide
-// them; shut, its children are not on screen at all — so without this a ⩲ set
-// on a shared move was saved in the notebook, exported to the PGN as its NAG,
-// and shown nowhere in the table.
-//
-// Only the plies the column actually spells out, for the same reason: a symbol
-// deeper in a shut group's lines has no cell here to sit on, and hanging it off
-// a shared move would file it under a move it does not annotate.
-//
-// First line wins, so members disagreeing about a shared move are resolved in
-// reading order rather than by whichever leaf was visited last — matching
-// mergeMarks, so a group reads the same in the table and in its footnote.
-function sharedMarks(node, shared) {
-	const plies = new Set(shared.map((m) => m.ply));
-	const out = {};
-	leavesOf(node).forEach((v) => {
-		for (const [k, mark] of Object.entries(v.marks || {}))
-			if (plies.has(Number(k)) && out[k] === undefined) out[k] = mark;
-	});
-	return out;
-}
-
-// The end of a node's single-child chain — the node sharedMoves() stops at.
-function forkOf(node) {
-	let n = node;
-	while (!n.leaf && n.children.size === 1) n = [...n.children.values()][0];
-	return n;
-}
-
-// A trie branch as a single column/row of its shared continuation: the moves
-// common to all its lines up to the first fork, with divergent cells empty.
-// Shut, it stands in for the lines underneath and says how many there are;
-// open, it is the group's header and shows the shared moves alone.
-function branchVar(node, open) {
-	const shared = sharedMoves(node); // [{ ply, san }] down the single-child chain
-	const marks = sharedMarks(node, shared);
-	const cells = {};
-	shared.forEach((m) => {
-		// resolved to a glyph here, exactly as grid() does for a line's own cells
-		cells[m.ply] = { text: m.san, cls: "collapsed", mark: markSym(marks[m.ply]) };
-	});
-	// ellipsis prefix before the branch's first shared move, like a sideline
-	const d = shared.length ? shared[0].ply : 0;
-	for (let ply = 0; ply < d; ply++)
-		cells[ply] = { text: "…", cls: "ellip" };
-	const count = countLeaves(node);
-	// The path this column shows, as a line: every move from ply 0 down to the
-	// last one it spells out. Tracing a group column highlights how the reader
-	// GETS here -- the mainline prefix, any enclosing groups, and this column's
-	// own shared moves -- which is the only well-defined answer for a column
-	// that stands in for several lines.
-	//
-	// Named `moves` because that is what tracePath reads. It cannot reach the
-	// cards or the printed report: those build from grid() directly, and this
-	// var only ever enters the preview's list.
-	const lastShared = shared.length ? shared[shared.length - 1].ply : -1;
-	const leaves = leavesOf(node);
-	const anyLeaf = leaves[0];
-	const stem = anyLeaf ? anyLeaf.moves.filter((m) => m.ply <= lastShared) : [];
-	// The lines under this column, for the context menu's group actions. Vars
-	// are copies; grid() carries the line each was built from (see table.js).
-	const groupLines = leaves.map((x) => x.line).filter(Boolean);
-	return {
-		tag: "collapse",
-		label: "",
-		moves: stem,
-		groupLines,
-		// Its own identity, not the stem's SAN path: a group whose stem is
-		// exactly some line's moves (a line ending at the fork) would otherwise
-		// share that line's key and the two would trace each other.
-		traceKey: "@" + node.key,
-		// The same header either way, so opening a group turns its arrow and
-		// nothing else — a header that rewrote itself on click read as the
-		// column having been replaced. The shared moves are in the cells; this
-		// says how many lines are under them, open or shut, exactly as the
-		// editor's group summary does.
-		name: `${count} lines`,
-		eval: "",
-		cells,
-		noteByPly: sharedNotes(node, shared),
-		collapsed: !open,
-		onclick: () => {
-			if (open) openTablePaths.delete(node.key);
-			else openTablePaths.add(node.key);
+	return groupedVars(g.vars[0], g.vars.slice(1), {
+		isOpen: (key) => openTablePaths.has(key),
+		onToggle: (key, open) => {
+			if (open) openTablePaths.delete(key);
+			else openTablePaths.add(key);
 			getRenderHooks().rerenderTable();
 		},
-	};
+	});
 }
 
 // The group-level Footnote chip. Its state is read back off the lines rather
@@ -436,19 +227,6 @@ export function focusLines(keep) {
 			collectKeys(c, openTablePaths),
 		);
 	getRenderHooks().renderApp();
-}
-
-// The moves a branch's lines share, from the branch's root child down its
-// single-child chain to the first fork (or the leaf).
-function sharedMoves(node) {
-	const out = [];
-	let n = node;
-	while (true) {
-		out.push({ ply: n.move.ply, san: n.move.san });
-		if (n.leaf || n.children.size !== 1) break;
-		n = [...n.children.values()][0];
-	}
-	return out;
 }
 
 function branchLabel(move) {

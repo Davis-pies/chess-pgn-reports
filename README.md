@@ -56,8 +56,14 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    all / Collapse all. A trace is a
    reading aid: it isn't saved with the notebook, and a group folding over the
    traced line simply stops showing it rather than going stale. The printed
-   report is unaffected by any of this — it shows every line's full divergence,
-   ungrouped, with no shading, folds or trace.
+   report groups its lines the same way, so a run of moves two lines share is
+   stated once and each picks up where it ends — but every group is open, since
+   nothing folds on paper, and the shading, fold controls and trace stay on
+   screen. Where the table is too wide for a page it is sliced across several,
+   and each slice stands on its own: a group spilling onto the next page
+   restates its shared moves there, and a line arriving alone spells its whole
+   divergence out, so the reader never has to turn back a page to find out how a
+   line began.
    Comment moves carry numbered `[n]` markers on the owning line only; a
    footnote's own notes become lettered sub-notes (a, b, c …) under its entry,
    restarting at `a` for each footnote and marked inside its move text — unless
@@ -124,6 +130,7 @@ Because it's fully client-side, the same URL works on your phone's browser.
 | `src/pgn.js` | tokenize + recursively parse PGN movetext -> variation tree (uses `chess.js` for SAN legality + FEN) |
 | `src/tree.js` | flatten the tree into root-to-leaf "lines" (mainline + each variation) |
 | `src/table.js` | tagged lines -> a ply-keyed cell grid shared by both layouts |
+| `src/group-cols.js` | grid -> grouped columns (a branch's shared moves in a column of their own), shared by the editor's table and the printed one |
 | `src/render.js` | grid -> DOM table (vertical/horizontal) + SVG board diagrams from FEN |
 | `src/notes-view.js` | the on-screen Notes list, grouped into collapsible `<details>` |
 | `src/store.js` | `localStorage` notebook persistence |
