@@ -62,8 +62,9 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    shared moves. On paper a group's **first line** states the run itself and
    carries straight on into its own moves, and the row of the last shared
    move is marked the way `tree` draws a directory: a run reaching right from
-   that move, dropping a tick into each column that continues from it — a tee
-   for each, a corner for the last. Groups nested inside a group mark their own
+   that move, dropping a tick into each of its **direct** branches — one apiece,
+   however many columns that branch's own sub-branches go on to take — and
+   turning a corner at the last of them. Groups nested inside a group mark their own
    rows the same way. A line's lead-in cells are left blank on paper — the rules say
    where each column picks up from, so a column of dots said nothing. Without that rule a line's ancestry was unreadable
    — every cell above a line's first move is a bare ellipsis, so a line

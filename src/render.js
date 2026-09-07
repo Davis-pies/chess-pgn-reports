@@ -225,12 +225,17 @@ export function renderTable(container, grid, trace) {
 	// full-height upright beside every group, nested ones inside each other:
 	// the page read as a grid of boxes rather than a table with a few marks in
 	// it. One horizontal line per group is the whole idea; the rest was noise.
-	const ruleAt = new Map(); // "ply:col" -> "mid" | "end"
-	const edgeAt = new Set(); // "ply:col" -- the closing stroke, continued down
+	// "ply:col" -> the marks this cell carries. Every covered cell draws the
+	// run; only a cell where one of the group's CHILDREN begins drops a tick
+	// into it, and the last of those turns the corner instead of carrying on.
+	const ruleAt = new Map();
 	(grid.spans || []).forEach((s) => {
+		const tees = new Set(s.tees);
 		for (let i = s.from; i <= s.to; i++)
-			ruleAt.set(s.ply + ":" + i, i === s.to ? "end" : "mid");
-		for (let p = s.ply + 1; p <= s.deep; p++) edgeAt.add(p + ":" + s.to);
+			ruleAt.set(
+				s.ply + ":" + i,
+				(i === s.to ? "end" : "run") + (tees.has(i) ? " grp-tee" : ""),
+			);
 	});
 	const lit = trace && trace.litByVar;
 	// A column's header follows its cells: lit when the column contributes at
@@ -354,7 +359,7 @@ export function renderTable(container, grid, trace) {
 				// ply is only an ellipsis: the line has no move here, and the rule
 				// says what the ellipsis was failing to.
 				const c = moveCell(rule ? null : v.cells[ply], ply, v.noteByPly);
-				if (rule) c.classList.add("grp-rule", "grp-rule-" + rule);
+				if (rule) c.className += " grp-rule grp-rule-" + rule;
 				c.className += groupClass(v);
 				if (v === vars[0]) c.classList.add("main-col", "sticky-col");
 				cellTrace(c, v, ply);

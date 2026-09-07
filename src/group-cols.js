@@ -305,7 +305,11 @@ function pushFlat(node, vars, spans, cut) {
 	const kids = fork.leaf ? [{ leaf: fork.leaf }] : [];
 	fork.children.forEach((c) => kids.push({ node: c }));
 	const start = vars.length;
+	// where each child's own block of columns begins -- one tick per child,
+	// however many columns that child's own descendants go on to take
+	const tees = [];
 	kids.forEach((k, i) => {
+		if (i) tees.push(vars.length);
 		// The first child is not cut at the fork: its column spells the shared
 		// run out and then runs on into its own moves. Every other child starts
 		// after the run, as it did when the group had a column.
@@ -313,7 +317,17 @@ function pushFlat(node, vars, spans, cut) {
 		if (k.leaf) vars.push(elide(k.leaf, c));
 		else pushFlat(k.node, vars, spans, c);
 	});
-	const end = vars.length - 1;
-	// `start` holds the shared run's last move, so the run begins after it
-	if (end > start) spans.push({ ply: inner, from: start + 1, to: end });
+	// `start` holds the shared run's last move, so the run begins after it and
+	// stops at the LAST CHILD's first column -- not at the last column of the
+	// group, which belongs to that child's own descendants. `tree` gives a
+	// directory one connector whatever is nested inside it; the columns the run
+	// crosses on the way are the earlier children's descendants, and they are
+	// spoken for by their own parent's connector.
+	if (tees.length)
+		spans.push({
+			ply: inner,
+			from: start + 1,
+			to: tees[tees.length - 1],
+			tees,
+		});
 }

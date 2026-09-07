@@ -1142,41 +1142,47 @@ sup {
 }
 
 /* The printed table's group marks, drawn like `tree`: along the row of a
-   group's last shared move, a run that drops a tick into each column
-   continuing from it -- a tee for each, a corner for the last.
+   group's last shared move, a run that drops a tick into each of its CHILDREN
+   -- one apiece, however many columns that child's own descendants take -- and
+   turns a corner at the last.
 
-       Na3 --+----+----+
-        Be7   Be6  b5   Nd5
+       Na3 --+---------+----+
+        Be7   Be6       b5   Nd5
 
-   The run is inset 2px at each end, so it breaks at every cell wall instead of
-   meeting its neighbour across one. Drawn edge to edge it formed a single
-   unbroken stroke over the walls it crossed, and a page of them read as though
-   the grid had lost its columns. The ticks sit at the cell's midpoint, nowhere
-   near a boundary, and the cells keep their normal padding, so no row changes
-   height and every wall stays exactly where it was. */
+   Drawn as 1px backgrounds at rounded offsets, not as borders at top:50%: a
+   border on a half-pixel is antialiased across two rows and comes out soft and
+   grey next to the crisp cell walls.
+
+   Inset from the cell's edges, so the run breaks at every wall instead of
+   meeting its neighbour across one -- drawn edge to edge it formed a single
+   unbroken stroke over the walls it crossed, and the grid looked like it had
+   lost its columns. The cells keep their normal padding, so no row changes
+   height and every wall stays where it was. */
 .tbl td.grp-rule {
   position: relative;
 }
 .tbl td.grp-rule::before {
   content: "";
   position: absolute;
-  top: 50%;
-  left: 2px;
-  right: 2px;
-  border-top: 1px solid var(--muted);
+  top: calc(50% - 1px);
+  left: 3px;
+  right: 3px;
+  height: 1px;
+  background: var(--text);
 }
-/* the last column: the run turns the corner rather than carrying on */
+/* the last child: the run turns the corner rather than carrying on */
 .tbl td.grp-rule-end::before {
-  right: 50%;
+  right: calc(50% - 1px);
 }
-/* the tick down into the column's own moves */
-.tbl td.grp-rule::after {
+/* the tick down into a child's own column */
+.tbl td.grp-tee::after {
   content: "";
   position: absolute;
-  left: 50%;
-  top: 50%;
-  bottom: 2px;
-  border-left: 1px solid var(--muted);
+  left: calc(50% - 1px);
+  top: calc(50% - 1px);
+  bottom: 3px;
+  width: 1px;
+  background: var(--text);
 }
 
 /* ---- print: table hidden, linear cards shown ---- */

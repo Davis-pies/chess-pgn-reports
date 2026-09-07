@@ -408,3 +408,51 @@ test("a printed line's header carries its name, not the Sideline tag", () => {
   );
   off();
 });
+
+// A group gets one connector per CHILD, and stops at the last of them -- not
+// at the last column, which belongs to that child's own descendants. `tree`
+// draws a directory one connector however much is nested inside it.
+test("a group's run stops at its last child, not at its last column", () => {
+  const off = installDom();
+  // 1...c5 2.Nf3 forks into Nc6 (one line) and d6 (a group of two)
+  const box = printTables(
+    "1. e4 e5 (1... c5 2. Nf3 Nc6 3. Bb5) (1... c5 2. Nf3 d6 3. d4)" +
+      " (1... c5 2. Nf3 d6 3. Bb5+) 2. Nf3",
+  );
+  const rows = [...box.querySelectorAll("table.tbl tr")];
+  const marked = rows.filter((tr) => tr.querySelector("td.grp-rule"));
+  assert.strictEqual(marked.length, 2, "the outer group and the nested one");
+
+  // the outer group's row: it has two children, one of which owns two columns,
+  // so its run covers ONE cell -- the column where that child begins
+  const outer = marked[0];
+  const cells = [...outer.children];
+  const covered = cells.filter((c) => c.classList.contains("grp-rule"));
+  assert.strictEqual(covered.length, 1, "one cell: the last child's own column");
+  assert.ok(covered[0].classList.contains("grp-rule-end"), "and it is the corner");
+  assert.ok(covered[0].classList.contains("grp-tee"), "with a tick into it");
+  assert.ok(
+    cells.indexOf(covered[0]) < cells.length - 1,
+    "it stops short of the table's last column",
+  );
+  off();
+});
+
+test("every column a run crosses without a child starting there gets no tick", () => {
+  const off = installDom();
+  // Nc6 owns two columns, so the run to the d6 child crosses one of them
+  const box = printTables(
+    "1. e4 e5 (1... c5 2. Nf3 Nc6 3. Bb5) (1... c5 2. Nf3 Nc6 3. a4)" +
+      " (1... c5 2. Nf3 d6 3. d4) 2. Nf3",
+  );
+  const outer = [...box.querySelectorAll("table.tbl tr")].filter((tr) =>
+    tr.querySelector("td.grp-rule"),
+  )[0];
+  const covered = [...outer.children].filter((c) =>
+    c.classList.contains("grp-rule"),
+  );
+  const tees = covered.filter((c) => c.classList.contains("grp-tee"));
+  assert.ok(covered.length > tees.length, "the run crosses more than it marks");
+  assert.strictEqual(tees.length, 1, "one child begins in this run's span");
+  off();
+});
