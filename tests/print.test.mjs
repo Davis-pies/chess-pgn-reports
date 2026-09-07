@@ -658,3 +658,35 @@ test("an annotation on a line's own move prints on that line's column", () => {
   assert.match(sym[0].parentElement.textContent, /^a4/);
   off();
 });
+
+test("a cell that states no move carries no symbol and no note marker", () => {
+  const off = installDom();
+  // the sideline diverges at move 3, so its cells for moves 1-2 state nothing;
+  // the annotation sits at ply 3, which it shares with the mainline
+  const s = loadState("1. e4 e5 2. Nf3 Nc6 (2... Nf6 3. d4) 3. Bb5");
+  s.lines.forEach((l) => {
+    if (l.moves.some((m) => m.ply === 2)) {
+      l.marks = { ...(l.marks || {}), 2: "$1" };
+      l.comments = [{ ply: 2, text: "the knight comes out" }];
+    }
+  });
+  const box = document.createElement("div");
+  appendPrintTables(box, grid(s.lines));
+
+  for (const td of box.querySelectorAll("table.tbl td")) {
+    const move = td.childNodes[0];
+    const states = move && move.nodeType === 3 && move.textContent.trim();
+    if (states) continue;
+    assert.strictEqual(
+      td.querySelector(".mv-mark"),
+      null,
+      "a symbol floats in a cell with no move",
+    );
+    assert.strictEqual(
+      td.querySelector("sup"),
+      null,
+      "a note marker floats in a cell with no move",
+    );
+  }
+  off();
+});

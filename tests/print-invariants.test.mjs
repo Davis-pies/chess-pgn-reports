@@ -152,6 +152,14 @@ test("no annotation is printed twice on one row", () => {
       const syms = tr.querySelectorAll("td .mv-mark").length;
       assert.ok(notes <= 1, `${notes} note markers on one row`);
       assert.ok(syms <= 1, `${syms} symbols on one row`);
+      // and neither may sit in a cell that states no move -- an annotation
+      // belongs to the move, and such a cell has none
+      for (const td of tr.querySelectorAll("td")) {
+        const first = td.childNodes[0];
+        if (first && first.nodeType === 3 && first.textContent.trim()) continue;
+        assert.strictEqual(td.querySelector(".mv-mark"), null);
+        assert.strictEqual(td.querySelector("sup"), null);
+      }
     }
   off();
 });

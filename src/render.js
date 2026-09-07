@@ -191,8 +191,15 @@ function markEl(sym) {
 // A move cell, plus any per-move symbol mark and referenced note markers.
 function moveCell(c, ply, noteByPly) {
 	const e = td(c ? c.text : "", c ? c.cls : "");
-	if (c && c.mark) e.appendChild(markEl(c.mark));
-	const notes = noteByPly && noteByPly[ply];
+	// An annotation belongs to the MOVE, so it is drawn only by the cell that
+	// states the move. A line's cells before its divergence state nothing --
+	// the column it diverges from says those moves, and says the annotation
+	// with them -- so a symbol or a marker here is a second copy floating in an
+	// empty cell, beside no move at all. It went unnoticed while such cells
+	// still printed an ellipsis for the symbol to sit against.
+	const states = !!c && c.cls !== "ellip";
+	if (states && c.mark) e.appendChild(markEl(c.mark));
+	const notes = states && noteByPly && noteByPly[ply];
 	if (notes && notes.length) {
 		// comma-separated so multiple notes at one move stay readable
 		const s = document.createElement("sup");

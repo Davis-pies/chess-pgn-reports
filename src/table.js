@@ -51,7 +51,11 @@ export function grid(all) {
 				cls = tag;
 			}
 			// resolved here so every table renderer keeps reading a plain glyph
-			cells[m.ply] = { text, cls, mark: markSym(marks[m.ply]) };
+			// no mark on an elided cell: it states no move for one to attach to
+			cells[m.ply] =
+				cls === "ellip"
+					? { text, cls }
+					: { text, cls, mark: markSym(marks[m.ply]) };
 		});
 		const noteByPly = byLine.get(l);
 		const base = {
