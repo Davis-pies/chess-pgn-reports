@@ -25,7 +25,14 @@ import { groupedVars } from "./group-cols.js";
 // at a column on the previous page. A line that arrives alone has no group
 // above it and spells its whole divergence out. Every table stands on its own.
 function printVars(mainV, lines) {
-  return groupedVars(mainV, lines, { isOpen: () => true });
+  return groupedVars(mainV, lines, { isOpen: () => true }).map((v) =>
+    // "Sideline" on every column but one tells the reader nothing they cannot
+    // see -- they are all sidelines. A header renders `name || label`, so
+    // dropping the tag leaves the name the reader gave the line, and nothing
+    // where they gave it none. The mainline keeps its label: it IS the column
+    // the others are read against, and usually has no name of its own.
+    v.tag === "mainline" ? v : { ...v, label: "" },
+  );
 }
 
 // Highest ply present in a subset of table vars — so a per-branch print table

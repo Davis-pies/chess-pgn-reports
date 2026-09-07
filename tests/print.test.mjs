@@ -320,3 +320,29 @@ test("a group's column carries no line count in print", () => {
   );
   off();
 });
+
+// "Sideline" on every column but one says nothing the reader cannot see: they
+// are all sidelines. The name the reader gave the line is what a header is
+// worth on paper, so it takes the tag's place — and a line with no name gets a
+// blank header rather than a label repeated down the row.
+test("a printed line's header carries its name, not the Sideline tag", () => {
+  const off = installDom();
+  const st = loadState(
+    "1. e4 c5 2. Nf3 (2. Nc3 Nc6) (2. d4 cxd4) (2. c3 d5) 2... d6 *",
+  );
+  st.lines[1].name = "Closed Sicilian";
+  getCurrent().showSplitTrie = false;
+  const box = document.createElement("div");
+  appendPrintTables(box, grid(st.lines));
+  const heads = [...box.querySelectorAll("table.tbl tr:first-child th")].map(
+    (h) => h.textContent.trim(),
+  );
+  assert.ok(heads.includes("Mainline"), "the reference column keeps its name");
+  assert.ok(heads.includes("Closed Sicilian"), "a named line is named");
+  assert.deepStrictEqual(
+    heads.filter((h) => h === "Sideline"),
+    [],
+    `no Sideline tags in print (got ${JSON.stringify(heads)})`,
+  );
+  off();
+});

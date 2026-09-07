@@ -60,7 +60,9 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    stated once and each picks up where it ends — but every group is open, since
    nothing folds on paper, and the shading, fold controls, "N lines" counts and
    trace stay on screen: on paper a group is just the column its shared moves
-   are written in. Where the table is too wide for a page it is sliced across several,
+   are written in. Column headers carry the name you gave a line, if you gave
+   it one, rather than the Sideline tag — every column but the mainline is a
+   sideline, so the tag said nothing the reader could not see. Where the table is too wide for a page it is sliced across several,
    and each slice stands on its own: a group spilling onto the next page
    restates its shared moves there, and a line arriving alone spells its whole
    divergence out, so the reader never has to turn back a page to find out how a
