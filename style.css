@@ -1145,6 +1145,22 @@ sup {
   font-size: 0.95rem;
 }
 
+/* The printed table's group rule: drawn on the row of a group's last shared
+   move, reaching across the columns that continue from it. It replaces the
+   run of empty cells those columns would each have drawn there, so it needs no
+   width of its own -- only a line down its middle. */
+.tbl td.grp-rule {
+  padding: 0;
+  vertical-align: middle;
+}
+.tbl td.grp-rule::after {
+  content: "";
+  display: block;
+  height: 0;
+  margin: 0 2px;
+  border-top: 1.5px solid var(--text);
+}
+
 /* ---- print: table hidden, linear cards shown ---- */
 @media print {
   .modal-overlay {

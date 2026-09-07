@@ -58,10 +58,16 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    reading aid: it isn't saved with the notebook, and a group folding over the
    traced line simply stops showing it rather than going stale. The printed
    report groups its lines the same way, so a run of moves two lines share is
-   stated once and each picks up where it ends — but every group is open, since
-   nothing folds on paper, and the shading, fold controls, "N lines" counts and
-   trace stay on screen: on paper a group is just the column its shared moves
-   are written in. Column headers carry the name you gave a line, if you gave
+   stated once and each picks up where it ends — but it has no column for those
+   shared moves. On paper a group's **first line** states the run itself and
+   carries straight on into its own moves, and a **horizontal rule** on the row
+   of the last shared move reaches from just right of it across every column
+   that continues from it; groups nested inside a group draw their own shorter
+   rules on their own rows. Without that rule a line's ancestry was unreadable
+   — every cell above a line's first move is a bare ellipsis, so a line
+   starting on move 7 gave no way to tell which of the two moves on that row it
+   followed. Every group is open, since nothing folds on paper, and the
+   shading, fold controls, "N lines" counts and trace stay on screen. Column headers carry the name you gave a line, if you gave
    it one, rather than the Sideline tag — every column but the mainline is a
    sideline, so the tag said nothing the reader could not see. Where the table is too wide for a page it is sliced across several,
    and each slice stands on its own: a group spilling onto the next page

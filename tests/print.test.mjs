@@ -164,12 +164,61 @@ test("the printed table opens every group whatever the preview has folded", () =
   );
   const rows = [...box.querySelectorAll("table.tbl tr")];
   const col = (i) => rows.slice(1).map((tr) => tr.children[i].textContent);
-  // the group's own column carries the moves both lines share...
-  assert.deepStrictEqual(col(2), ["\u2026", "c5", "Nf3", "Nc6", ""]);
-  // ...and each line picks up where that column left off
-  assert.deepStrictEqual(col(3), ["\u2026", "\u2026", "\u2026", "\u2026", "Bb5"]);
-  assert.deepStrictEqual(col(4), ["\u2026", "\u2026", "\u2026", "\u2026", "a4"]);
+  // The group has no column of its own on paper: its FIRST line states the
+  // moves they share and runs straight on into its own.
+  assert.deepStrictEqual(col(2), ["\u2026", "c5", "Nf3", "Nc6", "Bb5"]);
+  // The sibling still starts after the shared run. Its cell on the fork's own
+  // row is the group rule, which carries no text -- the rule is the statement.
+  assert.deepStrictEqual(col(3), ["\u2026", "\u2026", "\u2026", "", "a4"]);
   openTablePaths.clear();
+  off();
+});
+
+// What replaces the group column: a rule on the row of the last shared move,
+// reaching from just right of that move over every column continuing from it.
+// Without it a line's ancestry was unreadable -- every cell above its first
+// move is a bare ellipsis, so a reader could not tell which of two moves on
+// that row it followed.
+test("a group draws a rule from its last shared move across its continuations", () => {
+  const off = installDom();
+  const box = printTables(
+    "1. e4 e5 (1... c5 2. Nf3 Nc6 3. Bb5) (1... c5 2. Nf3 Nc6 3. a4) 2. Nf3",
+  );
+  const rows = [...box.querySelectorAll("table.tbl tr")];
+  const rules = [...box.querySelectorAll("td.grp-rule")];
+  assert.strictEqual(rules.length, 1, "one group, one rule");
+  // it sits on the row whose cell to its left holds the last shared move
+  const row = rules[0].parentElement;
+  assert.strictEqual(rules[0].previousElementSibling.textContent, "Nc6");
+  assert.strictEqual(
+    rows.indexOf(row),
+    4,
+    "on Nc6's row, not floating above the header",
+  );
+  // and covers exactly the sibling that continues from it
+  assert.strictEqual(rules[0].colSpan, 1);
+  off();
+});
+
+test("groups nested inside a group draw their own shorter rules", () => {
+  const off = installDom();
+  // 1...c5 2.Nf3 is shared by all three; Nc6 by the first two
+  const box = printTables(
+    "1. e4 e5 (1... c5 2. Nf3 Nc6 3. Bb5) (1... c5 2. Nf3 Nc6 3. a4)" +
+      " (1... c5 2. Nf3 d6 3. d4) 2. Nf3",
+  );
+  const rules = [...box.querySelectorAll("td.grp-rule")];
+  assert.strictEqual(rules.length, 2, "the outer group and the one inside it");
+  const spans = rules.map((r) => [
+    r.previousElementSibling.textContent,
+    r.colSpan,
+  ]);
+  // the outer rule follows Nf3 and covers both continuations; the inner
+  // follows Nc6 and covers only the second Nc6 line
+  assert.deepStrictEqual(spans, [
+    ["Nf3", 2],
+    ["Nc6", 1],
+  ]);
   off();
 });
 
@@ -265,8 +314,9 @@ test("a group split across print tables restates its shared moves", () => {
 // divergence out rather than eliding against a column that isn't there.
 test("a line alone on a later print table keeps its whole divergence", () => {
   const off = installDom();
-  // 13 lines: 12 fill the first table to the column cap, the 13th spills alone
-  const box = printTables(kid(13));
+  // Without group columns a line costs exactly one column, so the cap is
+  // reached by lines alone: 13 fill the first table, the 14th spills.
+  const box = printTables(kid(14));
   const tables = [...box.querySelectorAll("table.tbl")];
   const last = tables[tables.length - 1];
   const rows = [...last.querySelectorAll("tr")];
@@ -276,7 +326,7 @@ test("a line alone on a later print table keeps its whole divergence", () => {
     .slice(1)
     .map((tr) => tr.children[2].textContent)
     .filter((t) => t && t !== "\u2026");
-  assert.deepStrictEqual(own, ["Nf6", "c4", "g6", "Nc3", "Bg7", "e4", "d6", "Rb1"]);
+  assert.deepStrictEqual(own, ["Nf6", "c4", "g6", "Nc3", "Bg7", "e4", "d6", "Qd2"]);
   off();
 });
 

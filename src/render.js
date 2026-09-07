@@ -211,6 +211,15 @@ function moveCell(c, ply, noteByPly) {
 // grouping itself has.
 export function renderTable(container, grid, orientation, trace) {
 	const { vars, maxPly } = grid;
+	// Group rules (printed report only): one horizontal line per group, drawn
+	// on the row of its last shared move, spanning the columns that continue
+	// from it. See flatGroupedVars in group-cols.js for why the printed table
+	// says a line's ancestry this way rather than with a column of its own.
+	const spansByPly = new Map();
+	(grid.spans || []).forEach((s) => {
+		if (!spansByPly.has(s.ply)) spansByPly.set(s.ply, []);
+		spansByPly.get(s.ply).push(s);
+	});
 	const lit = trace && trace.litByVar;
 	// A column's header follows its cells: lit when the column contributes at
 	// least one move to the traced line, so the two can never disagree.
@@ -359,7 +368,21 @@ export function renderTable(container, grid, orientation, trace) {
 			num.className = "ply-col sticky-col";
 			if (labels[ply]) num.textContent = labels[ply];
 			tr.appendChild(num);
-			for (const v of vars) {
+			const rowSpans = spansByPly.get(ply) || [];
+			for (let i = 0; i < vars.length; i++) {
+				const s = rowSpans.find((x) => x.from === i);
+				if (s) {
+					// one cell instead of the run of empty ones these columns would
+					// each draw here: the rule IS the statement that they continue
+					// from the move to its left
+					const rule = document.createElement("td");
+					rule.className = "grp-rule";
+					rule.colSpan = s.to - s.from + 1;
+					tr.appendChild(rule);
+					i = s.to;
+					continue;
+				}
+				const v = vars[i];
 				const c = moveCell(v.cells[ply], ply, v.noteByPly);
 				c.className += groupClass(v);
 				if (v === vars[0]) c.classList.add("main-col", "sticky-col");

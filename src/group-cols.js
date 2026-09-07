@@ -268,3 +268,52 @@ function sharedMoves(node) {
 	}
 	return out;
 }
+
+// The PRINTED report's columns: the same grouping, without a column of its own
+// for each group.
+//
+// On screen a group's shared moves need their own column, because that column
+// is the fold control -- see pushNode. On paper nothing folds, and the column
+// bought nothing but a place to put moves that one of the lines beneath it was
+// going to spell out anyway. Worse, it made a line's ancestry unreadable: every
+// cell above a line's first move is a bare ellipsis, so a line starting at ply
+// 13 gave the reader no way to tell whether it followed the mainline's move at
+// ply 12 or the group's.
+//
+// So the group's FIRST line carries the shared run itself and continues into
+// its own tail, and its siblings still start at the move after the run. What
+// says they belong to it is `spans`: one horizontal rule per group, drawn on
+// the row of the last shared move, reaching from just right of that move
+// across every column that continues from it. Groups nested inside a group
+// produce their own, shorter rules, on their own rows.
+export function flatGroupedVars(mainV, lines) {
+	const trie = buildTrie(lines, mainV);
+	const vars = [mainV];
+	const spans = [];
+	trie.children.forEach((c) => pushFlat(c, vars, spans, -1));
+	return { vars, spans };
+}
+
+function pushFlat(node, vars, spans, cut) {
+	if (countLeaves(node) === 1) {
+		leavesOf(node).forEach((l) => vars.push(elide(l, cut)));
+		return;
+	}
+	const fork = forkOf(node);
+	const inner = fork.move.ply;
+	// a line ending exactly at the fork sits beside its continuations, as on screen
+	const kids = fork.leaf ? [{ leaf: fork.leaf }] : [];
+	fork.children.forEach((c) => kids.push({ node: c }));
+	const start = vars.length;
+	kids.forEach((k, i) => {
+		// The first child is not cut at the fork: its column spells the shared
+		// run out and then runs on into its own moves. Every other child starts
+		// after the run, as it did when the group had a column.
+		const c = i === 0 ? cut : inner;
+		if (k.leaf) vars.push(elide(k.leaf, c));
+		else pushFlat(k.node, vars, spans, c);
+	});
+	const end = vars.length - 1;
+	// `start` holds the shared run's last move, so the rule begins after it
+	if (end > start) spans.push({ ply: inner, from: start + 1, to: end });
+}

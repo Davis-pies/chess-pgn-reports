@@ -13,7 +13,7 @@ import { getCurrent } from "./state.js";
 import { allNotes } from "./notes.js";
 import { buildTrie, leavesOf } from "./tree.js";
 import { moveRef } from "./export.js";
-import { groupedVars } from "./group-cols.js";
+import { flatGroupedVars } from "./group-cols.js";
 
 // The columns one printed table renders: the same grouping the editor's table
 // builds, with every group open — there is nothing to click on paper, so a
@@ -25,14 +25,26 @@ import { groupedVars } from "./group-cols.js";
 // at a column on the previous page. A line that arrives alone has no group
 // above it and spells its whole divergence out. Every table stands on its own.
 function printVars(mainV, lines) {
-  return groupedVars(mainV, lines, { isOpen: () => true }).map((v) =>
+  const { vars, spans } = flatGroupedVars(mainV, lines);
+  return withSpans(
+    vars.map((v) =>
     // "Sideline" on every column but one tells the reader nothing they cannot
     // see -- they are all sidelines. A header renders `name || label`, so
     // dropping the tag leaves the name the reader gave the line, and nothing
     // where they gave it none. The mainline keeps its label: it IS the column
     // the others are read against, and usually has no name of its own.
-    v.tag === "mainline" ? v : { ...v, label: "" },
+      v.tag === "mainline" ? v : { ...v, label: "" },
+    ),
+    spans,
   );
+}
+
+// vars and their group rules travel together: every caller below passes the
+// list straight into renderTable, and a rule separated from the columns it
+// spans would point at the wrong ones.
+function withSpans(vars, spans) {
+  vars.spans = spans;
+  return vars;
 }
 
 // Highest ply present in a subset of table vars — so a per-branch print table
@@ -62,7 +74,8 @@ export function appendPrintTables(box, g) {
   }
   const split = getCurrent().showSplitTrie === true;
   if (!split && printWidth(mainV, others) <= size) {
-    renderTable(wrap, { ...g, vars: printVars(mainV, others) }, "horizontal");
+    const pv = printVars(mainV, others);
+    renderTable(wrap, { ...g, vars: pv, spans: pv.spans }, "horizontal");
     // Notes are collected off the LINES, not the columns: a group column is
     // synthesised and matches no line, and its shared moves' notes are already
     // gathered onto it by the column builder.
@@ -78,9 +91,10 @@ export function appendPrintTables(box, g) {
       // table is the reader's reference for the whole opening, so it runs the
       // mainline out to its full length even when its own branches are short.
       const maxPly = i === 0 ? subMaxPly([mainV, ...lines]) : subMaxPly(lines);
+      const pv = printVars(mainV, lines);
       renderTable(
         wrap,
-        { ...g, vars: printVars(mainV, lines), maxPly },
+        { ...g, vars: pv, spans: pv.spans, maxPly },
         "horizontal",
       );
       renderTableNotes(wrap, [mainV, ...lines], i === 0);
