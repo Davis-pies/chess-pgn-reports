@@ -874,33 +874,12 @@ function openUpdateDialog() {
     textContent: "Apply",
     disabled: true,
   });
-  const preview = el("button", {
-    className: "chip",
-    textContent: "Preview changes",
-  });
-  // The report is the tallest thing in the dialog, so once it has been read
-  // the button puts it away rather than only ever producing it again. Hiding
-  // is not cancelling: the merge it described is still what Apply will do.
-  let shown = false; // is the report on screen
-  let ran = false; // has a preview ever been produced, to word the button
-  let byHand = false; // the user closed it; don't reopen until the PGN changes
-  // There is nothing to preview until a PGN is in the box, so until then the
-  // button is not there to be clicked -- a control whose only outcome is "No
-  // moves found in PGN" is an invitation to a dead end.
-  const label = () => {
-    preview.hidden = !ta.value.trim();
-    preview.textContent = shown
-      ? "Hide preview"
-      : ran
-        ? "Show preview"
-        : "Preview changes";
-  };
+  // No button: supplying a PGN is itself the request for a report, and there is
+  // nothing else the dialog does, so the report is simply always there once
+  // there is something to report.
   const runPreview = () => {
     pending = null;
     apply.disabled = true;
-    ran = true;
-    shown = true;
-    report.hidden = false;
     try {
       const { nodes } = parsePgn(ta.value);
       if (!nodes.length) {
@@ -923,49 +902,28 @@ function openUpdateDialog() {
           textContent: "Could not read PGN: " + e.message,
         }),
       );
-    } finally {
-      label();
     }
   };
-  preview.onclick = () => {
-    if (!shown) return runPreview();
-    // Hidden by hand stays hidden: re-previewing on every edit is helpful,
-    // reopening a panel the user just closed is not. Only a change to the PGN
-    // itself lifts this, by way of the withdrawal below.
-    byHand = true;
-    shown = false;
-    report.hidden = true;
-    label();
-  };
-  // Supplying a PGN is itself the request for a report -- that is what the
-  // dialog is for -- so the preview runs on its own and the button exists to
-  // put it away. Debounced, because a repertoire of a few hundred lines is a
-  // real parse and this fires while the user is still typing or pasting.
+  // Debounced, because a repertoire of a few hundred lines is a real parse and
+  // this fires while the user is still typing or pasting.
   let timer = null;
   const schedulePreview = () => {
     clearTimeout(timer);
-    if (!ta.value.trim() || byHand) return;
+    if (!ta.value.trim()) return;
     timer = setTimeout(runPreview, 300);
   };
-  // A preview describes the text it was run on. Editing that text after the
-  // fact would leave Apply ready to install a merge of the OLD text, since
-  // `pending` carries its own copy -- so an edit withdraws the preview.
+  // A report describes the text it was run on, and `pending` carries its own
+  // copy -- so an edit must disarm Apply until the new text has been read,
+  // or Apply would install a merge of text the user had already replaced.
   ta.oninput = () => {
-    // a new PGN is a new question, so a report put away by hand comes back
-    byHand = false;
-    schedulePreview();
-    if (!ran) return label();
     pending = null;
     apply.disabled = true;
-    ran = false;
-    shown = false;
     report.replaceChildren();
-    report.hidden = true;
-    label();
+    schedulePreview();
   };
   // The report describes one mode; switching modes must re-describe it.
   keep.onchange = () => {
-    if (ran) runPreview();
+    if (ta.value.trim()) runPreview();
   };
   apply.onclick = () => {
     if (!pending) return;
@@ -993,12 +951,9 @@ function openUpdateDialog() {
     if (f)
       f.text().then((t) => {
         ta.value = t;
-        byHand = false;
-        label();
-        runPreview(); // a picked file is not typing: report it at once
+        runPreview(); // a picked file arrives whole: report it at once
       });
   };
-  label();
   const cancel = el("button", {
     className: "chip",
     textContent: "Cancel",
@@ -1010,7 +965,7 @@ function openUpdateDialog() {
   box.append(
     ta,
     keepRow,
-    el("div", { className: "importbar" }, [file, preview]),
+    el("div", { className: "importbar" }, [file]),
     report,
     el("div", { className: "modal-actions" }, [cancel, apply]),
   );

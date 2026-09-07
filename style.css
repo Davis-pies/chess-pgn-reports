@@ -1080,9 +1080,6 @@ sup {
   padding-top: 12px;
   border-top: 1px solid var(--line);
 }
-.mergerep[hidden] {
-  display: none;
-}
 .mergerep:not(:empty) {
   margin-top: 12px;
   padding: 10px 12px;

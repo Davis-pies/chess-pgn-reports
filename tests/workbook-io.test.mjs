@@ -9,6 +9,16 @@ const PGN = "1. e4 e5 2. Nf3 Nc6 (2... Nf6 3. d4) 3. Bb5";
 // not be re-imported per test); each test resets back to the import panel.
 const app = await bootApp();
 
+// Put a PGN in the update dialog the way a user would, and let the debounced
+// auto-preview run. There is no preview button any more: supplying the PGN is
+// the whole request.
+async function setPgn(dlg, text) {
+  const ta = dlg.querySelector("textarea");
+  ta.value = text;
+  ta.dispatchEvent(new app.dom.window.Event("input"));
+  await new Promise((r) => setTimeout(r, 400));
+}
+
 const key = (l) => l.moves.map((m) => m.san).join(" ");
 const find = (k) => getCurrent().lines.find((l) => key(l) === k);
 
@@ -87,11 +97,7 @@ test("Update PGN previews the change without applying it", async () => {
   app.clickText("Update PGN");
   const dlg = app.dom.window.document.getElementById("updpgn");
   assert.ok(dlg, "the update dialog opens");
-  dlg.querySelector("textarea").value =
-    "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 (3... Nf6 4. O-O) 4. Ba4";
-  [...dlg.querySelectorAll("button")]
-    .find((b) => b.textContent.includes("Preview"))
-    .click();
+  await setPgn(dlg, "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 (3... Nf6 4. O-O) 4. Ba4");
 
   assert.match(dlg.textContent, /extended/i, "the report names what grew");
   assert.strictEqual(
@@ -112,10 +118,7 @@ test("applying an update keeps annotations on the lines the new PGN extends", as
   const NEXT = "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 (3... Nf6 4. O-O) 4. Ba4";
   app.clickText("Update PGN");
   const dlg = app.dom.window.document.getElementById("updpgn");
-  dlg.querySelector("textarea").value = NEXT;
-  [...dlg.querySelectorAll("button")]
-    .find((b) => b.textContent.includes("Preview"))
-    .click();
+  await setPgn(dlg, NEXT);
   [...dlg.querySelectorAll("button")]
     .find((b) => b.textContent.includes("Apply"))
     .click();
@@ -139,10 +142,7 @@ test("cancelling an update leaves the workbook untouched", async () => {
 
   app.clickText("Update PGN");
   const dlg = app.dom.window.document.getElementById("updpgn");
-  dlg.querySelector("textarea").value = "1. d4 d5 2. c4";
-  [...dlg.querySelectorAll("button")]
-    .find((b) => b.textContent.includes("Preview"))
-    .click();
+  await setPgn(dlg, "1. d4 d5 2. c4");
   [...dlg.querySelectorAll("button")]
     .find((b) => b.textContent === "Cancel")
     .click();
@@ -163,10 +163,7 @@ test("an update that would drop annotated lines spells them out first", async ()
 
   app.clickText("Update PGN");
   const dlg = app.dom.window.document.getElementById("updpgn");
-  dlg.querySelector("textarea").value = "1. e4 e5 2. Nf3 Nc6 3. Bb5";
-  [...dlg.querySelectorAll("button")]
-    .find((b) => b.textContent.includes("Preview"))
-    .click();
+  await setPgn(dlg, "1. e4 e5 2. Nf3 Nc6 3. Bb5");
 
   assert.match(dlg.textContent, /Petroff/, "the line about to be lost is named");
 });
@@ -177,10 +174,7 @@ test("Update PGN reports a PGN it cannot parse instead of applying it", async ()
 
   app.clickText("Update PGN");
   const dlg = app.dom.window.document.getElementById("updpgn");
-  dlg.querySelector("textarea").value = "not a game at all";
-  [...dlg.querySelectorAll("button")]
-    .find((b) => b.textContent.includes("Preview"))
-    .click();
+  await setPgn(dlg, "not a game at all");
 
   assert.match(dlg.textContent, /could not read pgn/i);
   assert.strictEqual(getCurrent().pgn, PGN);
@@ -197,10 +191,7 @@ test("Update PGN reports movetext with no moves in it", async () => {
 
   app.clickText("Update PGN");
   const dlg = app.dom.window.document.getElementById("updpgn");
-  dlg.querySelector("textarea").value = "*";
-  [...dlg.querySelectorAll("button")]
-    .find((b) => b.textContent.includes("Preview"))
-    .click();
+  await setPgn(dlg, "*");
 
   assert.match(dlg.textContent, /no moves/i);
   assert.strictEqual(getCurrent().pgn, PGN);
@@ -263,9 +254,6 @@ test("the additive option keeps dropped lines and rebuilds the stored PGN", asyn
   const dlg = app.dom.window.document.getElementById("updpgn");
   dlg.querySelector("textarea").value = "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6";
   dlg.querySelector("input.keepdropped").click();
-  [...dlg.querySelectorAll("button")]
-    .find((b) => b.textContent.includes("Preview"))
-    .click();
   assert.match(dlg.textContent, /kept from the old PGN/i);
   assert.strictEqual(
     dlg.querySelector(".mergelost"),
@@ -299,10 +287,7 @@ test("without the additive option the stored PGN is exactly what was pasted", as
 
   app.clickText("Update PGN");
   const dlg = app.dom.window.document.getElementById("updpgn");
-  dlg.querySelector("textarea").value = NEXT;
-  [...dlg.querySelectorAll("button")]
-    .find((b) => b.textContent.includes("Preview"))
-    .click();
+  await setPgn(dlg, NEXT);
   [...dlg.querySelectorAll("button")]
     .find((b) => b.textContent.includes("Apply"))
     .click();
@@ -372,10 +357,7 @@ test("removing unannotated lines is stated, not passed off as an all-clear", asy
 
   app.clickText("Update PGN");
   const dlg = app.dom.window.document.getElementById("updpgn");
-  dlg.querySelector("textarea").value = "1. e4 e5 2. Nf3 Nc6 3. Bb5";
-  [...dlg.querySelectorAll("button")]
-    .find((b) => b.textContent.includes("Preview"))
-    .click();
+  await setPgn(dlg, "1. e4 e5 2. Nf3 Nc6 3. Bb5");
 
   const rep = dlg.querySelector(".mergerep").textContent;
   assert.ok(
@@ -393,11 +375,7 @@ test("the all-clear appears only when nothing is removed at all", async () => {
   app.clickText("Update PGN");
   const dlg = app.dom.window.document.getElementById("updpgn");
   // purely additive: the same lines, one of them deeper
-  dlg.querySelector("textarea").value =
-    "1. e4 e5 2. Nf3 Nc6 (2... Nf6 3. d4) 3. Bb5 a6";
-  [...dlg.querySelectorAll("button")]
-    .find((b) => b.textContent.includes("Preview"))
-    .click();
+  await setPgn(dlg, "1. e4 e5 2. Nf3 Nc6 (2... Nf6 3. d4) 3. Bb5 a6");
 
   const rep = dlg.querySelector(".mergerep").textContent;
   assert.match(rep, /nothing would be lost/i, rep);
@@ -415,89 +393,30 @@ function updateDialog(text) {
   return { dlg, btn, report: () => dlg.querySelector(".mergerep") };
 }
 
-test("the preview button becomes Hide preview once the report is showing", async () => {
-  app.reset();
-  await app.loadPgn(PGN);
-  const u = updateDialog("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6");
 
-  u.btn("Preview changes").click();
-  assert.ok(!u.report().hidden, "the report shows straight away");
-  assert.ok(u.btn("Hide preview"), "and the button offers to put it away");
-});
-
-test("hiding the preview keeps the merge it described", async () => {
-  app.reset();
-  await app.loadPgn(PGN);
-  const u = updateDialog("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6");
-  u.btn("Preview changes").click();
-  u.btn("Hide preview").click();
-
-  assert.ok(u.report().hidden, "the report is put away");
-  assert.ok(u.btn("Show preview"), "the button offers it back");
-  assert.ok(
-    !u.btn("Apply").disabled,
-    "Apply still stands -- hiding is not cancelling",
-  );
-
-  u.btn("Show preview").click();
-  assert.ok(!u.report().hidden, "and it comes back");
-  assert.match(u.report().textContent, /extended/i);
-});
 
 test("editing the PGN after a preview withdraws it", async () => {
   app.reset();
   await app.loadPgn(PGN);
-  const u = updateDialog("1. e4 e5 2. Nf3 Nc6 3. Bb5 a6");
-  u.btn("Preview changes").click();
+  const u = updateDialog("");
+  await setPgn(u.dlg, "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6");
   assert.ok(!u.btn("Apply").disabled);
 
+  // the moment the text changes the old report cannot speak for it
   const ta = u.dlg.querySelector("textarea");
   ta.value = "1. d4 d5 2. c4";
   ta.dispatchEvent(new app.dom.window.Event("input"));
-
   assert.ok(
     u.btn("Apply").disabled,
     "the old preview cannot be applied to new text",
   );
-  assert.ok(u.btn("Preview changes"), "the button asks to be run again");
+  assert.strictEqual(u.report().textContent, "", "and it is cleared");
+
+  await new Promise((r) => setTimeout(r, 400));
+  assert.ok(!u.btn("Apply").disabled, "the new text previews itself");
 });
 
-test("there is no preview button until there is a PGN to preview", async () => {
-  app.reset();
-  await app.loadPgn(PGN);
-  const u = updateDialog("");
 
-  const btn = [...u.dlg.querySelectorAll("button")].find((b) =>
-    /preview/i.test(b.textContent),
-  );
-  assert.ok(btn, "the button exists in the markup");
-  assert.ok(btn.hidden, "but is not shown over an empty box");
-
-  const ta = u.dlg.querySelector("textarea");
-  ta.value = "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6";
-  ta.dispatchEvent(new app.dom.window.Event("input"));
-  assert.ok(!btn.hidden, "typing a PGN brings it out");
-
-  ta.value = "   ";
-  ta.dispatchEvent(new app.dom.window.Event("input"));
-  assert.ok(btn.hidden, "and emptying the box puts it away again");
-});
-
-test("choosing a PGN file in the dialog brings the preview button out", async () => {
-  app.reset();
-  await app.loadPgn(PGN);
-  const u = updateDialog("");
-  const btn = [...u.dlg.querySelectorAll("button")].find((b) =>
-    /preview/i.test(b.textContent),
-  );
-  assert.ok(btn.hidden, "hidden to start");
-
-  choose(u.dlg.querySelector("input.filein"), "next.pgn", PGN);
-  await app.settle();
-
-  assert.strictEqual(u.dlg.querySelector("textarea").value, PGN);
-  assert.ok(!btn.hidden, "the loaded file brings the button out");
-});
 
 // Auto-preview. The report is the reason the dialog exists, so supplying a PGN
 // is enough to ask for it -- the button is only there to put it away again.
@@ -513,10 +432,8 @@ test("pasting a PGN previews it without a click", async () => {
   ta.dispatchEvent(new app.dom.window.Event("input"));
   await settleDebounce();
 
-  assert.ok(!u.report().hidden, "the report came up on its own");
+  assert.ok(u.report().textContent, "the report came up on its own");
   assert.match(u.report().textContent, /extended/i);
-  assert.ok(u.btn("Hide preview"), "the button is only there to put it away");
-  assert.ok(!u.btn("Hide preview").hidden);
   assert.ok(!u.btn("Apply").disabled, "and it is ready to apply");
 });
 
@@ -528,20 +445,7 @@ test("choosing a file in the dialog previews it without a click", async () => {
   choose(u.dlg.querySelector("input.filein"), "next.pgn", "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6");
   await app.settle();
 
-  assert.ok(!u.report().hidden, "no click needed after picking a file");
+  assert.ok(u.report().textContent, "no click needed after picking a file");
   assert.ok(!u.btn("Apply").disabled);
 });
 
-test("a preview hidden by hand stays hidden while the PGN is unchanged", async () => {
-  app.reset();
-  await app.loadPgn(PGN);
-  const u = updateDialog("");
-  const ta = u.dlg.querySelector("textarea");
-  ta.value = "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6";
-  ta.dispatchEvent(new app.dom.window.Event("input"));
-  await settleDebounce();
-
-  u.btn("Hide preview").click();
-  await settleDebounce();
-  assert.ok(u.report().hidden, "it does not reopen itself behind the user");
-});
