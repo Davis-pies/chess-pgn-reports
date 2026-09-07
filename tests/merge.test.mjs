@@ -366,3 +366,38 @@ test("without the option, the old behaviour is unchanged", () => {
   assert.strictEqual(report.kept, 0);
   assert.strictEqual(report.droppedLines.length, 1);
 });
+
+test("a line kept by additive mode is not also counted as a new line", () => {
+  // one line survives extended, one is dropped, one is genuinely new
+  const before = linesOf("1. e4 e5 2. Nf3 Nc6 (2... Nf6 3. d4)");
+  const after = linesOf("1. e4 e5 2. Nf3 Nc6 3. Bb5 (3. Bc4)");
+
+  const plain = mergeAnnotations(
+    linesOf("1. e4 e5 2. Nf3 Nc6 (2... Nf6 3. d4)"),
+    linesOf("1. e4 e5 2. Nf3 Nc6 3. Bb5 (3. Bc4)"),
+  );
+  assert.strictEqual(plain.added, 1, "one line is genuinely new");
+  assert.strictEqual(plain.removed, 1);
+  assert.strictEqual(plain.kept, 0);
+
+  const additive = mergeAnnotations(before, after, { keepDropped: true });
+  assert.strictEqual(
+    additive.added,
+    1,
+    "the same one line is new -- the kept line is not new, it is old",
+  );
+  assert.strictEqual(additive.kept, 1);
+  assert.strictEqual(additive.removed, 0);
+});
+
+test("the report's counts add up to the line set it describes", () => {
+  const before = linesOf("1. e4 e5 2. Nf3 Nc6 (2... Nf6 3. d4) (2... d6 3. d4)");
+  const after = linesOf("1. e4 e5 2. Nf3 Nc6 3. Bb5 (3. Bc4) a6");
+  const r = mergeAnnotations(before, after, { keepDropped: true });
+
+  assert.strictEqual(
+    r.exact + r.extended + r.shortened + r.added + r.kept,
+    after.length,
+    `counts must total the ${after.length} lines that came out: ${JSON.stringify(r, null, 1)}`,
+  );
+});

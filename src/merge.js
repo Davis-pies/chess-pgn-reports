@@ -166,6 +166,7 @@ export function mergeAnnotations(oldLines, newLines, { keepDropped = false } = {
 
 	// Line-scoped pass.
 	const matched = matchLines(oldLines, newLines);
+	const claimedSet = new Set(matched.values());
 	matched.forEach((n, old) => {
 		n.name = old.name || "";
 		n.meta = { ...(old.meta || {}) };
@@ -178,7 +179,11 @@ export function mergeAnnotations(oldLines, newLines, { keepDropped = false } = {
 	// with it untouched. A key the new set already has is skipped -- an old line
 	// can go unmatched because a more specific sibling claimed its successor
 	// first, and re-adding it would put the same line in twice.
-	let kept = 0;
+	// Tracked as a set, not just counted: a kept line is an OLD line that
+	// happens to be in the new array now, so every later question about the
+	// final set -- what is new, what was removed -- has to be able to tell it
+	// apart from a line the new PGN actually brought.
+	const keptLines = new Set();
 	if (keepDropped) {
 		const have = new Set(newLines.map(sanKey));
 		oldLines.forEach((l) => {
@@ -188,7 +193,7 @@ export function mergeAnnotations(oldLines, newLines, { keepDropped = false } = {
 			// an ordinary line and is normalised below
 			l.isMain = false;
 			newLines.push(l);
-			kept++;
+			keptLines.add(l);
 		});
 	}
 
@@ -223,7 +228,7 @@ export function mergeAnnotations(oldLines, newLines, { keepDropped = false } = {
 		}),
 	);
 	const droppedLines = oldLines
-		.filter((l) => !matched.has(l) && !newLines.includes(l) && lineWork(l))
+		.filter((l) => !matched.has(l) && !keptLines.has(l) && lineWork(l))
 		.map((l) => ({
 			key: sanKey(l),
 			// the moves themselves, so the report can number them properly
@@ -246,10 +251,14 @@ export function mergeAnnotations(oldLines, newLines, { keepDropped = false } = {
 		exact,
 		extended,
 		shortened,
-		kept,
-		removed: oldLines.filter((l) => !matched.has(l) && !newLines.includes(l))
-			.length,
-		added: newLines.filter((n) => ![...matched.values()].includes(n)).length,
+		kept: keptLines.size,
+		removed: oldLines.filter((l) => !matched.has(l) && !keptLines.has(l)).length,
+		// A kept line is not new -- it is the oldest thing in the set. Counting
+		// it here as well as under `kept` reported it twice and made the counts
+		// overshoot the lines that actually came out.
+		added: newLines.filter(
+			(n) => !claimedSet.has(n) && !keptLines.has(n),
+		).length,
 		droppedLines,
 		droppedNotes,
 	};
