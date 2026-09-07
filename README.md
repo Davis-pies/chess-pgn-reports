@@ -62,8 +62,10 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    shared moves. On paper a group's **first line** states the run itself and
    carries straight on into its own moves, and a **horizontal rule** on the row
    of the last shared move reaches from just right of it across every column
-   that continues from it; groups nested inside a group draw their own shorter
-   rules on their own rows. Without that rule a line's ancestry was unreadable
+   that continues from it, stopping at a short upright in the middle of the
+   last one; groups nested inside a group draw their own shorter rules on their
+   own rows. A line's lead-in cells are left blank on paper — the rules say
+   where each column picks up from, so a column of dots said nothing. Without that rule a line's ancestry was unreadable
    — every cell above a line's first move is a bare ellipsis, so a line
    starting on move 7 gave no way to tell which of the two moves on that row it
    followed. Every group is open, since nothing folds on paper, and the

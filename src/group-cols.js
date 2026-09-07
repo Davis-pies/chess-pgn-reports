@@ -294,17 +294,6 @@ export function flatGroupedVars(mainV, lines) {
 	return { vars, spans };
 }
 
-// The last ply any of a group's columns puts a move on.
-function deepestPly(vars, from, to) {
-	let m = 0;
-	for (let i = from; i <= to; i++)
-		for (const p of Object.keys(vars[i].cells)) {
-			const n = Number(p);
-			if (n > m && vars[i].cells[p].cls !== "ellip") m = n;
-		}
-	return m;
-}
-
 function pushFlat(node, vars, spans, cut) {
 	if (countLeaves(node) === 1) {
 		leavesOf(node).forEach((l) => vars.push(elide(l, cut)));
@@ -325,9 +314,6 @@ function pushFlat(node, vars, spans, cut) {
 		else pushFlat(k.node, vars, spans, c);
 	});
 	const end = vars.length - 1;
-	// `start` holds the shared run's last move, so the rule begins after it.
-	// `deep` is how far down the group actually reaches, which is what the
-	// closing tick's vertical stroke runs alongside.
-	if (end > start)
-		spans.push({ ply: inner, from: start + 1, to: end, deep: deepestPly(vars, start, end) });
+	// `start` holds the shared run's last move, so the rule begins after it
+	if (end > start) spans.push({ ply: inner, from: start + 1, to: end });
 }

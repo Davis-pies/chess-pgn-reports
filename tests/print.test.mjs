@@ -166,10 +166,10 @@ test("the printed table opens every group whatever the preview has folded", () =
   const col = (i) => rows.slice(1).map((tr) => tr.children[i].textContent);
   // The group has no column of its own on paper: its FIRST line states the
   // moves they share and runs straight on into its own.
-  assert.deepStrictEqual(col(2), ["\u2026", "c5", "Nf3", "Nc6", "Bb5"]);
+  assert.deepStrictEqual(col(2), ["", "c5", "Nf3", "Nc6", "Bb5"]);
   // The sibling still starts after the shared run. Its cell on the fork's own
   // row is the group rule, which carries no text -- the rule is the statement.
-  assert.deepStrictEqual(col(3), ["\u2026", "\u2026", "\u2026", "", "a4"]);
+  assert.deepStrictEqual(col(3), ["", "", "", "", "a4"]);
   openTablePaths.clear();
   off();
 });
@@ -221,9 +221,10 @@ test("groups nested inside a group draw their own shorter rules", () => {
   });
   const ends = box.querySelectorAll("td.grp-rule-end").length;
   assert.strictEqual(ends, 2, "the outer group and the one inside it");
-  assert.ok(
-    box.querySelectorAll("td.grp-edge").length > 0,
-    "a closing tick runs on down the rows its group reaches",
+  assert.strictEqual(
+    box.querySelectorAll("td.grp-edge").length,
+    0,
+    "no upright running down the group: one horizontal line is the whole idea",
   );
   off();
 });

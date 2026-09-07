@@ -1141,44 +1141,37 @@ sup {
   font-size: 0.95rem;
 }
 
-/* The printed table's group rule: drawn on the row of a group's last shared
-   move, across the cells of the columns that continue from it. Each covered
-   cell keeps its own td and draws its share of the line, so the grid never
-   loses its shape on that row; the rightmost adds a closing tick, whose stroke
-   runs on down the rows the group actually reaches. */
+/* The printed table's group rule: one hairline on the row of a group's last
+   shared move, reaching across the cells of the columns that continue from it
+   and stopping at a short upright in the MIDDLE of the last one.
+   
+   Both marks are drawn inside the cell and nowhere near its edges: an upright
+   sitting on a cell boundary reads as a table border, which is how a page of
+   these came out looking like a grid of nested boxes rather than a table with
+   a few marks in it. The cells keep their normal padding for the same reason
+   -- the grid's own boundaries stay exactly as they are on every other row. */
 .tbl td.grp-rule {
   position: relative;
-  padding: 0;
 }
 .tbl td.grp-rule::before {
   content: "";
   position: absolute;
+  top: 50%;
   left: 0;
   right: 0;
-  top: 50%;
-  border-top: 1.5px solid var(--text);
+  border-top: 1px solid var(--muted);
 }
-/* the closing tick: a short upright at the rule's right end, so it stops
-   visibly instead of running into whatever column comes next */
+/* the closing cell: the line runs only to the middle, where the upright is */
+.tbl td.grp-rule-end::before {
+  right: 50%;
+}
 .tbl td.grp-rule-end::after {
   content: "";
   position: absolute;
-  right: 0;
-  top: 50%;
-  bottom: 0;
-  border-right: 1.5px solid var(--text);
-}
-/* ...continued down the rows the group covers */
-.tbl td.grp-edge {
-  position: relative;
-}
-.tbl td.grp-edge::after {
-  content: "";
-  position: absolute;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  border-right: 1.5px solid var(--text);
+  left: 50%;
+  top: 28%;
+  height: 44%;
+  border-left: 1px solid var(--muted);
 }
 
 /* ---- print: table hidden, linear cards shown ---- */

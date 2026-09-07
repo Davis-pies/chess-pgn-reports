@@ -28,15 +28,29 @@ function printVars(mainV, lines) {
   const { vars, spans } = flatGroupedVars(mainV, lines);
   return withSpans(
     vars.map((v) =>
+      // A lead-in ellipsis marks a cell where the line has no move of its own.
+      // On screen that is worth saying: it tells a reader scanning a column
+      // that its moves start lower down. On paper it filled most of a wide
+      // table with dots, and now that the group rules say where each column
+      // picks up from, blank says it better.
+      blankElisions(
     // "Sideline" on every column but one tells the reader nothing they cannot
     // see -- they are all sidelines. A header renders `name || label`, so
     // dropping the tag leaves the name the reader gave the line, and nothing
     // where they gave it none. The mainline keeps its label: it IS the column
     // the others are read against, and usually has no name of its own.
-      v.tag === "mainline" ? v : { ...v, label: "" },
+        v.tag === "mainline" ? v : { ...v, label: "" },
+      ),
     ),
     spans,
   );
+}
+
+function blankElisions(v) {
+  const cells = {};
+  for (const [k, c] of Object.entries(v.cells))
+    cells[k] = c.cls === "ellip" ? { ...c, text: "" } : c;
+  return { ...v, cells };
 }
 
 // vars and their group rules travel together: every caller below passes the

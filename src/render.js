@@ -218,15 +218,17 @@ export function renderTable(container, grid, trace) {
 	// Marked per CELL rather than drawn as one cell spanning the group: a
 	// colspan swallowed the columns it covered, so the grid lost its shape on
 	// that row. Each covered cell keeps its own <td> and draws its share of the
-	// line; the rightmost draws the closing tick, and that tick's stroke runs
-	// on down the rows the group actually reaches, so the eye can see where the
-	// group ends as well as where it starts.
+	// line, and the rightmost closes it with a short tick.
+	//
+	// The tick's stroke was once continued down every row the group reached, to
+	// show its vertical extent as well. On a real repertoire that drew a
+	// full-height upright beside every group, nested ones inside each other:
+	// the page read as a grid of boxes rather than a table with a few marks in
+	// it. One horizontal line per group is the whole idea; the rest was noise.
 	const ruleAt = new Map(); // "ply:col" -> "mid" | "end"
-	const edgeAt = new Set(); // "ply:col" -- the closing tick continued downward
 	(grid.spans || []).forEach((s) => {
 		for (let i = s.from; i <= s.to; i++)
 			ruleAt.set(s.ply + ":" + i, i === s.to ? "end" : "mid");
-		for (let p = s.ply + 1; p <= s.deep; p++) edgeAt.add(p + ":" + s.to);
 	});
 	const lit = trace && trace.litByVar;
 	// A column's header follows its cells: lit when the column contributes at
@@ -351,7 +353,6 @@ export function renderTable(container, grid, trace) {
 				// says what the ellipsis was failing to.
 				const c = moveCell(rule ? null : v.cells[ply], ply, v.noteByPly);
 				if (rule) c.classList.add("grp-rule", "grp-rule-" + rule);
-				if (edgeAt.has(ply + ":" + i)) c.classList.add("grp-edge");
 				c.className += groupClass(v);
 				if (v === vars[0]) c.classList.add("main-col", "sticky-col");
 				cellTrace(c, v, ply);
