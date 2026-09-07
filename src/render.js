@@ -215,10 +215,18 @@ export function renderTable(container, grid, trace) {
 	// on the row of its last shared move, spanning the columns that continue
 	// from it. See flatGroupedVars in group-cols.js for why the printed table
 	// says a line's ancestry this way rather than with a column of its own.
-	const spansByPly = new Map();
+	// Marked per CELL rather than drawn as one cell spanning the group: a
+	// colspan swallowed the columns it covered, so the grid lost its shape on
+	// that row. Each covered cell keeps its own <td> and draws its share of the
+	// line; the rightmost draws the closing tick, and that tick's stroke runs
+	// on down the rows the group actually reaches, so the eye can see where the
+	// group ends as well as where it starts.
+	const ruleAt = new Map(); // "ply:col" -> "mid" | "end"
+	const edgeAt = new Set(); // "ply:col" -- the closing tick continued downward
 	(grid.spans || []).forEach((s) => {
-		if (!spansByPly.has(s.ply)) spansByPly.set(s.ply, []);
-		spansByPly.get(s.ply).push(s);
+		for (let i = s.from; i <= s.to; i++)
+			ruleAt.set(s.ply + ":" + i, i === s.to ? "end" : "mid");
+		for (let p = s.ply + 1; p <= s.deep; p++) edgeAt.add(p + ":" + s.to);
 	});
 	const lit = trace && trace.litByVar;
 	// A column's header follows its cells: lit when the column contributes at
@@ -335,22 +343,15 @@ export function renderTable(container, grid, trace) {
 			num.className = "ply-col sticky-col";
 			if (labels[ply]) num.textContent = labels[ply];
 			tr.appendChild(num);
-			const rowSpans = spansByPly.get(ply) || [];
 			for (let i = 0; i < vars.length; i++) {
-				const s = rowSpans.find((x) => x.from === i);
-				if (s) {
-					// one cell instead of the run of empty ones these columns would
-					// each draw here: the rule IS the statement that they continue
-					// from the move to its left
-					const rule = document.createElement("td");
-					rule.className = "grp-rule";
-					rule.colSpan = s.to - s.from + 1;
-					tr.appendChild(rule);
-					i = s.to;
-					continue;
-				}
 				const v = vars[i];
-				const c = moveCell(v.cells[ply], ply, v.noteByPly);
+				const rule = ruleAt.get(ply + ":" + i);
+				// The rule replaces whatever the cell would have said, which at this
+				// ply is only an ellipsis: the line has no move here, and the rule
+				// says what the ellipsis was failing to.
+				const c = moveCell(rule ? null : v.cells[ply], ply, v.noteByPly);
+				if (rule) c.classList.add("grp-rule", "grp-rule-" + rule);
+				if (edgeAt.has(ply + ":" + i)) c.classList.add("grp-edge");
 				c.className += groupClass(v);
 				if (v === vars[0]) c.classList.add("main-col", "sticky-col");
 				cellTrace(c, v, ply);

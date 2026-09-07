@@ -186,7 +186,7 @@ test("a group draws a rule from its last shared move across its continuations", 
   );
   const rows = [...box.querySelectorAll("table.tbl tr")];
   const rules = [...box.querySelectorAll("td.grp-rule")];
-  assert.strictEqual(rules.length, 1, "one group, one rule");
+  assert.strictEqual(rules.length, 1, "one group, one covered cell");
   // it sits on the row whose cell to its left holds the last shared move
   const row = rules[0].parentElement;
   assert.strictEqual(rules[0].previousElementSibling.textContent, "Nc6");
@@ -195,8 +195,11 @@ test("a group draws a rule from its last shared move across its continuations", 
     4,
     "on Nc6's row, not floating above the header",
   );
-  // and covers exactly the sibling that continues from it
+  // it keeps its own cell -- no colspan swallowing the columns it covers
   assert.strictEqual(rules[0].colSpan, 1);
+  assert.strictEqual(rules[0].textContent, "", "and states nothing but itself");
+  // the rightmost covered cell closes the rule off
+  assert.ok(rules[0].classList.contains("grp-rule-end"));
   off();
 });
 
@@ -207,18 +210,21 @@ test("groups nested inside a group draw their own shorter rules", () => {
     "1. e4 e5 (1... c5 2. Nf3 Nc6 3. Bb5) (1... c5 2. Nf3 Nc6 3. a4)" +
       " (1... c5 2. Nf3 d6 3. d4) 2. Nf3",
   );
-  const rules = [...box.querySelectorAll("td.grp-rule")];
-  assert.strictEqual(rules.length, 2, "the outer group and the one inside it");
-  const spans = rules.map((r) => [
-    r.previousElementSibling.textContent,
-    r.colSpan,
-  ]);
-  // the outer rule follows Nf3 and covers both continuations; the inner
-  // follows Nc6 and covers only the second Nc6 line
-  assert.deepStrictEqual(spans, [
-    ["Nf3", 2],
-    ["Nc6", 1],
-  ]);
+  // The outer group forks after Nf3 and covers two columns; the one nested
+  // inside it forks after Nc6 and covers one. Each covered cell is its own td,
+  // so the counts are cells, not colspans.
+  const byRow = new Map();
+  [...box.querySelectorAll("td.grp-rule")].forEach((td) => {
+    const k = [...td.parentElement.children].find((c) => c.textContent)
+      .textContent;
+    byRow.set(k, (byRow.get(k) || 0) + 1);
+  });
+  const ends = box.querySelectorAll("td.grp-rule-end").length;
+  assert.strictEqual(ends, 2, "the outer group and the one inside it");
+  assert.ok(
+    box.querySelectorAll("td.grp-edge").length > 0,
+    "a closing tick runs on down the rows its group reaches",
+  );
   off();
 });
 

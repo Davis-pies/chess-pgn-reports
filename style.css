@@ -1142,19 +1142,43 @@ sup {
 }
 
 /* The printed table's group rule: drawn on the row of a group's last shared
-   move, reaching across the columns that continue from it. It replaces the
-   run of empty cells those columns would each have drawn there, so it needs no
-   width of its own -- only a line down its middle. */
+   move, across the cells of the columns that continue from it. Each covered
+   cell keeps its own td and draws its share of the line, so the grid never
+   loses its shape on that row; the rightmost adds a closing tick, whose stroke
+   runs on down the rows the group actually reaches. */
 .tbl td.grp-rule {
+  position: relative;
   padding: 0;
-  vertical-align: middle;
 }
-.tbl td.grp-rule::after {
+.tbl td.grp-rule::before {
   content: "";
-  display: block;
-  height: 0;
-  margin: 0 2px;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
   border-top: 1.5px solid var(--text);
+}
+/* the closing tick: a short upright at the rule's right end, so it stops
+   visibly instead of running into whatever column comes next */
+.tbl td.grp-rule-end::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 50%;
+  bottom: 0;
+  border-right: 1.5px solid var(--text);
+}
+/* ...continued down the rows the group covers */
+.tbl td.grp-edge {
+  position: relative;
+}
+.tbl td.grp-edge::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  border-right: 1.5px solid var(--text);
 }
 
 /* ---- print: table hidden, linear cards shown ---- */
