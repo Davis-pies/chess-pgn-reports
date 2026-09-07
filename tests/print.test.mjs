@@ -505,3 +505,34 @@ test("branches leaving the mainline at different moves get their own runs", () =
   assert.deepStrictEqual(at, ["e4", "Nf3"], "each on the move it leaves");
   off();
 });
+
+// A run reaches its child across whatever columns lie between, and those
+// belong to branches that left earlier -- which may well have a move of their
+// own on that row. The run must never be drawn over one: a covered cell is
+// rendered empty, so crossing a move deleted it from the report.
+test("a run never covers a cell that has a move of its own", () => {
+  const off = installDom();
+  // c5 leaves at move 1 and is still going at move 3; Bc4 leaves at move 3,
+  // so its connector has to cross the c5 branch's column on that row
+  const box = printTables(
+    "1. e4 e5 (1... c5 2. Nf3 Nc6 3. d4 cxd4 4. Nxd4 Nf6)" +
+      " 2. Nf3 Nc6 3. Bb5 (3. Bc4) 3... a6",
+  );
+  const rows = [...box.querySelectorAll("table.tbl tr")];
+  for (const tr of rows)
+    for (const td of [...tr.children])
+      if (td.classList.contains("grp-rule"))
+        assert.strictEqual(
+          td.textContent,
+          "",
+          "a marked cell had text, so a move was overwritten",
+        );
+
+  // and the crossed branch keeps every move it had
+  const cols = rows
+    .slice(1)
+    .map((tr) => [...tr.children].map((c) => c.textContent));
+  const branch = cols.map((r) => r[2]).filter((t) => t);
+  assert.deepStrictEqual(branch, ["c5", "Nf3", "Nc6", "d4", "cxd4", "Nxd4", "Nf6"]);
+  off();
+});

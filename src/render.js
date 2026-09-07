@@ -229,13 +229,24 @@ export function renderTable(container, grid, trace) {
 	// run; only a cell where one of the group's CHILDREN begins drops a tick
 	// into it, and the last of those turns the corner instead of carrying on.
 	const ruleAt = new Map();
+	// A covered cell is rendered empty -- the mark is all it says -- so a run may
+	// only occupy cells that have nothing to say. It reaches its child across
+	// whatever columns lie between, and those belong to branches that left
+	// earlier and may well have a move of their own on that row; drawn over one,
+	// the move was deleted from the report. The run breaks around it instead.
+	const occupied = (i, ply) => {
+		const cell = vars[i].cells[ply];
+		return !!cell && cell.cls !== "ellip";
+	};
 	(grid.spans || []).forEach((s) => {
 		const tees = new Set(s.tees);
-		for (let i = s.from; i <= s.to; i++)
+		for (let i = s.from; i <= s.to; i++) {
+			if (occupied(i, s.ply)) continue;
 			ruleAt.set(
 				s.ply + ":" + i,
 				(i === s.to ? "end" : "run") + (tees.has(i) ? " gm-tee" : ""),
 			);
+		}
 	});
 	const lit = trace && trace.litByVar;
 	// A column's header follows its cells: lit when the column contributes at
