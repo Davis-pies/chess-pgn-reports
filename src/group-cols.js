@@ -286,6 +286,23 @@ function sharedMoves(node) {
 // the row of the last shared move, reaching from just right of that move
 // across every column that continues from it. Groups nested inside a group
 // produce their own, shorter rules, on their own rows.
+// The mainline's branches in the order the printed report lays them out:
+// latest-leaving first, ties keeping PGN order. One definition, used by the
+// layout and by the page packer -- the packer has to cut the report in this
+// order too, or the report reads one way down a page and another across them.
+function byDeparture(children) {
+	return [...children.values()].sort((a, b) => b.move.ply - a.move.ply);
+}
+
+// Every line, in that order. What the packer walks to decide what goes on
+// which page.
+export function orderedLeaves(mainV, lines) {
+	const trie = buildTrie(lines, mainV);
+	const out = trie.leaf ? [trie.leaf] : [];
+	byDeparture(trie.children).forEach((c) => out.push(...leavesOf(c)));
+	return out;
+}
+
 export function flatGroupedVars(mainV, lines) {
 	const trie = buildTrie(lines, mainV);
 	const vars = [mainV];
@@ -303,10 +320,7 @@ export function flatGroupedVars(mainV, lines) {
 	// later than it does, and is therefore still blank on the row it leaves.
 	//
 	// Ties keep PGN order, so branches leaving at the same move read as written.
-	const byDeparture = [...trie.children.values()].sort(
-		(a, b) => b.move.ply - a.move.ply,
-	);
-	byDeparture.forEach((c) => {
+	byDeparture(trie.children).forEach((c) => {
 		const at = vars.length;
 		pushFlat(c, vars, spans, -1);
 		const ply = firstOwnPly(vars[at], 0) - 1;

@@ -11,9 +11,8 @@ import { renderTable, appendFootnote } from "./render.js";
 import { el, renderInline } from "./dom.js";
 import { getCurrent } from "./state.js";
 import { allNotes } from "./notes.js";
-import { buildTrie, leavesOf } from "./tree.js";
 import { moveRef } from "./export.js";
-import { flatGroupedVars } from "./group-cols.js";
+import { flatGroupedVars, orderedLeaves } from "./group-cols.js";
 
 // The columns one printed table renders: the same grouping the editor's table
 // builds, with every group open — there is nothing to click on paper, so a
@@ -211,7 +210,11 @@ function printWidth(mainV, lines) {
 function packForPrint(mainV, lines, size) {
   const tables = [];
   let cur = [];
-  for (const l of leavesOf(buildTrie(lines, mainV))) {
+  // In the order the report lays the branches out, not the order the PGN
+  // wrote them: pages are cut from this sequence, so packing in a different
+  // order would put a branch on page three that the layout wants beside the
+  // mainline on page one.
+  for (const l of orderedLeaves(mainV, lines)) {
     // a lone line is one column: it always fits, and this keeps a table from
     // being closed empty
     if (!cur.length) {

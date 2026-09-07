@@ -571,3 +571,26 @@ test("branches are ordered so a run never has to cross a move", () => {
   }
   off();
 });
+
+// The whole report is ordered before it is cut into pages. Sorting only within
+// a page would leave the report reading one way down a page and another across
+// them, and could strand a branch on a later page than the layout wants it.
+test("pages are cut from the ordered report, not from PGN order", () => {
+  const off = installDom();
+  // 14 early-leaving branches fill the first page; the LAST thing the PGN
+  // writes is a branch leaving at move 3, which the layout wants first of all
+  const early = KID_FIFTHS.slice(0, 14)
+    .map((m) => `(1... Nf6 2. c4 g6 3. Nc3 Bg7 4. e4 d6 5. ${m})`)
+    .join(" ");
+  const box = printTables(`1. d4 d5 ${early} 2. c4 e6 (2... c6) 3. Nc3 *`);
+  const tables = [...box.querySelectorAll("table.tbl")];
+  assert.ok(tables.length > 1, "the fixture really does need several pages");
+  const firstPage = [...tables[0].querySelectorAll("tr")]
+    .map((tr) => [...tr.children].map((c) => c.textContent))
+    .flat();
+  assert.ok(
+    firstPage.includes("c6"),
+    "the latest-leaving branch is on the first page, though written last",
+  );
+  off();
+});
