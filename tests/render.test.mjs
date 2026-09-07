@@ -9,6 +9,7 @@ import { allNotes, numberNotes } from "../src/notes.js";
 import { installDom, loadState } from "./helpers.mjs";
 import {
 	renderTable,
+	movesText,
 	renderCards,
 	boardSvg,
 	fullMovesText,
@@ -867,4 +868,19 @@ test("appendFootNode renders one group branch as a depth-marked row", () => {
 	assert.strictEqual(row.querySelector("sup").textContent, "[a]");
 	assert.match(row.textContent, /2\.\.\.Nf3/);
 	off();
+});
+
+test("movesText numbers each fullmove once, pairing white with black", () => {
+	const mv = (sans, start = 0) =>
+		sans.map((san, i) => ({ san, ply: start + i }));
+	assert.strictEqual(
+		movesText(mv(["e4", "c5", "Nf3", "d6"])),
+		"1.e4 c5  2.Nf3 d6",
+	);
+	// a run opening on a black move states its number, then pairs as usual
+	assert.strictEqual(
+		movesText(mv(["c5", "Nf3", "d6"], 1)),
+		"1...c5  2.Nf3 d6",
+	);
+	assert.strictEqual(movesText([]), "");
 });

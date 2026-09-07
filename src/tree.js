@@ -6,6 +6,17 @@
 
 import { symFor, markOf } from "./nags.js";
 
+// The editor fills an unnamed line's name box with a placeholder ("Mainline",
+// "Line 7") and writes it back onto the line, so nearly every line ends up
+// carrying a name nobody gave it. Anything asking "did the user do work on
+// this line?" -- the merge report, most of all -- has to tell those apart from
+// a name that was actually typed. Both halves live here so the generator and
+// the test of it can never drift.
+export const defaultLineName = (isMain, idx) =>
+	isMain ? "Mainline" : "Line " + idx;
+export const isDefaultLineName = (n) =>
+	!n || n === "Mainline" || /^Line \d+$/.test(n);
+
 function chainToMoves(chain) {
 	return chain
 		.filter((x) => x && x.san)

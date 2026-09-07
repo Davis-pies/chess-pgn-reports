@@ -1,6 +1,6 @@
 import { buildTrie, leavesOf, countLeaves } from "./tree.js";
 
-import { renderTable, fullmoveLabel } from "./render.js";
+import { renderTable, movesText } from "./render.js";
 import { el } from "./dom.js";
 import {
 	getCurrent,
@@ -229,9 +229,12 @@ export function focusLines(keep) {
 	getRenderHooks().renderApp();
 }
 
-function branchLabel(move) {
-	return fullmoveLabel(move.ply) + move.san;
-}
+// The shared path a group header states is written by movesText (render.js),
+// so it numbers each fullmove once instead of every ply: "2.Nf3 d6  3.d4 cxd4",
+// not "2.Nf3  2...d6  3.d4  3...cxd4", which doubled every header's length and
+// read as a list of plies rather than as a line of chess. `path` is carried
+// down as the moves themselves for exactly that reason -- a pre-joined string
+// has lost the plies the pairing needs.
 
 // Shared move path of a branch, accumulated through its single-child chain
 // (e.g. "1... c5 2. Nf3") for the group header.
@@ -256,9 +259,7 @@ export function renderTrieNode(
 	// is what the trie's own shape says when nothing is filtered out.
 	forks = EMPTY,
 ) {
-	const nextPath = path
-		? path + "  " + branchLabel(node.move)
-		: branchLabel(node.move);
+	const nextPath = [...(path || []), node.move];
 	const boards = getCurrent().showBoards; // inline-boards master toggle
 	// Single-child chain: inline it, accumulating the path so a long shared
 	// continuation shows as one compressed header, not nested single groups.
@@ -303,7 +304,7 @@ export function renderTrieNode(
 	const count = countLeaves(node);
 	const summary = el("summary", {
 		className: "lg-head",
-		textContent: `${nextPath} · ${count} line${count === 1 ? "" : "s"}`,
+		textContent: `${movesText(nextPath)} · ${count} line${count === 1 ? "" : "s"}`,
 	});
 	// Marking a group as a footnote is marking all its lines: the group IS one
 	// footnote precisely when every line under it is tagged (see foot-groups.js).

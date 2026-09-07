@@ -482,3 +482,40 @@ test("a fork with several visible lines still keeps its level", () => {
 	);
 	off();
 });
+
+// A group header states its shared moves the way PGN does: a black move that
+// directly follows its own white half is written bare. Numbering every ply
+// ("5...Nf6 6.Nc3 6...Nxd4") doubled the length of every header and read as a
+// list of plies rather than as a line of chess.
+const LONGCHAIN =
+	"1. e4 e5 (1... c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 (4... g6)) 2. Nf3";
+
+test("a group header numbers each fullmove once, not each ply", () => {
+	const off = installDom();
+	const box = editorTrie(loadState(LONGCHAIN));
+	const head = [...box.querySelectorAll("summary.lg-head")].find((h) =>
+		h.textContent.includes("cxd4"),
+	);
+	assert.ok(head, "the shared chain has a group header");
+	const path = head.textContent.split(" · ")[0];
+	assert.strictEqual(path, "1...c5  2.Nf3 d6  3.d4 cxd4  4.Nxd4");
+	off();
+});
+
+test("a group header opening on a white move still numbers it", () => {
+	const off = installDom();
+	// the branch below 3. d4 starts on White's 4th, so its path opens there
+	const box = editorTrie(
+		loadState("1. e4 e5 (1... c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 (4... g6)) 2. Nf3"),
+	);
+	const heads = [...box.querySelectorAll("summary.lg-head")].map(
+		(h) => h.textContent.split(" · ")[0],
+	);
+	heads.forEach((p) =>
+		assert.ok(
+			/^\d+\.(\.\.)?[A-Za-z0-9]/.test(p),
+			`every header opens with a numbered move, got "${p}"`,
+		),
+	);
+	off();
+});

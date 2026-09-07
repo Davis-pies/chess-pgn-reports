@@ -127,15 +127,13 @@ test("a line the new PGN no longer contains is reported as dropped", () => {
   const after = linesOf("1. e4 e5 2. Nf3 Nc6 3. Bb5");
   const report = mergeAnnotations(before, after);
 
-  assert.deepStrictEqual(report.droppedLines, [
-    {
-      key: "e4 e5 Nf3 Nf6 d4",
-      name: "Petroff",
-      tag: "sideline",
-      eval: "±",
-      note: "",
-    },
-  ]);
+  assert.strictEqual(report.droppedLines.length, 1);
+  const [d] = report.droppedLines;
+  assert.strictEqual(d.key, "e4 e5 Nf3 Nf6 d4");
+  assert.strictEqual(d.name, "Petroff");
+  assert.strictEqual(d.tag, "sideline");
+  assert.strictEqual(d.eval, "±");
+  assert.strictEqual(d.note, "");
 });
 
 test("a dropped line carrying no annotations is counted but not reported", () => {
@@ -156,12 +154,10 @@ test("a note whose move path is gone is reported as dropped", () => {
 
   // Only paths that actually carried something are tracked, so the bare
   // "e4 e5 Nf3 Nf6" the note hung below is not itself a loss to report.
-  assert.deepStrictEqual(report.droppedNotes, [
-    {
-      path: "e4 e5 Nf3 Nf6 d4",
-      comments: ["the Steinitz attack"],
-      mark: undefined,
-    },
+  assert.strictEqual(report.droppedNotes.length, 1);
+  assert.strictEqual(report.droppedNotes[0].path, "e4 e5 Nf3 Nf6 d4");
+  assert.deepStrictEqual(report.droppedNotes[0].comments, [
+    "the Steinitz attack",
   ]);
 });
 
@@ -246,4 +242,51 @@ test("a line the new PGN cuts short still keeps its attributes", () => {
 
   assert.strictEqual(find(after, "e4 e5 Nf3 Nc6").name, "Ruy Lopez");
   assert.strictEqual(report.shortened, 1);
+});
+
+test("the editor's placeholder name does not count as work worth reporting", () => {
+  const before = linesOf("1. e4 e5 2. Nf3 Nc6 (2... Nf6 3. d4)");
+  // what lineEditor() writes onto every line it renders, named or not
+  before.forEach((l, i) => (l.name = l.isMain ? "Mainline" : "Line " + i));
+
+  const after = linesOf("1. e4 e5 2. Nf3 Nc6 3. Bb5");
+  const report = mergeAnnotations(before, after);
+
+  assert.strictEqual(report.removed, 1, "the line is still counted as removed");
+  assert.deepStrictEqual(
+    report.droppedLines,
+    [],
+    "but a placeholder name is not an annotation to warn about",
+  );
+});
+
+test("a real name alongside the placeholders is still reported", () => {
+  const before = linesOf("1. e4 e5 2. Nf3 Nc6 (2... Nf6 3. d4)");
+  before.forEach((l, i) => (l.name = l.isMain ? "Mainline" : "Line " + i));
+  find(before, "e4 e5 Nf3 Nf6 d4").name = "Petroff";
+
+  const after = linesOf("1. e4 e5 2. Nf3 Nc6 3. Bb5");
+  const report = mergeAnnotations(before, after);
+
+  assert.strictEqual(report.droppedLines.length, 1);
+  assert.strictEqual(report.droppedLines[0].name, "Petroff");
+});
+
+test("a dropped line reports its moves, so the report can number them", () => {
+  const before = linesOf("1. e4 e5 2. Nf3 Nc6 (2... Nf6 3. d4)");
+  find(before, "e4 e5 Nf3 Nf6 d4").meta = { eval: "±" };
+
+  const after = linesOf("1. e4 e5 2. Nf3 Nc6 3. Bb5");
+  const report = mergeAnnotations(before, after);
+
+  assert.deepStrictEqual(
+    report.droppedLines[0].moves.map((m) => [m.ply, m.san]),
+    [
+      [0, "e4"],
+      [1, "e5"],
+      [2, "Nf3"],
+      [3, "Nf6"],
+      [4, "d4"],
+    ],
+  );
 });

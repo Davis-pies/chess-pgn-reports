@@ -1,6 +1,7 @@
 import { fenAt } from "./pgn.js";
 import { appendBoard, fullmoveLabel } from "./render.js";
 import { el } from "./dom.js";
+import { defaultLineName } from "./tree.js";
 import { getCurrent, getSharedInfo, getRenderHooks } from "./state.js";
 import { NAGS, markSym, markOf, nagFor } from "./nags.js";
 import { numberNotes } from "./notes.js";
@@ -24,7 +25,7 @@ export function lineEditor(l, idx, showBoard = false) {
 	};
 	const isMain = !!l.isMain;
 	// name comes first, pre-populated
-	if (!l.name) l.name = isMain ? "Mainline" : "Line " + idx;
+	if (!l.name) l.name = defaultLineName(isMain, idx);
 	const name = el("input", { className: "ln", value: l.name });
 	name.oninput = () => {
 		l.name = name.value;

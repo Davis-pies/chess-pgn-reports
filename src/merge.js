@@ -21,6 +21,8 @@
 //     continuation, so they go to a single line even when one old line now
 //     prefixes several new ones.
 
+import { isDefaultLineName } from "./tree.js";
+
 const sanKey = (line) => line.moves.map((m) => m.san).join(" ");
 
 // How many leading moves two lines agree on.
@@ -50,9 +52,9 @@ function pathsOf(line) {
 // are a set, since several distinct notes can share a move.
 function moveAnnotations(oldLines) {
 	const out = new Map();
-	const at = (path) => {
+	const at = (path, moves) => {
 		let e = out.get(path);
-		if (!e) out.set(path, (e = { mark: undefined, comments: [] }));
+		if (!e) out.set(path, (e = { mark: undefined, comments: [], moves }));
 		return e;
 	};
 	oldLines.forEach((l) => {
@@ -61,13 +63,13 @@ function moveAnnotations(oldLines) {
 		Object.entries(l.marks || {}).forEach(([ply, mark]) => {
 			const i = indexOfPly.get(Number(ply));
 			if (i === undefined) return;
-			const e = at(paths[i]);
+			const e = at(paths[i], l.moves.slice(0, i + 1));
 			if (e.mark === undefined) e.mark = mark;
 		});
 		(l.comments || []).forEach((c) => {
 			const i = indexOfPly.get(c.ply);
 			if (i === undefined) return;
-			const e = at(paths[i]);
+			const e = at(paths[i], l.moves.slice(0, i + 1));
 			if (!e.comments.includes(c.text)) e.comments.push(c.text);
 		});
 	});
@@ -112,7 +114,15 @@ function matchLines(oldLines, newLines) {
 // this loses nothing by disappearing, so it is not worth reporting.
 function lineWork(l) {
 	const meta = l.meta || {};
-	return !!(l.name || l.tag === "foot" || meta.eval || meta.note || l.hidden);
+	// A placeholder name is not work: the editor writes one onto every line it
+	// renders, so counting it would report every removed line as annotated.
+	return !!(
+		!isDefaultLineName(l.name) ||
+		l.tag === "foot" ||
+		meta.eval ||
+		meta.note ||
+		l.hidden
+	);
 }
 
 /**
@@ -184,14 +194,21 @@ export function mergeAnnotations(oldLines, newLines) {
 		.filter((l) => !matched.has(l) && lineWork(l))
 		.map((l) => ({
 			key: sanKey(l),
-			name: l.name || "",
+			// the moves themselves, so the report can number them properly
+			moves: l.moves.map((m) => ({ san: m.san, ply: m.ply })),
+			name: isDefaultLineName(l.name) ? "" : l.name,
 			tag: l.tag === "foot" ? "foot" : "sideline",
 			eval: (l.meta || {}).eval || "",
 			note: (l.meta || {}).note || "",
 		}));
 	const droppedNotes = [...anno.entries()]
 		.filter(([path]) => !rehomed.has(path))
-		.map(([path, e]) => ({ path, comments: e.comments, mark: e.mark }));
+		.map(([path, e]) => ({
+			path,
+			moves: e.moves.map((m) => ({ san: m.san, ply: m.ply })),
+			comments: e.comments,
+			mark: e.mark,
+		}));
 
 	return {
 		exact,

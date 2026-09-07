@@ -120,6 +120,23 @@ export function appendBoard(container, fen, size = 220) {
 	return container.lastElementChild;
 }
 
+// A run of moves as PGN reads it: the white half of each fullmove carries its
+// number, the black half is bare unless it opens the run. Two spaces before a
+// move that starts a fullmove, one before the move that completes the pair, so
+// the pairing is visible without punctuation. Shared by the editor's group
+// headers and the Update PGN report, which must agree.
+export function movesText(moves) {
+	return moves
+		.map((m, i) =>
+			m.ply % 2 === 0 || i === 0 ? fullmoveLabel(m.ply) + m.san : m.san,
+		)
+		.reduce(
+			(acc, part, i) =>
+				i === 0 ? part : acc + (moves[i].ply % 2 === 0 ? "  " : " ") + part,
+			"",
+		);
+}
+
 export function fullmoveLabel(ply) {
 	const n = Math.floor(ply / 2) + 1;
 	return ply % 2 === 0 ? `${n}.` : `${n}...`;

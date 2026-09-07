@@ -1035,10 +1035,12 @@ test("focusing down to ONE line leaves it one group, not a ladder", async () => 
 				.map((g) => g.querySelector("summary").firstChild.textContent)
 				.join("\n"),
 	);
-	// and the surviving header still states the whole path down to the line
+	// and the surviving header still states the whole path down to the line.
+	// g6 is written bare here: the chain inlines on focus, so its own white
+	// half (4.Nxd4) is right there in the header beside it.
 	const head = groups[0].querySelector("summary").firstChild.textContent;
-	assert.match(head, /4\.Nxd4/);
-	assert.match(head, /4\.\.\.g6/);
+	assert.match(head, /2\.\.\.Nc6/, "the path starts where the line diverges");
+	assert.match(head, /4\.Nxd4 g6/, "and runs down to the line itself");
 });
 
 // 4.Nxd4 forks into 4...e5 and 4...g6; the 4...g6 group itself holds two lines,

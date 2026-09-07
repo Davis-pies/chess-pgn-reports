@@ -2,7 +2,7 @@
 import { parsePgn, fenMap } from "./pgn.js";
 import { collectLines, buildTrie, forkKeys } from "./tree.js";
 import { grid } from "./table.js";
-import { renderCards } from "./render.js";
+import { renderCards, movesText } from "./render.js";
 import {
   saveNotebook,
   listNotebooks,
@@ -937,7 +937,7 @@ function reportNodes(r) {
                 [d.tag === "foot" ? "footnote" : "", d.eval, d.note]
                   .filter(Boolean)
                   .map((x) => " " + x)
-                  .join("") + " — " + d.key,
+                  .join("") + " — " + movesText(d.moves),
             }),
           ]),
         ),
@@ -957,7 +957,8 @@ function reportNodes(r) {
         { className: "mergelost" },
         r.droppedNotes.map((d) =>
           el("li", {
-            textContent: (d.comments.join(" / ") || d.mark || "") + " — " + d.path,
+            textContent:
+              (d.comments.join(" / ") || d.mark || "") + " — " + movesText(d.moves),
           }),
         ),
       ),
