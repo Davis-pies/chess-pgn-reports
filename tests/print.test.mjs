@@ -301,3 +301,22 @@ test("a report that fits one table cascades without the trie split", () => {
   assert.strictEqual(cells.filter((t) => t === "Bxd7+").length, 1);
   off();
 });
+
+// The "N lines" count on a group's header is a fold affordance — it says how
+// much is behind the stub. Nothing folds on paper, so the printed report keeps
+// the shared-move column and drops the label, the same way it drops the ▸/▾
+// cue and the shading.
+test("a group's column carries no line count in print", () => {
+  const off = installDom();
+  const box = printTables(kid(16));
+  const heads = [...box.querySelectorAll("table.tbl tr:first-child th")].map(
+    (h) => h.textContent.trim(),
+  );
+  assert.ok(heads.includes("Mainline"), "the reference column is still named");
+  assert.deepStrictEqual(
+    heads.filter((h) => /^\d+ lines?$/.test(h)),
+    [],
+    `no "N lines" headers in print (got ${JSON.stringify(heads)})`,
+  );
+  off();
+});

@@ -236,7 +236,12 @@ function branchVar(opts, node, open) {
 		// column having been replaced. The shared moves are in the cells; this
 		// says how many lines are under them, open or shut, exactly as the
 		// editor's group summary does.
-		name: `${count} lines`,
+		//
+		// It is a fold affordance, though: it tells the reader how much a stub
+		// is standing in for. The printed report has no stubs and nothing to
+		// unfold, so it goes the way of the ▸/▾ cue and the shading, leaving
+		// the column to do its one job of stating the shared moves.
+		name: opts.onToggle ? `${count} lines` : "",
 		eval: "",
 		cells,
 		noteByPly: sharedNotes(node, shared),

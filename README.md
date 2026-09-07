@@ -58,8 +58,9 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    traced line simply stops showing it rather than going stale. The printed
    report groups its lines the same way, so a run of moves two lines share is
    stated once and each picks up where it ends — but every group is open, since
-   nothing folds on paper, and the shading, fold controls and trace stay on
-   screen. Where the table is too wide for a page it is sliced across several,
+   nothing folds on paper, and the shading, fold controls, "N lines" counts and
+   trace stay on screen: on paper a group is just the column its shared moves
+   are written in. Where the table is too wide for a page it is sliced across several,
    and each slice stands on its own: a group spilling onto the next page
    restates its shared moves there, and a line arriving alone spells its whole
    divergence out, so the reader never has to turn back a page to find out how a
