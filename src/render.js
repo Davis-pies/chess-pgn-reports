@@ -209,7 +209,7 @@ function moveCell(c, ply, noteByPly) {
 // ONLY by renderTrieTable; appendPrintTables passes nothing, so the printed
 // report carries no dimming and no click handlers, the same containment the
 // grouping itself has.
-export function renderTable(container, grid, orientation, trace) {
+export function renderTable(container, grid, trace) {
 	const { vars, maxPly } = grid;
 	// Group rules (printed report only): one horizontal line per group, drawn
 	// on the row of its last shared move, spanning the columns that continue
@@ -291,46 +291,13 @@ export function renderTable(container, grid, orientation, trace) {
 		labels[ply] = ply % 2 === 0 ? fullmoveLabel(ply) : "";
 
 	const table = document.createElement("table");
-	table.className = "tbl" + (orientation === "horizontal" ? " tbl-h" : "");
+	table.className = "tbl tbl-h";
 
-	const varHead = (v) => {
-		const c = document.createElement("td");
-		c.className =
-			"var-head" +
-			(v.onclick ? " clickable" : "") +
-			(v.collapsed ? " collapsed" : "") +
-			groupClass(v) +
-			traceClass(v);
-		if (!v.onclick) wireTrace(c, v);
-		if (v.onclick) {
-			wireExpandControl(c, v.onclick, !v.collapsed);
-			c.title = v.collapsed ? v.name || "expand branch" : "collapse branch";
-		}
-		if (v.collapsed) {
-			const cue = document.createElement("span");
-			cue.className = "collapse-cue";
-			cue.textContent = "\u25b8 ";
-			c.appendChild(cue);
-		} else if (v.onclick) {
-			const cue = document.createElement("span");
-			cue.className = "collapse-cue";
-			cue.textContent = "\u25be ";
-			c.appendChild(cue);
-		}
-		if (v.label) {
-			const tag = document.createElement("span");
-			tag.className = "tag " + v.tag;
-			tag.textContent = v.label;
-			c.appendChild(tag);
-		}
-		c.appendChild(document.createTextNode(" " + (v.name || "")));
-		const mb = menuButton(v);
-		if (mb) c.appendChild(mb);
-		wireMenu(c, v, null);
-		return c;
-	};
 
-	if (orientation === "horizontal") {
+	// rows = ply, columns = variations. There is one layout: the table is a
+	// reference grid read down the plies, and the transposed form never earned
+	// the branch it cost.
+	{
 		// rows = ply, columns = variations
 		const head = document.createElement("tr");
 		const plyTh = document.createElement("th");
@@ -392,37 +359,6 @@ export function renderTable(container, grid, orientation, trace) {
 				if (v.cells[ply]) wireMenu(c, v, ply);
 				tr.appendChild(c);
 			}
-			table.appendChild(tr);
-		}
-	} else {
-		// vertical: rows = variations, columns = ply
-		const head = document.createElement("tr");
-		const vth = document.createElement("th");
-		vth.className = "sticky-col";
-		vth.textContent = "Variation";
-		head.appendChild(vth);
-		for (let ply = 0; ply <= maxPly; ply++) {
-			const th = document.createElement("th");
-			if (labels[ply]) th.textContent = labels[ply];
-			head.appendChild(th);
-		}
-		head.appendChild(document.createElement("th"));
-		table.appendChild(head);
-		for (const v of vars) {
-			const tr = document.createElement("tr");
-			const vh = varHead(v);
-			vh.classList.add("sticky-col");
-			tr.appendChild(vh);
-			for (let ply = 0; ply <= maxPly; ply++) {
-				const c = moveCell(v.cells[ply], ply, v.noteByPly);
-				c.className += groupClass(v);
-				cellTrace(c, v, ply);
-				wireTrace(c, v);
-				// only where the column actually has a move at this ply
-				if (v.cells[ply]) wireMenu(c, v, ply);
-				tr.appendChild(c);
-			}
-			tr.appendChild(td(v.eval, "eval"));
 			table.appendChild(tr);
 		}
 	}

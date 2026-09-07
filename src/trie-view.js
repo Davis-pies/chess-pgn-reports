@@ -25,12 +25,12 @@ const EMPTY = new Set();
 // rather than a static `import ... from "./app.js"` -- see the comment on
 // setRenderHooks() in state.js for why.
 
-// Left-panel preview: ONE table. The mainline column is always visible (left
-// in horizontal, top row in vertical); each top-level trie branch contributes
+// Left-panel preview: ONE table. The mainline column is always visible on the
+// left; each top-level trie branch contributes
 // its columns. A collapsed branch is compressed to a single shared-continuation
 // column (the moves all its lines have in common up to the fork); clicking that
 // column's header expands it back into its individual line columns.
-export function renderTrieTable(container, g, orientation) {
+export function renderTrieTable(container, g) {
 	const mainV = g.vars[0]; // mainline sorts first
 	const others = g.vars.slice(1);
 	const trie = buildTrie(others, mainV);
@@ -105,7 +105,7 @@ export function renderTrieTable(container, g, orientation) {
 	container.appendChild(controls);
 	// rows span only the VISIBLE columns — collapsed branches don't stretch the
 	// table down to the deepest hidden line
-	renderTable(container, { ...g, vars, maxPly: subMaxPly(vars) }, orientation, {
+	renderTable(container, { ...g, vars, maxPly: subMaxPly(vars) }, {
 		litByVar,
 		// Right-click acts on the move; left-click still traces. A group column
 		// gets the group's line actions and the move section both -- its moves

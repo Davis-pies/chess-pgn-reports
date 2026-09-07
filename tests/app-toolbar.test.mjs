@@ -10,17 +10,6 @@ const PGN = "1. e4 e5 (1... c5 2. Nf3 Nc6) 2. Nf3 Nc6";
 // not be re-imported per test); each test resets back to the import panel.
 const app = await bootApp();
 
-test("orientation toggle switches the table between horizontal and vertical", async () => {
-  app.reset();
-  await app.loadPgn(PGN);
-  // horizontal is the default and is marked active
-  assert.match(app.button("Horizontal").className, /\bon\b/);
-  app.button("Vertical").click();
-  assert.match(app.button("Vertical").className, /\bon\b/);
-  assert.ok(!/\bon\b/.test(app.button("Horizontal").className));
-  app.button("Horizontal").click();
-  assert.match(app.button("Horizontal").className, /\bon\b/);
-});
 
 test("view toggle switches between the table and the printable line cards", async () => {
   app.reset();

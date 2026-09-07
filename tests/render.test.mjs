@@ -67,7 +67,7 @@ test("boardSvg carries an accessible name", () => {
 	delete global.document;
 });
 
-test("renders a vertical table with tagged variations into the DOM", () => {
+test("renders the table with tagged variations into the DOM", () => {
 	const { window } = dom();
 	global.document = window.document;
 	global.DOMParser = window.DOMParser;
@@ -78,17 +78,17 @@ test("renders a vertical table with tagged variations into the DOM", () => {
 	lines[1].tag = "sideline";
 
 	const container = document.createElement("div");
-	renderTable(container, grid(lines), "vertical");
+	renderTable(container, grid(lines));
 
 	const table = container.querySelector("table.tbl");
 	assert.ok(table, "expected a table");
-	// one table; header + 2 variation rows
-	assert.strictEqual(table.querySelectorAll("tr").length, 3);
-	const rows = table.querySelectorAll("tr");
-	const header = rows[0];
-	// header labels include move numbers
-	assert.ok(header.textContent.includes("1."));
-	assert.ok(header.textContent.includes("2."));
+	// rows are plies: a header of column names, then one row per ply
+	const rows = [...table.querySelectorAll("tr")];
+	assert.strictEqual(rows.length, 5, "header + 4 plies");
+	assert.ok(rows[0].textContent.includes("Mainline"), "columns are the lines");
+	// the ply column carries the move numbers, one per fullmove
+	const plies = rows.slice(1).map((tr) => tr.children[0].textContent);
+	assert.deepStrictEqual(plies, ["1.", "", "2.", ""]);
 	delete global.document;
 	delete global.DOMParser;
 });
@@ -129,9 +129,10 @@ test("collapse/expand variation headers are keyboard accessible", () => {
 	};
 
 	const container = document.createElement("div");
-	renderTable(container, g, "vertical");
+	renderTable(container, g);
 
-	const cell = container.querySelector("td.var-head.clickable");
+	// columns are the variations, so a variation's head is a <th>
+	const cell = container.querySelector("th.var-head.clickable");
 	assert.ok(cell, "expected a clickable variation head");
 	assert.strictEqual(cell.tabIndex, 0);
 	assert.strictEqual(cell.getAttribute("role"), "button");
@@ -163,7 +164,7 @@ test("a collapsed branch folds from its header, not from its move cells", () => 
 		parsePgn("1. e4 e5 (1... c5 2. Nf3 Nc6) 2. Nf3 Nc6").nodes,
 	);
 
-	for (const orientation of ["vertical", "horizontal"]) {
+	{
 		let called = 0;
 		const g = grid(lines);
 		g.vars[1].onclick = () => {
@@ -171,22 +172,22 @@ test("a collapsed branch folds from its header, not from its move cells", () => 
 		};
 		g.vars[1].collapsed = true;
 		const container = document.createElement("div");
-		renderTable(container, g, orientation);
+		renderTable(container, g);
 
 		const head = container.querySelector(".var-head.clickable.collapsed");
-		assert.ok(head, `expected a clickable collapsed header (${orientation})`);
+		assert.ok(head, "expected a clickable collapsed header");
 		assert.strictEqual(head.tabIndex, 0);
 		assert.strictEqual(head.getAttribute("role"), "button");
 		assert.strictEqual(head.getAttribute("aria-expanded"), "false");
 		head.dispatchEvent(
 			new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
 		);
-		assert.strictEqual(called, 1, `header folds (${orientation})`);
+		assert.strictEqual(called, 1, "header folds");
 
 		assert.strictEqual(
 			container.querySelector("td.clickable:not(.var-head)"),
 			null,
-			`move cells do not fold (${orientation})`,
+			"move cells do not fold",
 		);
 	}
 
@@ -197,7 +198,7 @@ test("horizontal layout transposes to one row per ply", () => {
 	global.document = dom().window.document;
 	const lines = collectLines(parsePgn("1. e4 c5 (1... e5) 2. Nf3").nodes);
 	const container = document.createElement("div");
-	renderTable(container, grid(lines), "horizontal", {});
+	renderTable(container, grid(lines), {});
 	const table = container.querySelector("table.tbl");
 	const rows = table.querySelectorAll("tr");
 	// header + maxPly+1 rows (ply 0..2) = 4 rows (e4,c5,e5,Nf3 -> maxPly 2)
@@ -589,7 +590,7 @@ test("a table cell's symbol is attached the same way", () => {
 	const s = loadState("1. e4 e5 2. Nf3 Nc6");
 	s.lines[0].marks = { 3: "∞" };
 	const t = document.createElement("div");
-	renderTable(t, grid(s.lines), "vertical");
+	renderTable(t, grid(s.lines));
 	const cell = [...t.querySelectorAll("td")].find((x) => /∞/.test(x.textContent));
 	assert.ok(cell.querySelector(".mv-mark"), "symbol is its own element");
 	assert.ok(!/ ∞/.test(cell.textContent), cell.textContent);

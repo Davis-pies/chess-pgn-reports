@@ -16,13 +16,13 @@ const GROUP = "1. e4 e5 (1... c5 2. Nf3 d6 3. d4 (3. Bb5+)) 2. Nf3";
 const GROUP_KEY = "1:c5";
 
 // Render the screen preview (never the print path, which is ungrouped).
-function preview(pgn, { note = () => {}, open = [], orientation } = {}) {
+function preview(pgn, { note = () => {}, open = [] } = {}) {
 	const s = loadState(pgn);
 	note(s);
 	openTablePaths.clear();
 	open.forEach((k) => openTablePaths.add(k));
 	const box = document.createElement("div");
-	renderTrieTable(box, grid(s.lines), orientation || "horizontal");
+	renderTrieTable(box, grid(s.lines));
 	return box;
 }
 
@@ -186,7 +186,6 @@ test("the vertical layout shows the group row's symbols the same way", () => {
 	const box = preview(GROUP, {
 		note: markOnShared,
 		open: [GROUP_KEY],
-		orientation: "vertical",
 	});
 	const row = [...box.querySelectorAll("tr")].find((r) =>
 		[...r.children].some((c) => moveOf(c) === "d6" && c.className.includes("collapsed")),
@@ -201,7 +200,6 @@ test("the vertical layout marks the group row the same way", () => {
 	const box = preview(GROUP, {
 		note: noteOnShared,
 		open: [GROUP_KEY],
-		orientation: "vertical",
 	});
 	// rows are variations here: find the group's row and its d6 cell
 	const row = [...box.querySelectorAll("tr")].find((r) =>
@@ -218,9 +216,9 @@ test("the vertical layout marks the group row the same way", () => {
 // enclosing it and its own tail, so reading one line means stitching three
 // places together. Tracing lights exactly the cells that make up it.
 
-const traceBox = (s, orientation = "horizontal") => {
+const traceBox = (s) => {
 	const box = document.createElement("div");
-	renderTrieTable(box, grid(s.lines), orientation);
+	renderTrieTable(box, grid(s.lines));
 	return box;
 };
 
@@ -322,27 +320,6 @@ test("a trace a fold has hidden stops showing rather than going stale", () => {
 	off();
 });
 
-test("the vertical layout traces the same cells", () => {
-	const off = installDom();
-	const s = loadState(GROUP);
-	openTablePaths.clear();
-	openTablePaths.add(GROUP_KEY);
-	setTraced("e4 c5 Nf3 d6 d4");
-	// vertical puts each variation on a row, so its row header is a td too —
-	// exclude the headers and compare the move cells
-	const box = traceBox(s, "vertical");
-	const lit = [...box.querySelectorAll("td.traced:not(.var-head)")]
-		.map(moveOf)
-		.sort();
-	assert.deepStrictEqual(lit, ["Nf3", "c5", "d4", "d6", "e4"].sort());
-	assert.strictEqual(
-		box.querySelectorAll("td.var-head.traced").length,
-		3,
-		"and the three contributing rows are headed as traced",
-	);
-	setTraced(null);
-	off();
-});
 
 test("clicking a move in a collapsed group traces it instead of expanding", () => {
 	const off = installDom();

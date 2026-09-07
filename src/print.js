@@ -75,7 +75,7 @@ export function appendPrintTables(box, g) {
   const split = getCurrent().showSplitTrie === true;
   if (!split && printWidth(mainV, others) <= size) {
     const pv = printVars(mainV, others);
-    renderTable(wrap, { ...g, vars: pv, spans: pv.spans }, "horizontal");
+    renderTable(wrap, { ...g, vars: pv, spans: pv.spans });
     // Notes are collected off the LINES, not the columns: a group column is
     // synthesised and matches no line, and its shared moves' notes are already
     // gathered onto it by the column builder.
@@ -92,11 +92,7 @@ export function appendPrintTables(box, g) {
       // mainline out to its full length even when its own branches are short.
       const maxPly = i === 0 ? subMaxPly([mainV, ...lines]) : subMaxPly(lines);
       const pv = printVars(mainV, lines);
-      renderTable(
-        wrap,
-        { ...g, vars: pv, spans: pv.spans, maxPly },
-        "horizontal",
-      );
+      renderTable(wrap, { ...g, vars: pv, spans: pv.spans, maxPly });
       renderTableNotes(wrap, [mainV, ...lines], i === 0);
     });
   }

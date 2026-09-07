@@ -50,10 +50,6 @@ test("full app flow: import PGN, tag a line, render table preview", async () => 
 	await tick();
 	assert.ok(!doc("loading"), "overlay removed after render");
 
-	// default layout is horizontal; switch to vertical so the tag badge shows
-	[...doc("view").querySelectorAll("button")]
-		.find((b) => b.textContent === "Vertical")
-		.click();
 	view = doc("view");
 	// Now in labeling view: line editors + a live table preview
 	assert.ok(view.querySelector(".markup"), "tagging panel present");
@@ -67,11 +63,19 @@ test("full app flow: import PGN, tag a line, render table preview", async () => 
 		(b) => b.textContent === "Sideline",
 	);
 	sidelineBtn.click();
-	// a single sideline is ONE line — rendered as a plain row, always visible
+	// a single sideline is ONE line — rendered as its own column, always
+	// visible. Its header carries the line's NAME, not its tag: every column
+	// but the mainline is a sideline, so the tag told the reader nothing.
 	const preview = doc("view").querySelector(".pv-table");
+	const heads = [...preview.querySelectorAll("th.var-head")].map(
+		(th) => th.textContent,
+	);
+	// a header also carries its ⋮ menu button, so match on the name it starts with
+	assert.match(heads[0], /^Mainline/, "the reference column");
+	assert.strictEqual(heads.length, 2, "mainline + the tagged sideline");
 	assert.ok(
-		preview.textContent.toLowerCase().includes("sideline"),
-		"sideline tag appears in table",
+		preview.textContent.includes("c5"),
+		"the sideline's divergent move is in the table",
 	);
 
 });

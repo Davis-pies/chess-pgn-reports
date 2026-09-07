@@ -400,10 +400,6 @@ select:focus {
 .tbl-h tr th.grp-start {
   border-left: 2px solid var(--grp-edge);
 }
-.tbl:not(.tbl-h) tr td.grp-start,
-.tbl:not(.tbl-h) tr th.grp-start {
-  border-top: 2px solid var(--grp-edge);
-}
 
 /* Tracing one line through the table: the cells that make up it keep full
    contrast and everything else drops back. No fill — the mainline column is

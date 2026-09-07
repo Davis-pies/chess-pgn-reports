@@ -31,7 +31,7 @@ function preview(pgn = GROUP, { open = [GROUP_KEY] } = {}) {
 	open.forEach((k) => openTablePaths.add(k));
 	setTraced(null);
 	const box = document.createElement("div");
-	renderTrieTable(box, grid(s.lines), "horizontal");
+	renderTrieTable(box, grid(s.lines));
 	return { s, box };
 }
 
@@ -142,7 +142,7 @@ test("Move to footnote tags the line, and offers the way back", () => {
 	const line2 = again.s.lines.find((l) => l.moves.some((m) => m.san === "d4"));
 	line2.tag = "foot";
 	const box2 = document.createElement("div");
-	renderTrieTable(box2, grid(again.s.lines), "horizontal");
+	renderTrieTable(box2, grid(again.s.lines));
 	off();
 });
 

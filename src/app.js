@@ -56,7 +56,6 @@ function freshState(overrides = {}) {
     name: "",
     pgn: "",
     lines: [],
-    orientation: "horizontal",
     showBoards: false,
     preview: "table",
     boardSize: 300,
@@ -105,7 +104,7 @@ export function rerenderTable() {
   const g = grid(getCurrent().lines);
   tableBox.replaceChildren();
   tableBox.appendChild(el("h3", { textContent: "Table" }));
-  renderTrieTable(tableBox, g, getCurrent().orientation);
+  renderTrieTable(tableBox, g);
 }
 // A <details> toggle queued by a previous render can fire after the app has
 // gone back to the import panel (the element is detached by then, but the
@@ -355,7 +354,7 @@ function viewRoot() {
   const t = el("div", { className: "pv-table" });
   tableBox = t;
   t.appendChild(el("h3", { textContent: "Table" }));
-  renderTrieTable(t, g, getCurrent().orientation);
+  renderTrieTable(t, g);
   side.appendChild(t);
   const c = el("div", {
     className:
@@ -386,7 +385,7 @@ function viewRoot() {
 
   // main (right): controls + management + reference sections
   main.appendChild(top);
-  main.appendChild(orientationToggle());
+  main.appendChild(viewControls());
   main.appendChild(notebookList());
   const mb = markupPanel();
   markupBox = mb; // module ref for in-place re-renders
@@ -470,7 +469,6 @@ function installNotebook(nb, id) {
       name: nb.name || "",
       pgn: nb.pgn,
       lines,
-      orientation: getCurrent().orientation,
       // a saved notebook carries its own board settings; fall back to the
       // session's for notebooks saved before `view` existed
       showBoards: view.showBoards ?? getCurrent().showBoards,
@@ -558,28 +556,15 @@ function openWorkbookFile(text) {
   });
 }
 
-function orientationToggle() {
+// The row above the editor: which preview the left panel shows, board size,
+// and the inline-board toggle. It used to open with a Layout pair as well --
+// the table transposed, plies across and lines down. One layout now: the table
+// is a reference grid read DOWN the plies, every other part of the report is
+// built for that shape, and the transposed form never earned the branch it
+// cost in the renderer.
+function viewControls() {
   const bar = el("div", { className: "orow" });
-  bar.appendChild(el("span", { textContent: "Layout: " }));
-  const h = el("button", {
-    className:
-      "chip" + (getCurrent().orientation === "horizontal" ? " on" : ""),
-    textContent: "Horizontal",
-  });
-  h.onclick = () => {
-    getCurrent().orientation = "horizontal";
-    renderApp();
-  };
-  const v = el("button", {
-    className: "chip" + (getCurrent().orientation === "vertical" ? " on" : ""),
-    textContent: "Vertical",
-  });
-  v.onclick = () => {
-    getCurrent().orientation = "vertical";
-    renderApp();
-  };
-  bar.append(h, v);
-  bar.appendChild(el("span", { textContent: "  View: " }));
+  bar.appendChild(el("span", { textContent: "View: " }));
   const tb = el("button", {
     className: "chip" + (getCurrent().preview === "table" ? " on" : ""),
     textContent: "Table",

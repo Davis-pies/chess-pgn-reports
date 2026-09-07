@@ -1,4 +1,4 @@
-// Converts tagged lines into a cell grid shared by both (horizontal/vertical)
+// Converts tagged lines into a cell grid shared by the screen and printed
 // table layouts. cell[variation][ply] is undefined where a variation has no
 // move at that ply, or a display object {text, cls}. The mainline is the
 // reference row (— usually structural, but a sideline can be promoted to it).

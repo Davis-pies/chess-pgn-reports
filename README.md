@@ -23,7 +23,7 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    group turns it into a single note — one `[n]` on the parent at the move the
    group replaces, the moves they share stated once, and their branches listed
    inside it. The chip dims when only some of the group's lines are tagged.
-3. **Render** — a table in **vertical** or **horizontal** layout, or a linear
+3. **Render** — a table (plies down, lines across), or a linear
    **card** view (each table row with a board diagram of its end position) for
    print — footnotes don't get their own card, since they're not a table row.
    Boards use the open-source **cburnett** piece set (white + black) with
