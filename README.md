@@ -65,7 +65,8 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    that move, dropping a tick into each of its **direct** branches — one apiece,
    however many columns that branch's own sub-branches go on to take — and
    turning a corner at the last of them. Groups nested inside a group mark their own
-   rows the same way. A line's lead-in cells are left blank on paper — the rules say
+   rows the same way, and the mainline is the root of that tree — its own
+   branches leave it by the same connector, one run per move they leave at. A line's lead-in cells are left blank on paper — the rules say
    where each column picks up from, so a column of dots said nothing. Without that rule a line's ancestry was unreadable
    — every cell above a line's first move is a bare ellipsis, so a line
    starting on move 7 gave no way to tell which of the two moves on that row it

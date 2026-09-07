@@ -290,8 +290,30 @@ export function flatGroupedVars(mainV, lines) {
 	const trie = buildTrie(lines, mainV);
 	const vars = [mainV];
 	const spans = [];
-	trie.children.forEach((c) => pushFlat(c, vars, spans, -1));
+	// The mainline is the root of the tree, so its own branches are connected to
+	// it the same way every other group's are. They do not all leave at the same
+	// move, though -- a top-level branch replaces the mainline move at its own
+	// first ply -- so they are grouped by where they leave, one run per row.
+	const roots = new Map(); // last shared ply -> column indices branching there
+	trie.children.forEach((c) => {
+		const at = vars.length;
+		pushFlat(c, vars, spans, -1);
+		const ply = firstOwnPly(vars[at], 0) - 1;
+		if (!roots.has(ply)) roots.set(ply, []);
+		roots.get(ply).push(at);
+	});
+	roots.forEach((tees, ply) => {
+		if (ply >= 0) spans.push({ ply, from: 1, to: tees[tees.length - 1], tees });
+	});
 	return { vars, spans };
+}
+
+// The first ply a column states a move of its own on.
+function firstOwnPly(v, fallback) {
+	const own = Object.keys(v.cells)
+		.map(Number)
+		.filter((p) => v.cells[p].cls !== "ellip");
+	return own.length ? Math.min(...own) : fallback;
 }
 
 function pushFlat(node, vars, spans, cut) {

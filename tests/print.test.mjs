@@ -185,11 +185,13 @@ test("a group draws a rule from its last shared move across its continuations", 
     "1. e4 e5 (1... c5 2. Nf3 Nc6 3. Bb5) (1... c5 2. Nf3 Nc6 3. a4) 2. Nf3",
   );
   const rows = [...box.querySelectorAll("table.tbl tr")];
-  const rules = [...box.querySelectorAll("td.grp-rule")];
+  // Two runs: the mainline's own branch, and the group inside it. This test is
+  // about the group, which is the one leaving Nc6.
+  const rules = [...box.querySelectorAll("td.grp-rule")].filter(
+    (td) => td.previousElementSibling.textContent === "Nc6",
+  );
   assert.strictEqual(rules.length, 1, "one group, one covered cell");
-  // it sits on the row whose cell to its left holds the last shared move
   const row = rules[0].parentElement;
-  assert.strictEqual(rules[0].previousElementSibling.textContent, "Nc6");
   assert.strictEqual(
     rows.indexOf(row),
     4,
@@ -220,12 +222,12 @@ test("groups nested inside a group draw their own shorter rules", () => {
     byRow.set(k, (byRow.get(k) || 0) + 1);
   });
   const ends = box.querySelectorAll("td.grp-rule .gm-end").length;
-  assert.strictEqual(ends, 2, "the outer group and the one inside it");
+  assert.strictEqual(ends, 3, "the mainline's branch, the group, and its inner");
   // Every mark is a junction on its own group's row -- a tee or a corner --
   // never a stroke running down the table. Two groups, two rows carrying them.
   const rows = [...box.querySelectorAll("table.tbl tr")];
   const marked = rows.filter((tr) => tr.querySelector("td.grp-rule"));
-  assert.strictEqual(marked.length, 2, "one row of marks per group");
+  assert.strictEqual(marked.length, 3, "the mainline's branch and two groups");
   assert.strictEqual(
     box.querySelectorAll("td.grp-edge").length,
     0,
@@ -428,11 +430,17 @@ test("a group's run stops at its last child, not at its last column", () => {
   );
   const rows = [...box.querySelectorAll("table.tbl tr")];
   const marked = rows.filter((tr) => tr.querySelector("td.grp-rule"));
-  assert.strictEqual(marked.length, 2, "the outer group and the nested one");
+  assert.strictEqual(
+    marked.length,
+    3,
+    "the mainline's branch, the group it leads to, and the one nested in that",
+  );
 
-  // the outer group's row: it has two children, one of which owns two columns,
-  // so its run covers ONE cell -- the column where that child begins
-  const outer = marked[0];
+  // The group leaving Nf3: it has two children, one of which owns two columns,
+  // so its run covers ONE cell -- the column where that child begins.
+  const outer = marked.find(
+    (tr) => tr.children[1].textContent === "Nf3",
+  );
   const cells = [...outer.children];
   const covered = cells.filter((c) => c.classList.contains("grp-rule"));
   assert.strictEqual(covered.length, 1, "one cell: the last child's own column");
@@ -452,14 +460,48 @@ test("every column a run crosses without a child starting there gets no tick", (
     "1. e4 e5 (1... c5 2. Nf3 Nc6 3. Bb5) (1... c5 2. Nf3 Nc6 3. a4)" +
       " (1... c5 2. Nf3 d6 3. d4) 2. Nf3",
   );
-  const outer = [...box.querySelectorAll("table.tbl tr")].filter((tr) =>
-    tr.querySelector("td.grp-rule"),
-  )[0];
+  const outer = [...box.querySelectorAll("table.tbl tr")].find(
+    (tr) =>
+      tr.querySelector("td.grp-rule") && tr.children[1].textContent === "Nf3",
+  );
   const covered = [...outer.children].filter((c) =>
     c.classList.contains("grp-rule"),
   );
   const tees = covered.filter((c) => c.querySelector(".gm-tee"));
   assert.ok(covered.length > tees.length, "the run crosses more than it marks");
   assert.strictEqual(tees.length, 1, "one child begins in this run's span");
+  off();
+});
+
+// The mainline is the root of the tree, so its own branches hang off it the
+// same way every other group's do -- without this the top of the table was a
+// set of columns with nothing saying what they left.
+test("a top-level branch is connected to the mainline it leaves", () => {
+  const off = installDom();
+  const box = printTables("1. e4 e5 (1... c5 2. Nf3 Nc6) 2. Nf3");
+  const rows = [...box.querySelectorAll("table.tbl tr")];
+  const marked = rows.filter((tr) => tr.querySelector("td.grp-rule"));
+  assert.strictEqual(marked.length, 1, "one run, from the mainline");
+  // 1...c5 replaces the mainline's e5 at ply 1, so the run sits on ply 0's row
+  assert.strictEqual(rows.indexOf(marked[0]), 1, "on 1.e4's row");
+  assert.strictEqual(
+    marked[0].children[1].textContent,
+    "e4",
+    "the run leaves the mainline's last shared move",
+  );
+  assert.ok(marked[0].querySelector(".gm-tee"), "with a tick into the branch");
+  off();
+});
+
+test("branches leaving the mainline at different moves get their own runs", () => {
+  const off = installDom();
+  const box = printTables("1. e4 e5 (1... c5) 2. Nf3 Nc6 (2... Nf6) 3. Bb5");
+  const rows = [...box.querySelectorAll("table.tbl tr")];
+  const marked = rows
+    .map((tr, i) => (tr.querySelector("td.grp-rule") ? i : -1))
+    .filter((i) => i >= 0);
+  assert.strictEqual(marked.length, 2, "one run per departure point");
+  const at = marked.map((i) => rows[i].children[1].textContent);
+  assert.deepStrictEqual(at, ["e4", "Nf3"], "each on the move it leaves");
   off();
 });
