@@ -528,11 +528,46 @@ test("a run never covers a cell that has a move of its own", () => {
           "a marked cell had text, so a move was overwritten",
         );
 
-  // and the crossed branch keeps every move it had
+  // and every branch keeps every move it had. The c5 branch is the FURTHER
+  // column: branches are ordered by how late they leave the mainline.
   const cols = rows
     .slice(1)
     .map((tr) => [...tr.children].map((c) => c.textContent));
-  const branch = cols.map((r) => r[2]).filter((t) => t);
+  const branch = cols.map((r) => r[3]).filter((t) => t);
   assert.deepStrictEqual(branch, ["c5", "Nf3", "Nc6", "d4", "cxd4", "Nxd4", "Nf6"]);
+  off();
+});
+
+// Breaking a run around a move is not enough: the run resumes on the far side
+// and reads as though it left THAT line. The columns are ordered so the case
+// cannot arise -- branches that leave the mainline latest sit nearest it, so a
+// run only ever crosses branches that leave later, which are blank on its row.
+test("branches are ordered so a run never has to cross a move", () => {
+  const off = installDom();
+  const box = printTables(
+    "1. e4 e5 (1... c5 2. Nf3 Nc6 3. d4 cxd4 4. Nxd4 Nf6)" +
+      " 2. Nf3 Nc6 3. Bb5 (3. Bc4) 3... a6",
+  );
+  const rows = [...box.querySelectorAll("table.tbl tr")];
+  const col = (i) => rows.slice(1).map((tr) => tr.children[i].textContent);
+  // Bc4 leaves at move 3, c5 at move 1, so Bc4 is the nearer column
+  assert.deepStrictEqual(col(2).filter(Boolean), ["Bc4"]);
+  assert.deepStrictEqual(
+    col(3).filter(Boolean),
+    ["c5", "Nf3", "Nc6", "d4", "cxd4", "Nxd4", "Nf6"],
+  );
+
+  // every run is unbroken: its covered cells are one contiguous stretch
+  for (const tr of rows) {
+    const marked = [...tr.children]
+      .map((td, i) => (td.classList.contains("grp-rule") ? i : -1))
+      .filter((i) => i >= 0);
+    if (!marked.length) continue;
+    assert.strictEqual(
+      marked[marked.length - 1] - marked[0] + 1,
+      marked.length,
+      `a run broke around something on row ${rows.indexOf(tr)}`,
+    );
+  }
   off();
 });

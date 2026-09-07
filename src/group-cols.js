@@ -295,7 +295,18 @@ export function flatGroupedVars(mainV, lines) {
 	// move, though -- a top-level branch replaces the mainline move at its own
 	// first ply -- so they are grouped by where they leave, one run per row.
 	const roots = new Map(); // last shared ply -> column indices branching there
-	trie.children.forEach((c) => {
+	// Ordered by how late they leave, latest first, so a run never has to cross
+	// a column that has a move on its row. A run reaches its child across
+	// whatever lies between; breaking it around an occupied cell is not enough,
+	// because the far side then reads as a run leaving THAT line. Ordered this
+	// way, everything between the mainline and a branch leaves the mainline
+	// later than it does, and is therefore still blank on the row it leaves.
+	//
+	// Ties keep PGN order, so branches leaving at the same move read as written.
+	const byDeparture = [...trie.children.values()].sort(
+		(a, b) => b.move.ply - a.move.ply,
+	);
+	byDeparture.forEach((c) => {
 		const at = vars.length;
 		pushFlat(c, vars, spans, -1);
 		const ply = firstOwnPly(vars[at], 0) - 1;
