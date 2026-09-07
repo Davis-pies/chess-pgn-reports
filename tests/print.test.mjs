@@ -199,7 +199,7 @@ test("a group draws a rule from its last shared move across its continuations", 
   assert.strictEqual(rules[0].colSpan, 1);
   assert.strictEqual(rules[0].textContent, "", "and states nothing but itself");
   // the rightmost covered cell closes the rule off
-  assert.ok(rules[0].classList.contains("grp-rule-end"));
+  assert.ok(rules[0].querySelector(".gm-end"), "the run turns the corner");
   off();
 });
 
@@ -219,7 +219,7 @@ test("groups nested inside a group draw their own shorter rules", () => {
       .textContent;
     byRow.set(k, (byRow.get(k) || 0) + 1);
   });
-  const ends = box.querySelectorAll("td.grp-rule-end").length;
+  const ends = box.querySelectorAll("td.grp-rule .gm-end").length;
   assert.strictEqual(ends, 2, "the outer group and the one inside it");
   // Every mark is a junction on its own group's row -- a tee or a corner --
   // never a stroke running down the table. Two groups, two rows carrying them.
@@ -230,6 +230,13 @@ test("groups nested inside a group draw their own shorter rules", () => {
     box.querySelectorAll("td.grp-edge").length,
     0,
     "nothing runs down the table beside a column",
+  );
+  // A positioned <td> breaks border-collapse rendering in the print engine and
+  // the walls come out missing, so every mark hangs off a span inside the cell.
+  assert.strictEqual(
+    box.querySelectorAll("td.grp-rule > *:not(span.gm)").length,
+    0,
+    "a covered cell carries nothing but its mark span",
   );
   off();
 });
@@ -429,8 +436,8 @@ test("a group's run stops at its last child, not at its last column", () => {
   const cells = [...outer.children];
   const covered = cells.filter((c) => c.classList.contains("grp-rule"));
   assert.strictEqual(covered.length, 1, "one cell: the last child's own column");
-  assert.ok(covered[0].classList.contains("grp-rule-end"), "and it is the corner");
-  assert.ok(covered[0].classList.contains("grp-tee"), "with a tick into it");
+  assert.ok(covered[0].querySelector(".gm-end"), "and it is the corner");
+  assert.ok(covered[0].querySelector(".gm-tee"), "with a tick into it");
   assert.ok(
     cells.indexOf(covered[0]) < cells.length - 1,
     "it stops short of the table's last column",
@@ -451,7 +458,7 @@ test("every column a run crosses without a child starting there gets no tick", (
   const covered = [...outer.children].filter((c) =>
     c.classList.contains("grp-rule"),
   );
-  const tees = covered.filter((c) => c.classList.contains("grp-tee"));
+  const tees = covered.filter((c) => c.querySelector(".gm-tee"));
   assert.ok(covered.length > tees.length, "the run crosses more than it marks");
   assert.strictEqual(tees.length, 1, "one child begins in this run's span");
   off();

@@ -234,7 +234,7 @@ export function renderTable(container, grid, trace) {
 		for (let i = s.from; i <= s.to; i++)
 			ruleAt.set(
 				s.ply + ":" + i,
-				(i === s.to ? "end" : "run") + (tees.has(i) ? " grp-tee" : ""),
+				(i === s.to ? "end" : "run") + (tees.has(i) ? " gm-tee" : ""),
 			);
 	});
 	const lit = trace && trace.litByVar;
@@ -359,7 +359,17 @@ export function renderTable(container, grid, trace) {
 				// ply is only an ellipsis: the line has no move here, and the rule
 				// says what the ellipsis was failing to.
 				const c = moveCell(rule ? null : v.cells[ply], ply, v.noteByPly);
-				if (rule) c.className += " grp-rule grp-rule-" + rule;
+				if (rule) {
+					// The marks hang off a span INSIDE the cell, never off the cell
+					// itself. A positioned <td> breaks border-collapse rendering in
+					// the print engine and the walls come out missing -- the same
+					// fault the sticky reference columns have, which print.css
+					// already works around by making them static.
+					c.className += " grp-rule";
+					const m = document.createElement("span");
+					m.className = "gm gm-" + rule;
+					c.appendChild(m);
+				}
 				c.className += groupClass(v);
 				if (v === vars[0]) c.classList.add("main-col", "sticky-col");
 				cellTrace(c, v, ply);

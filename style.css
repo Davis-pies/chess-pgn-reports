@@ -1149,40 +1149,44 @@ sup {
        Na3 --+---------+----+
         Be7   Be6       b5   Nd5
 
-   Drawn as 1px backgrounds at rounded offsets, not as borders at top:50%: a
-   border on a half-pixel is antialiased across two rows and comes out soft and
-   grey next to the crisp cell walls.
+   Anchored to a span inside the cell, never to the cell itself: a positioned
+   <td> breaks border-collapse rendering in the print engine and the walls come
+   out missing, which is the same fault the sticky reference columns have and
+   the print block already works around.
 
-   Inset from the cell's edges, so the run breaks at every wall instead of
-   meeting its neighbour across one -- drawn edge to edge it formed a single
-   unbroken stroke over the walls it crossed, and the grid looked like it had
-   lost its columns. The cells keep their normal padding, so no row changes
-   height and every wall stays where it was. */
-.tbl td.grp-rule {
+   Drawn with borders rather than backgrounds, because browsers drop background
+   colour when printing unless asked not to -- as backgrounds these vanished
+   from the printed page entirely.
+
+   The span is pulled out over the cell's padding so the run reaches the full
+   width, then inset 3px at each end so it breaks at every wall rather than
+   meeting its neighbour across one. */
+.tbl .gm {
+  display: block;
   position: relative;
+  height: 1em;
+  margin: 0 -8px;
 }
-.tbl td.grp-rule::before {
+.tbl .gm::before {
   content: "";
   position: absolute;
-  top: calc(50% - 1px);
+  top: 50%;
   left: 3px;
   right: 3px;
-  height: 1px;
-  background: var(--text);
+  border-top: 1px solid var(--text);
 }
 /* the last child: the run turns the corner rather than carrying on */
-.tbl td.grp-rule-end::before {
-  right: calc(50% - 1px);
+.tbl .gm-end::before {
+  right: 50%;
 }
 /* the tick down into a child's own column */
-.tbl td.grp-tee::after {
+.tbl .gm-tee::after {
   content: "";
   position: absolute;
-  left: calc(50% - 1px);
-  top: calc(50% - 1px);
-  bottom: 3px;
-  width: 1px;
-  background: var(--text);
+  left: 50%;
+  top: 50%;
+  bottom: 0;
+  border-left: 1px solid var(--text);
 }
 
 /* ---- print: table hidden, linear cards shown ---- */
