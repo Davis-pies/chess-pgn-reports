@@ -314,6 +314,6 @@ function pushFlat(node, vars, spans, cut) {
 		else pushFlat(k.node, vars, spans, c);
 	});
 	const end = vars.length - 1;
-	// `start` holds the shared run's last move, so the rule begins after it
+	// `start` holds the shared run's last move, so the run begins after it
 	if (end > start) spans.push({ ply: inner, from: start + 1, to: end });
 }

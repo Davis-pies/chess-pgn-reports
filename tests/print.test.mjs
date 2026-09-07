@@ -221,10 +221,15 @@ test("groups nested inside a group draw their own shorter rules", () => {
   });
   const ends = box.querySelectorAll("td.grp-rule-end").length;
   assert.strictEqual(ends, 2, "the outer group and the one inside it");
+  // Every mark is a junction on its own group's row -- a tee or a corner --
+  // never a stroke running down the table. Two groups, two rows carrying them.
+  const rows = [...box.querySelectorAll("table.tbl tr")];
+  const marked = rows.filter((tr) => tr.querySelector("td.grp-rule"));
+  assert.strictEqual(marked.length, 2, "one row of marks per group");
   assert.strictEqual(
     box.querySelectorAll("td.grp-edge").length,
     0,
-    "no upright running down the group: one horizontal line is the whole idea",
+    "nothing runs down the table beside a column",
   );
   off();
 });

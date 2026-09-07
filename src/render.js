@@ -226,9 +226,11 @@ export function renderTable(container, grid, trace) {
 	// the page read as a grid of boxes rather than a table with a few marks in
 	// it. One horizontal line per group is the whole idea; the rest was noise.
 	const ruleAt = new Map(); // "ply:col" -> "mid" | "end"
+	const edgeAt = new Set(); // "ply:col" -- the closing stroke, continued down
 	(grid.spans || []).forEach((s) => {
 		for (let i = s.from; i <= s.to; i++)
 			ruleAt.set(s.ply + ":" + i, i === s.to ? "end" : "mid");
+		for (let p = s.ply + 1; p <= s.deep; p++) edgeAt.add(p + ":" + s.to);
 	});
 	const lit = trace && trace.litByVar;
 	// A column's header follows its cells: lit when the column contributes at

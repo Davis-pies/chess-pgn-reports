@@ -1141,15 +1141,19 @@ sup {
   font-size: 0.95rem;
 }
 
-/* The printed table's group rule: one hairline on the row of a group's last
-   shared move, reaching across the cells of the columns that continue from it
-   and stopping at a short upright in the MIDDLE of the last one.
-   
-   Both marks are drawn inside the cell and nowhere near its edges: an upright
-   sitting on a cell boundary reads as a table border, which is how a page of
-   these came out looking like a grid of nested boxes rather than a table with
-   a few marks in it. The cells keep their normal padding for the same reason
-   -- the grid's own boundaries stay exactly as they are on every other row. */
+/* The printed table's group marks, drawn like `tree`: along the row of a
+   group's last shared move, a run that drops a tick into each column
+   continuing from it -- a tee for each, a corner for the last.
+
+       Na3 --+----+----+
+        Be7   Be6  b5   Nd5
+
+   The run is inset 2px at each end, so it breaks at every cell wall instead of
+   meeting its neighbour across one. Drawn edge to edge it formed a single
+   unbroken stroke over the walls it crossed, and a page of them read as though
+   the grid had lost its columns. The ticks sit at the cell's midpoint, nowhere
+   near a boundary, and the cells keep their normal padding, so no row changes
+   height and every wall stays exactly where it was. */
 .tbl td.grp-rule {
   position: relative;
 }
@@ -1157,20 +1161,21 @@ sup {
   content: "";
   position: absolute;
   top: 50%;
-  left: 0;
-  right: 0;
+  left: 2px;
+  right: 2px;
   border-top: 1px solid var(--muted);
 }
-/* the closing cell: the line runs only to the middle, where the upright is */
+/* the last column: the run turns the corner rather than carrying on */
 .tbl td.grp-rule-end::before {
   right: 50%;
 }
-.tbl td.grp-rule-end::after {
+/* the tick down into the column's own moves */
+.tbl td.grp-rule::after {
   content: "";
   position: absolute;
   left: 50%;
-  top: 28%;
-  height: 44%;
+  top: 50%;
+  bottom: 2px;
   border-left: 1px solid var(--muted);
 }
 
