@@ -13,6 +13,7 @@ import {
   parseWorkbook,
 } from "./store.js";
 import { mergeAnnotations } from "./merge.js";
+import { buildPgn } from "./pgn-out.js";
 import { el } from "./dom.js";
 import {
   getCurrent,
@@ -843,6 +844,15 @@ function openUpdateDialog() {
         ta.value = t;
       });
   };
+  // Additive mode. Off by default: replacing the PGN is what the button says
+  // it does, and silently keeping lines the new file deliberately cut would be
+  // a surprise. On, nothing can be lost -- at the cost of the stored PGN no
+  // longer being the file that was pasted (see the apply handler).
+  const keep = el("input", { type: "checkbox", className: "keepdropped" });
+  const keepRow = el("label", { className: "opt" }, [
+    keep,
+    " Keep lines the new PGN drops (nothing is lost; the workbook's PGN is rebuilt from its lines)",
+  ]);
   const report = el("div", { className: "mergerep" });
   const apply = el("button", {
     className: "chip primary",
@@ -865,8 +875,10 @@ function openUpdateDialog() {
         return;
       }
       const lines = collectLines(nodes);
-      const r = mergeAnnotations(getCurrent().lines, lines);
-      pending = { pgn: ta.value, lines };
+      const r = mergeAnnotations(getCurrent().lines, lines, {
+        keepDropped: keep.checked,
+      });
+      pending = { pgn: ta.value, lines, keepDropped: keep.checked };
       apply.disabled = false;
       report.replaceChildren(...reportNodes(r));
     } catch (e) {
@@ -875,16 +887,22 @@ function openUpdateDialog() {
       );
     }
   };
+  keep.onchange = () => {
+    if (pending) preview.onclick();
+  };
   apply.onclick = () => {
     if (!pending) return;
-    const { pgn, lines } = pending;
+    const { pgn, lines, keepDropped } = pending;
     ov.remove();
     withLoading(() => {
       // Everything but the moves survives: this is the same workbook, under a
       // newer PGN, so its id, name and view settings are left exactly as they
       // were and only `pgn`/`lines` are swapped.
-      getCurrent().pgn = pgn;
       getCurrent().lines = lines;
+      // In additive mode the pasted text no longer describes the line set --
+      // it never mentioned the lines that were kept -- so the stored PGN is
+      // rebuilt from the lines themselves, the same way Export PGN builds one.
+      getCurrent().pgn = keepDropped ? buildPgn(getCurrent()) : pgn;
       getCurrent().sel = null;
       clearViewState();
       renderApp();
@@ -897,6 +915,7 @@ function openUpdateDialog() {
   });
   box.append(
     ta,
+    keepRow,
     el("div", { className: "importbar" }, [file, preview]),
     report,
     el("div", { className: "modal-actions" }, [cancel, apply]),
@@ -916,6 +935,14 @@ function reportNodes(r) {
       el("li", { textContent: `${r.shortened} lines cut short (annotations kept)` }),
       el("li", { textContent: `${r.added} new lines` }),
       el("li", { textContent: `${r.removed} lines no longer present` }),
+      ...(r.kept
+        ? [
+            el("li", {
+              className: "good",
+              textContent: `${r.kept} lines kept from the old PGN`,
+            }),
+          ]
+        : []),
     ]),
   ];
   if (r.droppedLines.length) {

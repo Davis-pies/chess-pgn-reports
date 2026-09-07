@@ -109,6 +109,11 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    every annotated line and every note the new PGN leaves no home for. Apply
    or cancel. Applying keeps the workbook's name, id and view settings; only
    the moves change.
+   **Keep lines the new PGN drops** makes the update purely additive: a line
+   the new file no longer plays is carried over whole, with its annotations, so
+   nothing can be lost. The pasted text then no longer describes the line set,
+   so the workbook's stored PGN is rebuilt from its lines (the same way Export
+   PGN builds one) rather than being the file that was pasted.
 
 ## Run locally
 

@@ -252,3 +252,61 @@ test("a blank name at the prompt is refused rather than saved as Untitled", asyn
   assert.strictEqual(cap.anchors.length, 0, "no file is written");
   assert.strictEqual(getCurrent().name, "Keep This");
 });
+
+test("the additive option keeps dropped lines and rebuilds the stored PGN", async () => {
+  app.reset();
+  await app.loadPgn(PGN);
+  find("e4 e5 Nf3 Nf6 d4").name = "Petroff";
+  find("e4 e5 Nf3 Nf6 d4").comments = [{ ply: 4, text: "central break" }];
+
+  app.clickText("Update PGN");
+  const dlg = app.dom.window.document.getElementById("updpgn");
+  dlg.querySelector("textarea").value = "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6";
+  dlg.querySelector("input.keepdropped").click();
+  [...dlg.querySelectorAll("button")]
+    .find((b) => b.textContent.includes("Preview"))
+    .click();
+  assert.match(dlg.textContent, /kept from the old PGN/i);
+  assert.strictEqual(
+    dlg.querySelector(".mergelost"),
+    null,
+    "additive mode lists nothing as lost",
+  );
+  assert.match(dlg.textContent, /nothing would be lost/i);
+  [...dlg.querySelectorAll("button")]
+    .find((b) => b.textContent.includes("Apply"))
+    .click();
+  await app.settle();
+
+  const kept = find("e4 e5 Nf3 Nf6 d4");
+  assert.ok(kept, "the line the new PGN dropped is still here");
+  assert.strictEqual(kept.name, "Petroff");
+  assert.deepStrictEqual(kept.comments, [{ ply: 4, text: "central break" }]);
+
+  // the pasted PGN never mentioned Nf6/d4, so the stored PGN must have been
+  // rebuilt from the lines rather than kept as what was pasted
+  assert.match(getCurrent().pgn, /Nf6/, "the kept line reaches the stored PGN");
+  assert.ok(
+    getCurrent().pgn !== "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6",
+    "the stored PGN is no longer the pasted text",
+  );
+});
+
+test("without the additive option the stored PGN is exactly what was pasted", async () => {
+  app.reset();
+  await app.loadPgn(PGN);
+  const NEXT = "1. e4 e5 2. Nf3 Nc6 3. Bb5 a6";
+
+  app.clickText("Update PGN");
+  const dlg = app.dom.window.document.getElementById("updpgn");
+  dlg.querySelector("textarea").value = NEXT;
+  [...dlg.querySelectorAll("button")]
+    .find((b) => b.textContent.includes("Preview"))
+    .click();
+  [...dlg.querySelectorAll("button")]
+    .find((b) => b.textContent.includes("Apply"))
+    .click();
+  await app.settle();
+
+  assert.strictEqual(getCurrent().pgn, NEXT);
+});

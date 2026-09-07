@@ -290,3 +290,79 @@ test("a dropped line reports its moves, so the report can number them", () => {
     ],
   );
 });
+
+// ---------------------------------------------------------------------------
+// Additive mode: lines the new PGN drops are kept rather than lost. The stored
+// PGN stops describing the line set, so app.js rebuilds it from the lines.
+// ---------------------------------------------------------------------------
+
+test("additive mode keeps a dropped line, with its annotations intact", () => {
+  const before = linesOf("1. e4 e5 2. Nf3 Nc6 (2... Nf6 3. d4)");
+  const gone = find(before, "e4 e5 Nf3 Nf6 d4");
+  gone.name = "Petroff";
+  gone.meta = { eval: "±" };
+  noteAt(gone, 4, "the Steinitz attack");
+
+  const after = linesOf("1. e4 e5 2. Nf3 Nc6 3. Bb5");
+  const report = mergeAnnotations(before, after, { keepDropped: true });
+
+  const kept = find(after, "e4 e5 Nf3 Nf6 d4");
+  assert.ok(kept, "the dropped line is still there");
+  assert.strictEqual(kept.name, "Petroff");
+  assert.deepStrictEqual(kept.meta, { eval: "±" });
+  assert.deepStrictEqual(kept.comments, [{ ply: 4, text: "the Steinitz attack" }]);
+  assert.strictEqual(report.kept, 1);
+});
+
+test("additive mode reports nothing as lost", () => {
+  const before = linesOf("1. e4 e5 2. Nf3 Nc6 (2... Nf6 3. d4)");
+  const gone = find(before, "e4 e5 Nf3 Nf6 d4");
+  gone.name = "Petroff";
+  noteAt(gone, 4, "the Steinitz attack");
+
+  const after = linesOf("1. e4 e5 2. Nf3 Nc6 3. Bb5");
+  const report = mergeAnnotations(before, after, { keepDropped: true });
+
+  assert.deepStrictEqual(report.droppedLines, []);
+  assert.deepStrictEqual(report.droppedNotes, []);
+  assert.strictEqual(report.removed, 0, "nothing was removed after all");
+});
+
+test("a kept old mainline comes back as a sideline, not a second mainline", () => {
+  const before = linesOf("1. e4 e5 2. Nf3 Nc6");
+  before.forEach((l) => (l.isMain = true)); // the old main is the only line
+
+  const after = linesOf("1. d4 d5 2. c4");
+  mergeAnnotations(before, after, { keepDropped: true });
+
+  const mains = after.filter((l) => l.isMain);
+  assert.strictEqual(mains.length, 1, "exactly one mainline");
+  assert.strictEqual(key(mains[0]), "d4 d5 c4", "the new PGN's own mainline");
+  const kept = find(after, "e4 e5 Nf3 Nc6");
+  assert.strictEqual(kept.tag, "sideline");
+  assert.strictEqual(kept.hidden, false);
+});
+
+test("additive mode does not duplicate a line the new PGN already has", () => {
+  const before = linesOf("1. e4 e5 2. Nf3 Nc6 (2... Nf6 3. d4)");
+  const after = linesOf("1. e4 e5 2. Nf3 Nc6 (2... Nf6 3. d4) 3. Bb5");
+  mergeAnnotations(before, after, { keepDropped: true });
+
+  const keys = after.map(key);
+  assert.strictEqual(
+    new Set(keys).size,
+    keys.length,
+    "no line appears twice:\n" + keys.join("\n"),
+  );
+});
+
+test("without the option, the old behaviour is unchanged", () => {
+  const before = linesOf("1. e4 e5 2. Nf3 Nc6 (2... Nf6 3. d4)");
+  find(before, "e4 e5 Nf3 Nf6 d4").name = "Petroff";
+  const after = linesOf("1. e4 e5 2. Nf3 Nc6 3. Bb5");
+  const report = mergeAnnotations(before, after);
+
+  assert.strictEqual(report.removed, 1);
+  assert.strictEqual(report.kept, 0);
+  assert.strictEqual(report.droppedLines.length, 1);
+});

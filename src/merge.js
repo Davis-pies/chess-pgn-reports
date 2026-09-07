@@ -129,23 +129,27 @@ function lineWork(l) {
  * Carry `oldLines`' annotations onto `newLines`, which are mutated in place
  * the way store.js's tag re-application already mutates freshly parsed lines.
  *
+ * With `keepDropped`, a line the new PGN no longer plays is carried over
+ * whole instead of being lost -- additive mode. The workbook's stored PGN then
+ * no longer describes its own lines, so the caller must rebuild it from them
+ * (app.js does, via buildPgn).
+ *
  * Returns a report for the preview: how many lines matched unchanged, were
- * extended or shortened, and arrived new, plus the two kinds of annotation
- * that could not be re-homed -- `droppedLines` (a line's own name/tag/eval,
- * when the line itself is gone) and `droppedNotes` (a note or mark whose move
- * path the new PGN no longer contains).
+ * extended or shortened, arrived new or were kept, plus the two kinds of
+ * annotation that could not be re-homed -- `droppedLines` (a line's own
+ * name/tag/eval, when the line itself is gone) and `droppedNotes` (a note or
+ * mark whose move path the new PGN no longer contains). Both are empty in
+ * additive mode, where by construction nothing is dropped.
  */
-export function mergeAnnotations(oldLines, newLines) {
+export function mergeAnnotations(oldLines, newLines, { keepDropped = false } = {}) {
 	// Move-scoped pass, first: every new line through a remembered move path
 	// picks the annotation up, however the lines were re-cut around it.
 	const anno = moveAnnotations(oldLines);
-	const rehomed = new Set();
 	newLines.forEach((l) => {
 		const paths = pathsOf(l);
 		l.moves.forEach((m, i) => {
 			const e = anno.get(paths[i]);
 			if (!e) return;
-			rehomed.add(paths[i]);
 			if (e.mark !== undefined) {
 				l.marks = l.marks || {};
 				l.marks[m.ply] = e.mark;
@@ -169,6 +173,25 @@ export function mergeAnnotations(oldLines, newLines) {
 		n.hidden = !!old.hidden;
 	});
 
+	// Additive mode: carry over every old line the new PGN has no home for.
+	// The line object itself is reused, so its marks, notes, name and tag come
+	// with it untouched. A key the new set already has is skipped -- an old line
+	// can go unmatched because a more specific sibling claimed its successor
+	// first, and re-adding it would put the same line in twice.
+	let kept = 0;
+	if (keepDropped) {
+		const have = new Set(newLines.map(sanKey));
+		oldLines.forEach((l) => {
+			if (matched.has(l) || have.has(sanKey(l))) return;
+			have.add(sanKey(l));
+			// the new PGN's own mainline stays the mainline; a kept line joins as
+			// an ordinary line and is normalised below
+			l.isMain = false;
+			newLines.push(l);
+			kept++;
+		});
+	}
+
 	// A user-promoted mainline is re-promoted onto whatever it became. Done
 	// after the attribute copy so the normalisation below has the final answer.
 	const oldMain = oldLines.find((l) => l.isMain);
@@ -190,8 +213,17 @@ export function mergeAnnotations(oldLines, newLines) {
 		else if (n.moves.length > old.moves.length) extended++;
 		else shortened++;
 	});
+	// Which remembered move paths the final line set still plays. Computed here
+	// rather than during the copy pass above, so a line kept by additive mode
+	// counts as the home for its own annotations.
+	const present = new Set();
+	newLines.forEach((l) =>
+		pathsOf(l).forEach((p) => {
+			if (anno.has(p)) present.add(p);
+		}),
+	);
 	const droppedLines = oldLines
-		.filter((l) => !matched.has(l) && lineWork(l))
+		.filter((l) => !matched.has(l) && !newLines.includes(l) && lineWork(l))
 		.map((l) => ({
 			key: sanKey(l),
 			// the moves themselves, so the report can number them properly
@@ -202,7 +234,7 @@ export function mergeAnnotations(oldLines, newLines) {
 			note: (l.meta || {}).note || "",
 		}));
 	const droppedNotes = [...anno.entries()]
-		.filter(([path]) => !rehomed.has(path))
+		.filter(([path]) => !present.has(path))
 		.map(([path, e]) => ({
 			path,
 			moves: e.moves.map((m) => ({ san: m.san, ply: m.ply })),
@@ -214,7 +246,9 @@ export function mergeAnnotations(oldLines, newLines) {
 		exact,
 		extended,
 		shortened,
-		removed: oldLines.filter((l) => !matched.has(l)).length,
+		kept,
+		removed: oldLines.filter((l) => !matched.has(l) && !newLines.includes(l))
+			.length,
 		added: newLines.filter((n) => ![...matched.values()].includes(n)).length,
 		droppedLines,
 		droppedNotes,
