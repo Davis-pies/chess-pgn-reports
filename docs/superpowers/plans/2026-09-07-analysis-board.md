@@ -1097,15 +1097,7 @@ Expected: FAIL — `Cannot find module '.../src/analysis-view.js'`
 
 import { el } from "./dom.js";
 import { interactiveBoard } from "./board-input.js";
-import {
-	activeLine,
-	back,
-	fenOf,
-	forward,
-	goTo,
-	play,
-	select,
-} from "./analysis.js";
+import { back, fenOf, forward, goTo, play, select } from "./analysis.js";
 
 // "1.e4 e5 2.Nf3". Deliberately not render.js's movesText: that one formats a
 // notebook line's divergent tail against a mainline, which a scratch has no
@@ -1396,6 +1388,13 @@ Then wire the buttons into `src/analysis-view.js`. Add to its imports:
 
 ```js
 import { commitAll, commitLine } from "./analysis-commit.js";
+```
+
+and add `activeLine` to the existing `from "./analysis.js"` import — the commit
+bar is its only caller, so it does not belong there until now:
+
+```js
+import { activeLine, back, fenOf, forward, goTo, play, select } from "./analysis.js";
 ```
 
 and append this before `return panel;`:
