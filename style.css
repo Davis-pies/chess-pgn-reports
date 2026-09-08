@@ -1431,3 +1431,12 @@ sup {
 .optsel:hover {
   border-color: var(--main);
 }
+
+/* --- analysis board --- */
+.an-board svg.flipped { transform: rotate(180deg); }
+/* the pieces would be upside-down with the board, so turn them back */
+.an-board svg.flipped use,
+.an-board svg.flipped text { transform: rotate(180deg); transform-origin: center; transform-box: fill-box; }
+.an-board rect.sel { fill: #b9c96f; }
+.an-board rect.target { fill: #cdd68a; }
+.an-board rect { cursor: pointer; }
