@@ -32,7 +32,13 @@ import {
   setSharedInfo,
   setRenderHooks,
   setTraced,
+  getMode,
+  setMode,
+  getScratch,
+  setScratch,
 } from "./state.js";
+import { analysisPanel } from "./analysis-view.js";
+import { newScratch } from "./analysis.js";
 import { allNotes } from "./notes.js";
 import {
   visibleLines,
@@ -90,6 +96,8 @@ setCurrent(freshState());
 openPaths.clear();
 openTablePaths.clear();
 setTraced(null);
+setMode("report");
+setScratch(null);
 closedNotePaths.clear();
 // Point the extracted view modules' callbacks at *this* app.js instance --
 // see the comment on setRenderHooks() in state.js for why this indirection
@@ -275,6 +283,15 @@ function themeBtn() {
   return b;
 }
 
+// Open Analysis mode, seeded with `moves` (a line's moves up to and including
+// the one to branch from). The seed is copied by newScratch, so exploring
+// never reaches back into the notebook line it came from.
+export function openAnalysis(moves = []) {
+	setScratch(newScratch(moves));
+	setMode("analysis");
+	renderApp();
+}
+
 function renderApp() {
   const v = $("view");
   computeShared(); // which lines carry each move (identical position + SAN)
@@ -304,6 +321,17 @@ function viewRoot() {
       },
       className: "chip",
       textContent: "New / Import",
+    }),
+  );
+  top.appendChild(
+    el("button", {
+      className: "chip an-toggle",
+      textContent: getMode() === "analysis" ? "Report" : "Analysis",
+      onclick: () => {
+        if (getMode() === "analysis") setMode("report");
+        else openAnalysis();
+        renderApp();
+      },
     }),
   );
   const name = el("input", {
@@ -361,6 +389,23 @@ function viewRoot() {
     }),
   );
   top.appendChild(themeBtn());
+  // Analysis mode replaces the whole two-column layout rather than sitting
+  // beside it: the board and (later) the engine need the room, and none of the
+  // report panels mean anything while you are exploring a position that is not
+  // in the notebook yet.
+  if (getMode() === "analysis") {
+    if (!getScratch()) setScratch(newScratch());
+    const wrapAn = el("div", { className: "app-layout analysis-mode" });
+    wrapAn.appendChild(top);
+    const an = analysisPanel(getScratch(), renderApp);
+    wrapAn.appendChild(an);
+    wrap.appendChild(wrapAn);
+    // Focus after the tree is live, so the arrow keys work without the user
+    // having to click the panel first. Re-render rebuilds and re-focuses it.
+    queueMicrotask(() => an.focus());
+    return wrap;
+  }
+
   const layout = el("div", { className: "app-layout" });
   const side = el("aside", { className: "side-panel" });
   const main = el("div", { className: "main-panel" });
