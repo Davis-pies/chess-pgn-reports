@@ -1448,3 +1448,11 @@ sup {
 	background: color-mix(in srgb, Canvas 82%, transparent);
 }
 .an-promo-pick { min-width: 7rem; }
+
+.analysis { display: flex; flex-direction: column; gap: .6rem; align-items: flex-start; }
+.an-lines { display: flex; flex-direction: column; gap: .2rem; width: 100%; }
+.an-line { padding: .2rem .35rem; border-radius: .25rem; cursor: pointer; }
+.an-line.active { background: color-mix(in srgb, CanvasText 8%, transparent); }
+.an-move { background: none; border: 0; padding: 0 .2rem; font: inherit; color: inherit; cursor: pointer; }
+.an-move.at { font-weight: 700; text-decoration: underline; }
+.an-empty { opacity: .6; }

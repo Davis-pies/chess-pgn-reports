@@ -1,0 +1,131 @@
+// tests/analysis-view.test.mjs
+import { test } from "node:test";
+import assert from "node:assert";
+import { installDom } from "./helpers.mjs";
+import { analysisPanel, numberedMoves } from "../src/analysis-view.js";
+import { newScratch, activeLine, play, goTo } from "../src/analysis.js";
+
+const click = (root, sel) => {
+	const n = root.querySelector(sel);
+	assert.ok(n, `no ${sel}`);
+	n.click();
+	return n;
+};
+const mouse = (root, sq, type) =>
+	root
+		.querySelector(`rect[data-sq="${sq}"]`)
+		.dispatchEvent(new window.MouseEvent(type, { bubbles: true, cancelable: true }));
+
+test("numbering starts at move one and pairs the colours", () => {
+	assert.strictEqual(numberedMoves([]), "");
+	assert.strictEqual(
+		numberedMoves([{ san: "e4" }, { san: "e5" }, { san: "Nf3" }]),
+		"1.e4 e5 2.Nf3",
+	);
+});
+
+test("the panel draws a board, the nav and the scratch lines", () => {
+	const done = installDom();
+	const s = newScratch([{ san: "e4" }]);
+	const panel = analysisPanel(s, () => {});
+	assert.ok(panel.querySelector(".an-board svg"));
+	assert.ok(panel.querySelector(".an-nav"));
+	assert.strictEqual(panel.querySelectorAll(".an-line").length, 1);
+	assert.match(panel.querySelector(".an-line").textContent, /1\.e4/);
+	done();
+});
+
+test("playing a move on the board updates the scratch and reports the change", () => {
+	const done = installDom();
+	const s = newScratch();
+	let changed = 0;
+	const panel = analysisPanel(s, () => changed++);
+	mouse(panel, "e2", "mousedown");
+	mouse(panel, "e4", "mouseup");
+	assert.deepStrictEqual(
+		activeLine(s).moves.map((m) => m.san),
+		["e4"],
+	);
+	assert.strictEqual(changed, 1);
+	done();
+});
+
+test("the board shows the position at the cursor, not the end of the line", () => {
+	const done = installDom();
+	const s = newScratch([{ san: "e4" }, { san: "e5" }]);
+	goTo(s, 0);
+	const panel = analysisPanel(s, () => {});
+	// at the start position, so a white pawn is still on e2 and can be picked
+	mouse(panel, "e2", "mousedown");
+	assert.ok(panel.querySelector('rect[data-sq="e4"].target'));
+	done();
+});
+
+test("back and forward walk the cursor", () => {
+	const done = installDom();
+	const s = newScratch([{ san: "e4" }, { san: "e5" }]);
+	const panel = analysisPanel(s, () => {});
+	click(panel, ".an-back");
+	assert.strictEqual(s.at, 1);
+	click(panel, ".an-fwd");
+	assert.strictEqual(s.at, 2);
+	done();
+});
+
+test("flip toggles the board and nothing else", () => {
+	const done = installDom();
+	const s = newScratch([{ san: "e4" }]);
+	const panel = analysisPanel(s, () => {});
+	click(panel, ".an-flip");
+	assert.strictEqual(s.flipped, true);
+	assert.strictEqual(s.at, 1, "the cursor did not move");
+	done();
+});
+
+test("left and right arrows step the cursor", () => {
+	const done = installDom();
+	const s = newScratch([{ san: "e4" }, { san: "e5" }]);
+	const panel = analysisPanel(s, () => {});
+	const key = (k) =>
+		panel.dispatchEvent(
+			new window.KeyboardEvent("keydown", { key: k, bubbles: true }),
+		);
+	key("ArrowLeft");
+	assert.strictEqual(s.at, 1);
+	key("ArrowLeft");
+	assert.strictEqual(s.at, 0);
+	key("ArrowRight");
+	assert.strictEqual(s.at, 1);
+	done();
+});
+
+test("the panel is focusable so the arrow keys can reach it", () => {
+	const done = installDom();
+	const panel = analysisPanel(newScratch(), () => {});
+	assert.strictEqual(panel.tabIndex, -1);
+	done();
+});
+
+test("a fork shows as a second line, and clicking one selects it", () => {
+	const done = installDom();
+	const s = newScratch([{ san: "e4" }, { san: "e5" }]);
+	goTo(s, 1);
+	play(s, "c5");
+	const panel = analysisPanel(s, () => {});
+	const rows = panel.querySelectorAll(".an-line");
+	assert.strictEqual(rows.length, 2);
+	assert.ok(rows[1].classList.contains("active"), "the fork is the active line");
+	rows[0].click();
+	assert.strictEqual(s.active, 0);
+	done();
+});
+
+test("clicking a move in a line jumps the cursor to it", () => {
+	const done = installDom();
+	const s = newScratch([{ san: "e4" }, { san: "e5" }, { san: "Nf3" }]);
+	const panel = analysisPanel(s, () => {});
+	panel.querySelectorAll(".an-line .an-move")[1].click();
+	assert.strictEqual(s.active, 0);
+	assert.strictEqual(s.at, 2, "the cursor sits after the clicked move");
+	done();
+});
