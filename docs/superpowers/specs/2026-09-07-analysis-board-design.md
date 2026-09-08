@@ -48,18 +48,18 @@ one data shape runs end to end and committing is an array push.
 ```js
 { lines: [ { moves: [{san, ply}] } ],  // each root-to-leaf
   active: 0,   // scratch line the board is on
-  ply: 0,      // cursor within it
+  at: 0,       // cursor: how many of its moves are played
   flipped: false }
 ```
 
-All tree behaviour comes from one rule in `play(san)`, with the cursor at ply
-`p` of the active line:
+All tree behaviour comes from one rule in `play(san)`, with the cursor at `at`
+in the active line:
 
 | Condition | Effect |
 |---|---|
-| `san` equals `moves[p]` | advance the cursor — walking a line already held |
-| cursor is at the end | append |
-| otherwise | **fork**: new line copying `moves[0..p]` + `san`, becomes active |
+| `san` equals `moves[at].san` | advance the cursor — walking a line already held |
+| `at` is at the end | append |
+| otherwise | **fork**: new line copying `moves[0..at)` + `san`, becomes active |
 
 Forking never discards a tail, which is what "several lines at a time" means
 here. Branches duplicate their shared prefix — the same trade the notebook
@@ -117,6 +117,26 @@ Each becomes the exact shape `collectLines` emits:
 pushed onto `current.lines`. Never `isMain` — a committed line is a sideline,
 promoted afterwards with the existing ★. A scratch line whose moves already
 match a notebook line is refused with a message rather than duplicated.
+
+## Persistence
+
+A workbook is **not** a dump of `current.lines`. `toNotebook` saves `pgn` plus
+`tags` keyed by `keyFor(l.moves)`, and `applyNotebook` re-parses that PGN on
+load and re-applies the tags by move-key. So a committed line that lives only
+in `current.lines` is gone on the next save/reload: it is not in the PGN, so
+nothing re-parses it.
+
+Commit therefore has two writes, not one: push the line, then regenerate
+`current.pgn` with `buildPgn(getCurrent())`. `app.js` already does exactly this
+in the Update PGN flow, so the pattern exists and is not new machinery.
+
+## Ply numbering
+
+Plies are **0-based** (`parseSeq` starts at `ply: 0`), so within a scratch line
+a move's `ply` equals its index in `moves`. The scratch cursor is therefore an
+index `at` -- the number of moves played, and the ply of the next move. `at` is
+used throughout rather than `ply` so the cursor is never confused with a move's
+own `ply` field.
 
 ## Entry points
 
