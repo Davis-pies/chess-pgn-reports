@@ -234,7 +234,8 @@ test("sanFor turns a from/to pair into SAN, and rejects an illegal one", () => {
 
 test("sanFor handles promotion", () => {
 	const s = newScratch();
-	["e4", "d5", "exd5", "c6", "dxc6", "Qd6", "cxb7", "Qb8"].forEach((m) =>
+	// ...Na6 clears b8 legally; Qb8 would be its own knight's square
+	["e4", "d5", "exd5", "c6", "dxc6", "Qd6", "cxb7", "Na6"].forEach((m) =>
 		play(s, m),
 	);
 	assert.strictEqual(sanFor(s, "b7", "a8", "q"), "bxa8=Q");
@@ -254,7 +255,7 @@ test("toLine produces the shape collectLines emits", () => {
 	assert.strictEqual(l.tag, "sideline");
 	assert.strictEqual(l.name, "Line 3");
 	assert.strictEqual(l.ply, 1);
-	assert.ok(l.fen.includes("w KQkq") === false, "black moved last, so white is to move next");
+	assert.ok(l.fen.includes(" w "), "black moved last, so white is to move next");
 	assert.ok(l.fen.startsWith("rnbqkbnr/pppp1ppp"));
 	assert.strictEqual(l.isMain, undefined, "a committed line is never the mainline");
 });
