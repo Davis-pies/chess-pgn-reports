@@ -7,7 +7,8 @@
 
 import { el } from "./dom.js";
 import { interactiveBoard } from "./board-input.js";
-import { back, fenOf, forward, goTo, play, select } from "./analysis.js";
+import { activeLine, back, fenOf, forward, goTo, play, select } from "./analysis.js";
+import { commitAll, commitLine } from "./analysis-commit.js";
 
 // "1.e4 e5 2.Nf3". Deliberately not render.js's movesText: that one formats a
 // notebook line's divergent tail against a mainline, which a scratch has no
@@ -101,6 +102,35 @@ export function analysisPanel(scratch, onChange) {
 		list.appendChild(row);
 	});
 	panel.appendChild(list);
+
+	// The commit bar. A message element rather than an alert(): adding a line
+	// is a thing you do several times in a row, and a modal between each one
+	// would be in the way.
+	const msg = el("div", { className: "an-msg" });
+	const bar = el("div", { className: "orow an-commit" });
+	bar.append(
+		el("button", {
+			className: "chip primary an-add",
+			textContent: "Add as new line",
+			onclick: () => {
+				const r = commitLine(activeLine(scratch));
+				msg.textContent = r.ok ? `Added ${r.line.name}.` : r.reason;
+				onChange();
+			},
+		}),
+		el("button", {
+			className: "chip an-add-all",
+			textContent: "Add all",
+			onclick: () => {
+				const { added, skipped } = commitAll(scratch);
+				msg.textContent =
+					`Added ${added} line${added === 1 ? "" : "s"}` +
+					(skipped ? `, skipped ${skipped} already in the notebook.` : ".");
+				onChange();
+			},
+		}),
+	);
+	panel.append(bar, msg);
 
 	return panel;
 }
