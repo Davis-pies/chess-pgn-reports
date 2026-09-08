@@ -1440,3 +1440,11 @@ sup {
 .an-board rect.sel { fill: #b9c96f; }
 .an-board rect.target { fill: #cdd68a; }
 .an-board rect { cursor: pointer; }
+
+.an-board { position: relative; }
+.an-promo {
+	position: absolute; inset: 0; display: flex; flex-direction: column;
+	align-items: center; justify-content: center; gap: .35rem;
+	background: color-mix(in srgb, Canvas 82%, transparent);
+}
+.an-promo-pick { min-width: 7rem; }

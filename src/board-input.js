@@ -12,6 +12,15 @@
 import { Chess } from "chess.js";
 import { boardSvg } from "./render.js";
 
+// Queen first: it is the answer almost every time, so it is the shortest
+// distance from the cursor, and the order never changes under the user.
+const PROMO_PIECES = [
+	["q", "Queen"],
+	["r", "Rook"],
+	["b", "Bishop"],
+	["n", "Knight"],
+];
+
 export function interactiveBoard(fen, onMove, { size = 320, flipped = false } = {}) {
 	const wrap = document.createElement("div");
 	wrap.className = "an-board";
@@ -24,6 +33,7 @@ export function interactiveBoard(fen, onMove, { size = 320, flipped = false } = 
 
 	const chess = new Chess(fen);
 	let from = null;
+	let pending = null; // a promotion waiting on a choice: { from, to }
 
 	const nodes = (sq) => svg.querySelectorAll(`[data-sq="${sq}"]`);
 	const clear = () => {
@@ -43,15 +53,47 @@ export function interactiveBoard(fen, onMove, { size = 320, flipped = false } = 
 		ms.forEach((m) => nodes(m.to).forEach((n) => n.classList.add("target")));
 	}
 
-	// Returns true if the square completed a pending move.
+	// Returns true if the square completed a pending move (or opened the
+	// promotion picker, which is the same thing from the caller's side: the
+	// gesture is over either way).
 	function drop(sq) {
 		if (!from) return false;
 		const cand = movesFrom(from).filter((m) => m.to === sq);
 		if (!cand.length) return false;
+		// Every candidate for one from/to pair is the same move except for the
+		// piece promoted to, so asking once covers all four.
+		if (cand.some((m) => m.promotion)) {
+			pending = { from, to: sq };
+			askPromotion();
+			return true;
+		}
 		const san = cand[0].san;
 		clear();
 		onMove(san);
 		return true;
+	}
+
+	function askPromotion() {
+		const box = document.createElement("div");
+		box.className = "an-promo";
+		PROMO_PIECES.forEach(([piece, label]) => {
+			const b = document.createElement("button");
+			b.className = "an-promo-pick";
+			b.dataset.piece = piece;
+			b.textContent = label;
+			b.onclick = () => {
+				const { from: f, to } = pending;
+				const m = chess
+					.moves({ square: f, verbose: true })
+					.find((x) => x.to === to && x.promotion === piece);
+				pending = null;
+				box.remove();
+				clear();
+				if (m) onMove(m.san);
+			};
+			box.appendChild(b);
+		});
+		wrap.appendChild(box);
 	}
 
 	function squareOf(e) {
@@ -60,6 +102,7 @@ export function interactiveBoard(fen, onMove, { size = 320, flipped = false } = 
 	}
 
 	svg.addEventListener("mousedown", (e) => {
+		if (pending) return;
 		const sq = squareOf(e);
 		if (!sq) return;
 		e.preventDefault();
@@ -70,6 +113,7 @@ export function interactiveBoard(fen, onMove, { size = 320, flipped = false } = 
 	});
 
 	svg.addEventListener("mouseup", (e) => {
+		if (pending) return;
 		const sq = squareOf(e);
 		// Releasing on the source is the first half of a click-click, so it must
 		// leave the selection alone rather than treating it as a failed drag.

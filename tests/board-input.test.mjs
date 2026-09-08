@@ -98,3 +98,74 @@ test("flipping is view-only and does not renumber the squares", () => {
 	assert.deepStrictEqual(marked(board, "sel"), ["e2"]);
 	done();
 });
+
+// append to tests/board-input.test.mjs
+
+// White pawn on b7, black rook on a8: both a push and a capture promote.
+const PROMO_FEN = "r3k3/1P6/8/8/8/8/8/4K3 w - - 0 1";
+
+test("a promoting move asks which piece before it is played", () => {
+	const done = installDom();
+	const seen = [];
+	const board = interactiveBoard(PROMO_FEN, (san) => seen.push(san));
+	on(board, "b7", "mousedown");
+	on(board, "b8", "mouseup");
+	assert.deepStrictEqual(seen, [], "nothing is played until a piece is chosen");
+	const picker = board.querySelector(".an-promo");
+	assert.ok(picker, "the picker opened");
+	assert.deepStrictEqual(
+		[...picker.querySelectorAll("button")].map((b) => b.dataset.piece),
+		["q", "r", "b", "n"],
+	);
+	done();
+});
+
+test("choosing a piece plays that promotion and closes the picker", () => {
+	const done = installDom();
+	const seen = [];
+	const board = interactiveBoard(PROMO_FEN, (san) => seen.push(san));
+	on(board, "b7", "mousedown");
+	on(board, "b8", "mouseup");
+	board.querySelector('.an-promo button[data-piece="n"]').click();
+	assert.deepStrictEqual(seen, ["b8=N"]);
+	assert.strictEqual(board.querySelector(".an-promo"), null);
+	assert.deepStrictEqual(marked(board, "sel"), []);
+	done();
+});
+
+test("a promoting capture keeps the capture in the SAN", () => {
+	const done = installDom();
+	const seen = [];
+	const board = interactiveBoard(PROMO_FEN, (san) => seen.push(san));
+	on(board, "b7", "mousedown");
+	on(board, "a8", "mouseup");
+	board.querySelector('.an-promo button[data-piece="q"]').click();
+	// the new queen checks the king on e8, so chess.js spells it with the +
+	assert.deepStrictEqual(seen, ["bxa8=Q+"]);
+	done();
+});
+
+test("the board ignores clicks while the picker is open", () => {
+	const done = installDom();
+	const seen = [];
+	const board = interactiveBoard(PROMO_FEN, (san) => seen.push(san));
+	on(board, "b7", "mousedown");
+	on(board, "b8", "mouseup");
+	on(board, "e1", "mousedown");
+	// the promoting pawn stays lit while the picker asks, so you can see what
+	// is being promoted -- what must NOT happen is the king becoming selected
+	assert.deepStrictEqual(marked(board, "sel"), ["b7"]);
+	assert.ok(board.querySelector(".an-promo"), "the picker is still open");
+	done();
+});
+
+test("a non-promoting move never opens the picker", () => {
+	const done = installDom();
+	const seen = [];
+	const board = interactiveBoard(PROMO_FEN, (san) => seen.push(san));
+	on(board, "e1", "mousedown");
+	on(board, "e2", "mouseup");
+	assert.deepStrictEqual(seen, ["Ke2"]);
+	assert.strictEqual(board.querySelector(".an-promo"), null);
+	done();
+});

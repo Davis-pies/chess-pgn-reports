@@ -790,7 +790,8 @@ test("a promoting capture keeps the capture in the SAN", () => {
 	on(board, "b7", "mousedown");
 	on(board, "a8", "mouseup");
 	board.querySelector('.an-promo button[data-piece="q"]').click();
-	assert.deepStrictEqual(seen, ["bxa8=Q"]);
+	// the new queen checks the king on e8, so chess.js spells it with the +
+	assert.deepStrictEqual(seen, ["bxa8=Q+"]);
 	done();
 });
 
@@ -801,7 +802,9 @@ test("the board ignores clicks while the picker is open", () => {
 	on(board, "b7", "mousedown");
 	on(board, "b8", "mouseup");
 	on(board, "e1", "mousedown");
-	assert.deepStrictEqual(marked(board, "sel"), [], "the king was not selected");
+	// the promoting pawn stays lit while the picker asks, so you can see what
+	// is being promoted -- what must NOT happen is the king becoming selected
+	assert.deepStrictEqual(marked(board, "sel"), ["b7"]);
 	assert.ok(board.querySelector(".an-promo"), "the picker is still open");
 	done();
 });
