@@ -71,12 +71,19 @@ export function boardSvg(fen, size = 220) {
 			const x = f * sq;
 			const y = r * sq;
 			const light = (r + f) % 2 === 0;
+			// Square names are stamped on every element in the square, not just
+			// the rect: a click can land on a piece or on a rank/file coordinate
+			// drawn over it, and all three should resolve to the same square.
+			// Attributes only -- geometry and paint are unchanged, so the printed
+			// board is byte-for-byte what it was.
+			const name = FILES[f] + (8 - r);
 			const rect = document.createElementNS(NS, "rect");
 			rect.setAttribute("x", x);
 			rect.setAttribute("y", y);
 			rect.setAttribute("width", sq);
 			rect.setAttribute("height", sq);
 			rect.setAttribute("fill", light ? LIGHT_SQ : DARK_SQ);
+			rect.setAttribute("data-sq", name);
 			svg.appendChild(rect);
 
 			const p = grid[r][f];
@@ -88,6 +95,7 @@ export function boardSvg(fen, size = 220) {
 				const ps = sq - pad * 2;
 				u.setAttribute("width", ps);
 				u.setAttribute("height", ps);
+				u.setAttribute("data-sq", name);
 				svg.appendChild(u);
 			}
 
@@ -107,6 +115,7 @@ export function boardSvg(fen, size = 220) {
 					coord.setAttribute("text-anchor", "end");
 					coord.textContent = FILES[f];
 				}
+				coord.setAttribute("data-sq", name);
 				svg.appendChild(coord);
 			}
 		}

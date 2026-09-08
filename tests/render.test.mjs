@@ -898,3 +898,23 @@ test("noMain: no empty card for the absent mainline", () => {
 	for (const c of cards) assert.ok(c.textContent.trim().length > 0);
 	undo();
 });
+
+const BOARD_START_FEN =
+	"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+test("board squares carry their algebraic names", () => {
+	const done = installDom();
+	const svg = boardSvg(BOARD_START_FEN, 320);
+	const rects = [...svg.querySelectorAll("rect")];
+	assert.strictEqual(rects.length, 64);
+	assert.strictEqual(rects[0].getAttribute("data-sq"), "a8");
+	assert.strictEqual(rects[7].getAttribute("data-sq"), "h8");
+	assert.strictEqual(rects[63].getAttribute("data-sq"), "h1");
+	// a piece is addressable by its square too, so a click that lands on the
+	// piece rather than the square behind it still resolves
+	const e1 = [...svg.querySelectorAll("use")].find(
+		(u) => u.getAttribute("data-sq") === "e1",
+	);
+	assert.ok(e1, "the white king's <use> is tagged e1");
+	done();
+});
