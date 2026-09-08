@@ -180,6 +180,13 @@ function refresh(box, target) {
 // `target` is either { line, ply } for a line column's move cell, or { lines }
 // for a group column's — a group is not one line, so it gets the group actions
 // and no per-move section: the moves in its column belong to all of its lines.
+// The moves of `line` up to and including `ply`, which is what seeds an
+// analysis scratch: a line is a root-to-leaf path, so branching from a move
+// means carrying everything before it.
+function movesUpTo(line, ply) {
+	return line.moves.filter((m) => m.ply <= ply);
+}
+
 function buildInto(box, target) {
 	box.replaceChildren();
 	if (target.lines) {
@@ -189,12 +196,24 @@ function buildInto(box, target) {
 		// group's lines reaches the position, and moveSection resolves the
 		// shared group off it exactly as it would from a line column.
 		if (target.ply != null) moveSection(box, target.lines[0], target.ply);
+		if (target.ply != null)
+			box.appendChild(
+				item("Analyse from here", () =>
+					getRenderHooks().openAnalysis(movesUpTo(target.lines[0], target.ply)),
+				),
+			);
 		box.appendChild(section(target.lines.length + " lines"));
 		// Still no Make mainline: a group is not one line.
 		lineActions(box, target.lines);
 	} else {
 		const { line, ply } = target;
 		if (ply != null) moveSection(box, line, ply);
+		if (ply != null)
+			box.appendChild(
+				item("Analyse from here", () =>
+					getRenderHooks().openAnalysis(movesUpTo(line, ply)),
+				),
+			);
 		box.appendChild(section(line.name || "this line"));
 		// The mainline is the table's reference row: lineEditor offers it none
 		// of these either, and setHidden/solo refuse it at the primitive.

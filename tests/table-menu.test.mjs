@@ -69,6 +69,7 @@ test("right-clicking a line's move offers the move and the line", () => {
 	assert.ok(menu.querySelector(".sympick"), "the editor's symbol picker");
 	assert.ok(menu.querySelector(".cedit"), "the editor's note editor");
 	assert.deepStrictEqual(items(menu), [
+		"Analyse from here",
 		"★ Make mainline",
 		"Move to footnote",
 		"Focus",
@@ -96,7 +97,7 @@ test("a group column's menu acts on every line under it and offers no promote", 
 	const menu = rightClick(box, "d6");
 	assert.deepStrictEqual(
 		items(menu),
-		["Move to footnote", "Focus", "Hide"],
+		["Analyse from here", "Move to footnote", "Focus", "Hide"],
 		"no Make mainline: a group is not one line",
 	);
 	assert.ok(menu.querySelector(".sympick"), "but its shared move is editable");
@@ -114,7 +115,13 @@ test("the mainline is offered none of the line controls", () => {
 	const off = installDom();
 	const { box } = preview();
 	const menu = rightClick(box, "e5"); // a mainline-only move
-	assert.deepStrictEqual(items(menu), [], "no promote, hide, focus or footnote");
+	// Analysing from a mainline move is exactly how you add a variation to it,
+	// so it stays; what the mainline is refused is the LINE controls.
+	assert.deepStrictEqual(
+		items(menu),
+		["Analyse from here"],
+		"no promote, hide, focus or footnote",
+	);
 	assert.ok(menu.querySelector(".tmenu-note"), "and says why");
 	assert.ok(menu.querySelector(".sympick"), "but its moves are still editable");
 	closeTableMenu();

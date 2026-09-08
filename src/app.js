@@ -104,6 +104,7 @@ closedNotePaths.clear();
 // (rather than a static `import ... from "./app.js"`) is necessary.
 setRenderHooks({
   renderApp,
+  openAnalysis,
   rerenderTable,
   rerenderMarkup,
   rerenderNotes,
@@ -310,6 +311,10 @@ function viewRoot() {
   top.appendChild(
     el("button", {
       onclick: () => {
+        // Starting over goes back to the report: an analysis board of the
+        // notebook you just discarded is not a place to land.
+        setMode("report");
+        setScratch(null);
         setCurrent(
           freshState({
             boardSize: getCurrent().boardSize,

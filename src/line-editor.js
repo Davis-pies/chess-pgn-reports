@@ -372,6 +372,22 @@ export function movePanel(l) {
 	}
 	box.appendChild(symbolRow(atEnd ? null : selPly, lines, cur));
 	if (!atEnd) box.appendChild(commentEditor(selPly, lines));
+	// Branching from a move needs every move before it, since a line is a
+	// root-to-leaf path. Reached through the hooks registry rather than a
+	// static import of app.js: this module is a seam, and a static binding
+	// would keep pointing at the first app.js instance a test loaded.
+	if (!atEnd)
+		box.appendChild(
+			el("button", {
+				type: "button",
+				className: "chip mini",
+				textContent: "Analyse from here",
+				onclick: () =>
+					getRenderHooks().openAnalysis(
+						l.moves.filter((m) => m.ply <= selPly),
+					),
+			}),
+		);
 	const done = el("button", {
 		type: "button",
 		className: "chip mini",

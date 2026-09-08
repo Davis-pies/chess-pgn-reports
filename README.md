@@ -32,7 +32,16 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    it doesn't forget which line you had promoted, so unticking restores the
    table you had. PGN export is the exception: a `.pgn` has no way to say "no
    mainline", so it keeps writing the first line as the trunk.
-3. **Render** — a table (plies down, lines across), or a linear
+3. **Analyse** — **Analysis** in the toolbar opens an interactive board, or
+   right-click any move (in the table or the line editor) and choose **Analyse
+   from here** to open it at that position. Play moves to explore; diverging
+   from a position you have already visited keeps both continuations, so you can
+   build up several lines in one sitting without losing the one you came from.
+   Nothing reaches the notebook until you press **Add as new line** (or **Add
+   all**), which files the line as a sideline you can then tag like any other.
+   To correct a wrong move, analyse from the move before it, play the right one,
+   add it, and hide the old line.
+4. **Render** — a table (plies down, lines across), or a linear
    **card** view (each table row with a board diagram of its end position) for
    print — footnotes don't get their own card, since they're not a table row.
    Boards use the open-source **cburnett** piece set (white + black) with
@@ -111,18 +120,18 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    footnote's own notes collapse to a one-line header saying how much is
    nested beneath, with **Expand all** / **Collapse all** beside the heading.
    Everything starts expanded, and the folding is not saved with the notebook.
-4. **Export** — **Export PGN** (editable chess notation for any chess app),
+5. **Export** — **Export PGN** (editable chess notation for any chess app),
    **Export Markdown** (paste into Google Docs/Word), or **Print → Save as
    PDF** (always the linear card view). Saved workbooks (`localStorage`) are
    listed under **My saved workbooks** on the import screen to reopen/delete.
-5. **Save and reload as a file** — **Save to file** asks for a name (prefilled
+6. **Save and reload as a file** — **Save to file** asks for a name (prefilled
    with the workbook's current one) and writes the whole workbook, PGN and all
    annotations together, to one `.json` you can back up, share or keep in
    version control; the import screen reopens one. It's the same format
    `localStorage` holds, so nothing is lost either way. A file opens with no
    `localStorage` id of its own — pressing **Save** files it as a new entry
    rather than overwriting one.
-6. **Update the PGN under your annotations** — **Update PGN…** replaces the
+7. **Update the PGN under your annotations** — **Update PGN…** replaces the
    moves without throwing the markup away. Notes and symbols are re-attached by
    **move path**, so a note on a move several lines share reaches all of them,
    however the new PGN re-cuts the lines around it; a line's own name, tag,
