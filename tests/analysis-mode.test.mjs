@@ -9,19 +9,37 @@ after(() => app.teardown());
 
 const PGN = "1. e4 e5 2. Nf3 Nc6 *";
 
-test("the toolbar toggles between the report and the analysis board", async () => {
+test("the analysis board opens over the report and closes back to it", async () => {
 	app.reset();
 	await app.loadPgn(PGN);
 	assert.ok(app.view().querySelector(".pv-table"), "the report is up");
 	assert.strictEqual(app.view().querySelector(".analysis"), null);
 
 	app.view().querySelector(".an-toggle").click();
-	assert.ok(app.view().querySelector(".analysis"), "the analysis panel is up");
+	assert.ok(app.view().querySelector(".an-overlay .analysis"), "the board is in the overlay");
 	assert.ok(app.view().querySelector(".an-board svg"));
-	assert.strictEqual(app.view().querySelector(".pv-table"), null, "the report is put away");
+	assert.ok(app.view().querySelector(".pv-table"), "the report stays beneath it");
+
+	app.view().querySelector(".an-close").click();
+	assert.strictEqual(app.view().querySelector(".an-overlay"), null, "the ✕ closes it");
 
 	app.view().querySelector(".an-toggle").click();
-	assert.ok(app.view().querySelector(".pv-table"), "and comes back");
+	app.view().querySelector(".an-overlay").dispatchEvent(
+		new app.dom.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+	);
+	assert.strictEqual(app.view().querySelector(".an-overlay"), null, "so does Escape");
+
+	app.view().querySelector(".an-toggle").click();
+	app.view().querySelector(".an-overlay").click();
+	assert.strictEqual(app.view().querySelector(".an-overlay"), null, "and a click on the backdrop");
+});
+
+test("a click inside the analysis window does not close it", async () => {
+	app.reset();
+	await app.loadPgn(PGN);
+	app.view().querySelector(".an-toggle").click();
+	app.view().querySelector(".an-start").click();
+	assert.ok(app.view().querySelector(".an-overlay"));
 });
 
 test("a line added on the board shows up in the report", async () => {
@@ -34,13 +52,13 @@ test("a line added on the board shows up in the report", async () => {
 	const sq = (s, type) =>
 		app
 			.view()
-			.querySelector(`rect[data-sq="${s}"]`)
+			.querySelector(`.an-board rect[data-sq="${s}"]`)
 			.dispatchEvent(new app.dom.window.MouseEvent(type, { bubbles: true, cancelable: true }));
 	sq("d2", "mousedown");
 	sq("d4", "mouseup");
 	app.view().querySelector(".an-add").click();
 	assert.strictEqual(getCurrent().lines.length, before + 1);
-	app.view().querySelector(".an-toggle").click();
+	app.view().querySelector(".an-close").click();
 	assert.match(app.view().querySelector(".pv-table").textContent, /d4/);
 });
 
@@ -48,7 +66,7 @@ test("the scratch and the mode are never saved into a workbook", async () => {
 	app.reset();
 	await app.loadPgn(PGN);
 	app.view().querySelector(".an-toggle").click();
-	app.view().querySelector(".an-toggle").click();
+	app.view().querySelector(".an-close").click();
 	app.clickText("Save");
 	// store.js's PREFIX
 	const key = Object.keys(app.dom.window.localStorage).find((k) =>
@@ -69,14 +87,14 @@ test("a line added on the board survives a save and reload", async () => {
 	const sq = (s, type) =>
 		app
 			.view()
-			.querySelector(`rect[data-sq="${s}"]`)
+			.querySelector(`.an-board rect[data-sq="${s}"]`)
 			.dispatchEvent(
 				new app.dom.window.MouseEvent(type, { bubbles: true, cancelable: true }),
 			);
 	sq("d2", "mousedown");
 	sq("d4", "mouseup");
 	app.view().querySelector(".an-add").click();
-	app.view().querySelector(".an-toggle").click();
+	app.view().querySelector(".an-close").click();
 	app.clickText("Save");
 
 	// Reload the way the app does: re-parse the saved PGN and re-apply the

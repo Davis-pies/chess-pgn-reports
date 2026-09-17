@@ -13,6 +13,7 @@ import {
 	goTo,
 	select,
 	toLine,
+	removeLine,
 } from "../src/analysis.js";
 
 const sans = (s) => activeLine(s).moves.map((m) => m.san);
@@ -146,4 +147,33 @@ test("toLine produces the shape collectLines emits", () => {
 	assert.ok(l.fen.includes(" w "), "black moved last, so white is to move next");
 	assert.ok(l.fen.startsWith("rnbqkbnr/pppp1ppp"));
 	assert.strictEqual(l.isMain, undefined, "a committed line is never the mainline");
+});
+
+test("removeLine drops a scratch line and keeps the cursor on a real one", () => {
+	const s = newScratch([{ san: "e4" }, { san: "e5" }]);
+	goTo(s, 1);
+	play(s, "c5"); // forks line 1: e4 c5
+	assert.strictEqual(s.lines.length, 2);
+
+	// removing a line before the active one shifts the active index down with it
+	removeLine(s, 0);
+	assert.strictEqual(s.lines.length, 1);
+	assert.deepStrictEqual(sans(s), ["e4", "c5"]);
+	assert.strictEqual(s.at, 2, "the cursor stays where it was");
+
+	// removing the last line leaves one empty line, never none
+	removeLine(s, 0);
+	assert.strictEqual(s.lines.length, 1);
+	assert.deepStrictEqual(sans(s), []);
+	assert.strictEqual(s.at, 0);
+});
+
+test("removing the active line selects its neighbour", () => {
+	const s = newScratch([{ san: "e4" }, { san: "e5" }]);
+	goTo(s, 1);
+	play(s, "c5");
+	removeLine(s, 1);
+	assert.strictEqual(s.active, 0);
+	assert.deepStrictEqual(sans(s), ["e4", "e5"]);
+	assert.strictEqual(s.at, 2);
 });

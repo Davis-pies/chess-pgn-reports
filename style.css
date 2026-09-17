@@ -1433,10 +1433,6 @@ sup {
 }
 
 /* --- analysis board --- */
-.an-board svg.flipped { transform: rotate(180deg); }
-/* the pieces would be upside-down with the board, so turn them back */
-.an-board svg.flipped use,
-.an-board svg.flipped text { transform: rotate(180deg); transform-origin: center; transform-box: fill-box; }
 .an-board rect.sel { fill: #b9c96f; }
 .an-board rect.target { fill: #cdd68a; }
 .an-board rect { cursor: pointer; }
@@ -1451,8 +1447,11 @@ sup {
 
 .analysis { display: flex; flex-direction: column; gap: .6rem; align-items: flex-start; }
 .an-lines { display: flex; flex-direction: column; gap: .2rem; width: 100%; }
-.an-line { padding: .2rem .35rem; border-radius: .25rem; cursor: pointer; }
+.an-line { display: flex; flex-wrap: wrap; align-items: center; padding: .2rem .35rem; border-radius: .25rem; cursor: pointer; }
 .an-line.active { background: color-mix(in srgb, CanvasText 8%, transparent); }
 .an-move { background: none; border: 0; padding: 0 .2rem; font: inherit; color: inherit; cursor: pointer; }
 .an-move.at { font-weight: 700; text-decoration: underline; }
 .an-empty { opacity: .6; }
+.an-window { width: auto; max-width: 100%; }
+.an-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: .5rem; }
+.an-del { margin-left: auto; }

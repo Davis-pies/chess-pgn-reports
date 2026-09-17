@@ -331,12 +331,8 @@ function viewRoot() {
   top.appendChild(
     el("button", {
       className: "chip an-toggle",
-      textContent: getMode() === "analysis" ? "Report" : "Analysis",
-      onclick: () => {
-        if (getMode() === "analysis") setMode("report");
-        else openAnalysis();
-        renderApp();
-      },
+      textContent: "Analysis",
+      onclick: () => openAnalysis(),
     }),
   );
   const name = el("input", {
@@ -394,23 +390,6 @@ function viewRoot() {
     }),
   );
   top.appendChild(themeBtn());
-  // Analysis mode replaces the whole two-column layout rather than sitting
-  // beside it: the board and (later) the engine need the room, and none of the
-  // report panels mean anything while you are exploring a position that is not
-  // in the notebook yet.
-  if (getMode() === "analysis") {
-    if (!getScratch()) setScratch(newScratch());
-    const wrapAn = el("div", { className: "app-layout analysis-mode" });
-    wrapAn.appendChild(top);
-    const an = analysisPanel(getScratch(), renderApp);
-    wrapAn.appendChild(an);
-    wrap.appendChild(wrapAn);
-    // Focus after the tree is live, so the arrow keys work without the user
-    // having to click the panel first. Re-render rebuilds and re-focuses it.
-    queueMicrotask(() => an.focus());
-    return wrap;
-  }
-
   const layout = el("div", { className: "app-layout" });
   const side = el("aside", { className: "side-panel" });
   const main = el("div", { className: "main-panel" });
@@ -476,7 +455,37 @@ function viewRoot() {
     "--card-font",
     cardFont() / 100 + "rem",
   );
+  if (getMode() === "analysis") wrap.appendChild(analysisOverlay());
   return wrap;
+}
+
+// The analysis board as a window over the report rather than a page of its
+// own, so the table it was opened from stays in view behind it. It closes on
+// the ✕, Escape, or a click on the backdrop; the scratch is kept either way.
+function analysisOverlay() {
+  if (!getScratch()) setScratch(newScratch());
+  const close = () => {
+    setMode("report");
+    renderApp();
+  };
+  const ov = el("div", { className: "modal-overlay an-overlay" });
+  ov.onclick = (e) => e.target === ov && close();
+  ov.onkeydown = (e) => e.key === "Escape" && close();
+  const an = analysisPanel(getScratch(), renderApp);
+  const head = el("div", { className: "an-head" }, [
+    el("h3", { textContent: "Analysis" }),
+    el("button", {
+      className: "chip mini an-close",
+      textContent: "✕",
+      title: "Close (Esc)",
+      onclick: close,
+    }),
+  ]);
+  ov.appendChild(el("div", { className: "modal an-window" }, [head, an]));
+  // Focus after the tree is live, so the arrow keys and Escape work without a
+  // click first. Re-render rebuilds and re-focuses it.
+  queueMicrotask(() => an.focus());
+  return ov;
 }
 
 function notebookList() {

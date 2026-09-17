@@ -129,3 +129,17 @@ test("clicking a move in a line jumps the cursor to it", () => {
 	assert.strictEqual(s.at, 2, "the cursor sits after the clicked move");
 	done();
 });
+
+test("each scratch line has a delete button", () => {
+	const done = installDom();
+	const s = newScratch([{ san: "e4" }, { san: "e5" }]);
+	goTo(s, 1);
+	play(s, "c5");
+	let changed = 0;
+	const panel = analysisPanel(s, () => changed++);
+	panel.querySelectorAll(".an-del")[0].click();
+	assert.strictEqual(s.lines.length, 1);
+	assert.deepStrictEqual(activeLine(s).moves.map((m) => m.san), ["e4", "c5"]);
+	assert.strictEqual(changed, 1);
+	done();
+});

@@ -7,7 +7,7 @@
 
 import { el } from "./dom.js";
 import { interactiveBoard } from "./board-input.js";
-import { activeLine, back, fenOf, forward, goTo, play, select } from "./analysis.js";
+import { activeLine, back, fenOf, forward, goTo, play, removeLine, select } from "./analysis.js";
 import { commitAll, commitLine } from "./analysis-commit.js";
 
 // "1.e4 e5 2.Nf3". Deliberately not render.js's movesText: that one formats a
@@ -99,6 +99,18 @@ export function analysisPanel(scratch, onChange) {
 			};
 			row.appendChild(mv);
 		});
+		row.appendChild(
+			el("button", {
+				className: "chip mini an-del",
+				textContent: "✕",
+				title: "Delete this line",
+				onclick: (e) => {
+					e.stopPropagation();
+					removeLine(scratch, i);
+					onChange();
+				},
+			}),
+		);
 		list.appendChild(row);
 	});
 	panel.appendChild(list);

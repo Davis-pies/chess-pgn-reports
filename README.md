@@ -32,11 +32,13 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    it doesn't forget which line you had promoted, so unticking restores the
    table you had. PGN export is the exception: a `.pgn` has no way to say "no
    mainline", so it keeps writing the first line as the trunk.
-3. **Analyse** — **Analysis** in the toolbar opens an interactive board, or
+3. **Analyse** — **Analysis** in the toolbar opens an interactive board in a
+   window over the report (close it with ✕, Esc or a click outside), or
    right-click any move (in the table or the line editor) and choose **Analyse
    from here** to open it at that position. Play moves to explore; diverging
    from a position you have already visited keeps both continuations, so you can
    build up several lines in one sitting without losing the one you came from.
+   **Flip** turns the board to Black's side, and ✕ on a line deletes it.
    Nothing reaches the notebook until you press **Add as new line** (or **Add
    all**), which files the line as a sideline you can then tag like any other.
    To correct a wrong move, analyse from the move before it, play the right one,

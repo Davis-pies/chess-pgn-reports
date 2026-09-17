@@ -93,7 +93,10 @@ test("a click on a coordinate label resolves to its square", () => {
 test("flipping is view-only and does not renumber the squares", () => {
 	const done = installDom();
 	const board = interactiveBoard(START, () => {}, { flipped: true });
-	assert.ok(board.querySelector("svg").classList.contains("flipped"));
+	// drawn from Black's side: h1 is the top-left square, and a8 the bottom-right
+	const rects = [...board.querySelectorAll("rect")];
+	assert.strictEqual(rects[0].getAttribute("data-sq"), "h1");
+	assert.strictEqual(rects[63].getAttribute("data-sq"), "a8");
 	on(board, "e2", "mousedown");
 	assert.deepStrictEqual(marked(board, "sel"), ["e2"]);
 	done();

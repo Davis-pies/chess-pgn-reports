@@ -105,6 +105,21 @@ export function select(s, idx) {
 	return s;
 }
 
+// Drop a line. The cursor moves with the active line if one before it went;
+// if the active line itself went, it lands on the neighbour before it. A
+// scratch always keeps one line, empty if need be, so there is a board to play.
+export function removeLine(s, idx) {
+	if (!s.lines[idx]) return s;
+	s.lines.splice(idx, 1);
+	if (!s.lines.length) {
+		s.lines.push({ moves: [] });
+		s.active = 0;
+		s.at = 0;
+	} else if (idx < s.active) s.active--;
+	else if (idx === s.active) select(s, Math.max(0, idx - 1));
+	return s;
+}
+
 // A scratch line as a notebook line. `idx` is the index it will occupy in
 // current.lines after the push, which is what names an unnamed line.
 export function toLine(scratchLine, idx) {

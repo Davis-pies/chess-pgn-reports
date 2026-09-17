@@ -24,11 +24,7 @@ const PROMO_PIECES = [
 export function interactiveBoard(fen, onMove, { size = 320, flipped = false } = {}) {
 	const wrap = document.createElement("div");
 	wrap.className = "an-board";
-	const svg = boardSvg(fen, size);
-	// Flip is a CSS rotation of the drawing, so the squares keep their real
-	// names and every hit test stays honest -- a flipped board is the same
-	// board seen from the other side, not a different coordinate system.
-	if (flipped) svg.classList.add("flipped");
+	const svg = boardSvg(fen, size, { flipped });
 	wrap.appendChild(svg);
 
 	const chess = new Chess(fen);

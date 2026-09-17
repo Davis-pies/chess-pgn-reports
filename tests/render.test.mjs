@@ -918,3 +918,22 @@ test("board squares carry their algebraic names", () => {
 	assert.ok(e1, "the white king's <use> is tagged e1");
 	done();
 });
+
+test("a flipped board is drawn from Black's side, pieces on their own squares", () => {
+	const done = installDom();
+	const svg = boardSvg(BOARD_START_FEN, 320, { flipped: true });
+	const rects = [...svg.querySelectorAll("rect")];
+	assert.strictEqual(rects[0].getAttribute("data-sq"), "h1");
+	assert.strictEqual(rects[63].getAttribute("data-sq"), "a8");
+	// the white king sits on e1, now in the top row, fourth file from the left
+	const e1 = [...svg.querySelectorAll("use")].find(
+		(u) => u.getAttribute("data-sq") === "e1",
+	);
+	assert.ok(Number(e1.getAttribute("y")) < 40, "top row");
+	assert.ok(Number(e1.getAttribute("x")) > 120 && Number(e1.getAttribute("x")) < 160, "fourth file");
+	// the edge labels read from Black's side too
+	const labels = [...svg.querySelectorAll("text")].map((t) => t.textContent);
+	assert.deepStrictEqual(labels.slice(0, 1), ["1"]);
+	assert.ok(labels.includes("h") && labels.indexOf("h") < labels.indexOf("a"));
+	done();
+});

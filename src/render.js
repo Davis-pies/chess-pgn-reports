@@ -51,7 +51,9 @@ function fenGrid(fen) {
 // Build an SVG <svg> board for a FEN position. Pieces are <use> references into
 // the injected cburnett sprite, each padded for spacing; coordinates are drawn
 // on the a-file and 1st rank.
-export function boardSvg(fen, size = 220) {
+// `flipped` draws it from Black's side. The squares keep their real names, so
+// a click resolves the same either way; only where each one is drawn changes.
+export function boardSvg(fen, size = 220, { flipped = false } = {}) {
 	const grid = fenGrid(fen);
 	const sq = size / 8;
 	const pad = Math.max(2, sq * 0.1);
@@ -70,13 +72,15 @@ export function boardSvg(fen, size = 220) {
 		for (let f = 0; f < 8; f++) {
 			const x = f * sq;
 			const y = r * sq;
-			const light = (r + f) % 2 === 0;
+			const light = (r + f) % 2 === 0; // a 180° turn keeps every colour
+			const br = flipped ? 7 - r : r; // the board rank/file drawn here
+			const bf = flipped ? 7 - f : f;
 			// Square names are stamped on every element in the square, not just
 			// the rect: a click can land on a piece or on a rank/file coordinate
 			// drawn over it, and all three should resolve to the same square.
 			// Attributes only -- geometry and paint are unchanged, so the printed
 			// board is byte-for-byte what it was.
-			const name = FILES[f] + (8 - r);
+			const name = FILES[bf] + (8 - br);
 			const rect = document.createElementNS(NS, "rect");
 			rect.setAttribute("x", x);
 			rect.setAttribute("y", y);
@@ -86,7 +90,7 @@ export function boardSvg(fen, size = 220) {
 			rect.setAttribute("data-sq", name);
 			svg.appendChild(rect);
 
-			const p = grid[r][f];
+			const p = grid[br][bf];
 			if (p && PIECE_IDS[p]) {
 				const u = document.createElementNS(NS, "use");
 				u.setAttribute("href", "#" + PIECE_IDS[p]);
@@ -108,12 +112,12 @@ export function boardSvg(fen, size = 220) {
 				if (f === 0 && r !== 7) {
 					coord.setAttribute("x", x + 1.5);
 					coord.setAttribute("y", y + font - 1);
-					coord.textContent = String(8 - r);
+					coord.textContent = String(8 - br);
 				} else if (r === 7) {
 					coord.setAttribute("x", x + sq - 1.5);
 					coord.setAttribute("y", y + sq - 1);
 					coord.setAttribute("text-anchor", "end");
-					coord.textContent = FILES[f];
+					coord.textContent = FILES[bf];
 				}
 				coord.setAttribute("data-sq", name);
 				svg.appendChild(coord);
