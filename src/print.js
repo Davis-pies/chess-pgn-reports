@@ -132,7 +132,9 @@ export function appendPrintTables(box, g) {
     renderTable(wrap, {
       ...g,
       vars: pv,
-      spans: pv.spans,
+      // "branch lines" off: the rules go, and the cells they covered were
+      // blank already, so nothing else on the page moves
+      spans: getCurrent().printBranchLines === false ? [] : pv.spans,
       maxPly,
       fromPly: stem,
       byMove: getCurrent().printByMove === true,

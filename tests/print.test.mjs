@@ -838,3 +838,26 @@ test("the printed table's row padding is set from the notebook", () => {
   assert.strictEqual(pad(), "5px");
   off();
 });
+
+test("branch lines can be left off the printed table without moving a column", () => {
+  const off = installDom();
+  const PGN =
+    "1. e4 (1. d4) e5 (1... c5 2. Nf3 Nc6 3. Bb5) (1... c5 2. Nf3 d6 3. d4)" +
+    " (1... c5 2. Nf3 d6 3. Bb5+) 2. Nf3 *";
+  const s = loadState(PGN);
+  const cols = (box) =>
+    [...box.querySelectorAll("table.tbl tr")].map((tr) =>
+      [...tr.children].map((c) => c.textContent),
+    );
+  let box = document.createElement("div");
+  appendPrintTables(box, grid(s.lines));
+  assert.ok(box.querySelector("td.grp-rule"), "drawn by default");
+  const withLines = cols(box);
+  s.printBranchLines = false;
+  box = document.createElement("div");
+  appendPrintTables(box, grid(s.lines));
+  assert.strictEqual(box.querySelectorAll("td.grp-rule, .gm").length, 0);
+  // the rules carry no text, so every row and column reads exactly as before
+  assert.deepStrictEqual(cols(box), withLines, "same columns in the same order");
+  off();
+});

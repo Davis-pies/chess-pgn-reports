@@ -140,6 +140,7 @@ export function exportBar() {
     ["cell borders", "printBorders", true],
     ["one row per move", "printByMove", false],
     ["zebra stripes", "printZebra", false],
+    ["branch lines", "printBranchLines", true],
   ]);
   // the top and bottom padding of every printed cell, in px
   table.appendChild(
