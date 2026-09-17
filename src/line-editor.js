@@ -432,18 +432,45 @@ export function commentEditor(ply, lines) {
 		});
 	};
 	const texts = snapshot(); // live row order; edits update this array
-	texts.forEach((_, i) => {
-		const row = el("div", { className: "nt" });
-		const inp = el("input", { className: "lno", value: texts[i] });
-		inp.oninput = () => {
-			texts[i] = inp.value;
-			writeAll(texts);
-		};
+	// One row per note, then an empty box. Every keystroke saves: there is no
+	// Add button to forget. The first keystroke in the empty box makes it a
+	// note and opens a fresh empty box beneath it, so the next note always has
+	// somewhere to go. Nothing here redraws the editor, which would steal the
+	// focus mid-word; only the table and the notes list, which show the note
+	// and live outside it, are redrawn.
+	const addRow = (i) => {
+		const isNew = i === texts.length;
+		const row = el("div", { className: "nt" + (isNew ? " new" : "") });
+		const inp = el("input", {
+			className: "lno",
+			value: isNew ? "" : texts[i],
+			placeholder: isNew ? (i ? "add another note…" : "note at this move…") : "",
+		});
 		const del = el("button", {
 			type: "button",
 			className: "chip mini danger",
 			textContent: "✕",
+			hidden: isNew,
 		});
+		inp.oninput = () => {
+			if (row.classList.contains("new")) {
+				row.classList.remove("new");
+				del.hidden = false;
+				texts.push("");
+				addRow(texts.length);
+			}
+			texts[i] = inp.value;
+			writeAll(texts);
+			const hooks = getRenderHooks();
+			hooks.rerenderTable?.();
+			hooks.rerenderNotes?.();
+		};
+		// Enter moves on to the empty box, for the next note.
+		inp.onkeydown = (e) => {
+			if (e.key !== "Enter") return;
+			e.preventDefault();
+			wrap.querySelector(".nt.new input")?.focus();
+		};
 		del.onclick = () => {
 			texts.splice(i, 1);
 			writeAll(texts);
@@ -451,35 +478,7 @@ export function commentEditor(ply, lines) {
 		};
 		row.append(inp, del);
 		wrap.appendChild(row);
-	});
-	const addInp = el("input", {
-		className: "lno",
-		placeholder: texts.length ? "add another note…" : "note at this move…",
-	});
-	const add = el("button", {
-		type: "button",
-		className: "chip",
-		textContent: "Add note",
-	});
-	add.onclick = () => {
-		if (addInp.value.trim()) {
-			texts.push(addInp.value.trim());
-			writeAll(texts);
-			addInp.value = "";
-			getRenderHooks().renderApp();
-		}
 	};
-	// Enter saves, so a note can be typed and committed without leaving the
-	// keyboard. Routed through add.click() rather than calling the handler
-	// directly, so it is the same DISPATCHED event as a real click: the table's
-	// context menu rebuilds itself on clicks inside .cedit, and a handler called
-	// straight would add the note but leave the menu still showing the empty
-	// field it was typed into.
-	addInp.onkeydown = (e) => {
-		if (e.key !== "Enter") return;
-		e.preventDefault();
-		add.click();
-	};
-	wrap.append(addInp, add);
+	for (let i = 0; i <= texts.length; i++) addRow(i);
 	return wrap;
 }

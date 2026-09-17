@@ -13,13 +13,12 @@ import {
 	fenOf,
 	forward,
 	goTo,
-	noteAt,
 	play,
 	removeLine,
 	select,
-	setNote,
 } from "./analysis.js";
 import { commitAll, commitLine } from "./analysis-commit.js";
+import { commentEditor } from "./line-editor.js";
 
 // "1.e4 e5 2.Nf3". Deliberately not render.js's movesText: that one formats a
 // notebook line's divergent tail against a mainline, which a scratch has no
@@ -44,6 +43,7 @@ export function analysisPanel(scratch, onChange) {
 	// click still bubbles here.
 	panel.onkeydown = (e) => {
 		if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+		if (e.target.closest("input, textarea")) return; // the caret's, while typing a note
 		e.preventDefault();
 		if (e.key === "ArrowLeft") back(scratch);
 		else forward(scratch);
@@ -83,27 +83,13 @@ export function analysisPanel(scratch, onChange) {
 	);
 	panel.appendChild(nav);
 
-	// The note on the move just played, saved on every keystroke. It must not
-	// redraw the panel: saving on blur did, and the blur a click on Add causes
-	// replaced the button before the click landed, so the first press was lost.
-	const note = el("textarea", {
-		className: "an-note",
-		rows: 2,
-		placeholder: scratch.at ? "Note on this move" : "Play a move to note it",
-		disabled: scratch.at === 0,
-		value: noteAt(scratch),
-	});
-	note.oninput = () => {
-		setNote(scratch, note.value);
-		const at = panel.querySelector(".an-move.at");
-		if (at) {
-			at.classList.toggle("has-note", !!noteAt(scratch));
-			at.title = noteAt(scratch);
-		}
-	};
-	// keep the arrow keys for the caret while typing
-	note.onkeydown = (e) => e.stopPropagation();
-	panel.appendChild(note);
+	// Notes on the move just played, in the notebook's own note editor: a
+	// scratch line keeps comments in the same shape a notebook line does.
+	panel.appendChild(
+		scratch.at
+			? commentEditor(scratch.at - 1, [activeLine(scratch)])
+			: el("div", { className: "an-note-hint", textContent: "Play a move to note it." }),
+	);
 
 	const list = el("div", { className: "an-lines" });
 	scratch.lines.forEach((line, i) => {

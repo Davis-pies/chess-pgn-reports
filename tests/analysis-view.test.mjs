@@ -145,25 +145,23 @@ test("each scratch line has a delete button", () => {
 	done();
 });
 
-test("the note box saves as you type, without redrawing the panel", () => {
+test("the board's note boxes are the notebook's, on the move just played", () => {
 	const done = installDom();
 	const s = newScratch([{ san: "e4" }, { san: "e5" }]);
 	let changed = 0;
 	const panel = analysisPanel(s, () => changed++);
-	const box = panel.querySelector(".an-note");
-	assert.strictEqual(box.disabled, false);
+	const box = panel.querySelector(".cedit .nt.new input");
 	box.value = "symmetrical";
-	box.dispatchEvent(new window.Event("input", { bubbles: true }));
+	box.oninput();
 	assert.deepStrictEqual(activeLine(s).comments, [{ ply: 1, text: "symmetrical" }]);
 	// A redraw here would replace the button a click is on its way to, which
 	// is how a first click on Add used to be swallowed.
 	assert.strictEqual(changed, 0);
-	assert.ok(panel.querySelector(".an-move.at.has-note"), "the move shows its note at once");
-	box.dispatchEvent(new window.Event("change", { bubbles: true }));
-	assert.strictEqual(changed, 0, "leaving the box does not redraw either");
+	assert.strictEqual(panel.querySelectorAll(".cedit .nt").length, 2, "another box opened");
 
 	const again = analysisPanel(s, () => {});
-	assert.strictEqual(again.querySelector(".an-note").value, "symmetrical");
+	assert.strictEqual(again.querySelector(".cedit input").value, "symmetrical");
+	assert.ok(again.querySelector(".an-move.has-note"), "the move shows it has a note");
 	done();
 });
 
@@ -172,9 +170,9 @@ test("Add takes a note that was typed but never left", () => {
 	loadState("1. e4 e5 2. Nf3 Nc6 *");
 	const s = newScratch([{ san: "e4" }, { san: "c5" }]);
 	const panel = analysisPanel(s, () => {});
-	const box = panel.querySelector(".an-note");
+	const box = panel.querySelector(".cedit .nt.new input");
 	box.value = "the Sicilian";
-	box.dispatchEvent(new window.Event("input", { bubbles: true }));
+	box.oninput();
 	click(panel, ".an-add");
 	const added = getCurrent().lines[getCurrent().lines.length - 1];
 	assert.deepStrictEqual(added.moves.map((m) => m.san), ["e4", "c5"]);
@@ -185,7 +183,8 @@ test("Add takes a note that was typed but never left", () => {
 test("there is no note to write before the first move", () => {
 	const done = installDom();
 	const panel = analysisPanel(newScratch(), () => {});
-	assert.strictEqual(panel.querySelector(".an-note").disabled, true);
+	assert.strictEqual(panel.querySelector(".cedit"), null);
+	assert.ok(panel.querySelector(".an-note-hint"));
 	done();
 });
 
@@ -198,5 +197,18 @@ test("Add as footnote files the line as a footnote", () => {
 	const added = getCurrent().lines[getCurrent().lines.length - 1];
 	assert.deepStrictEqual(added.moves.map((m) => m.san), ["e4", "c5"]);
 	assert.strictEqual(added.tag, "foot");
+	done();
+});
+
+test("the arrow keys move the caret in a note box, not the board", () => {
+	const done = installDom();
+	const s = newScratch([{ san: "e4" }, { san: "e5" }]);
+	let changed = 0;
+	const panel = analysisPanel(s, () => changed++);
+	panel
+		.querySelector(".cedit input")
+		.dispatchEvent(new window.KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+	assert.strictEqual(s.at, 2);
+	assert.strictEqual(changed, 0);
 	done();
 });

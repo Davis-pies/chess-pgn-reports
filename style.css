@@ -1456,7 +1456,9 @@ sup {
 .an-empty { opacity: .6; }
 /* fixed to the board's width, so a long line wraps instead of widening it */
 .an-window { width: min(400px, 100%); }
-.an-note { width: 100%; box-sizing: border-box; font: inherit; resize: vertical; }
+.an-note-hint { opacity: .6; }
+/* stacked in a column here, so the move editor's 300px flex basis would be a height */
+.analysis .cedit { flex: none; width: 100%; box-sizing: border-box; }
 .an-move.has-note::after { content: "*"; opacity: .6; }
 .an-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: .5rem; }
 .an-del { margin-left: auto; }

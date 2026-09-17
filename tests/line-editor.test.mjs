@@ -238,34 +238,77 @@ test("movePanel's done button clears the selection", () => {
 	off();
 });
 
-test("commentEditor adds a note to every line in the shared group", () => {
+test("commentEditor saves a note on every line in the group as it is typed", () => {
 	const off = installDom();
 	let renders = 0;
 	const s = loadState(TWO_LINES, { renderHooks: { renderApp: () => renders++ } });
 	const group = [s.lines[0], s.lines[1]];
 	const ed = commentEditor(0, group);
-	assert.strictEqual(
-		ed.querySelector("input.lno").placeholder,
-		"note at this move…",
-	);
-	ed.querySelector("input.lno").value = "  the King's pawn  ";
-	byText(ed, "button", "Add note").onclick();
+	assert.strictEqual(byText(ed, "button", "Add note"), undefined, "there is no Add button");
+	const box = ed.querySelector(".nt.new input");
+	assert.strictEqual(box.placeholder, "note at this move…");
+	box.value = "  the King's pawn  ";
+	box.oninput();
 	for (const l of group)
 		assert.deepStrictEqual(l.comments, [{ ply: 0, text: "the King's pawn" }]);
-	assert.strictEqual(ed.querySelector("input.lno").value, "", "input cleared");
-	assert.strictEqual(renders, 1);
+	// nothing redraws the editor under the keystroke, which would steal focus
+	assert.strictEqual(renders, 0);
 	off();
 });
 
-test("commentEditor ignores an empty or whitespace-only note", () => {
+test("typing in the empty note box opens another beneath it, once", () => {
 	const off = installDom();
-	let renders = 0;
-	const s = loadState(TWO_LINES, { renderHooks: { renderApp: () => renders++ } });
+	const s = loadState(TWO_LINES);
 	const ed = commentEditor(0, [s.lines[0]]);
-	ed.querySelector("input.lno").value = "   ";
-	byText(ed, "button", "Add note").onclick();
+	const box = ed.querySelector(".nt.new input");
+	box.value = "a";
+	box.oninput();
+	box.value = "ab";
+	box.oninput();
+	const rows = [...ed.querySelectorAll(".nt")];
+	assert.strictEqual(rows.length, 2, "one note and one fresh box");
+	assert.strictEqual(rows[0].querySelector("input"), box, "the box typed in stays put");
+	assert.ok(!rows[0].classList.contains("new"));
+	assert.ok(!rows[0].querySelector("button").hidden, "and can now be deleted");
+	assert.ok(rows[1].classList.contains("new"));
+	assert.strictEqual(rows[1].querySelector("input").placeholder, "add another note…");
+
+	const next = rows[1].querySelector("input");
+	next.value = "second";
+	next.oninput();
+	assert.deepStrictEqual(
+		s.lines[0].comments.map((c) => c.text),
+		["ab", "second"],
+	);
+	assert.strictEqual(ed.querySelectorAll(".nt").length, 3);
+	off();
+});
+
+test("commentEditor keeps a whitespace-only note out of the lines", () => {
+	const off = installDom();
+	const s = loadState(TWO_LINES);
+	const ed = commentEditor(0, [s.lines[0]]);
+	const box = ed.querySelector(".nt.new input");
+	box.value = "   ";
+	box.oninput();
 	assert.deepStrictEqual(s.lines[0].comments, []);
-	assert.strictEqual(renders, 0);
+	off();
+});
+
+test("typing a note redraws the table and the notes list, not the editor", () => {
+	const off = installDom();
+	const calls = [];
+	const s = loadState(TWO_LINES, {
+		renderHooks: {
+			renderApp: () => calls.push("app"),
+			rerenderTable: () => calls.push("table"),
+			rerenderNotes: () => calls.push("notes"),
+		},
+	});
+	const box = commentEditor(0, [s.lines[0]]).querySelector(".nt.new input");
+	box.value = "x";
+	box.oninput();
+	assert.deepStrictEqual(calls, ["table", "notes"]);
 	off();
 });
 
@@ -273,12 +316,12 @@ test("commentEditor lists existing notes and edits them in place", () => {
 	const off = installDom();
 	const s = loadState("1. e4 {solid} e5 2. Nf3");
 	const ed = commentEditor(0, [s.lines[0]]);
-	const rows = [...ed.querySelectorAll(".nt")];
+	const rows = [...ed.querySelectorAll(".nt:not(.new)")];
 	assert.strictEqual(rows.length, 1);
 	assert.strictEqual(rows[0].querySelector("input").value, "solid");
-	// the trailing input is the "add another" field once a note exists
+	// the trailing box is the "add another" field once a note exists
 	assert.strictEqual(
-		ed.querySelector(":scope > input.lno").placeholder,
+		ed.querySelector(".nt.new input").placeholder,
 		"add another note…",
 	);
 	const inp = rows[0].querySelector("input");
@@ -307,7 +350,7 @@ test("commentEditor deduplicates a note shared across the group", () => {
 	const group = [s.lines[0], s.lines[1]];
 	group.forEach((l) => (l.comments = [{ ply: 0, text: "same" }]));
 	// one row, not one per line
-	assert.strictEqual(commentEditor(0, group).querySelectorAll(".nt").length, 1);
+	assert.strictEqual(commentEditor(0, group).querySelectorAll(".nt:not(.new)").length, 1);
 	off();
 });
 
@@ -515,7 +558,7 @@ test("a note on a shared move is reachable from a visible sibling", () => {
 	[first, second].forEach((l) => (l.comments = [{ ply: 3, text: "Hmmmmm" }]));
 	first.hidden = true;
 	sharedChip(second).onclick();
-	const notes = [...lineEditor(second, 1).querySelectorAll(".movepanel .nt input")];
+	const notes = [...lineEditor(second, 1).querySelectorAll(".movepanel .nt:not(.new) input")];
 	assert.deepStrictEqual(
 		notes.map((i) => i.value),
 		["Hmmmmm"],
@@ -557,36 +600,23 @@ test("a sibling's shared chip is marked shared, not selected", () => {
 	off();
 });
 
-test("Enter in the add-note field saves the note", () => {
+test("Enter in a note box moves on to the empty one", () => {
 	const off = installDom();
 	const s = loadState(TWO_LINES);
 	const main = s.lines[0];
 	const box = commentEditor(0, [main]);
 	document.body.appendChild(box);
-	const add = [...box.querySelectorAll("input")].at(-1);
-	add.value = "typed and entered";
-	add.onkeydown({ key: "Enter", preventDefault() {} });
-	assert.deepStrictEqual(
-		(main.comments || []).map((c) => c.text),
-		["typed and entered"],
-	);
-	assert.strictEqual(add.value, "", "and the field is cleared for the next one");
+	const first = box.querySelector(".nt.new input");
+	first.value = "typed and entered";
+	first.oninput();
+	let prevented = false;
+	first.onkeydown({ key: "Enter", preventDefault: () => (prevented = true) });
+	assert.ok(prevented);
+	assert.deepStrictEqual(main.comments.map((c) => c.text), ["typed and entered"]);
+	assert.strictEqual(document.activeElement, box.querySelector(".nt.new input"));
+	box.remove();
 	off();
 });
-
-test("Enter with an empty add-note field adds nothing", () => {
-	const off = installDom();
-	const s = loadState(TWO_LINES);
-	const main = s.lines[0];
-	const box = commentEditor(0, [main]);
-	document.body.appendChild(box);
-	const add = [...box.querySelectorAll("input")].at(-1);
-	add.value = "   ";
-	add.onkeydown({ key: "Enter", preventDefault() {} });
-	assert.deepStrictEqual(main.comments || [], []);
-	off();
-});
-
 
 // --- the eight glyphs a White/Black pair shares ------------------------------
 // ⊙ ○ ⟳ ↑ → ⯹ ⇄ ⊕ carry no side in the glyph, so the palette shows one button
