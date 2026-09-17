@@ -172,3 +172,26 @@ test("a non-promoting move never opens the picker", () => {
 	assert.strictEqual(board.querySelector(".an-promo"), null);
 	done();
 });
+
+test("a dragged piece follows the mouse and snaps back if dropped off the board", () => {
+	const done = installDom();
+	const seen = [];
+	const board = interactiveBoard(START, (san) => seen.push(san));
+	document.body.appendChild(board);
+	const piece = () => board.querySelector('use[data-sq="e2"]');
+	board
+		.querySelector('rect[data-sq="e2"]')
+		.dispatchEvent(new window.MouseEvent("mousedown", { bubbles: true, cancelable: true, clientX: 10, clientY: 10 }));
+	window.dispatchEvent(new window.MouseEvent("mousemove", { clientX: 30, clientY: -30 }));
+	assert.strictEqual(piece().getAttribute("transform"), "translate(20 -40)");
+	assert.ok(piece().classList.contains("dragging"), "it lets the square under it take the drop");
+
+	window.dispatchEvent(new window.MouseEvent("mouseup", {}));
+	assert.strictEqual(piece().getAttribute("transform"), null, "back on its square");
+	assert.ok(!piece().classList.contains("dragging"));
+	window.dispatchEvent(new window.MouseEvent("mousemove", { clientX: 90, clientY: 90 }));
+	assert.strictEqual(piece().getAttribute("transform"), null, "and no longer following");
+	assert.deepStrictEqual(seen, []);
+	board.remove();
+	done();
+});

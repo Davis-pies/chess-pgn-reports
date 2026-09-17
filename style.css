@@ -1435,7 +1435,8 @@ sup {
 /* --- analysis board --- */
 .an-board rect.sel { fill: #b9c96f; }
 .an-board rect.target { fill: #cdd68a; }
-.an-board rect { cursor: pointer; }
+.an-board rect, .an-board use { cursor: pointer; }
+.an-board use.dragging { pointer-events: none; cursor: grabbing; }
 
 .an-board { position: relative; }
 .an-promo {
@@ -1445,6 +1446,7 @@ sup {
 }
 .an-promo-pick { min-width: 7rem; }
 
+.analysis:focus { outline: none; } /* focused only so the arrow keys land */
 .analysis { display: flex; flex-direction: column; gap: .6rem; align-items: flex-start; }
 .an-lines { display: flex; flex-direction: column; gap: .2rem; width: 100%; }
 .an-line { display: flex; flex-wrap: wrap; align-items: center; padding: .2rem .35rem; border-radius: .25rem; cursor: pointer; }

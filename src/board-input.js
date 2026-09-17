@@ -106,7 +106,36 @@ export function interactiveBoard(fen, onMove, { size = 320, flipped = false } = 
 		// starts a new selection (including clicking another of your own pieces).
 		if (drop(sq)) return;
 		pick(sq);
+		if (from) follow(e);
 	});
+
+	// The picked piece rides under the cursor until the button comes up. It
+	// stops catching pointer events meanwhile, so the mouseup lands on the
+	// square beneath it and the drop above resolves as before. The listeners
+	// are on window so a release off the board still ends the drag; a move
+	// that is played re-renders the board anyway, and anything else snaps back.
+	function follow(down) {
+		const piece = svg.querySelector(`use[data-sq="${from}"]`);
+		if (!piece) return;
+		svg.appendChild(piece); // drawn last, so it passes over the other pieces
+		piece.classList.add("dragging");
+		// the board can be drawn smaller than its viewBox; move in board units
+		const w = svg.getBoundingClientRect().width;
+		const scale = w ? size / w : 1;
+		const move = (e) => {
+			const dx = (e.clientX - down.clientX) * scale;
+			const dy = (e.clientY - down.clientY) * scale;
+			piece.setAttribute("transform", `translate(${dx} ${dy})`);
+		};
+		const up = () => {
+			window.removeEventListener("mousemove", move);
+			window.removeEventListener("mouseup", up);
+			piece.removeAttribute("transform");
+			piece.classList.remove("dragging");
+		};
+		window.addEventListener("mousemove", move);
+		window.addEventListener("mouseup", up);
+	}
 
 	svg.addEventListener("mouseup", (e) => {
 		if (pending) return;
