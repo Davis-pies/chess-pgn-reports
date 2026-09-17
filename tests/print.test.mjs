@@ -757,3 +757,32 @@ test("the stem leaves the column headers as they were", () => {
   assert.deepStrictEqual(head, ["ply", "Mainline", ""]);
   off();
 });
+
+test("one row per move stacks White's and Black's moves in a cell", () => {
+  const off = installDom();
+  const s = loadState("1. e4 c5 2. Nf3 d6 (2... Nc6 3. d4) 3. d4 cxd4 *");
+  s.printByMove = true;
+  const box = document.createElement("div");
+  appendPrintTables(box, grid(s.lines));
+  const rows = [...box.querySelectorAll("table.tbl tr")].slice(1);
+  // stem 1. e4 c5 2. Nf3 (plies 0-2); the rows cover plies 3..5, which are
+  // moves 2 (Black half only) and 3
+  assert.deepStrictEqual(
+    rows.map((r) => r.children[0].textContent),
+    ["2.", "3."],
+  );
+  const halves = (col) =>
+    rows.map((r) =>
+      [...r.children[col].querySelectorAll(".half")].map((h) => h.textContent),
+    );
+  assert.deepStrictEqual(halves(1), [["", "d6"], ["d4", "cxd4"]]);
+  assert.deepStrictEqual(halves(2), [["", "Nc6"], ["d4", ""]]);
+  off();
+});
+
+test("rows stay per ply unless the option is on", () => {
+  const off = installDom();
+  const box = printTables("1. e4 c5 2. Nf3 d6 (2... Nc6 3. d4) 3. d4 cxd4 *");
+  assert.strictEqual(box.querySelectorAll(".half").length, 0);
+  off();
+});

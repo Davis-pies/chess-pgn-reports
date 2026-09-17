@@ -169,8 +169,8 @@ function groupClass(v) {
 	);
 }
 
-function td(text, cls) {
-	const e = document.createElement("td");
+function td(text, cls, tag = "td") {
+	const e = document.createElement(tag);
 	if (text) e.textContent = text;
 	if (cls) e.className = cls;
 	return e;
@@ -189,8 +189,8 @@ function markEl(sym) {
 }
 
 // A move cell, plus any per-move symbol mark and referenced note markers.
-function moveCell(c, ply, noteByPly) {
-	const e = td(c ? c.text : "", c ? c.cls : "");
+function moveCell(c, ply, noteByPly, tag = "td") {
+	const e = td(c ? c.text : "", c ? c.cls : "", tag);
 	// An annotation belongs to the MOVE, so it is drawn only by the cell that
 	// states the move. A line's cells before its divergence state nothing --
 	// the column it diverges from says those moves, and says the annotation
@@ -367,7 +367,42 @@ export function renderTable(container, grid, trace) {
 		// Print can start below a stem of moves every column shares (see
 		// stemLength in print.js); the stem states them, so their rows go.
 		const from = grid.fromPly || 0;
-		for (let ply = from; ply <= maxPly; ply++) {
+		// One ply at a time, or (print's "one row per move") a full move whose
+		// two plies stack in each cell, White's over Black's. A ply outside the
+		// table's range still takes its half, so the halves line up across a row.
+		const rows = [];
+		if (grid.byMove)
+			for (let n = Math.floor(from / 2); 2 * n <= maxPly; n++)
+				rows.push([2 * n, 2 * n + 1]);
+		else for (let ply = from; ply <= maxPly; ply++) rows.push([ply]);
+		const cellAt = (i, ply, tag) => {
+			const v = vars[i];
+			const shown = ply >= from && ply <= maxPly;
+			const rule = shown && ruleAt.get(ply + ":" + i);
+			// The rule replaces whatever the cell would have said, which at this
+			// ply is only an ellipsis: the line has no move here, and the rule
+			// says what the ellipsis was failing to.
+			const c = moveCell(
+				rule || !shown ? null : v.cells[ply],
+				ply,
+				v.noteByPly,
+				tag,
+			);
+			if (rule) {
+				// The marks hang off a span INSIDE the cell, never off the cell
+				// itself. A positioned <td> breaks border-collapse rendering in
+				// the print engine and the walls come out missing -- the same
+				// fault the sticky reference columns have, which print.css
+				// already works around by making them static.
+				c.className += " grp-rule";
+				const m = document.createElement("span");
+				m.className = "gm gm-" + rule;
+				c.appendChild(m);
+			}
+			return c;
+		};
+		for (const plies of rows) {
+			const ply = plies[0];
 			const tr = document.createElement("tr");
 			tr.dataset.ply = String(ply);
 			const num = document.createElement("th");
@@ -376,28 +411,24 @@ export function renderTable(container, grid, trace) {
 			tr.appendChild(num);
 			for (let i = 0; i < vars.length; i++) {
 				const v = vars[i];
-				const rule = ruleAt.get(ply + ":" + i);
-				// The rule replaces whatever the cell would have said, which at this
-				// ply is only an ellipsis: the line has no move here, and the rule
-				// says what the ellipsis was failing to.
-				const c = moveCell(rule ? null : v.cells[ply], ply, v.noteByPly);
-				if (rule) {
-					// The marks hang off a span INSIDE the cell, never off the cell
-					// itself. A positioned <td> breaks border-collapse rendering in
-					// the print engine and the walls come out missing -- the same
-					// fault the sticky reference columns have, which print.css
-					// already works around by making them static.
-					c.className += " grp-rule";
-					const m = document.createElement("span");
-					m.className = "gm gm-" + rule;
-					c.appendChild(m);
+				let c;
+				if (plies.length === 1) {
+					c = cellAt(i, ply, "td");
+					cellTrace(c, v, ply);
+					wireTrace(c, v);
+					// only where the column actually has a move at this ply
+					if (v.cells[ply]) wireMenu(c, v, ply);
+				} else {
+					// print only: no trace or menu to wire
+					c = document.createElement("td");
+					plies.forEach((p) => {
+						const h = cellAt(i, p, "div");
+						h.classList.add("half");
+						c.appendChild(h);
+					});
 				}
 				c.className += groupClass(v);
 				if (v === vars[0]) c.classList.add("main-col", "sticky-col");
-				cellTrace(c, v, ply);
-				wireTrace(c, v);
-				// only where the column actually has a move at this ply
-				if (v.cells[ply]) wireMenu(c, v, ply);
 				tr.appendChild(c);
 			}
 			table.appendChild(tr);

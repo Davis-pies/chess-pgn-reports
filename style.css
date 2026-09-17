@@ -720,6 +720,11 @@ select:focus {
   break-after: avoid;
   page-break-after: avoid;
 }
+/* one row per move: White's ply over Black's in each cell. An empty half
+   keeps its line so the two halves stay level across the row. */
+.tbl .half {
+  min-height: 1.3em;
+}
 
 .notes {
   margin-top: 16px;

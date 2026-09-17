@@ -125,7 +125,14 @@ export function appendPrintTables(box, g) {
       buildCardMoves(s, { ...mainV, moves: mainV.moves.slice(0, stem) });
       wrap.appendChild(s);
     }
-    renderTable(wrap, { ...g, vars: pv, spans: pv.spans, maxPly, fromPly: stem });
+    renderTable(wrap, {
+      ...g,
+      vars: pv,
+      spans: pv.spans,
+      maxPly,
+      fromPly: stem,
+      byMove: getCurrent().printByMove === true,
+    });
     renderTableNotes(wrap, [mainV, ...lines], i === 0);
   });
   box.appendChild(wrap);

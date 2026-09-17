@@ -133,7 +133,10 @@ export function exportBar() {
   );
   pOpts.append(
     cards,
-    group("Table", [["include in print", "printTables", true]]),
+    group("Table", [
+      ["include in print", "printTables", true],
+      ["one row per move", "printByMove", false],
+    ]),
     // Applies everywhere a line's name would prefix a note — the notes panel,
     // print, Markdown and every comment in the exported PGN — not just to
     // print, so it sits in its own group. A line's name still heads its own
