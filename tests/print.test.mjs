@@ -810,3 +810,16 @@ test("a table whose rows start on Black's move numbers its first row", () => {
   assert.strictEqual(first.children[0].textContent, "2...");
   off();
 });
+
+test("zebra stripes are an option on the printed table, off by default", () => {
+  const off = installDom();
+  const s = loadState("1. e4 c5 2. Nf3 (2. c3) *");
+  let box = document.createElement("div");
+  appendPrintTables(box, grid(s.lines));
+  assert.ok(!box.querySelector(".pv-htable.zebra"), "off by default");
+  s.printZebra = true;
+  box = document.createElement("div");
+  appendPrintTables(box, grid(s.lines));
+  assert.ok(box.querySelector(".pv-htable.zebra"));
+  off();
+});

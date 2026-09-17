@@ -137,6 +137,7 @@ export function exportBar() {
       ["include in print", "printTables", true],
       ["cell borders", "printBorders", true],
       ["one row per move", "printByMove", false],
+      ["zebra stripes", "printZebra", false],
     ]),
     // Applies everywhere a line's name would prefix a note — the notes panel,
     // print, Markdown and every comment in the exported PGN — not just to

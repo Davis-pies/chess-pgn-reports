@@ -1322,6 +1322,14 @@ sup {
   .tbl tr:nth-child(even) td:not(.sticky-col) {
     background: #fff; /* no zebra in print */
   }
+  /* ...unless "zebra stripes" is on. Every data cell, the mainline's included:
+     the screen skips the pinned column only because it scrolls, and print has
+     unpinned it. The browser drops backgrounds from a print unless told not to. */
+  .pv-htable.zebra .tbl tr:nth-child(even) td {
+    background: #e4e4e4; /* #eee all but vanished beside the cell borders */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
   /* sticky reference columns break border-collapse rendering in the PDF
 	   engine (missing vertical/horizontal lines) — make them static for print */
   .tbl .sticky-col {

@@ -240,6 +240,7 @@ function workbookState() {
       printTables: c.printTables,
       printBorders: c.printBorders,
       printByMove: c.printByMove,
+      printZebra: c.printZebra,
       showBoards: c.showBoards,
       showFinalBoard: c.showFinalBoard,
       showFirstDivBoard: c.showFirstDivBoard,
@@ -480,6 +481,7 @@ function installNotebook(nb, id) {
       printTables: view.printTables ?? getCurrent().printTables,
       printBorders: view.printBorders ?? getCurrent().printBorders,
       printByMove: view.printByMove ?? getCurrent().printByMove,
+      printZebra: view.printZebra ?? getCurrent().printZebra,
       showFinalBoard:
         (view.showFinalBoard ?? getCurrent().showFinalBoard) !== false,
       showFirstDivBoard: !!(
