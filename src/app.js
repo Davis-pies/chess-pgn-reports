@@ -238,6 +238,8 @@ function workbookState() {
       cardFont: c.cardFont,
       printCards: c.printCards,
       printTables: c.printTables,
+      printBorders: c.printBorders,
+      printByMove: c.printByMove,
       showBoards: c.showBoards,
       showFinalBoard: c.showFinalBoard,
       showFirstDivBoard: c.showFirstDivBoard,
@@ -476,6 +478,8 @@ function installNotebook(nb, id) {
       cardFont: view.cardFont || getCurrent().cardFont,
       printCards: view.printCards ?? getCurrent().printCards,
       printTables: view.printTables ?? getCurrent().printTables,
+      printBorders: view.printBorders ?? getCurrent().printBorders,
+      printByMove: view.printByMove ?? getCurrent().printByMove,
       showFinalBoard:
         (view.showFinalBoard ?? getCurrent().showFinalBoard) !== false,
       showFirstDivBoard: !!(

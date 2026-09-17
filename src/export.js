@@ -135,6 +135,7 @@ export function exportBar() {
     cards,
     group("Table", [
       ["include in print", "printTables", true],
+      ["cell borders", "printBorders", true],
       ["one row per move", "printByMove", false],
     ]),
     // Applies everywhere a line's name would prefix a note — the notes panel,

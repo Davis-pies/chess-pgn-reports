@@ -786,3 +786,16 @@ test("rows stay per ply unless the option is on", () => {
   assert.strictEqual(box.querySelectorAll(".half").length, 0);
   off();
 });
+
+test("cell borders can be left off the printed table", () => {
+  const off = installDom();
+  const s = loadState("1. e4 c5 2. Nf3 (2. c3) *");
+  let box = document.createElement("div");
+  appendPrintTables(box, grid(s.lines));
+  assert.ok(!box.querySelector(".pv-htable.no-borders"), "on by default");
+  s.printBorders = false;
+  box = document.createElement("div");
+  appendPrintTables(box, grid(s.lines));
+  assert.ok(box.querySelector(".pv-htable.no-borders"));
+  off();
+});

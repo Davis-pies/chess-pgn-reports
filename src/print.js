@@ -93,7 +93,9 @@ export function appendPrintTables(box, g) {
   // the whole horizontal-table section can be left out of the printed report
   const wrap = el("div", {
     className:
-      "pv-htable" + (getCurrent().printTables === false ? " noprint" : ""),
+      "pv-htable" +
+      (getCurrent().printTables === false ? " noprint" : "") +
+      (getCurrent().printBorders === false ? " no-borders" : ""),
   });
   const mainV = g.vars[0]; // mainline sorts first
   const others = g.vars.slice(1);

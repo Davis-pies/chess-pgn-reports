@@ -1303,6 +1303,15 @@ sup {
     page-break-inside: avoid; /* keep each table whole; a table that doesn't
 		                            fit the remaining page moves to the next */
   }
+  /* "cell borders" off: MCO's look, with only a rule under the headers. The
+     group rules are spans of their own and stay. */
+  .pv-htable.no-borders .tbl th,
+  .pv-htable.no-borders .tbl td {
+    border: none;
+  }
+  .pv-htable.no-borders .tbl tr:first-child th {
+    border-bottom: 1px solid var(--text);
+  }
   .tbl tr:nth-child(even) td:not(.sticky-col) {
     background: #fff; /* no zebra in print */
   }
