@@ -7,7 +7,7 @@
 // run once, in a column of their own, and pick up from where it ends. Every
 // group is open (nothing folds on paper) and every table is self-contained,
 // so a slice never refers back to a column on the page before it.
-import { renderTable, appendFootnote } from "./render.js";
+import { renderTable, appendFootnote, buildCardMoves } from "./render.js";
 import { el, renderInline } from "./dom.js";
 import { getCurrent } from "./state.js";
 import { allNotes } from "./notes.js";
@@ -72,6 +72,23 @@ export function subMaxPly(vars) {
   return m;
 }
 
+// How many leading plies every column of a printed table states identically:
+// the stem MCO prints once above a table instead of down every column. Capped
+// one short of the shortest column so no line is swallowed whole and left with
+// nothing to say below it. A lone column is not a table of alternatives, so it
+// has no stem.
+export function stemLength(vars) {
+  if (vars.length < 2) return 0;
+  const shortest = Math.min(...vars.map((v) => v.moves.length));
+  let n = 0;
+  while (
+    n < shortest - 1 &&
+    vars.every((v) => v.moves[n].san === vars[0].moves[n].san)
+  )
+    n++;
+  return n;
+}
+
 export function appendPrintTables(box, g) {
   // the whole horizontal-table section can be left out of the printed report
   const wrap = el("div", {
@@ -100,7 +117,15 @@ export function appendPrintTables(box, g) {
     // mainline out to its full length even when its own branches are short.
     const maxPly = i === 0 ? subMaxPly([mainV, ...lines]) : subMaxPly(lines);
     const pv = printVars(mainV, lines);
-    renderTable(wrap, { ...g, vars: pv, spans: pv.spans, maxPly });
+    const stem = stemLength([mainV, ...lines]);
+    if (stem) {
+      const s = el("div", { className: "print-stem" });
+      // the mainline's own moves, marks and note markers: every column states
+      // these moves, and the rows that carried the markers are gone
+      buildCardMoves(s, { ...mainV, moves: mainV.moves.slice(0, stem) });
+      wrap.appendChild(s);
+    }
+    renderTable(wrap, { ...g, vars: pv, spans: pv.spans, maxPly, fromPly: stem });
     renderTableNotes(wrap, [mainV, ...lines], i === 0);
   });
   box.appendChild(wrap);

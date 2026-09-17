@@ -39,12 +39,13 @@ function report(pgn) {
 }
 
 // Every table's cell text, as ply -> the set of things printed on that row.
-// Row 0 is the header, so row i + 1 is ply i.
+// A table starts below its stem, so each row says which ply it is.
 function rowsByPly(box) {
   const out = [];
   for (const table of box.querySelectorAll("table.tbl")) {
     const per = new Map();
-    [...table.querySelectorAll("tr")].slice(1).forEach((tr, ply) => {
+    [...table.querySelectorAll("tr")].slice(1).forEach((tr) => {
+      const ply = Number(tr.dataset.ply);
       const texts = new Set(
         [...tr.children].map((c) => c.textContent).filter(Boolean),
       );
@@ -58,6 +59,18 @@ function rowsByPly(box) {
 // Marked cells, grouped into the contiguous stretches that make up one run.
 // A row can carry several runs -- two groups can fork at the same ply in
 // different parts of the table -- so this must not treat a row as one run.
+// Each table's stem: the moves printed once above it, and the first ply its
+// rows cover.
+function stemsOf(box) {
+  return [...box.querySelectorAll("table.tbl")].map((t) => {
+    const prev = t.previousElementSibling;
+    const from = Number(t.querySelectorAll("tr")[1]?.dataset.ply || 0);
+    return prev?.classList.contains("print-stem")
+      ? { from, text: prev.textContent }
+      : { from: 0, text: "" };
+  });
+}
+
 function runsIn(box) {
   const runs = [];
   for (const table of box.querySelectorAll("table.tbl"))
@@ -80,6 +93,7 @@ test("no move is ever missing from the printed report", () => {
   const off = installDom();
   const { state, box } = report(AWKWARD);
   const byPly = rowsByPly(box);
+  const stems = stemsOf(box);
 
   // A line's early moves are elided against whichever column states them, so
   // the move belongs to the ROW rather than to the line's own column -- but it
@@ -87,7 +101,8 @@ test("no move is ever missing from the printed report", () => {
   for (const line of state.lines)
     for (const m of line.moves)
       assert.ok(
-        byPly.some((t) => t.get(m.ply)?.has(m.san)),
+        byPly.some((t) => t.get(m.ply)?.has(m.san)) ||
+          stems.some((st) => m.ply < st.from && st.text.includes(m.san)),
         `${m.san} at ply ${m.ply} is printed nowhere`,
       );
   off();
@@ -97,7 +112,7 @@ test("a group mark never stands where a move should be", () => {
   const off = installDom();
   const { box } = report(AWKWARD);
   const marked = [...box.querySelectorAll("td.grp-rule")];
-  assert.ok(marked.length >= 20, `only ${marked.length} marked cells`);
+  assert.ok(marked.length >= 19, `only ${marked.length} marked cells`);
   // a marked cell is rendered empty, so one carrying text means the mark took
   // a move's place and the move is gone from the report
   for (const td of marked)
@@ -109,9 +124,10 @@ test("every run is unbroken and ends in its corner", () => {
   const off = installDom();
   const { box } = report(AWKWARD);
   const runs = runsIn(box);
-  // the fixture draws 6 runs over 26 covered cells across 2 tables -- asserted
-  // so that a change gutting the marks fails here rather than passing vacuously
-  assert.ok(runs.length >= 5, `only ${runs.length} runs: are any being drawn?`);
+  // the fixture draws 4 runs across 2 tables (the runs leaving a table's last
+  // stem move are left to the stem) -- asserted so that a change gutting the
+  // marks fails here rather than passing vacuously
+  assert.ok(runs.length >= 4, `only ${runs.length} runs: are any being drawn?`);
   for (const cells of runs) {
     // A run that stopped short and resumed past an obstacle reads as a run
     // leaving THAT line -- the very ambiguity the marks exist to remove. Each

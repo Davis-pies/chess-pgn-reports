@@ -364,8 +364,12 @@ export function renderTable(container, grid, trace) {
 			head.appendChild(th);
 		});
 		table.appendChild(head);
-		for (let ply = 0; ply <= maxPly; ply++) {
+		// Print can start below a stem of moves every column shares (see
+		// stemLength in print.js); the stem states them, so their rows go.
+		const from = grid.fromPly || 0;
+		for (let ply = from; ply <= maxPly; ply++) {
 			const tr = document.createElement("tr");
+			tr.dataset.ply = String(ply);
 			const num = document.createElement("th");
 			num.className = "ply-col sticky-col";
 			if (labels[ply]) num.textContent = labels[ply];
@@ -442,7 +446,7 @@ export function cardMovesText(v) {
 
 // Same layout as cardMovesText but built as DOM so note numbers render as
 // true superscripts in the Lines (print) view and the printed PDF.
-function buildCardMoves(container, v) {
+export function buildCardMoves(container, v) {
 	let first = true;
 	const seg = (text) => {
 		if (!first) container.appendChild(document.createTextNode("  "));

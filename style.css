@@ -714,6 +714,12 @@ select:focus {
      and that block carries the separation to the next table. */
   margin: 0 auto 6px;
 }
+/* the moves every column of a print table shares, stated once above it */
+.print-stem {
+  margin: 0 0 4px;
+  break-after: avoid;
+  page-break-after: avoid;
+}
 
 .notes {
   margin-top: 16px;
