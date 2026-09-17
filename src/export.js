@@ -145,7 +145,7 @@ export function exportBar() {
   table.appendChild(
     el("label", { className: "opt" }, [
       "row padding ",
-      numberOpt("printRowPad", 3, 0, 12, 1),
+      numberOpt("printRowPad", 0, 0, 12, 1),
       " px",
     ]),
   );

@@ -831,10 +831,10 @@ test("the printed table's row padding is set from the notebook", () => {
   appendPrintTables(box, grid(s.lines));
   const pad = () =>
     box.querySelector(".pv-htable").style.getPropertyValue("--row-pad");
-  assert.strictEqual(pad(), "3px", "today's padding by default");
-  s.printRowPad = 0;
+  assert.strictEqual(pad(), "0px", "no padding by default");
+  s.printRowPad = 5;
   box = document.createElement("div");
   appendPrintTables(box, grid(s.lines));
-  assert.strictEqual(pad(), "0px", "0 is kept, not read as unset");
+  assert.strictEqual(pad(), "5px");
   off();
 });

@@ -240,28 +240,26 @@ test("the table row padding input drives --row-pad and clamps out-of-range value
   const pad = () =>
     app.view().querySelector(".pv-htable").style.getPropertyValue("--row-pad");
   const box = () => app.view().querySelectorAll(".optsel")[1];
-  assert.strictEqual(box().value, "3", "defaults to 3px");
-  assert.strictEqual(pad(), "3px");
+  assert.strictEqual(box().value, "0", "defaults to 0px");
+  assert.strictEqual(pad(), "0px");
 
   box().value = "8";
   box().onchange();
   assert.strictEqual(pad(), "8px");
 
-  // 0 is a real setting, not a fallback to the default
-  box().value = "0";
-  box().onchange();
-  assert.strictEqual(pad(), "0px");
-
   box().value = "40";
   box().onchange();
   assert.strictEqual(pad(), "12px", "clamped to the 12px ceiling");
-  box().value = "-5";
-  box().onchange();
-  assert.strictEqual(pad(), "0px", "clamped to the 0px floor");
 
   box().value = "";
   box().onchange();
-  assert.strictEqual(pad(), "3px", "a blank field resets to the default");
+  assert.strictEqual(pad(), "0px", "a blank field resets to the default");
+
+  box().value = "5";
+  box().onchange();
+  box().value = "-5";
+  box().onchange();
+  assert.strictEqual(pad(), "0px", "clamped to the 0px floor");
 });
 
 test("include-in-print toggles mark the card and table sections noprint", async () => {

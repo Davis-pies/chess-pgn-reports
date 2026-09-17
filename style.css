@@ -1322,8 +1322,8 @@ sup {
   /* "row padding": print.js sets --row-pad on the wrapper */
   .pv-htable .tbl th,
   .pv-htable .tbl td {
-    padding-top: var(--row-pad, 3px);
-    padding-bottom: var(--row-pad, 3px);
+    padding-top: var(--row-pad, 0px);
+    padding-bottom: var(--row-pad, 0px);
   }
   .tbl tr:nth-child(even) td:not(.sticky-col) {
     background: #fff; /* no zebra in print */
