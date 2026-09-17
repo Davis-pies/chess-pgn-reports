@@ -145,7 +145,7 @@ test("each scratch line has a delete button", () => {
 	done();
 });
 
-test("the note box edits the note on the move just played", () => {
+test("the note box saves as you type, without redrawing the panel", () => {
 	const done = installDom();
 	const s = newScratch([{ san: "e4" }, { san: "e5" }]);
 	let changed = 0;
@@ -153,13 +153,32 @@ test("the note box edits the note on the move just played", () => {
 	const box = panel.querySelector(".an-note");
 	assert.strictEqual(box.disabled, false);
 	box.value = "symmetrical";
-	box.dispatchEvent(new window.Event("change", { bubbles: true }));
+	box.dispatchEvent(new window.Event("input", { bubbles: true }));
 	assert.deepStrictEqual(activeLine(s).comments, [{ ply: 1, text: "symmetrical" }]);
-	assert.strictEqual(changed, 1);
+	// A redraw here would replace the button a click is on its way to, which
+	// is how a first click on Add used to be swallowed.
+	assert.strictEqual(changed, 0);
+	assert.ok(panel.querySelector(".an-move.at.has-note"), "the move shows its note at once");
+	box.dispatchEvent(new window.Event("change", { bubbles: true }));
+	assert.strictEqual(changed, 0, "leaving the box does not redraw either");
 
 	const again = analysisPanel(s, () => {});
 	assert.strictEqual(again.querySelector(".an-note").value, "symmetrical");
-	assert.ok(again.querySelector(".an-move.has-note"), "the move shows it has a note");
+	done();
+});
+
+test("Add takes a note that was typed but never left", () => {
+	const done = installDom();
+	loadState("1. e4 e5 2. Nf3 Nc6 *");
+	const s = newScratch([{ san: "e4" }, { san: "c5" }]);
+	const panel = analysisPanel(s, () => {});
+	const box = panel.querySelector(".an-note");
+	box.value = "the Sicilian";
+	box.dispatchEvent(new window.Event("input", { bubbles: true }));
+	click(panel, ".an-add");
+	const added = getCurrent().lines[getCurrent().lines.length - 1];
+	assert.deepStrictEqual(added.moves.map((m) => m.san), ["e4", "c5"]);
+	assert.deepStrictEqual(added.comments, [{ ply: 1, text: "the Sicilian" }]);
 	done();
 });
 

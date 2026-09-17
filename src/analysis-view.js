@@ -83,8 +83,9 @@ export function analysisPanel(scratch, onChange) {
 	);
 	panel.appendChild(nav);
 
-	// The note on the move just played. Saved on change (blur or Enter) rather
-	// than per keystroke, since every save re-renders the panel.
+	// The note on the move just played, saved on every keystroke. It must not
+	// redraw the panel: saving on blur did, and the blur a click on Add causes
+	// replaced the button before the click landed, so the first press was lost.
 	const note = el("textarea", {
 		className: "an-note",
 		rows: 2,
@@ -92,9 +93,13 @@ export function analysisPanel(scratch, onChange) {
 		disabled: scratch.at === 0,
 		value: noteAt(scratch),
 	});
-	note.onchange = () => {
+	note.oninput = () => {
 		setNote(scratch, note.value);
-		onChange();
+		const at = panel.querySelector(".an-move.at");
+		if (at) {
+			at.classList.toggle("has-note", !!noteAt(scratch));
+			at.title = noteAt(scratch);
+		}
 	};
 	// keep the arrow keys for the caret while typing
 	note.onkeydown = (e) => e.stopPropagation();
