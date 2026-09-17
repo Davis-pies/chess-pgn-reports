@@ -43,7 +43,9 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    the notebook with the line.
    Nothing reaches the notebook until you press **Add as new line** (or **Add
    all**), which files the line as a sideline you can then tag like any other,
-   or **Add as footnote**.
+   or **Add as footnote**. Adding closes the window; if the line cannot be added
+   (it has no moves, or the notebook already has it) the window stays open and
+   says why.
    To correct a wrong move, analyse from the move before it, play the right one,
    add it, and hide the old line.
 4. **Render** — a table (plies down, lines across), or a linear

@@ -471,7 +471,7 @@ function analysisOverlay() {
   const ov = el("div", { className: "modal-overlay an-overlay" });
   ov.onclick = (e) => e.target === ov && close();
   ov.onkeydown = (e) => e.key === "Escape" && close();
-  const an = analysisPanel(getScratch(), renderApp);
+  const an = analysisPanel(getScratch(), renderApp, { onAdded: close });
   const head = el("div", { className: "an-head" }, [
     el("h3", { textContent: "Analysis" }),
     el("button", {

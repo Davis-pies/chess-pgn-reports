@@ -58,7 +58,7 @@ test("a line added on the board shows up in the report", async () => {
 	sq("d4", "mouseup");
 	app.view().querySelector(".an-add").click();
 	assert.strictEqual(getCurrent().lines.length, before + 1);
-	app.view().querySelector(".an-close").click();
+	assert.strictEqual(app.view().querySelector(".an-overlay"), null, "adding closed the window");
 	assert.match(app.view().querySelector(".pv-table").textContent, /d4/);
 });
 
@@ -94,7 +94,6 @@ test("a line added on the board survives a save and reload", async () => {
 	sq("d2", "mousedown");
 	sq("d4", "mouseup");
 	app.view().querySelector(".an-add").click();
-	app.view().querySelector(".an-close").click();
 	app.clickText("Save");
 
 	// Reload the way the app does: re-parse the saved PGN and re-apply the
@@ -135,4 +134,14 @@ test("a line added into an existing branch opens that branch in the table", asyn
 	const head = app.view().querySelector(".pv-table tr").textContent;
 	assert.match(head, /▾ 2 lines/, "the branch is open, not folded to ▸");
 	assert.match(app.view().querySelector(".pv-table").textContent, /Nc3/);
+});
+
+test("a refused add keeps the window open and says why", async () => {
+	app.reset();
+	await app.loadPgn(PGN);
+	app.view().querySelector(".an-toggle").click();
+	app.view().querySelector(".an-start").click();
+	app.view().querySelector(".an-add").click();
+	assert.ok(app.view().querySelector(".an-overlay"), "still open");
+	assert.match(app.view().querySelector(".an-msg").textContent, /no moves/);
 });

@@ -212,3 +212,22 @@ test("the arrow keys move the caret in a note box, not the board", () => {
 	assert.strictEqual(changed, 0);
 	done();
 });
+
+test("each add button reports a line added, and nothing when refused", () => {
+	const done = installDom();
+	loadState("1. e4 e5 2. Nf3 Nc6 *");
+	for (const [btn, reply] of [[".an-add", "d5"], [".an-add-foot", "Nf6"], [".an-add-all", "f5"]]) {
+		let added = 0;
+		const s = newScratch([{ san: "d4" }, { san: reply }]);
+		click(analysisPanel(s, () => {}, { onAdded: () => added++ }), btn);
+		assert.strictEqual(added, 1, `${btn} reports the add`);
+	}
+	let added = 0;
+	let changed = 0;
+	const empty = analysisPanel(newScratch(), () => changed++, { onAdded: () => added++ });
+	click(empty, ".an-add");
+	assert.strictEqual(added, 0);
+	assert.strictEqual(changed, 0, "no redraw, so the reason stays on screen");
+	assert.match(empty.querySelector(".an-msg").textContent, /no moves/);
+	done();
+});

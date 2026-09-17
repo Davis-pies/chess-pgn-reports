@@ -32,7 +32,7 @@ export function numberedMoves(moves) {
 const noteOn = (line, ply) =>
 	(line.comments || []).find((c) => c.ply === ply)?.text || "";
 
-export function analysisPanel(scratch, onChange) {
+export function analysisPanel(scratch, onChange, { onAdded = onChange } = {}) {
 	// tabIndex -1 rather than 0: the panel is focusable so the arrow keys have
 	// somewhere to land, but it is not a tab stop of its own -- tabbing should
 	// still walk the actual controls. app.js focuses it after appending.
@@ -139,41 +139,33 @@ export function analysisPanel(scratch, onChange) {
 	});
 	panel.appendChild(list);
 
-	// The commit bar. A message element rather than an alert(): adding a line
-	// is a thing you do several times in a row, and a modal between each one
-	// would be in the way.
+	// The commit bar. A line that goes in hands over to onAdded, which closes
+	// the window in the app. A refusal changes nothing, so it does not redraw:
+	// the reason is written into the panel on screen and stays there.
 	const msg = el("div", { className: "an-msg" });
+	const addBtn = (cls, text, add) =>
+		el("button", {
+			className: "chip " + cls,
+			textContent: text,
+			onclick: () => {
+				const refused = add();
+				if (refused) msg.textContent = refused;
+				else onAdded();
+			},
+		});
+	const one = (opts) => {
+		const r = commitLine(activeLine(scratch), opts);
+		return r.ok ? null : r.reason;
+	};
 	const bar = el("div", { className: "orow an-commit" });
 	bar.append(
-		el("button", {
-			className: "chip primary an-add",
-			textContent: "Add as new line",
-			onclick: () => {
-				const r = commitLine(activeLine(scratch));
-				msg.textContent = r.ok ? `Added ${r.line.name}.` : r.reason;
-				onChange();
-			},
-		}),
-		el("button", {
-			className: "chip an-add-foot",
-			textContent: "Add as footnote",
-			onclick: () => {
-				const r = commitLine(activeLine(scratch), { tag: "foot" });
-				msg.textContent = r.ok ? `Added ${r.line.name} as a footnote.` : r.reason;
-				onChange();
-			},
-		}),
-		el("button", {
-			className: "chip an-add-all",
-			textContent: "Add all",
-			onclick: () => {
-				const { added, skipped } = commitAll(scratch);
-				msg.textContent =
-					`Added ${added} line${added === 1 ? "" : "s"}` +
-					(skipped ? `, skipped ${skipped} already in the notebook.` : ".");
-				onChange();
-			},
-		}),
+		addBtn("primary an-add", "Add as new line", () => one()),
+		addBtn("an-add-foot", "Add as footnote", () => one({ tag: "foot" })),
+		addBtn("an-add-all", "Add all", () =>
+			commitAll(scratch).added
+				? null
+				: "Nothing added: every line is empty or already in the notebook.",
+		),
 	);
 	panel.append(bar, msg);
 
