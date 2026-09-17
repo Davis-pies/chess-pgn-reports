@@ -117,3 +117,22 @@ test("a line added on the board survives a save and reload", async () => {
 		"and so did the imported ones",
 	);
 });
+
+test("a line added into an existing branch opens that branch in the table", async () => {
+	app.reset();
+	await app.loadPgn("1. e4 e5 (1... c5 2. Nf3) 2. Nf3 Nc6 *");
+	app.view().querySelector(".an-toggle").click();
+	const sq = (s, type) =>
+		app
+			.view()
+			.querySelector(`.an-board rect[data-sq="${s}"]`)
+			.dispatchEvent(new app.dom.window.MouseEvent(type, { bubbles: true, cancelable: true }));
+	for (const [a, b] of [["e2", "e4"], ["c7", "c5"], ["b1", "c3"]]) {
+		sq(a, "mousedown");
+		sq(b, "mouseup");
+	}
+	app.view().querySelector(".an-add").click();
+	const head = app.view().querySelector(".pv-table tr").textContent;
+	assert.match(head, /▾ 2 lines/, "the branch is open, not folded to ▸");
+	assert.match(app.view().querySelector(".pv-table").textContent, /Nc3/);
+});

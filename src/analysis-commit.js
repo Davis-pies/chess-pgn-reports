@@ -13,7 +13,8 @@
 // while changing a move under an existing line could silently re-parent its
 // siblings and strand marks keyed by a ply that moved.
 
-import { getCurrent } from "./state.js";
+import { getCurrent, openTablePaths } from "./state.js";
+import { divergence } from "./tree.js";
 import { buildPgn } from "./pgn-out.js";
 import { toLine } from "./analysis.js";
 
@@ -33,6 +34,7 @@ export function commitLine(scratchLine, { tag = "sideline" } = {}) {
 	line.tag = tag;
 	cur.lines.push(line);
 	cur.pgn = buildPgn(cur);
+	revealInTable(line, cur.lines);
 	return { ok: true, line };
 }
 
@@ -44,4 +46,17 @@ export function commitAll(scratch) {
 		else skipped++;
 	}
 	return { added, skipped };
+}
+
+// The table folds a branch holding several lines into one "N lines" column, so
+// a line added into an existing branch would land out of sight. Open every
+// group on its path: the keys are buildTrie's, "ply:san" joined from where the
+// line leaves the mainline. Keys that name no group are simply never asked for.
+function revealInTable(line, lines) {
+	const main = lines.find((l) => l.isMain) || lines[0];
+	let key = "";
+	for (const m of line.moves.slice(divergence(line, main))) {
+		key = (key ? key + "/" : "") + m.ply + ":" + m.san;
+		openTablePaths.add(key);
+	}
 }
