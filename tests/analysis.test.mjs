@@ -14,6 +14,8 @@ import {
 	select,
 	toLine,
 	removeLine,
+	setNote,
+	noteAt,
 } from "../src/analysis.js";
 
 const sans = (s) => activeLine(s).moves.map((m) => m.san);
@@ -176,4 +178,39 @@ test("removing the active line selects its neighbour", () => {
 	assert.strictEqual(s.active, 0);
 	assert.deepStrictEqual(sans(s), ["e4", "e5"]);
 	assert.strictEqual(s.at, 2);
+});
+
+test("a note belongs to the move just played, one per move", () => {
+	const s = newScratch([{ san: "e4" }, { san: "e5" }]);
+	assert.strictEqual(noteAt(s), "");
+	setNote(s, "the open game");
+	setNote(s, "the open game, again");
+	assert.deepStrictEqual(activeLine(s).comments, [{ ply: 1, text: "the open game, again" }]);
+	goTo(s, 1);
+	assert.strictEqual(noteAt(s), "", "the note is on e5, not e4");
+	setNote(s, "king's pawn");
+	setNote(s, "   ");
+	assert.deepStrictEqual(activeLine(s).comments, [{ ply: 1, text: "the open game, again" }], "a blank note clears it");
+	goTo(s, 0);
+	setNote(s, "nowhere to put this");
+	assert.strictEqual(activeLine(s).comments.length, 1, "no move played, no note");
+});
+
+test("a fork keeps the notes on the moves it shares and none after", () => {
+	const s = newScratch([{ san: "e4" }, { san: "e5" }]);
+	goTo(s, 1);
+	setNote(s, "best by test");
+	goTo(s, 2);
+	setNote(s, "symmetrical");
+	goTo(s, 1);
+	play(s, "c5");
+	assert.deepStrictEqual(activeLine(s).comments, [{ ply: 0, text: "best by test" }]);
+	activeLine(s).comments[0].text = "changed";
+	assert.strictEqual(s.lines[0].comments[0].text, "best by test", "copied, not shared");
+});
+
+test("toLine carries the notes", () => {
+	const s = newScratch([{ san: "e4" }]);
+	setNote(s, "best by test");
+	assert.deepStrictEqual(toLine(activeLine(s), 1).comments, [{ ply: 0, text: "best by test" }]);
 });

@@ -1,7 +1,8 @@
 // tests/analysis-view.test.mjs
 import { test } from "node:test";
 import assert from "node:assert";
-import { installDom } from "./helpers.mjs";
+import { installDom, loadState } from "./helpers.mjs";
+import { getCurrent } from "../src/state.js";
 import { analysisPanel, numberedMoves } from "../src/analysis-view.js";
 import { newScratch, activeLine, play, goTo } from "../src/analysis.js";
 
@@ -141,5 +142,42 @@ test("each scratch line has a delete button", () => {
 	assert.strictEqual(s.lines.length, 1);
 	assert.deepStrictEqual(activeLine(s).moves.map((m) => m.san), ["e4", "c5"]);
 	assert.strictEqual(changed, 1);
+	done();
+});
+
+test("the note box edits the note on the move just played", () => {
+	const done = installDom();
+	const s = newScratch([{ san: "e4" }, { san: "e5" }]);
+	let changed = 0;
+	const panel = analysisPanel(s, () => changed++);
+	const box = panel.querySelector(".an-note");
+	assert.strictEqual(box.disabled, false);
+	box.value = "symmetrical";
+	box.dispatchEvent(new window.Event("change", { bubbles: true }));
+	assert.deepStrictEqual(activeLine(s).comments, [{ ply: 1, text: "symmetrical" }]);
+	assert.strictEqual(changed, 1);
+
+	const again = analysisPanel(s, () => {});
+	assert.strictEqual(again.querySelector(".an-note").value, "symmetrical");
+	assert.ok(again.querySelector(".an-move.has-note"), "the move shows it has a note");
+	done();
+});
+
+test("there is no note to write before the first move", () => {
+	const done = installDom();
+	const panel = analysisPanel(newScratch(), () => {});
+	assert.strictEqual(panel.querySelector(".an-note").disabled, true);
+	done();
+});
+
+test("Add as footnote files the line as a footnote", () => {
+	const done = installDom();
+	loadState("1. e4 e5 2. Nf3 Nc6 *");
+	const s = newScratch([{ san: "e4" }, { san: "c5" }]);
+	const panel = analysisPanel(s, () => {});
+	click(panel, ".an-add-foot");
+	const added = getCurrent().lines[getCurrent().lines.length - 1];
+	assert.deepStrictEqual(added.moves.map((m) => m.san), ["e4", "c5"]);
+	assert.strictEqual(added.tag, "foot");
 	done();
 });

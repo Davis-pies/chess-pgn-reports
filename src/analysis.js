@@ -77,7 +77,11 @@ export function play(s, san) {
 		.slice(0, s.at)
 		.map((m) => ({ san: m.san, ply: m.ply }));
 	moves.push({ san, ply: s.at });
-	s.lines.push({ moves });
+	// The notes on the shared moves come along too, copied for the same reason.
+	const comments = (line.comments || [])
+		.filter((c) => c.ply < s.at)
+		.map((c) => ({ ply: c.ply, text: c.text }));
+	s.lines.push({ moves, comments });
 	s.active = s.lines.length - 1;
 	s.at = moves.length;
 	return s;
@@ -105,6 +109,23 @@ export function select(s, idx) {
 	return s;
 }
 
+// A note on the move just played -- the one before the cursor -- in the same
+// { ply, text } shape a notebook line keeps, one per move as the line editor
+// has it. A blank note clears it; at the start there is no move to hold one.
+export function noteAt(s) {
+	const c = (activeLine(s).comments || []).find((n) => n.ply === s.at - 1);
+	return c ? c.text : "";
+}
+
+export function setNote(s, text) {
+	if (s.at === 0) return s;
+	const line = activeLine(s);
+	const ply = s.at - 1;
+	line.comments = (line.comments || []).filter((c) => c.ply !== ply);
+	if (text.trim()) line.comments.push({ ply, text: text.trim() });
+	return s;
+}
+
 // Drop a line. The cursor moves with the active line if one before it went;
 // if the active line itself went, it lands on the neighbour before it. A
 // scratch always keeps one line, empty if need be, so there is a board to play.
@@ -128,7 +149,7 @@ export function toLine(scratchLine, idx) {
 	return {
 		moves,
 		marks: {},
-		comments: [],
+		comments: (scratchLine.comments || []).map((c) => ({ ply: c.ply, text: c.text })),
 		meta: {},
 		fen: replay(moves).fen(),
 		ply: last ? last.ply : 0,

@@ -38,9 +38,12 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    from here** to open it at that position. Play moves to explore; diverging
    from a position you have already visited keeps both continuations, so you can
    build up several lines in one sitting without losing the one you came from.
-   **Flip** turns the board to Black's side, and ✕ on a line deletes it.
+   **Flip** turns the board to Black's side, and ✕ on a line deletes it. The
+   box under the board holds a note on the move just played, which goes into
+   the notebook with the line.
    Nothing reaches the notebook until you press **Add as new line** (or **Add
-   all**), which files the line as a sideline you can then tag like any other.
+   all**), which files the line as a sideline you can then tag like any other,
+   or **Add as footnote**.
    To correct a wrong move, analyse from the move before it, play the right one,
    add it, and hide the old line.
 4. **Render** — a table (plies down, lines across), or a linear

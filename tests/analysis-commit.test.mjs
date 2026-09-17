@@ -82,3 +82,12 @@ test("committed lines are numbered by where they land", () => {
 	assert.strictEqual(r.line.name, `Line ${idx}`);
 	done();
 });
+
+test("a line can be committed as a footnote", () => {
+	const done = installDom();
+	loadState(PGN);
+	const r = commitLine({ moves: [{ san: "e4", ply: 0 }, { san: "c5", ply: 1 }] }, { tag: "foot" });
+	assert.strictEqual(r.ok, true);
+	assert.strictEqual(r.line.tag, "foot");
+	done();
+});

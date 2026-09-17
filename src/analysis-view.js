@@ -7,7 +7,18 @@
 
 import { el } from "./dom.js";
 import { interactiveBoard } from "./board-input.js";
-import { activeLine, back, fenOf, forward, goTo, play, removeLine, select } from "./analysis.js";
+import {
+	activeLine,
+	back,
+	fenOf,
+	forward,
+	goTo,
+	noteAt,
+	play,
+	removeLine,
+	select,
+	setNote,
+} from "./analysis.js";
 import { commitAll, commitLine } from "./analysis-commit.js";
 
 // "1.e4 e5 2.Nf3". Deliberately not render.js's movesText: that one formats a
@@ -18,6 +29,9 @@ export function numberedMoves(moves) {
 		.map((m, i) => (i % 2 === 0 ? `${i / 2 + 1}.${m.san}` : m.san))
 		.join(" ");
 }
+
+const noteOn = (line, ply) =>
+	(line.comments || []).find((c) => c.ply === ply)?.text || "";
 
 export function analysisPanel(scratch, onChange) {
 	// tabIndex -1 rather than 0: the panel is focusable so the arrow keys have
@@ -69,6 +83,23 @@ export function analysisPanel(scratch, onChange) {
 	);
 	panel.appendChild(nav);
 
+	// The note on the move just played. Saved on change (blur or Enter) rather
+	// than per keystroke, since every save re-renders the panel.
+	const note = el("textarea", {
+		className: "an-note",
+		rows: 2,
+		placeholder: scratch.at ? "Note on this move" : "Play a move to note it",
+		disabled: scratch.at === 0,
+		value: noteAt(scratch),
+	});
+	note.onchange = () => {
+		setNote(scratch, note.value);
+		onChange();
+	};
+	// keep the arrow keys for the caret while typing
+	note.onkeydown = (e) => e.stopPropagation();
+	panel.appendChild(note);
+
 	const list = el("div", { className: "an-lines" });
 	scratch.lines.forEach((line, i) => {
 		const row = el("div", {
@@ -88,8 +119,10 @@ export function analysisPanel(scratch, onChange) {
 			const mv = el("button", {
 				className:
 					"an-move" +
-					(i === scratch.active && j === scratch.at - 1 ? " at" : ""),
+					(i === scratch.active && j === scratch.at - 1 ? " at" : "") +
+					(noteOn(line, j) ? " has-note" : ""),
 				textContent: j % 2 === 0 ? `${j / 2 + 1}.${m.san}` : m.san,
+				title: noteOn(line, j),
 			});
 			mv.onclick = (e) => {
 				e.stopPropagation();
@@ -127,6 +160,15 @@ export function analysisPanel(scratch, onChange) {
 			onclick: () => {
 				const r = commitLine(activeLine(scratch));
 				msg.textContent = r.ok ? `Added ${r.line.name}.` : r.reason;
+				onChange();
+			},
+		}),
+		el("button", {
+			className: "chip an-add-foot",
+			textContent: "Add as footnote",
+			onclick: () => {
+				const r = commitLine(activeLine(scratch), { tag: "foot" });
+				msg.textContent = r.ok ? `Added ${r.line.name} as a footnote.` : r.reason;
 				onChange();
 			},
 		}),

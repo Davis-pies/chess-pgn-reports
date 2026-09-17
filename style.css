@@ -1452,6 +1452,9 @@ sup {
 .an-move { background: none; border: 0; padding: 0 .2rem; font: inherit; color: inherit; cursor: pointer; }
 .an-move.at { font-weight: 700; text-decoration: underline; }
 .an-empty { opacity: .6; }
-.an-window { width: auto; max-width: 100%; }
+/* fixed to the board's width, so a long line wraps instead of widening it */
+.an-window { width: min(400px, 100%); }
+.an-note { width: 100%; box-sizing: border-box; font: inherit; resize: vertical; }
+.an-move.has-note::after { content: "*"; opacity: .6; }
 .an-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: .5rem; }
 .an-del { margin-left: auto; }

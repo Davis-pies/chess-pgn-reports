@@ -19,7 +19,8 @@ import { toLine } from "./analysis.js";
 
 const keyOf = (moves) => moves.map((m) => m.san).join(" ");
 
-export function commitLine(scratchLine) {
+// `tag` is what the line is filed as: a sideline unless asked for a footnote.
+export function commitLine(scratchLine, { tag = "sideline" } = {}) {
 	const moves = scratchLine.moves || [];
 	if (!moves.length) return { ok: false, reason: "That line has no moves yet." };
 	const cur = getCurrent();
@@ -29,6 +30,7 @@ export function commitLine(scratchLine) {
 	// Named for the index it is about to occupy, which is what the editor's
 	// placeholder names do for every other unnamed line.
 	const line = toLine(scratchLine, cur.lines.length);
+	line.tag = tag;
 	cur.lines.push(line);
 	cur.pgn = buildPgn(cur);
 	return { ok: true, line };
