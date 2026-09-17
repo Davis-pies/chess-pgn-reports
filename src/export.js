@@ -49,6 +49,31 @@ export function branchContext(l) {
 const FONT_MIN = 60;
 const FONT_MAX = 200;
 
+// A numeric print option bound to getCurrent()[key], clamped to [min, max].
+function numberOpt(key, def, min, max, step) {
+  const box = el("input", {
+    className: "optsel",
+    type: "number",
+    min: String(min),
+    max: String(max),
+    step: String(step),
+    value: String(getCurrent()[key] ?? def),
+  });
+  // on change, not on input: every commit re-renders the whole app, so reacting
+  // per keystroke would tear the field out from under the cursor mid-number.
+  box.onchange = () => {
+    const raw = String(box.value).trim();
+    const n = Math.round(Number(raw));
+    // a blank or non-numeric field falls back to the default. Note Number("")
+    // is 0, which is finite — so the emptiness check has to come first, or a
+    // cleared field would clamp to the minimum instead of resetting.
+    getCurrent()[key] =
+      raw === "" || !Number.isFinite(n) ? def : Math.min(max, Math.max(min, n));
+    getRenderHooks().renderApp();
+  };
+  return box;
+}
+
 export function exportBar() {
   const bar = el("div", { className: "export" });
   const printBtn = el("button", {
@@ -106,39 +131,27 @@ export function exportBar() {
   // Card text size, as a percentage of the default. Cards only: the table's
   // columns are sized by their content, so scaling its text would move the
   // print pagination as well.
-  const sel = el("input", {
-    className: "optsel",
-    type: "number",
-    min: String(FONT_MIN),
-    max: String(FONT_MAX),
-    step: "5",
-    value: String(getCurrent().cardFont || 100),
-  });
-  // on change, not on input: every commit re-renders the whole app, so reacting
-  // per keystroke would tear the field out from under the cursor mid-number.
-  sel.onchange = () => {
-    const raw = String(sel.value).trim();
-    const n = Math.round(Number(raw));
-    // a blank or non-numeric field falls back to the default. Note Number("")
-    // is 0, which is finite — so the emptiness check has to come first, or a
-    // cleared field would clamp to the minimum instead of resetting.
-    getCurrent().cardFont =
-      raw === "" || !Number.isFinite(n)
-        ? 100
-        : Math.min(FONT_MAX, Math.max(FONT_MIN, n));
-    getRenderHooks().renderApp();
-  };
+  const sel = numberOpt("cardFont", 100, FONT_MIN, FONT_MAX, 5);
   cards.appendChild(
     el("label", { className: "opt" }, ["text size ", sel, " %"]),
   );
+  const table = group("Table", [
+    ["include in print", "printTables", true],
+    ["cell borders", "printBorders", true],
+    ["one row per move", "printByMove", false],
+    ["zebra stripes", "printZebra", false],
+  ]);
+  // the top and bottom padding of every printed cell, in px
+  table.appendChild(
+    el("label", { className: "opt" }, [
+      "row padding ",
+      numberOpt("printRowPad", 3, 0, 12, 1),
+      " px",
+    ]),
+  );
   pOpts.append(
     cards,
-    group("Table", [
-      ["include in print", "printTables", true],
-      ["cell borders", "printBorders", true],
-      ["one row per move", "printByMove", false],
-      ["zebra stripes", "printZebra", false],
-    ]),
+    table,
     // Applies everywhere a line's name would prefix a note — the notes panel,
     // print, Markdown and every comment in the exported PGN — not just to
     // print, so it sits in its own group. A line's name still heads its own

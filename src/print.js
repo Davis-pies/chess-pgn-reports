@@ -98,6 +98,8 @@ export function appendPrintTables(box, g) {
       (getCurrent().printBorders === false ? " no-borders" : "") +
       (getCurrent().printZebra === true ? " zebra" : ""),
   });
+  // `??`, not `||`: 0 is a setting of its own
+  wrap.style.setProperty("--row-pad", (getCurrent().printRowPad ?? 3) + "px");
   const mainV = g.vars[0]; // mainline sorts first
   const others = g.vars.slice(1);
   const size = 13; // mainline + 13 = 14 data columns per table (fits a page)

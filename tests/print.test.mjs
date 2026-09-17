@@ -823,3 +823,18 @@ test("zebra stripes are an option on the printed table, off by default", () => {
   assert.ok(box.querySelector(".pv-htable.zebra"));
   off();
 });
+
+test("the printed table's row padding is set from the notebook", () => {
+  const off = installDom();
+  const s = loadState("1. e4 c5 2. Nf3 (2. c3) *");
+  let box = document.createElement("div");
+  appendPrintTables(box, grid(s.lines));
+  const pad = () =>
+    box.querySelector(".pv-htable").style.getPropertyValue("--row-pad");
+  assert.strictEqual(pad(), "3px", "today's padding by default");
+  s.printRowPad = 0;
+  box = document.createElement("div");
+  appendPrintTables(box, grid(s.lines));
+  assert.strictEqual(pad(), "0px", "0 is kept, not read as unset");
+  off();
+});
