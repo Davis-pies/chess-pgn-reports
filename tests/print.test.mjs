@@ -799,3 +799,14 @@ test("cell borders can be left off the printed table", () => {
   assert.ok(box.querySelector(".pv-htable.no-borders"));
   off();
 });
+
+// Only White's rows carry a number, which left a table starting on Black's move
+// (its stem ending on White's) with no number on its first row at all.
+test("a table whose rows start on Black's move numbers its first row", () => {
+  const off = installDom();
+  const box = printTables("1. e4 c5 2. Nf3 d6 (2... Nc6 3. d4) 3. d4 *");
+  const first = box.querySelectorAll("table.tbl tr")[1];
+  assert.strictEqual(first.dataset.ply, "3");
+  assert.strictEqual(first.children[0].textContent, "2...");
+  off();
+});

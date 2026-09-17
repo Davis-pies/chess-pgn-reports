@@ -540,7 +540,7 @@ select:focus {
 .tbl .collapse-cue {
   color: var(--main);
 }
-.tbl td.collapsed {
+.tbl :is(td, .half).collapsed {
   font-style: italic;
   color: var(--muted);
 }
@@ -716,6 +716,8 @@ select:focus {
 }
 /* the moves every column of a print table shares, stated once above it */
 .print-stem {
+  /* centred over the table, which centres itself on the page */
+  text-align: center;
   margin: 0 0 4px;
   break-after: avoid;
   page-break-after: avoid;
@@ -724,6 +726,11 @@ select:focus {
    keeps its line so the two halves stay level across the row. */
 .tbl .half {
   min-height: 1.3em;
+}
+/* the move number lines up with White's half, not the middle of the pair */
+.tbl.by-move th,
+.tbl.by-move td {
+  vertical-align: top;
 }
 
 .notes {
@@ -850,16 +857,16 @@ sup {
   border: none;
   background: none;
 }
-.tbl td.main {
+.tbl :is(td, .half).main {
   font-weight: 700;
 }
-.tbl td.sideline {
+.tbl :is(td, .half).sideline {
   color: var(--sideline);
 }
-.tbl td.foot {
+.tbl :is(td, .half).foot {
   color: var(--foot);
 }
-.tbl td.ellip {
+.tbl :is(td, .half).ellip {
   color: var(--muted);
   opacity: 0.6;
 }
@@ -1294,7 +1301,7 @@ sup {
   .pv-htable {
     display: block !important;
   }
-  .tbl td.ellip {
+  .tbl :is(td, .half).ellip {
     color: #444;
     opacity: 1; /* the 0.6 screen opacity prints as washed-out grey */
   }
@@ -1320,10 +1327,10 @@ sup {
   .tbl .sticky-col {
     position: static;
   }
-  .tbl td.sideline {
+  .tbl :is(td, .half).sideline {
     color: #333;
   }
-  .tbl td.foot {
+  .tbl :is(td, .half).foot {
     color: #333;
   }
   .cards {

@@ -326,7 +326,7 @@ export function renderTable(container, grid, trace) {
 		labels[ply] = ply % 2 === 0 ? fullmoveLabel(ply) : "";
 
 	const table = document.createElement("table");
-	table.className = "tbl tbl-h";
+	table.className = "tbl tbl-h" + (grid.byMove ? " by-move" : "");
 
 
 	// rows = ply, columns = variations. There is one layout: the table is a
@@ -407,7 +407,10 @@ export function renderTable(container, grid, trace) {
 			tr.dataset.ply = String(ply);
 			const num = document.createElement("th");
 			num.className = "ply-col sticky-col";
-			if (labels[ply]) num.textContent = labels[ply];
+			// a table cut below a stem can open on Black's move, which has no
+			// number of its own; the first row needs one to be read at all
+			const label = labels[ply] || (ply === from ? fullmoveLabel(ply) : "");
+			if (label) num.textContent = label;
 			tr.appendChild(num);
 			for (let i = 0; i < vars.length; i++) {
 				const v = vars[i];
