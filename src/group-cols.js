@@ -40,7 +40,9 @@ import { markSym } from "./nags.js";
 export function groupedVars(mainV, lines, { isOpen, onToggle } = {}) {
 	const opts = { isOpen: isOpen || (() => false), onToggle: onToggle || null };
 	const trie = buildTrie(lines, mainV);
-	const vars = [mainV];
+	// A synthetic mainV is the empty reference, not a column: with the mainline
+	// disabled there is nothing for it to show and nothing to read it against.
+	const vars = mainV.synthetic ? [] : [mainV];
 	trie.children.forEach((c) => pushNode(opts, c, vars));
 	return vars;
 }
@@ -305,7 +307,13 @@ export function orderedLeaves(mainV, lines) {
 
 export function flatGroupedVars(mainV, lines) {
 	const trie = buildTrie(lines, mainV);
-	const vars = [mainV];
+	// A synthetic mainV is the empty reference, not a column (see table.js), and
+	// its top-level runs go with it: a run is a rule drawn FROM the mainline's
+	// row out to the branch that leaves it, and there is no such row now. The
+	// branches are top-level and leave nothing. Inner groups keep their own
+	// runs, which pushFlat draws.
+	const flat = !!mainV.synthetic;
+	const vars = flat ? [] : [mainV];
 	const spans = [];
 	// The mainline is the root of the tree, so its own branches are connected to
 	// it the same way every other group's are. They do not all leave at the same
@@ -327,9 +335,11 @@ export function flatGroupedVars(mainV, lines) {
 		if (!roots.has(ply)) roots.set(ply, []);
 		roots.get(ply).push(at);
 	});
-	roots.forEach((tees, ply) => {
-		if (ply >= 0) spans.push({ ply, from: 1, to: tees[tees.length - 1], tees });
-	});
+	if (!flat)
+		roots.forEach((tees, ply) => {
+			if (ply >= 0)
+				spans.push({ ply, from: 1, to: tees[tees.length - 1], tees });
+		});
 	return { vars, spans };
 }
 

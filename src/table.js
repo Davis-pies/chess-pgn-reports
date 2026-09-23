@@ -6,7 +6,7 @@
 // and returned as `footNotes` for the prose footnotes section. Comments render
 // as per-line note markers (no row duplication).
 
-import { divergence, mainOf, isMainLine } from "./tree.js";
+import { divergence, mainOf, isMainLine, noMain, EMPTY_MAIN } from "./tree.js";
 import { numberNotes } from "./notes.js";
 import { markSym } from "./nags.js";
 import { visibleLines } from "./visibility.js";
@@ -78,6 +78,30 @@ export function grid(all) {
 		if (tag === "foot") footNotes.push({ ...base, noteByPly });
 		else vars.push({ ...base, cells, noteByPly });
 	});
+	// With the mainline disabled no line yields a mainline var (isMainLine is
+	// false for all of them), so grid builds one for the empty reference itself.
+	// It is KEPT in `vars` rather than dropped because four call sites read the
+	// reference as `vars[0]` and the rest as `vars.slice(1)` (trie-view.js,
+	// print.js) and pass it straight into groupedVars/buildTrie as the
+	// divergence reference -- keeping it there leaves all four unchanged.
+	// It renders as no row: every row loop skips a synthetic var, and
+	// groupedVars/flatGroupedVars never push one as a column.
+	if (noMain())
+		vars.unshift({
+			line: null,
+			tag: "mainline",
+			label: TAG_META.mainline.label,
+			name: "",
+			eval: "",
+			note: "",
+			fen: undefined,
+			moves: EMPTY_MAIN.moves,
+			marks: {},
+			d: 0,
+			cells: {},
+			noteByPly: {},
+			synthetic: true,
+		});
 	// mainline is the top reference row
 	vars.sort(
 		(a, b) => (a.tag === "mainline" ? -1 : 1) - (b.tag === "mainline" ? -1 : 1),
@@ -88,5 +112,5 @@ export function grid(all) {
 		(m, v) => Math.max(m, ...Object.keys(v.cells).map(Number)),
 		0,
 	);
-	return { vars, maxPly, mainMoves: main.moves, footNotes };
+	return { vars, maxPly, mainMoves: main.moves, footNotes, noMain: noMain() };
 }

@@ -3,6 +3,17 @@ import assert from "node:assert";
 import { parsePgn } from "../src/pgn.js";
 import { collectLines } from "../src/tree.js";
 import { grid } from "../src/table.js";
+import { setCurrent } from "../src/state.js";
+
+// grid() reads the No mainline flag off `current` (see tree.js's noMain).
+function withNoMain(fn) {
+	setCurrent({ lines: [], noMain: true });
+	try {
+		return fn();
+	} finally {
+		setCurrent(null);
+	}
+}
 
 function linesFrom(pgn) {
 	return collectLines(parsePgn(pgn).nodes);
@@ -164,4 +175,37 @@ test("a hidden footnote is absent from footNotes", () => {
 		},
 	];
 	assert.equal(grid(lines).footNotes.length, 0);
+});
+
+test("noMain: no line elides a prefix and none is the mainline", () => {
+	withNoMain(() => {
+		const lines = linesFrom("1. e4 e5 (1... c5 2. Nf3) 2. Nf3 Nc6");
+		const g = grid(lines);
+		assert.strictEqual(g.noMain, true);
+		const rows = g.vars.filter((v) => !v.synthetic);
+		assert.ok(rows.length >= 2);
+		for (const v of rows) {
+			assert.strictEqual(v.d, 0);
+			assert.notStrictEqual(v.tag, "mainline");
+			const ellip = Object.values(v.cells).filter((c) => c.cls === "ellip");
+			assert.strictEqual(ellip.length, 0);
+		}
+	});
+});
+
+test("noMain: the mainline var is synthetic and still sorts first", () => {
+	withNoMain(() => {
+		const g = grid(linesFrom("1. e4 e5 (1... c5) 2. Nf3"));
+		assert.strictEqual(g.vars[0].synthetic, true);
+		assert.strictEqual(g.vars[0].tag, "mainline");
+		assert.deepStrictEqual(g.vars[0].moves, []);
+		assert.deepStrictEqual(g.mainMoves, []);
+	});
+});
+
+test("the mainline var is real and not synthetic by default", () => {
+	const g = grid(linesFrom("1. e4 e5 (1... c5) 2. Nf3"));
+	assert.strictEqual(g.vars[0].tag, "mainline");
+	assert.strictEqual(g.vars[0].synthetic, undefined);
+	assert.strictEqual(g.noMain, false);
 });
