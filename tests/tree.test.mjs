@@ -8,7 +8,11 @@ import {
 	leavesOf,
 	countLeaves,
 	forkKeys,
+	EMPTY_MAIN,
+	mainOf,
+	isMainLine,
 } from "../src/tree.js";
+import { setCurrent } from "../src/state.js";
 
 test("collects mainline plus each variation as a line", () => {
 	const { nodes } = parsePgn(
@@ -110,4 +114,36 @@ test("forkKeys names the nodes that really branch, over the whole line set", () 
 		[...forkKeys(kept, main)].every((k) => keys.has(k)),
 		"filtering never invents a key",
 	);
+});
+
+test("mainOf finds the isMain line, or falls back to the first", () => {
+	setCurrent({ lines: [] });
+	const a = { moves: [{ san: "e4", ply: 0 }] };
+	const b = { moves: [{ san: "d4", ply: 0 }], isMain: true };
+	assert.strictEqual(mainOf([a, b]), b);
+	assert.strictEqual(mainOf([a]), a);
+	setCurrent(null);
+});
+
+test("isMainLine is the line's own flag while the mainline is enabled", () => {
+	setCurrent({ lines: [] });
+	assert.strictEqual(isMainLine({ isMain: true }), true);
+	assert.strictEqual(isMainLine({}), false);
+	setCurrent(null);
+});
+
+test("noMain makes the reference an empty line and no line the mainline", () => {
+	setCurrent({ lines: [], noMain: true });
+	const b = { moves: [{ san: "d4", ply: 0 }], isMain: true };
+	assert.strictEqual(mainOf([b]), EMPTY_MAIN);
+	assert.strictEqual(isMainLine(b), false);
+	// which is the whole point: nothing elides a prefix
+	assert.strictEqual(divergence(b, EMPTY_MAIN), 0);
+	setCurrent(null);
+});
+
+test("mainOf survives no state at all", () => {
+	setCurrent(null);
+	const a = { moves: [] };
+	assert.strictEqual(mainOf([a]), a);
 });

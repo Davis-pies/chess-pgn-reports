@@ -5,6 +5,7 @@
 // its own nodes' comments), so note markers render without row duplication.
 
 import { symFor, markOf } from "./nags.js";
+import { getCurrent } from "./state.js";
 
 // The editor fills an unnamed line's name box with a placeholder ("Mainline",
 // "Line 7") and writes it back onto the line, so nearly every line ends up
@@ -16,6 +17,32 @@ export const defaultLineName = (isMain, idx) =>
 	isMain ? "Mainline" : "Line " + idx;
 export const isDefaultLineName = (n) =>
 	!n || n === "Mainline" || /^Line \d+$/.test(n);
+
+// The reference the whole table is measured against.
+//
+// With the mainline disabled it is an EMPTY line, which is the whole feature:
+// divergence() is then 0 for every line, so no line elides a prefix, and
+// buildTrie() roots at ply 1 instead of at each line's divergent tail -- so the
+// group columns scaffold the whole game. No layout code knows about the flag.
+//
+// Frozen because it is shared by every caller in a render, and a renderer that
+// wrote to `.marks` on it would leak into the next one.
+export const EMPTY_MAIN = Object.freeze({
+	moves: [],
+	marks: {},
+	comments: [],
+	synthetic: true,
+});
+
+// The three readers of the flag. `l.isMain` stays on the line and stays
+// persisted (see store.js) -- what the flag changes is every READ of it, which
+// is now a question about the notebook and not only about the line. That is
+// what makes the tickbox lossless: ticking it does not forget which line had
+// been promoted, so unticking restores the table you had.
+export const noMain = () => !!(getCurrent() && getCurrent().noMain);
+export const mainOf = (lines) =>
+	noMain() ? EMPTY_MAIN : lines.find((l) => l.isMain) || lines[0];
+export const isMainLine = (l) => !noMain() && !!l.isMain;
 
 function chainToMoves(chain) {
 	return chain
