@@ -14,7 +14,7 @@
 // siblings and strand marks keyed by a ply that moved.
 
 import { getCurrent, openTablePaths } from "./state.js";
-import { divergence } from "./tree.js";
+import { divergence, mainOf } from "./tree.js";
 import { buildPgn } from "./pgn-out.js";
 import { toLine } from "./analysis.js";
 
@@ -53,7 +53,7 @@ export function commitAll(scratch) {
 // group on its path: the keys are buildTrie's, "ply:san" joined from where the
 // line leaves the mainline. Keys that name no group are simply never asked for.
 function revealInTable(line, lines) {
-	const main = lines.find((l) => l.isMain) || lines[0];
+	const main = mainOf(lines);
 	let key = "";
 	for (const m of line.moves.slice(divergence(line, main))) {
 		key = (key ? key + "/" : "") + m.ply + ":" + m.san;
