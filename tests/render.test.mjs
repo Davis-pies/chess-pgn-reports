@@ -885,3 +885,16 @@ test("movesText numbers each fullmove once, pairing white with black", () => {
 	);
 	assert.strictEqual(movesText([]), "");
 });
+
+test("noMain: no empty card for the absent mainline", () => {
+	const undo = installDom();
+	const st = loadState("1. e4 e5 (1... c5) 2. Nf3");
+	st.noMain = true;
+	const g = grid(st.lines);
+	const box = document.createElement("div");
+	renderCards(box, g, { boardSize: 120 });
+	const cards = box.querySelectorAll(".card");
+	assert.strictEqual(cards.length, g.vars.length - 1);
+	for (const c of cards) assert.ok(c.textContent.trim().length > 0);
+	undo();
+});

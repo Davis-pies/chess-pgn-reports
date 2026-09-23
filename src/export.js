@@ -207,6 +207,7 @@ export function buildMarkdown() {
   if (getCurrent().name) L.push("# " + getCurrent().name, "");
   L.push("## Lines", "");
   for (const v of g.vars) {
+    if (v.synthetic) continue; // the empty reference, not a line
     const lead =
       v.tag === "mainline" ? "**Mainline**" : "- " + v.label.toUpperCase();
     const moves = cardMovesText(v);

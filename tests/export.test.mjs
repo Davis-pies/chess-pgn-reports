@@ -414,3 +414,21 @@ test("the screen notes panel renders a group's members", () => {
   assert.strictEqual(notesPanel().querySelectorAll(".fnode").length, 2);
   off();
 });
+
+test("noMain: Markdown has no Mainline entry", () => {
+  const undo = installDom();
+  const st = loadState("1. e4 e5 (1... c5) 2. Nf3");
+  st.noMain = true;
+  const md = buildMarkdown();
+  assert.ok(!md.includes("**Mainline**"), md);
+  assert.ok(md.includes("e4"), md);
+  assert.ok(md.includes("c5"), md);
+  undo();
+});
+
+test("Markdown leads with the Mainline by default", () => {
+  const undo = installDom();
+  loadState("1. e4 e5 (1... c5) 2. Nf3");
+  assert.ok(buildMarkdown().includes("**Mainline**"));
+  undo();
+});

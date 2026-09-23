@@ -517,7 +517,8 @@ export function renderCards(container, grid, opts = {}) {
 	wrap.className = "cards";
 	// Footnote lines are notes, not cards — they render in the notes block of
 	// whichever card carries their anchor.
-	const all = grid.vars;
+	// A synthetic mainline var is the empty reference, not a row (see table.js).
+	const all = grid.vars.filter((v) => !v.synthetic);
 	for (const v of all) {
 		const card = document.createElement("section");
 		card.className = "card";
