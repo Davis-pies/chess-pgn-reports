@@ -308,3 +308,27 @@ test("parseWorkbook refuses a file written by a newer version", () => {
   });
   assert.throws(() => parseWorkbook(text), /newer version/i);
 });
+
+test("view.noMain rides the workbook", () => {
+  const nb = toNotebook({
+    name: "n",
+    pgn: "1. e4 e5",
+    lines: [{ moves: [{ san: "e4", ply: 0 }], isMain: true }],
+    view: { noMain: true },
+  });
+  assert.strictEqual(nb.view.noMain, true);
+  assert.strictEqual(JSON.parse(JSON.stringify(nb)).view.noMain, true);
+});
+
+test("a promoted mainline is still recorded while noMain is on", () => {
+  const a = { moves: [{ san: "e4", ply: 0 }] };
+  const b = { moves: [{ san: "d4", ply: 0 }], isMain: true };
+  const nb = toNotebook({
+    name: "n",
+    pgn: "",
+    lines: [a, b],
+    view: { noMain: true },
+  });
+  // unticking the box must restore the table the user had
+  assert.strictEqual(nb.main, "d4");
+});

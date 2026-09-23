@@ -57,6 +57,9 @@ function freshState(overrides = {}) {
     pgn: "",
     lines: [],
     showBoards: false,
+    // No mainline: every line is a peer. See tree.js's mainOf/isMainLine --
+    // the flag is read there and nowhere else.
+    noMain: false,
     preview: "table",
     boardSize: 300,
     cardFont: 100,
@@ -244,6 +247,7 @@ function workbookState() {
       printRowPad: c.printRowPad,
       printBranchLines: c.printBranchLines,
       showBoards: c.showBoards,
+      noMain: c.noMain,
       showFinalBoard: c.showFinalBoard,
       showFirstDivBoard: c.showFirstDivBoard,
       showFootNames: c.showFootNames,
@@ -477,6 +481,10 @@ function installNotebook(nb, id) {
       // a saved notebook carries its own board settings; fall back to the
       // session's for notebooks saved before `view` existed
       showBoards: view.showBoards ?? getCurrent().showBoards,
+      // `!!` rather than the neighbours' `??`: the session's own noMain is not
+      // a sensible default to inherit. Opening a notebook saved without the
+      // flag gives you the mainline back, not whatever the last one was doing.
+      noMain: !!view.noMain,
       boardSize: view.boardSize || getCurrent().boardSize,
       cardFont: view.cardFont || getCurrent().cardFont,
       printCards: view.printCards ?? getCurrent().printCards,
@@ -613,6 +621,22 @@ function viewControls() {
     renderApp();
   };
   bar.appendChild(b);
+  const nm = el("label", {}, [
+    "No mainline ",
+    el("input", { type: "checkbox", checked: !!getCurrent().noMain }),
+  ]);
+  nm.title =
+    "every line is a peer: no reference column, and no line is privileged";
+  nm.querySelector("input").onchange = (e) => {
+    getCurrent().noMain = e.target.checked;
+    // The trie now spans the whole game rather than the divergent tails, so
+    // every remembered open path is keyed off a root that no longer exists.
+    openPaths.clear();
+    openTablePaths.clear();
+    setTraced(null);
+    renderApp();
+  };
+  bar.appendChild(nm);
   return bar;
 }
 
