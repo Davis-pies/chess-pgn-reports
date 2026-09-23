@@ -676,3 +676,21 @@ test("the mainline row keeps its tag and no chips by default", () => {
 	assert.strictEqual(row.querySelector("input.ln").value, "Mainline");
 	undo();
 });
+
+test("clicking a lit Focus chip clears the focus", () => {
+	const off = installDom();
+	const s = loadState("1. e4 e5 (1... c5) (1... e6) 2. Nf3");
+	const keep = s.lines.find((l) => l.moves.some((m) => m.san === "c5"));
+	byText(lineEditor(keep, 1), "button", "Focus").click();
+	assert.strictEqual(visibleLines(s.lines).length, 2, "focused");
+	// the chip is lit now, and a second click is the way back out
+	const lit = byText(lineEditor(keep, 1), "button", "Focus");
+	assert.ok(lit.className.includes("on"), "chip is not lit");
+	lit.click();
+	assert.strictEqual(
+		visibleLines(s.lines).length,
+		s.lines.length,
+		"every line is back",
+	);
+	off();
+});

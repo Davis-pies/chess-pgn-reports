@@ -203,13 +203,17 @@ function groupSoloChip(node) {
 		className: "chip solo groupsolo" + (on ? " on" : ""),
 		textContent: "Focus",
 		title: on
-			? "this group is what the notebook is showing"
+			? "showing only this group -- click to show every line again"
 			: "hide every line outside this group",
 	});
 	chip.onclick = (e) => {
 		e.preventDefault();
 		e.stopPropagation();
-		focusLines(leaves);
+		// The chip lights up when this group is what the notebook is showing, so
+		// it has to be the way out of that too -- a lit chip that re-focused the
+		// same group looked like a toggle and did nothing.
+		if (on) clearFocus();
+		else focusLines(leaves);
 	};
 	return chip;
 }
@@ -218,6 +222,14 @@ function groupSoloChip(node) {
 // branch left standing: the table compresses a multi-line branch into a single
 // "N lines" stub by default, and focusing a group only to be shown a stub of it
 // is the opposite of what the click asked for.
+// The way back out of a focus, from either chip -- the same thing the table
+// menu's "Stop focusing" has always done. It leaves the open branches alone:
+// the reader opened those, and a focus ending is no reason to refold them.
+export function clearFocus() {
+	showAll(getCurrent().lines);
+	getRenderHooks().renderApp();
+}
+
 export function focusLines(keep) {
 	solo(getCurrent().lines, keep);
 	openTablePaths.clear();

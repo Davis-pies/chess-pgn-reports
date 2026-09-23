@@ -1260,3 +1260,32 @@ test("Expand all reaches every level; Collapse all returns to one stub", async (
 	assert.strictEqual(shut.length, 1, "back to the one outermost stub");
 	assert.match(shut[0].textContent, /3 lines/);
 });
+
+test("clicking a lit group Focus chip clears the focus", async () => {
+	app.reset();
+	const view = doc("view");
+	view.querySelector("textarea.pgnin").value =
+		"1. e4 e5 (1... c5 2. Nf3) (1... c5 2. Nc3) (1... e6) 2. Nf3";
+	[...view.querySelectorAll("button")]
+		.find((b) => b.textContent.includes("Load"))
+		.click();
+	await tick();
+
+	const chip = () =>
+		doc("view").querySelector(".markup details.lgroup summary .chip.groupsolo");
+	chip().click();
+	await tick();
+	const outside = getCurrent().lines.find((l) =>
+		l.moves.some((m) => m.san === "e6"),
+	);
+	assert.strictEqual(outside.hidden, true, "focused");
+
+	// the group's chip is lit now; clicking it again brings everything back
+	assert.ok(chip().className.includes("on"), "group chip is not lit");
+	chip().click();
+	await tick();
+	assert.ok(
+		getCurrent().lines.every((l) => !l.hidden),
+		"every line is back",
+	);
+});

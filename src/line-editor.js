@@ -13,7 +13,7 @@ import { NAGS, markSym, markOf, nagFor } from "./nags.js";
 import { numberNotes } from "./notes.js";
 import { branchContext } from "./export.js";
 import { visibleLines, setHidden, isFocused } from "./visibility.js";
-import { focusLines } from "./trie-view.js";
+import { focusLines, clearFocus } from "./trie-view.js";
 
 export function lineEditor(l, idx, showBoard = false) {
 	const row = el("div", { className: "ledge" });
@@ -81,10 +81,12 @@ export function lineEditor(l, idx, showBoard = false) {
 			className: "chip solo" + (focused ? " on" : ""),
 			textContent: "Focus",
 			title: focused
-				? "this line is what the notebook is showing"
+				? "showing only this line -- click to show every line again"
 				: "hide every other line",
 		});
-		soloBtn.onclick = () => focusLines([l]);
+		// A lit chip is the way out of the focus as well as into it; without this
+		// it re-focused the same line, which looked like a toggle and did nothing.
+		soloBtn.onclick = () => (focused ? clearFocus() : focusLines([l]));
 		tags.append(hide, soloBtn);
 	}
 	const head = el("div", { className: "ledge-head" });
