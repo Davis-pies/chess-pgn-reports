@@ -1,7 +1,13 @@
 import { fenAt } from "./pgn.js";
 import { appendBoard, fullmoveLabel } from "./render.js";
 import { el } from "./dom.js";
-import { defaultLineName, mainOf, isMainLine, noMain } from "./tree.js";
+import {
+	defaultLineName,
+	isDefaultLineName,
+	mainOf,
+	isMainLine,
+	noMain,
+} from "./tree.js";
 import { getCurrent, getSharedInfo, getRenderHooks } from "./state.js";
 import { NAGS, markSym, markOf, nagFor } from "./nags.js";
 import { numberNotes } from "./notes.js";
@@ -25,7 +31,13 @@ export function lineEditor(l, idx, showBoard = false) {
 	};
 	const isMain = isMainLine(l);
 	// name comes first, pre-populated
-	if (!l.name) l.name = defaultLineName(isMain, idx);
+	// Re-derived on every render, not just when the box is empty: a name this
+	// box wrote is a PLACEHOLDER for the line's position, and the position moves
+	// -- most visibly when No mainline is ticked, which turns the "Mainline" row
+	// into an ordinary peer and shifts everything below it by one. A name the
+	// user actually typed is left alone, which is what isDefaultLineName is for.
+	if (!l.name || isDefaultLineName(l.name))
+		l.name = defaultLineName(isMain, idx);
 	const name = el("input", { className: "ln", value: l.name });
 	name.oninput = () => {
 		l.name = name.value;

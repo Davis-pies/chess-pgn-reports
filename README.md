@@ -23,6 +23,15 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    group turns it into a single note — one `[n]` on the parent at the move the
    group replaces, the moves they share stated once, and their branches listed
    inside it. The chip dims when only some of the group's lines are tagged.
+   **No mainline** in the View row drops the concept entirely: every line
+   becomes a peer, with no reference column and no elided `…` prefix, and the
+   first line is as tag-able, hide-able and footnote-able as any other. Lines
+   are still shown grouped by the moves they share, splitting at each point of
+   divergence — that structure just comes from the lines themselves rather than
+   from a privileged trunk. The setting travels with the notebook, and ticking
+   it doesn't forget which line you had promoted, so unticking restores the
+   table you had. PGN export is the exception: a `.pgn` has no way to say "no
+   mainline", so it keeps writing the first line as the trunk.
 3. **Render** — a table (plies down, lines across), or a linear
    **card** view (each table row with a board diagram of its end position) for
    print — footnotes don't get their own card, since they're not a table row.
