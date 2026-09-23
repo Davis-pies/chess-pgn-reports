@@ -496,3 +496,39 @@ test("a group header opening on a white move still numbers it", () => {
 	);
 	off();
 });
+
+test("noMain: no column is pinned as the mainline", () => {
+	const undo = installDom();
+	const st = loadState("1. e4 e5 (1... c5 2. Nf3 d6) 2. Nf3 Nc6");
+	st.noMain = true;
+	// The trie now roots at ply 1, so the whole game is one group at 1.e4 --
+	// open it to see the fork underneath.
+	openTablePaths.clear();
+	openTablePaths.add("0:e4");
+	const box = document.createElement("div");
+	renderTrieTable(box, grid(st.lines));
+	assert.strictEqual(box.querySelectorAll(".main-col").length, 0);
+	assert.strictEqual(box.querySelectorAll(".var-head.sticky-col").length, 0);
+	// every line is spelled out; nothing is read against a trunk
+	const texts = [...box.querySelectorAll("td, th")].map((n) => n.textContent);
+	assert.ok(texts.some((t) => t.includes("e5")));
+	assert.ok(texts.some((t) => t.includes("c5")));
+	// and the scaffold is there: 1.e4 is shared by both lines, so it is stated
+	// once in the group's own column rather than once per line
+	const e4 = [...box.querySelectorAll("td")].filter(
+		(n) => n.textContent.trim() === "e4",
+	);
+	assert.strictEqual(e4.length, 1, "e4 repeated per line");
+	undo();
+});
+
+test("the mainline column is pinned by default", () => {
+	const undo = installDom();
+	const st = loadState("1. e4 e5 (1... c5) 2. Nf3");
+	openTablePaths.clear();
+	const box = document.createElement("div");
+	renderTrieTable(box, grid(st.lines));
+	assert.ok(box.querySelectorAll(".main-col").length > 0);
+	assert.strictEqual(st.noMain, undefined);
+	undo();
+});

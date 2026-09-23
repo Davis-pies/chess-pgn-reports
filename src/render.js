@@ -217,7 +217,7 @@ function moveCell(c, ply, noteByPly, tag = "td") {
 // report carries no dimming and no click handlers, the same containment the
 // grouping itself has.
 export function renderTable(container, grid, trace) {
-	const { vars, maxPly } = grid;
+	const { vars, maxPly, noMain } = grid;
 	// Group rules (printed report only): one horizontal line per group, drawn
 	// on the row of its last shared move, spanning the columns that continue
 	// from it. See flatGroupedVars in group-cols.js for why the printed table
@@ -343,7 +343,7 @@ export function renderTable(container, grid, trace) {
 			const th = document.createElement("th");
 			th.className =
 				"var-head" +
-				(i === 0 ? " main-col sticky-col" : "") +
+				(i === 0 && !noMain ? " main-col sticky-col" : "") +
 				(v.onclick ? " clickable" : "") +
 				(v.collapsed ? " collapsed" : "") +
 				groupClass(v) +
@@ -431,7 +431,8 @@ export function renderTable(container, grid, trace) {
 					});
 				}
 				c.className += groupClass(v);
-				if (v === vars[0]) c.classList.add("main-col", "sticky-col");
+				if (v === vars[0] && !noMain)
+					c.classList.add("main-col", "sticky-col");
 				tr.appendChild(c);
 			}
 			table.appendChild(tr);
