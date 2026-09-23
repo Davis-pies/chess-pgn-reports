@@ -5,6 +5,7 @@ import { Chess } from "chess.js";
 import { readFileSync } from "node:fs";
 import { parsePgn } from "../src/pgn.js";
 import { collectLines } from "../src/tree.js";
+import { setCurrent } from "../src/state.js";
 import {
 	treeFromLines,
 	buildTree,
@@ -459,4 +460,18 @@ test("every NAG with a glyph round-trips to its own code", () => {
 			wrong.push(`$${n.code} (${n.sym} ${n.label}) -> $${got}`);
 	}
 	assert.deepEqual(wrong, [], "these lost their side:\n" + wrong.join("\n"));
+});
+
+test("noMain: export still emits a trunk with variations", () => {
+	setCurrent({ lines: [], noMain: true });
+	try {
+		const lines = linesOf("1. e4 e5 (1... c5 2. Nf3) 2. Nf3 Nc6");
+		const out = buildPgn({ name: "n", lines });
+		assert.ok(out.includes("1. e4 e5"), out);
+		assert.ok(out.includes("(1... c5"), out);
+		// and it round-trips
+		assert.ok(collectLines(parsePgn(out).nodes).length >= 2);
+	} finally {
+		setCurrent(null);
+	}
 });
