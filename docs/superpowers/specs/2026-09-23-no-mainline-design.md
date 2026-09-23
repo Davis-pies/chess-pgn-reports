@@ -140,9 +140,15 @@ sites become conditional on `!grid.noMain`.
 No change needed: `v.d` is 0 for every line when `noMain`, so `slice(0)` is the
 whole line.
 
-`print.js:174-191` `renderTableNotes` looks the mainline var up by
-`tag === "mainline"`; with `noMain` that find returns the synthetic var, so the
-`showMain` branch must treat a synthetic hit as "no mainline note to show".
+`print.js:174-191` `renderTableNotes` needs no change. It looks the mainline var
+up by `tag === "mainline"` inside the var list it was handed, and
+`flatGroupedVars` has already dropped the synthetic one — so the existing
+`if (mainV)` guard covers it and no note is suppressed as "the mainline's".
+
+`print.js:124` `stemLength([mainV, ...lines])` returns 0, because the synthetic
+var has no moves and the stem is bounded by the shortest. So the printed report
+grows no lead-in stem, and a run of moves several lines share is stated by
+`flatGroupedVars`' group rules, the same way it states any other shared run.
 
 ## 6. Footnotes need almost nothing
 
