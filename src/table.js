@@ -6,7 +6,7 @@
 // and returned as `footNotes` for the prose footnotes section. Comments render
 // as per-line note markers (no row duplication).
 
-import { divergence } from "./tree.js";
+import { divergence, mainOf, isMainLine } from "./tree.js";
 import { numberNotes } from "./notes.js";
 import { markSym } from "./nags.js";
 import { visibleLines } from "./visibility.js";
@@ -22,7 +22,7 @@ export function grid(all) {
 	// Filtering HERE -- ahead of the isMain lookup and numberNotes -- also means
 	// a hidden line consumes no [n] note number and no footnote letter.
 	const lines = visibleLines(all);
-	const main = lines.find((l) => l.isMain) || lines[0];
+	const main = mainOf(lines);
 	// Numbering lives in notes.js so the table's [n] superscripts and the Notes
 	// list cannot drift apart. byLine gives each line its own ply -> [numbers].
 	const { byLine } = numberNotes(lines);
@@ -33,7 +33,7 @@ export function grid(all) {
 	// follow-up, which will need exactly this: the set of lines pulled out of the table.
 	const footNotes = [];
 	lines.forEach((l) => {
-		const isMain = !!l.isMain;
+		const isMain = isMainLine(l);
 		const tag = isMain ? "mainline" : l.tag === "foot" ? "foot" : "sideline";
 		const d = isMain ? 0 : divergence(l, main);
 		const cells = {};

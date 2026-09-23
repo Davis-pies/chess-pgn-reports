@@ -1,7 +1,7 @@
 import { fenAt } from "./pgn.js";
 import { appendBoard, fullmoveLabel } from "./render.js";
 import { el } from "./dom.js";
-import { defaultLineName } from "./tree.js";
+import { defaultLineName, mainOf, isMainLine } from "./tree.js";
 import { getCurrent, getSharedInfo, getRenderHooks } from "./state.js";
 import { NAGS, markSym, markOf, nagFor } from "./nags.js";
 import { numberNotes } from "./notes.js";
@@ -23,7 +23,7 @@ export function lineEditor(l, idx, showBoard = false) {
 		};
 		return b;
 	};
-	const isMain = !!l.isMain;
+	const isMain = isMainLine(l);
 	// name comes first, pre-populated
 	if (!l.name) l.name = defaultLineName(isMain, idx);
 	const name = el("input", { className: "ln", value: l.name });
@@ -143,7 +143,7 @@ export const EVAL_SYMBOLS = [
 // A tappable strip of a line's moves. Clicking a move selects it as the target
 // for the symbol row; the current mark, if any, is shown on the chip.
 export function moveStrip(l) {
-	const mainL = getCurrent().lines.find((x) => x.isMain) || getCurrent().lines[0];
+	const mainL = mainOf(getCurrent().lines);
 	const wrap = el("span", { className: "moves" });
 	wrap.appendChild(
 		el("span", {
@@ -153,7 +153,7 @@ export function moveStrip(l) {
 	);
 	let d = 0;
 	const mv = l.moves;
-	if (!l.isMain)
+	if (!isMainLine(l))
 		while (
 			d < mv.length &&
 			d < mainL.moves.length &&
@@ -161,12 +161,12 @@ export function moveStrip(l) {
 		)
 			d++;
 	// indicate the directly preceding move (where this line diverges)
-	if (!l.isMain) {
+	if (!isMainLine(l)) {
 		const ctx = branchContext(l);
 		if (ctx)
 			wrap.appendChild(el("span", { className: "ctxchip", textContent: ctx }));
 	}
-	const owned = l.isMain ? mv : mv.slice(d);
+	const owned = isMainLine(l) ? mv : mv.slice(d);
 	// markers for this line's moves: numbers for ordinary notes, letters for a
 	// footnote's own sub-notes. byLine already has them keyed by ply, so this
 	// replaces a per-move scan of the whole notes list.

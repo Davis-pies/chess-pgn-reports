@@ -147,7 +147,10 @@ export function divergence(line, main) {
 export function buildTrie(lines, main) {
 	const root = { children: new Map(), leaf: null };
 	for (const l of lines) {
-		if (l.isMain) continue;
+		// isMainLine, not l.isMain: with the mainline disabled the line that
+		// carries the flag is an ordinary peer and belongs IN the trie, which is
+		// what puts it in a group column beside the others.
+		if (isMainLine(l)) continue;
 		const d = divergence(l, main);
 		let node = root;
 		for (const m of l.moves.slice(d)) {

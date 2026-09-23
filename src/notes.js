@@ -1,5 +1,5 @@
 import { getCurrent } from "./state.js";
-import { divergence } from "./tree.js";
+import { divergence, mainOf, isMainLine } from "./tree.js";
 import { footGroups } from "./foot-groups.js";
 import { visibleLines } from "./visibility.js";
 // The tree INSIDE a group footnote — decoration, symbol merging and lettering —
@@ -57,13 +57,13 @@ export function numberNotes(lines, opts = {}) {
 	const byLine = new Map(lines.map((l) => [l, {}]));
 	const seen = new Map(); // "ply|text" -> the number first assigned to it
 	// Fallback parent, and the tie-break winner in parentOf below.
-	const main = lines.find((l) => l.isMain) || lines[0];
+	const main = mainOf(lines);
 	const footEntries = []; // [entry, line] — noteByPly filled in after the loop
 	// A note the editor shared onto a non-footnote line stays a global numbered
 	// note; only notes living exclusively on footnote lines become a footnote's
 	// own lettered sub-notes. Computed up front because a footnote line can be
 	// visited before the sideline that shares its note.
-	const isFoot = (l) => !l.isMain && l.tag === "foot";
+	const isFoot = (l) => !isMainLine(l) && l.tag === "foot";
 	const globalKeys = new Set();
 	lines.forEach((l) => {
 		if (isFoot(l)) return;
@@ -85,7 +85,7 @@ export function numberNotes(lines, opts = {}) {
 		lines.forEach((c) => {
 			if (c === l || isFoot(c)) return;
 			const d = divergence(l, c);
-			if (d > bestD || (d === bestD && c.isMain)) {
+			if (d > bestD || (d === bestD && isMainLine(c))) {
 				best = c;
 				bestD = d;
 			}
@@ -129,7 +129,7 @@ export function numberNotes(lines, opts = {}) {
 		// instead of aliasing the still-empty map in.
 		// A group member is already a child of the group's entry, so it must not
 		// also build a footnote of its own.
-		if (!l.isMain && l.tag === "foot" && main && !grouped.has(l)) {
+		if (!isMainLine(l) && l.tag === "foot" && main && !grouped.has(l)) {
 			const parent = parentOf(l);
 			const d = divergence(l, parent);
 			const ply = anchorPly(parent, d);

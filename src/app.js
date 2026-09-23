@@ -1,6 +1,12 @@
 // Browser glue: import PGN, tag each line, render the table, persist notebook.
 import { parsePgn, fenMap } from "./pgn.js";
-import { collectLines, buildTrie, forkKeys } from "./tree.js";
+import {
+  collectLines,
+  buildTrie,
+  forkKeys,
+  mainOf,
+  isMainLine,
+} from "./tree.js";
 import { grid } from "./table.js";
 import { renderCards, movesText } from "./render.js";
 import {
@@ -643,8 +649,7 @@ function viewControls() {
 function markupPanel() {
   const box = el("div", { className: "markup" });
   // view toggle: grouped (divergence trie) vs flat list
-  const main =
-    getCurrent().lines.find((l) => l.isMain) || getCurrent().lines[0];
+  const main = mainOf(getCurrent().lines);
   const row = el("div", { className: "orow" });
   const grouped = el("button", {
     className: "chip" + (getCurrent().groupView !== "flat" ? " on" : ""),
@@ -718,7 +723,7 @@ function markupPanel() {
   // flat view renders every non-main line in order; grouped uses the trie
   if (getCurrent().groupView === "flat") {
     shown.forEach((l) => {
-      if (!l.isMain)
+      if (!isMainLine(l))
         box.appendChild(lineEditor(l, counter.n++, getCurrent().showBoards));
     });
   } else {

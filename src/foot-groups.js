@@ -1,4 +1,10 @@
-import { buildTrie, leavesOf, countLeaves, divergence } from "./tree.js";
+import {
+	buildTrie,
+	leavesOf,
+	countLeaves,
+	divergence,
+	isMainLine,
+} from "./tree.js";
 
 // Marking a whole trie node as one footnote is derived from the hierarchy, not
 // stored: a node is a group when every line under it is tagged "foot". Building
@@ -6,7 +12,7 @@ import { buildTrie, leavesOf, countLeaves, divergence } from "./tree.js";
 // of the resulting root is the maximal node whose lines are all footnotes, and
 // an untagged sibling passing through the same move simply isn't in the trie.
 
-const isFoot = (l) => !l.isMain && l.tag === "foot";
+const isFoot = (l) => !isMainLine(l) && l.tag === "foot";
 
 // The move run from `node` down its single-child chain to the first fork (or to
 // the end of a line), plus the node it stops on.

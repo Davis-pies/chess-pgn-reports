@@ -7,6 +7,7 @@
 // from files, both directions live here so there is one definition of it.
 
 import { migrateMarks } from "./nags.js";
+import { isMainLine } from "./tree.js";
 
 const PREFIX = "ott:";
 
@@ -84,9 +85,9 @@ export function applyNotebook(nb, lines) {
   // as the mainline it now is rather than as the sideline it was saved as.
   applied.forEach((t, l) => {
     // legacy notebooks used 'main'/'minor'; mainline is now structural
-    l.tag = l.isMain ? undefined : t.tag === "foot" ? "foot" : "sideline";
+    l.tag = isMainLine(l) ? undefined : t.tag === "foot" ? "foot" : "sideline";
     // notebooks saved before hidden existed have no field and load visible
-    l.hidden = !l.isMain && !!t.hidden;
+    l.hidden = !isMainLine(l) && !!t.hidden;
   });
   return lines;
 }

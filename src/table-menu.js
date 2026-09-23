@@ -13,6 +13,7 @@
 // without a mouse on cells that the trace work already made focusable.
 
 import { el } from "./dom.js";
+import { isMainLine } from "./tree.js";
 import { getCurrent, getSharedInfo, getRenderHooks } from "./state.js";
 import { symbolRow, commentEditor, promoteMainline } from "./line-editor.js";
 import { setHidden, solo, isFocused } from "./visibility.js";
@@ -197,7 +198,7 @@ function buildInto(box, target) {
 		box.appendChild(section(line.name || "this line"));
 		// The mainline is the table's reference row: lineEditor offers it none
 		// of these either, and setHidden/solo refuse it at the primitive.
-		if (line.isMain) {
+		if (isMainLine(line)) {
 			box.appendChild(
 				el("div", {
 					className: "tmenu-note",

@@ -1,4 +1,5 @@
 import { grid } from "./table.js";
+import { mainOf, isMainLine } from "./tree.js";
 import {
   fullmoveLabel,
   cardMovesText,
@@ -17,7 +18,7 @@ import { buildPgn } from "./pgn-out.js";
 export function moveRef(ply, owner) {
   // use the owning line's move if given (a variation note at a colliding ply
   // should reference the variation's move, not the mainline's)
-  const pool = owner ? [owner] : getCurrent().lines.filter((l) => l.isMain);
+  const pool = owner ? [owner] : getCurrent().lines.filter((l) => isMainLine(l));
   for (const l of pool) {
     const m = l.moves.find((x) => x.ply === ply);
     if (m) return fullmoveLabel(m.ply) + m.san;
@@ -27,9 +28,8 @@ export function moveRef(ply, owner) {
 
 // "→ <directly preceding move>" so a branched line's divergence point is clear.
 export function branchContext(l) {
-  if (l.isMain) return "";
-  const mainL =
-    getCurrent().lines.find((x) => x.isMain) || getCurrent().lines[0];
+  if (isMainLine(l)) return "";
+  const mainL = mainOf(getCurrent().lines);
   let d = 0;
   const mv = l.moves;
   while (

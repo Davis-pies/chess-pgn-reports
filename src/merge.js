@@ -21,7 +21,7 @@
 //     continuation, so they go to a single line even when one old line now
 //     prefixes several new ones.
 
-import { isDefaultLineName } from "./tree.js";
+import { isDefaultLineName, isMainLine } from "./tree.js";
 
 const sanKey = (line) => line.moves.map((m) => m.san).join(" ");
 
@@ -206,8 +206,8 @@ export function mergeAnnotations(oldLines, newLines, { keepDropped = false } = {
 	// Same normalisation store.js applies on load: the mainline is structural,
 	// so it carries no tag and is never hidden.
 	newLines.forEach((l) => {
-		l.tag = l.isMain ? undefined : l.tag === "foot" ? "foot" : "sideline";
-		l.hidden = !l.isMain && !!l.hidden;
+		l.tag = isMainLine(l) ? undefined : l.tag === "foot" ? "foot" : "sideline";
+		l.hidden = !isMainLine(l) && !!l.hidden;
 	});
 
 	let exact = 0;

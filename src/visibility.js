@@ -9,6 +9,8 @@
 // solo() are the only writers and both refuse l.isMain, so no caller can route
 // around that rule.
 
+import { isMainLine } from "./tree.js";
+
 export function visibleLines(lines) {
 	return lines.filter((l) => !l.hidden);
 }
@@ -22,7 +24,7 @@ export function hiddenLines(lines) {
 // carries a falsy value that means nothing.
 export function setHidden(targets, on) {
 	targets.forEach((l) => {
-		if (l.isMain) return;
+		if (isMainLine(l)) return;
 		if (on) l.hidden = true;
 		else delete l.hidden;
 	});
@@ -42,9 +44,9 @@ export function showAll(lines) {
 // honest after a reload, a manual hide, or a Show all. The mainline is excluded
 // from both sides because it is never hidden in the first place.
 export function isFocused(all, keep) {
-	const want = new Set(keep.filter((l) => !l.isMain));
+	const want = new Set(keep.filter((l) => !isMainLine(l)));
 	if (!want.size) return false;
-	const shown = all.filter((l) => !l.hidden && !l.isMain);
+	const shown = all.filter((l) => !l.hidden && !isMainLine(l));
 	return shown.length === want.size && shown.every((l) => want.has(l));
 }
 
