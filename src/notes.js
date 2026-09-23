@@ -90,7 +90,10 @@ export function numberNotes(lines, opts = {}) {
 				bestD = d;
 			}
 		});
-		return best || main;
+		// `main` is the fallback, but with the mainline disabled it is the EMPTY
+		// reference -- a line with no moves, no row and no card, so a note filed
+		// against it would render nowhere. No candidate then means no anchor.
+		return best || (main.synthetic ? null : main);
 	};
 	// Group footnotes. A whole all-foot trie node is ONE entry: its members are
 	// nested children of that entry instead of separate notes, and the parent
@@ -109,6 +112,7 @@ export function numberNotes(lines, opts = {}) {
 	groups.forEach((g) => {
 		const pseudo = stemLine(g);
 		const parent = parentOf(pseudo);
+		if (!parent) return; // nothing in the table for this note to hang off
 		const d = divergence(pseudo, parent);
 		const ply = anchorPly(parent, d);
 		const n = entries.length + 1;
@@ -129,8 +133,17 @@ export function numberNotes(lines, opts = {}) {
 		// instead of aliasing the still-empty map in.
 		// A group member is already a child of the group's entry, so it must not
 		// also build a footnote of its own.
-		if (!isMainLine(l) && l.tag === "foot" && main && !grouped.has(l)) {
-			const parent = parentOf(l);
+		// `parentOf` can come back empty when the mainline is disabled and this
+		// footnote is the only line left to anchor on -- there is then nothing in
+		// the table to carry its [n], so no entry is built. Its own comments are
+		// still processed below: they stay ordinary numbered notes rather than
+		// vanishing with the footnote they could not be filed under.
+		const anchor =
+			!isMainLine(l) && l.tag === "foot" && main && !grouped.has(l)
+				? parentOf(l)
+				: null;
+		if (anchor) {
+			const parent = anchor;
 			const d = divergence(l, parent);
 			const ply = anchorPly(parent, d);
 			const n = entries.length + 1;

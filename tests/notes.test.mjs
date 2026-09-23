@@ -762,3 +762,28 @@ test("hiding a group's members dissolves the footnote group", () => {
 		"the surviving footnote is still listed",
 	);
 });
+
+test("noMain: a footnote anchors on the line it shares most moves with", () => {
+	const s = loadState("1. e4 e5 (1... c5 2. Nf3 d6) 2. Nf3 Nc6", {
+		tags: { 1: "foot" },
+	});
+	s.noMain = true;
+	// a {comment} inside a variation swallows the moves after it, so the note
+	// goes on the line directly
+	const foot = s.lines[1];
+	foot.comments = [{ text: "the Sicilian", ply: foot.moves.at(-1).ply }];
+	const { entries } = numberNotes(s.lines);
+	const e = entries.find((x) => x.foot);
+	assert.ok(e, "no footnote entry");
+	assert.ok(e.owner, "footnote has no owner");
+	assert.ok(e.owner.moves.length > 0, "anchored on an empty line");
+});
+
+test("noMain: a notebook of nothing but one footnote files no anchor", () => {
+	const s = loadState("1. e4 e5", { tags: { 0: "foot" } });
+	s.noMain = true;
+	s.lines[0].tag = "foot";
+	const { entries } = numberNotes(s.lines);
+	for (const e of entries)
+		assert.ok(!e.owner || e.owner.moves.length > 0, "anchored on an empty line");
+});
