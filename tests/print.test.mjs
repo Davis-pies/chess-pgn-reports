@@ -861,3 +861,20 @@ test("branch lines can be left off the printed table without moving a column", (
   assert.deepStrictEqual(cols(box), withLines, "same columns in the same order");
   off();
 });
+
+test("noMain: the printed report has no mainline column and no stem", () => {
+  const undo = installDom();
+  const st = loadState("1. e4 e5 (1... c5 2. Nf3 d6) 2. Nf3 Nc6 3. Bb5");
+  st.noMain = true;
+  const box = document.createElement("div");
+  appendPrintTables(box, grid(st.lines));
+  assert.strictEqual(box.querySelectorAll(".print-stem").length, 0);
+  assert.strictEqual(box.querySelectorAll(".main-col").length, 0);
+  const heads = [...box.querySelectorAll(".var-head")].map((n) => n.textContent);
+  assert.ok(!heads.includes("Mainline"), heads.join("|"));
+  // every line still reaches paper
+  const text = box.textContent;
+  assert.ok(text.includes("Bb5"), text);
+  assert.ok(text.includes("d6"), text);
+  undo();
+});
