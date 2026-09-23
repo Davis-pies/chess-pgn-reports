@@ -481,3 +481,23 @@ test("a header menu draws no board — a header has no move", () => {
 	closeTableMenu();
 	off();
 });
+
+test("noMain: the line that carries isMain gets the ordinary line actions", () => {
+	const off = installDom();
+	const s = loadState(GROUP);
+	s.noMain = true;
+	openTablePaths.clear();
+	// the trie roots at ply 1 now, so open the whole game's group then the fork
+	openTablePaths.add("0:e4");
+	setTraced(null);
+	const box = document.createElement("div");
+	renderTrieTable(box, grid(s.lines));
+	const menu = rightClick(box, "e5");
+	const labels = items(menu);
+	assert.ok(!labels.some((t) => t.includes("Make mainline")), labels.join("|"));
+	assert.ok(labels.includes("Move to footnote"), labels.join("|"));
+	assert.ok(labels.includes("Hide"), labels.join("|"));
+	assert.strictEqual(menu.querySelectorAll(".tmenu-note").length, 0);
+	closeTableMenu();
+	off();
+});

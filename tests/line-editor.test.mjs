@@ -652,3 +652,27 @@ test("geometric-shape glyphs are flagged for their own optical size", () => {
 	assert.deepStrictEqual(geo.sort(), ["△", "○", "□"].sort());
 	off();
 });
+
+test("noMain: every row gets the tag chips and no promote button", () => {
+	const undo = installDom();
+	const st = loadState("1. e4 e5 (1... c5) 2. Nf3");
+	st.noMain = true;
+	const row = lineEditor(st.lines[0], 1, false);
+	const labels = [...row.querySelectorAll("button")].map((b) => b.textContent);
+	assert.ok(!labels.some((t) => t.includes("Make mainline")), labels.join("|"));
+	assert.ok(labels.includes("Sideline"));
+	assert.ok(labels.includes("Footnote"));
+	assert.ok(labels.includes("Hide"));
+	assert.strictEqual(row.querySelectorAll(".maintag").length, 0);
+	assert.strictEqual(row.querySelector("input.ln").value, "Line 1");
+	undo();
+});
+
+test("the mainline row keeps its tag and no chips by default", () => {
+	const undo = installDom();
+	const st = loadState("1. e4 e5 (1... c5) 2. Nf3");
+	const row = lineEditor(st.lines[0], 0, false);
+	assert.strictEqual(row.querySelectorAll(".maintag").length, 1);
+	assert.strictEqual(row.querySelector("input.ln").value, "Mainline");
+	undo();
+});

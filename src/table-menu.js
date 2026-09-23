@@ -13,7 +13,7 @@
 // without a mouse on cells that the trace work already made focusable.
 
 import { el } from "./dom.js";
-import { isMainLine } from "./tree.js";
+import { isMainLine, noMain } from "./tree.js";
 import { getCurrent, getSharedInfo, getRenderHooks } from "./state.js";
 import { symbolRow, commentEditor, promoteMainline } from "./line-editor.js";
 import { setHidden, solo, isFocused } from "./visibility.js";
@@ -206,9 +206,8 @@ function buildInto(box, target) {
 				}),
 			);
 		} else {
-			box.appendChild(
-				item("★ Make mainline", () => promoteMainline(line)),
-			);
+			if (!noMain())
+				box.appendChild(item("★ Make mainline", () => promoteMainline(line)));
 			lineActions(box, [line]);
 		}
 	}

@@ -6,6 +6,7 @@ import {
   forkKeys,
   mainOf,
   isMainLine,
+  noMain,
 } from "./tree.js";
 import { grid } from "./table.js";
 import { renderCards, movesText } from "./render.js";
@@ -689,7 +690,8 @@ function markupPanel() {
     });
     row.append(all, none);
   }
-  // bulk hide/show, in both views: the mainline is never affected
+  // bulk hide/show, in both views: the mainline, when there is one, is never
+  // affected
   const hideEvery = el("button", {
     className: "chip mini",
     textContent: "Hide all",
@@ -710,12 +712,15 @@ function markupPanel() {
   box.appendChild(row);
   box.appendChild(
     el("h3", {
-      textContent:
-        "The mainline is the reference row. Promote a sideline to make it the mainline; tag the rest Sideline or Footnote.",
+      textContent: noMain()
+        ? "Every line is a peer. Tag each one Sideline or Footnote; lines are shown grouped by the moves they share."
+        : "The mainline is the reference row. Promote a sideline to make it the mainline; tag the rest Sideline or Footnote.",
     }),
   );
-  // mainline first, then the side lines grouped as a trie of shared divergence
-  box.appendChild(lineEditor(main, 0, getCurrent().showBoards));
+  // mainline first, then the side lines grouped as a trie of shared divergence.
+  // With the mainline disabled there is no row above the trie: `main` is the
+  // empty reference, and every real line is in the trie below.
+  if (!noMain()) box.appendChild(lineEditor(main, 0, getCurrent().showBoards));
   const counter = { n: 1 };
   // hidden lines leave BOTH editor views and live in the drawer below
   const shown = visibleLines(getCurrent().lines);

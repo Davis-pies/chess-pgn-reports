@@ -1,7 +1,7 @@
 import { fenAt } from "./pgn.js";
 import { appendBoard, fullmoveLabel } from "./render.js";
 import { el } from "./dom.js";
-import { defaultLineName, mainOf, isMainLine } from "./tree.js";
+import { defaultLineName, mainOf, isMainLine, noMain } from "./tree.js";
 import { getCurrent, getSharedInfo, getRenderHooks } from "./state.js";
 import { NAGS, markSym, markOf, nagFor } from "./nags.js";
 import { numberNotes } from "./notes.js";
@@ -39,14 +39,17 @@ export function lineEditor(l, idx, showBoard = false) {
 		);
 	} else {
 		tags.append(btn("sideline", "Sideline"), btn("foot", "Footnote"));
-		const promote = el("button", {
-			className: "chip",
-			textContent: "★ Make mainline",
-		});
-		promote.onclick = () => {
-			promoteMainline(l);
-		};
-		tags.appendChild(promote);
+		// Nothing to promote to when the mainline is disabled.
+		if (!noMain()) {
+			const promote = el("button", {
+				className: "chip",
+				textContent: "★ Make mainline",
+			});
+			promote.onclick = () => {
+				promoteMainline(l);
+			};
+			tags.appendChild(promote);
+		}
 		// Hide/Focus sit with the tag chips, and only on a non-mainline row --
 		// the mainline is the table's reference row and is never hidable.
 		const hide = el("button", {

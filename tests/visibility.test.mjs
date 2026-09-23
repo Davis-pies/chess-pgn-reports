@@ -9,6 +9,7 @@ import {
 	solo,
 	isFocused,
 } from "../src/visibility.js";
+import { setCurrent } from "../src/state.js";
 
 // four lines: the mainline plus three sidelines
 const mk = () => [
@@ -125,4 +126,25 @@ test("isFocused reads the current focus back off the lines", () => {
 test("isFocused is false when nothing could be focused", () => {
 	const { lines } = tree();
 	assert.ok(!isFocused(lines, []), "an empty selection focuses nothing");
+});
+
+test("noMain: the line carrying isMain can be hidden and soloed", () => {
+	const a = { moves: [{ san: "e4", ply: 0 }], isMain: true };
+	const b = { moves: [{ san: "d4", ply: 0 }] };
+	setCurrent({ lines: [a, b], noMain: true });
+	setHidden([a], true);
+	assert.equal(a.hidden, true);
+	solo([a, b], [b]);
+	assert.equal(a.hidden, true);
+	assert.equal(b.hidden, undefined);
+	assert.equal(isFocused([a, b], [b]), true);
+	setCurrent(null);
+});
+
+test("the mainline is still never hidden by default", () => {
+	const a = { moves: [{ san: "e4", ply: 0 }], isMain: true };
+	setCurrent({ lines: [a] });
+	setHidden([a], true);
+	assert.equal(a.hidden, undefined);
+	setCurrent(null);
 });
