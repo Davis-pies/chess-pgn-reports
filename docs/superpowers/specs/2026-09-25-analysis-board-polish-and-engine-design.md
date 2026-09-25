@@ -33,9 +33,9 @@ so the notebook that opens is an ordinary one.
 
 ## Engine (D)
 
-**Choice.** Stockfish 18 *lite, single-threaded* WebAssembly build from the
+**Choice.** Stockfish 19 *lite, single-threaded* WebAssembly build from the
 `stockfish` npm package, vendored under `vendor/stockfish/` (21 KB JS +
-7.3 MB wasm). Single-threaded because multi-threaded WASM needs
+1.8 MB wasm; first shipped as Stockfish 18 at 7.3 MB). Single-threaded because multi-threaded WASM needs
 cross-origin-isolation headers that GitHub Pages cannot send. Vendored rather
 than loaded from a CDN because a Worker must be same-origin and the build
 locates its `.wasm` next to its own script. Loaded only when the engine is
@@ -64,6 +64,30 @@ first switched on. GPL-3.0, run as a separate program over UCI; noted in
 not a scratch change: the panel installs `engine.onUpdate`, which repaints
 the engine box, eval bar and arrows in place. That keeps typing a note and
 dragging a piece undisturbed by a running search.
+
+## Full-strength build
+
+Stockfish 19's full single-threaded build (same program, full-size network)
+is a 99 MB `.wasm` — too big for the repository (GitHub warns past 50 MB and
+refuses 100 MB) and for a page load. Only its 21 KB loader is vendored.
+
+- `engine-store.js` downloads the `.wasm` on request from unpkg, falling back
+  to jsDelivr, streaming for a progress bar and checking the `\0asm` magic
+  before storing it in IndexedDB. A user-picked file is accepted the same way,
+  for networks that block both mirrors.
+- The loader reads its `.wasm` URL from its own hash, so the stored blob is
+  handed over as a `blob:` URL and later visits make no network request.
+- `engine-flavor.js` owns the lite/full choice, the download box's state and
+  a `localStorage` preference; `engine.swap(factory)` ends the old worker,
+  clears the eval cache (different engine, different results) and picks up
+  the position on the new one.
+
+Verified in headless Chromium (mirror requests redirected to a local copy,
+since the dev container cannot reach the CDNs): one download, then after a
+reload the full engine started from IndexedDB with no fetch. The full build
+reached depth 18 from the start position in 0.4 s on ~113k nodes. Whether
+unpkg/jsDelivr serve a 99 MB file from a 160 MB package is unverified here;
+the manual-file path covers the case that they do not.
 
 ## Testing
 

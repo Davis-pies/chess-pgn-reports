@@ -40,6 +40,7 @@ import {
 import { analysisPanel } from "./analysis-view.js";
 import { newScratch, seedLine } from "./analysis.js";
 import { sharedEngine } from "./engine.js";
+import { sharedFlavors } from "./engine-flavor.js";
 import { allNotes } from "./notes.js";
 import {
   visibleLines,
@@ -481,7 +482,11 @@ function analysisOverlay() {
   const ov = el("div", { className: "modal-overlay an-overlay" });
   ov.onclick = (e) => e.target === ov && close();
   ov.onkeydown = (e) => e.key === "Escape" && close();
-  const an = analysisPanel(getScratch(), renderApp, { onAdded: close, engine });
+  const an = analysisPanel(getScratch(), renderApp, {
+    onAdded: close,
+    engine,
+    flavors: sharedFlavors(),
+  });
   const head = el("div", { className: "an-head" }, [
     el("h3", { textContent: "Analysis" }),
     el("button", {

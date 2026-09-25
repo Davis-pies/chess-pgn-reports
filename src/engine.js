@@ -100,7 +100,7 @@ export function numberedFrom(fen, sans) {
 }
 
 // depth 0 means "until stopped". Hash is in MB; 64 is roomy for analysis
-// and small beside the 7MB the engine itself takes.
+// and small beside the engine itself.
 const DEFAULTS = { multiPv: 3, depth: 22, throttle: 120, hash: 64, cacheSize: 2000 };
 
 // The controller the view talks to. `makeWorker` returns something with
@@ -332,6 +332,22 @@ export function createEngine(makeWorker, opts = {}) {
 			override = 0;
 			next();
 		},
+		// Run a different build (lite or full). Its results are not the old
+		// one's, so the cache starts over; the position being analysed, if
+		// any, is picked up by the new engine.
+		swap(factory) {
+			const fen = wanted;
+			this.quit();
+			makeWorker = factory;
+			cache.clear();
+			state.lines = [];
+			state.depth = 0;
+			wanted = null;
+			if (state.enabled) {
+				state.status = "idle";
+				if (fen) this.analyse(fen);
+			}
+		},
 		quit() {
 			if (worker) {
 				send("quit");
@@ -343,17 +359,18 @@ export function createEngine(makeWorker, opts = {}) {
 	};
 }
 
-// The app's engine: one per page, created on first use. The worker path is
-// resolved against this module, so it holds wherever the site is hosted.
+// The app's engine: one per page, created on first use, running the lite
+// build until the full one is chosen. Worker paths are resolved against this
+// module, so they hold wherever the site is hosted.
+const script = (name) => new URL(`../vendor/stockfish/${name}`, import.meta.url);
+export const liteWorker = () => new Worker(script("stockfish-19-lite-single.js"));
+// The full build's .wasm comes from browser storage, handed over by URL in
+// the loader's hash (the loader reads it from there).
+export const fullWorker = (wasmUrl) => () =>
+	new Worker(script("stockfish-19-single.js") + "#" + encodeURIComponent(wasmUrl));
+
 let shared = null;
 export function sharedEngine() {
-	if (!shared) {
-		shared = createEngine(
-			() =>
-				new Worker(
-					new URL("../vendor/stockfish/stockfish-18-lite-single.js", import.meta.url),
-				),
-		);
-	}
+	if (!shared) shared = createEngine(liteWorker);
 	return shared;
 }

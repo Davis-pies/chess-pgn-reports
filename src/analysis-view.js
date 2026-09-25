@@ -34,6 +34,7 @@ import {
 import { commitAll, commitLine, inNotebook } from "./analysis-commit.js";
 import { commentEditor } from "./line-editor.js";
 import { formatScore, numberedFrom, whiteShare } from "./engine.js";
+import { FULL } from "./engine-store.js";
 
 // "1.e4 e5 2.Nf3". Deliberately not render.js's movesText: that one formats a
 // notebook line's divergent tail against a mainline, which a scratch has no
@@ -49,7 +50,11 @@ const noteOn = (line, ply) =>
 
 const BOARD_SIZE = 480; // viewBox units; CSS scales it to the column
 
-export function analysisPanel(scratch, onChange, { onAdded = onChange, engine = null } = {}) {
+export function analysisPanel(
+	scratch,
+	onChange,
+	{ onAdded = onChange, engine = null, flavors = null } = {},
+) {
 	// tabIndex -1 rather than 0: the panel is focusable so the arrow keys have
 	// somewhere to land, but it is not a tab stop of its own -- tabbing should
 	// still walk the actual controls. app.js focuses it after appending.
@@ -155,7 +160,7 @@ export function analysisPanel(scratch, onChange, { onAdded = onChange, engine = 
 
 	// ---- right column: engine, lines, note, commit
 	const right = el("div", { className: "an-right" });
-	if (engine) right.appendChild(engineBox(engine, scratch, pos, onChange, { board, bar }));
+	if (engine) right.appendChild(engineBox(engine, scratch, pos, onChange, { board, bar, flavors }));
 
 	const listHead = el("div", { className: "an-sec" }, [
 		el("span", { textContent: `Your lines (${scratch.lines.filter((l) => l.moves.length).length})` }),
@@ -296,7 +301,7 @@ function moveLabel(s) {
 
 // The engine's corner. Built once per panel; `paint` refills it from the
 // engine's state and is what the engine calls as its output comes in.
-function engineBox(engine, scratch, pos, onChange, { board, bar }) {
+function engineBox(engine, scratch, pos, onChange, { board, bar, flavors }) {
 	const box = el("div", { className: "an-engine" });
 	const on = engine.state.enabled;
 	const toggle = el("button", {
@@ -326,7 +331,16 @@ function engineBox(engine, scratch, pos, onChange, { board, bar }) {
 			pick("an-engine-depth", "How deep to search", [[16, "depth 16"], [20, "depth 20"], [22, "depth 22"], [26, "depth 26"], [30, "depth 30"], [0, "∞ no limit"]], engine.depth, (d) => engine.setDepth(d)),
 		);
 	}
+	if (on && flavors) {
+		const f = el("select", { className: "an-engine-flavor", title: "Which Stockfish 19 to run" });
+		[["lite", "Lite · 1.8 MB"], ["full", "Full · 99 MB"]].forEach(([v, text]) => {
+			f.appendChild(el("option", { value: v, textContent: text, selected: v === flavors.state.flavor }));
+		});
+		f.onchange = () => flavors.choose(f.value);
+		opts.prepend(f);
+	}
 	box.appendChild(el("div", { className: "an-engine-head" }, [toggle, info, opts]));
+	if (flavors) box.appendChild(fullBox(flavors));
 	const lines = el("div", { className: "an-pvs" });
 	box.appendChild(lines);
 	const deeper = el("button", {
@@ -340,7 +354,7 @@ function engineBox(engine, scratch, pos, onChange, { board, bar }) {
 		const fresh = st.fen === pos.fen;
 		bar.hidden = !st.enabled;
 		if (!st.enabled) {
-			info.textContent = "Stockfish 18, on this device";
+			info.textContent = "Stockfish 19, on this device";
 			lines.replaceChildren();
 			drawArrows(board, []);
 			return;
@@ -418,5 +432,68 @@ function engineBox(engine, scratch, pos, onChange, { board, bar }) {
 	engine.onUpdate = paint;
 	paint(engine.state);
 	if (on && !pos.over) engine.analyse(pos.fen);
+	return box;
+}
+
+// Getting the full engine: offered when it is chosen and not yet on this
+// device, with the download's progress, and a way round a blocked download.
+// Painted in place from the flavor manager's state, like the engine box.
+function fullBox(flavors) {
+	const box = el("div", { className: "an-full" });
+	const fileIn = el("input", { type: "file", accept: ".wasm,application/wasm", hidden: true });
+	fileIn.onchange = () => fileIn.files[0] && flavors.loadFile(fileIn.files[0]);
+	const btn = (cls, text, onclick, primary) =>
+		el("button", { className: "chip mini " + cls + (primary ? " primary" : ""), textContent: text, onclick });
+	const MB = (n) => (n / 1048576).toFixed(0);
+	const paint = (st) => {
+		box.hidden = !st.offer && st.status !== "downloading" && st.flavor !== "full";
+		if (st.flavor === "full" && !st.offer) {
+			box.replaceChildren(
+				el("span", { className: "an-full-note", textContent: "Full engine, loaded from this browser." }),
+				btn("an-full-forget", "Remove download", () => flavors.forget()),
+			);
+			return;
+		}
+		if (st.status === "downloading") {
+			const pct = st.total ? (st.loaded / st.total) * 100 : 0;
+			box.replaceChildren(
+				el("span", { className: "an-full-note", textContent: `Downloading the full engine… ${MB(st.loaded)} of ${MB(st.total)} MB` }),
+				el("div", { className: "an-progress" }, [el("div", { style: `width:${pct.toFixed(1)}%` })]),
+			);
+			return;
+		}
+		const kids = [];
+		if (st.status === "error") {
+			const link = el("a", { href: FULL.manual, target: "_blank", rel: "noopener", textContent: "Stockfish.js releases" });
+			kids.push(
+				el("div", { className: "an-full-err" }, [
+					`Could not get the full engine: ${st.error}. You can download `,
+					el("code", { textContent: "stockfish-19-single.wasm" }),
+					" from the ",
+					link,
+					" page yourself and load it here.",
+				]),
+			);
+		} else {
+			kids.push(
+				el("span", {
+					className: "an-full-note",
+					textContent:
+						"The full engine is much stronger, and a one-time 99 MB download. It is kept in this browser, so it is only fetched once.",
+				}),
+			);
+		}
+		kids.push(
+			el("div", { className: "orow an-full-acts" }, [
+				btn("an-full-get", st.status === "error" ? "Try again" : "Download 99 MB", () => flavors.download(), true),
+				btn("an-full-file", "Load file…", () => fileIn.click()),
+				btn("an-full-cancel", "Not now", () => flavors.choose("lite")),
+			]),
+			fileIn,
+		);
+		box.replaceChildren(...kids);
+	};
+	flavors.onUpdate = paint;
+	paint(flavors.state);
 	return box;
 }

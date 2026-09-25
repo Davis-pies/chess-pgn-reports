@@ -1521,3 +1521,11 @@ sup {
 .an-msg { font-size: .85rem; color: var(--warn); overflow-wrap: anywhere; white-space: pre-wrap; max-height: 8rem; overflow: auto; }
 .an-tools { flex-wrap: wrap; gap: .3rem; padding-top: .5rem; border-top: 1px solid var(--line); }
 .an-engine-acts { gap: .3rem; }
+.an-full { display: flex; flex-direction: column; gap: .35rem; font-size: .82rem; padding: .4rem .5rem; border-radius: 6px; background: color-mix(in srgb, var(--main) 7%, transparent); }
+.an-full[hidden] { display: none; }
+.an-full:has(.an-full-forget) { flex-direction: row; align-items: center; justify-content: space-between; background: none; padding: 0; }
+.an-full-note { color: var(--muted); }
+.an-full-err { color: var(--warn); }
+.an-full-acts { gap: .3rem; flex-wrap: wrap; }
+.an-progress { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.an-progress > div { height: 100%; background: var(--main); transition: width .2s; }

@@ -58,14 +58,20 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
      played, which goes into the notebook with the line.
    - **Copying** — **Copy FEN** for the position, **Copy PGN** for every line
      on the board as one game with variations.
-   - **Engine** — **Engine off/on** runs Stockfish 18 (the lite WebAssembly
-     build) *on your own device*, in a background worker: nothing is sent
-     anywhere, and its 7 MB is only downloaded the first time you switch it
-     on. It shows an eval bar beside the board, the top lines (1–5) with
-     scores from White's side, and arrows for their first moves. Click any move
-     in a line to play the line up to it. Search depth is adjustable (up to
-     unlimited); **Go deeper** keeps searching a finished position, and
-     **Note eval** writes the verdict into the current move's note.
+   - **Engine** — **Engine off/on** runs Stockfish 19 *on your own device*,
+     in a background worker: nothing is sent anywhere. Two builds:
+     **Lite** (1.8 MB, bundled with the app, downloaded the first time you
+     switch the engine on) and **Full** (99 MB, noticeably stronger).
+     Choosing Full offers a one-time download, which is kept in the browser
+     (IndexedDB) so later visits start it from disk; if the download is
+     blocked, you can download `stockfish-19-single.wasm` yourself from the
+     [Stockfish.js releases](https://github.com/nmrugg/stockfish.js/releases/tag/v19.0.0)
+     and load the file. **Remove download** frees the space again. The engine
+     shows an eval bar beside the board, the top lines (1–5) with scores from
+     White's side, and arrows for their first moves. Click any move in a line
+     to play the line up to it. Search depth is adjustable (up to unlimited);
+     **Go deeper** keeps searching a finished position, and **Note eval**
+     writes the verdict into the current move's note.
      Evaluations are cached per position, so stepping back to a position shows
      its best result at once, and a search picks up from the depth already
      reached instead of starting over (the engine's own hash table is kept
@@ -234,8 +240,10 @@ Because it's fully client-side, the same URL works on your phone's browser.
 | `src/board-input.js` | the interactive board over `render.js`'s SVG: click, drag and touch input, promotion, highlights, arrows |
 | `src/analysis-view.js` | the analysis window: board, lines, notes, engine box, commit bar |
 | `src/analysis-commit.js` | the only write from the board into the notebook (line + regenerated PGN) |
-| `src/engine.js` | local Stockfish in a Web Worker over UCI: search sequencing, per-position eval cache, SAN conversion |
-| `vendor/stockfish/` | Stockfish 18 lite single-threaded WebAssembly build (GPL-3.0, unmodified) |
+| `src/engine.js` | local Stockfish in a Web Worker over UCI: search sequencing, per-position eval cache, SAN conversion, swapping builds |
+| `src/engine-store.js` | the full build's one-time download (with progress and mirror fallback) and its IndexedDB copy |
+| `src/engine-flavor.js` | which build runs (lite/full), the download box's state, the viewer's preference |
+| `vendor/stockfish/` | Stockfish 19 single-threaded (lite bundled, full loader) WebAssembly build (GPL-3.0, unmodified) |
 | `src/app.js` | browser glue: import, tag buttons, orientation toggle, print |
 
 A variation's first move is an **alternative at the same ply** as the move it
