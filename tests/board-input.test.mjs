@@ -117,7 +117,7 @@ test("a promoting move asks which piece before it is played", () => {
 	const picker = board.querySelector(".an-promo");
 	assert.ok(picker, "the picker opened");
 	assert.deepStrictEqual(
-		[...picker.querySelectorAll("button")].map((b) => b.dataset.piece),
+		[...picker.querySelectorAll(".an-promo-pick")].map((b) => b.dataset.piece),
 		["q", "r", "b", "n"],
 	);
 	done();
@@ -193,5 +193,138 @@ test("a dragged piece follows the mouse and snaps back if dropped off the board"
 	assert.strictEqual(piece().getAttribute("transform"), null, "and no longer following");
 	assert.deepStrictEqual(seen, []);
 	board.remove();
+	done();
+});
+
+// ---- highlights, move hints, arrows, touch
+
+import { drawArrows } from "../src/board-input.js";
+
+test("the last move and a king in check are marked", () => {
+	const done = installDom();
+	const board = interactiveBoard(START, () => {}, {
+		lastMove: { from: "e2", to: "e4" },
+		check: "e8",
+	});
+	assert.deepStrictEqual(marked(board, "last"), ["e2", "e4"]);
+	assert.deepStrictEqual(marked(board, "check"), ["e8"]);
+	done();
+});
+
+test("picking a piece draws a dot on each target, a ring round a capture", () => {
+	const done = installDom();
+	// white knight on e4 can take the pawn on d6 or go to empty squares
+	const board = interactiveBoard("4k3/8/3p4/8/4N3/8/8/4K3 w - - 0 1", () => {});
+	on(board, "e4", "mousedown");
+	const hints = [...board.querySelectorAll(".an-hint")];
+	assert.strictEqual(hints.length, 8);
+	const takes = hints.filter((h) => h.classList.contains("take")).map((h) => h.getAttribute("data-sq"));
+	assert.deepStrictEqual(takes, ["d6"]);
+	on(board, "e4", "mouseup");
+	on(board, "e5", "mousedown"); // not a target: the selection and dots go
+	assert.strictEqual(board.querySelectorAll(".an-hint").length, 0);
+	done();
+});
+
+test("a promotion can be cancelled, and nothing is played", () => {
+	const done = installDom();
+	const seen = [];
+	const board = interactiveBoard(PROMO_FEN, (san) => seen.push(san));
+	on(board, "b7", "mousedown");
+	on(board, "b8", "mouseup");
+	board.querySelector(".an-promo-cancel").click();
+	assert.strictEqual(board.querySelector(".an-promo"), null);
+	assert.deepStrictEqual(seen, []);
+	assert.deepStrictEqual(marked(board, "sel"), []);
+	done();
+});
+
+test("a piece dragged follows the pointer and snaps back if not played", () => {
+	const done = installDom();
+	const board = interactiveBoard(START, () => {});
+	const rect = board.querySelector('rect[data-sq="e2"]');
+	rect.dispatchEvent(new window.MouseEvent("mousedown", { bubbles: true, clientX: 10, clientY: 10 }));
+	const piece = board.querySelector('use[data-sq="e2"]');
+	assert.ok(piece.classList.contains("dragging"));
+	window.dispatchEvent(new window.MouseEvent("mousemove", { clientX: 30, clientY: 10 }));
+	assert.match(piece.getAttribute("transform"), /translate\(20 0\)/);
+	window.dispatchEvent(new window.MouseEvent("mouseup", {}));
+	assert.strictEqual(piece.getAttribute("transform"), null);
+	assert.ok(!piece.classList.contains("dragging"));
+	done();
+});
+
+test("a right click does not pick a piece", () => {
+	const done = installDom();
+	const board = interactiveBoard(START, () => {});
+	board
+		.querySelector('rect[data-sq="e2"]')
+		.dispatchEvent(new window.MouseEvent("mousedown", { bubbles: true, button: 2 }));
+	assert.deepStrictEqual(marked(board, "sel"), []);
+	done();
+});
+
+// jsdom has no TouchEvent constructor to speak of, so a plain Event carrying
+// the touch lists stands in for one.
+function touch(target, type, x, y, list = "touches") {
+	const e = new window.Event(type, { bubbles: true, cancelable: true });
+	const pt = [{ clientX: x, clientY: y }];
+	e.touches = list === "touches" ? pt : [];
+	e.changedTouches = pt;
+	target.dispatchEvent(e);
+	return e;
+}
+
+test("a finger drag plays the move it ends on", () => {
+	const done = installDom();
+	const seen = [];
+	const board = interactiveBoard(START, (san) => seen.push(san));
+	const svg = board.querySelector("svg");
+	const e2 = board.querySelector('rect[data-sq="e2"]');
+	const start = touch(e2, "touchstart", 5, 5);
+	assert.ok(start.defaultPrevented, "the page does not scroll under the drag");
+	touch(svg, "touchmove", 6, 5);
+	const e4 = board.querySelector('rect[data-sq="e4"]');
+	document.elementFromPoint = () => e4;
+	touch(svg, "touchend", 9, 9, "changed");
+	assert.deepStrictEqual(seen, ["e4"]);
+	done();
+});
+
+test("a tap then a tap is a click-click; a cancelled touch plays nothing", () => {
+	const done = installDom();
+	const seen = [];
+	const board = interactiveBoard(START, (san) => seen.push(san));
+	const svg = board.querySelector("svg");
+	const g1 = board.querySelector('rect[data-sq="g1"]');
+	document.elementFromPoint = () => g1;
+	touch(g1, "touchstart", 1, 1);
+	touch(svg, "touchcancel", 1, 1, "changed");
+	assert.deepStrictEqual(marked(board, "sel"), ["g1"], "still selected");
+	touch(board.querySelector('rect[data-sq="f3"]'), "touchstart", 1, 1);
+	assert.deepStrictEqual(seen, ["Nf3"]);
+	done();
+});
+
+test("arrows are drawn over the board and replaced in place", () => {
+	const done = installDom();
+	const board = interactiveBoard(START, () => {}, { size: 320 });
+	drawArrows(board, [{ from: "e2", to: "e4" }, { from: "d2", to: "d4", weight: 0.3 }]);
+	assert.strictEqual(board.querySelectorAll(".an-arrow").length, 2);
+	const tip = board.querySelector(".an-arrow polygon").getAttribute("points");
+	assert.match(tip, /^180,180 /, "the first arrow's point is on e4's centre");
+	drawArrows(board, [{ from: "g1", to: "f3" }]);
+	assert.strictEqual(board.querySelectorAll(".an-arrow").length, 1);
+	drawArrows(board, []);
+	assert.strictEqual(board.querySelector(".an-arrows"), null);
+	done();
+});
+
+test("arrows follow a flipped board", () => {
+	const done = installDom();
+	const board = interactiveBoard(START, () => {}, { size: 320, flipped: true });
+	drawArrows(board, [{ from: "e2", to: "e4" }]);
+	const tip = board.querySelector(".an-arrow polygon").getAttribute("points");
+	assert.match(tip, /^140,140 /);
 	done();
 });

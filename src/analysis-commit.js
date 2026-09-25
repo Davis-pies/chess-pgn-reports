@@ -14,11 +14,20 @@
 // siblings and strand marks keyed by a ply that moved.
 
 import { getCurrent, openTablePaths } from "./state.js";
-import { divergence, mainOf } from "./tree.js";
+import { defaultLineName, divergence, mainOf } from "./tree.js";
 import { buildPgn } from "./pgn-out.js";
 import { toLine } from "./analysis.js";
 
 const keyOf = (moves) => moves.map((m) => m.san).join(" ");
+
+// Whether the notebook already holds exactly these moves -- what Add would
+// refuse, shown on the line before anyone presses it.
+export function inNotebook(moves) {
+	const cur = getCurrent();
+	if (!cur || !moves.length) return false;
+	const key = keyOf(moves);
+	return cur.lines.some((l) => keyOf(l.moves) === key);
+}
 
 // `tag` is what the line is filed as: a sideline unless asked for a footnote.
 export function commitLine(scratchLine, { tag = "sideline" } = {}) {
@@ -32,6 +41,14 @@ export function commitLine(scratchLine, { tag = "sideline" } = {}) {
 	// placeholder names do for every other unnamed line.
 	const line = toLine(scratchLine, cur.lines.length);
 	line.tag = tag;
+	// The first line into an empty notebook -- a repertoire begun on the
+	// board rather than from a PGN -- is its mainline, as the first line of
+	// an imported PGN is. A mainline has no tag of its own.
+	if (!cur.lines.length) {
+		line.isMain = true;
+		line.name = defaultLineName(true, 0);
+		delete line.tag;
+	}
 	cur.lines.push(line);
 	cur.pgn = buildPgn(cur);
 	revealInTable(line, cur.lines);

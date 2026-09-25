@@ -91,3 +91,30 @@ test("a line can be committed as a footnote", () => {
 	assert.strictEqual(r.line.tag, "foot");
 	done();
 });
+
+test("the first line into an empty notebook is its mainline", () => {
+	const done = installDom();
+	loadState("1. e4 *");
+	getCurrent().lines = [];
+	const r = commitLine({ moves: [{ san: "d4", ply: 0 }, { san: "d5", ply: 1 }] }, { tag: "foot" });
+	assert.strictEqual(r.ok, true);
+	const [main] = getCurrent().lines;
+	assert.strictEqual(main.isMain, true);
+	assert.strictEqual(main.name, "Mainline");
+	assert.strictEqual(main.tag, undefined);
+	assert.match(getCurrent().pgn, /1\. d4 d5/);
+	commitLine({ moves: [{ san: "d4", ply: 0 }, { san: "Nf6", ply: 1 }] });
+	assert.strictEqual(getCurrent().lines[1].tag, "sideline");
+	done();
+});
+
+test("inNotebook tells a line the notebook holds from one it does not", async () => {
+	const done = installDom();
+	const { inNotebook } = await import("../src/analysis-commit.js");
+	loadState(PGN);
+	const m = (...s) => s.map((san, ply) => ({ san, ply }));
+	assert.strictEqual(inNotebook(m("e4", "e5", "Nf3", "Nc6")), true);
+	assert.strictEqual(inNotebook(m("e4", "e5")), false);
+	assert.strictEqual(inNotebook([]), false);
+	done();
+});
