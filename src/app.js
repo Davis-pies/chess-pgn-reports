@@ -38,7 +38,8 @@ import {
   setScratch,
 } from "./state.js";
 import { analysisPanel } from "./analysis-view.js";
-import { newScratch } from "./analysis.js";
+import { newScratch, seedLine } from "./analysis.js";
+import { sharedEngine } from "./engine.js";
 import { allNotes } from "./notes.js";
 import {
   visibleLines,
@@ -285,10 +286,14 @@ function themeBtn() {
 }
 
 // Open Analysis mode, seeded with `moves` (a line's moves up to and including
-// the one to branch from). The seed is copied by newScratch, so exploring
-// never reaches back into the notebook line it came from.
+// the one to branch from). The seed is copied, so exploring never reaches
+// back into the notebook line it came from. Lines already on the board stay:
+// opening it again, from the toolbar or from another move, picks up where
+// the last visit left off rather than throwing that work away.
 export function openAnalysis(moves = []) {
-	setScratch(newScratch(moves));
+	const s = getScratch();
+	if (!s) setScratch(newScratch(moves));
+	else if (moves.length) seedLine(s, moves);
 	setMode("analysis");
 	renderApp();
 }
@@ -305,6 +310,7 @@ function viewRoot() {
   const wrap = el("div", { className: "app" });
   if (!getCurrent().lines.length) {
     wrap.appendChild(importPanel());
+    if (getMode() === "analysis") wrap.appendChild(analysisOverlay());
     return wrap;
   }
   const top = el("div", { className: "toolbar" });
@@ -464,14 +470,18 @@ function viewRoot() {
 // the ✕, Escape, or a click on the backdrop; the scratch is kept either way.
 function analysisOverlay() {
   if (!getScratch()) setScratch(newScratch());
+  const engine = sharedEngine();
+  // Closing stops the engine's search but keeps its switch, so it is back on
+  // where it was the next time the board opens.
   const close = () => {
+    engine.pause();
     setMode("report");
     renderApp();
   };
   const ov = el("div", { className: "modal-overlay an-overlay" });
   ov.onclick = (e) => e.target === ov && close();
   ov.onkeydown = (e) => e.key === "Escape" && close();
-  const an = analysisPanel(getScratch(), renderApp, { onAdded: close });
+  const an = analysisPanel(getScratch(), renderApp, { onAdded: close, engine });
   const head = el("div", { className: "an-head" }, [
     el("h3", { textContent: "Analysis" }),
     el("button", {
@@ -866,7 +876,15 @@ function importPanel() {
     textContent: "Load & Tag",
     onclick: () => loadPgnText(ta.value),
   });
-  box.append(ta, el("div", { className: "importbar" }, [go]));
+  // No PGN to start from: play the lines in on the board instead. The first
+  // one added becomes the mainline, and the notebook opens around it.
+  const fromBoard = el("button", {
+    className: "chip an-fromboard",
+    textContent: "Start from a board",
+    title: "Play your lines on an analysis board and add them to a new notebook",
+    onclick: () => openAnalysis(),
+  });
+  box.append(ta, el("div", { className: "importbar" }, [go, fromBoard]));
 
   // Loading from a file. Two sources, so two buttons that say which is which,
   // stacked rather than side by side: they are alternatives, not a pair of

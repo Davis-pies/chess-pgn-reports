@@ -77,3 +77,20 @@ test("the line editor's move panel offers the same entry", async () => {
 		["e4"],
 	);
 });
+
+test("opening the board again keeps its lines; analysing another move adds one", async () => {
+	app.reset();
+	await app.loadPgn(PGN);
+	app.view().querySelector(".an-toggle").click();
+	const s = getScratch();
+	s.lines[0].moves.push({ san: "d4", ply: 0 });
+	app.view().querySelector(".an-close").click();
+	app.view().querySelector(".an-toggle").click();
+	assert.strictEqual(getScratch(), s, "the same board");
+	assert.strictEqual(s.lines[0].moves[0].san, "d4");
+	app.view().querySelector(".an-close").click();
+	rightClick([...app.view().querySelectorAll(".pv-table td")].find((c) => c.textContent.includes("Nf3")));
+	menuItem("Analyse from here").click();
+	assert.strictEqual(getScratch().lines.length, 2);
+	assert.deepStrictEqual(getScratch().lines[1].moves.map((m) => m.san), ["e4", "e5", "Nf3"]);
+});

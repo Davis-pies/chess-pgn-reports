@@ -145,3 +145,23 @@ test("a refused add keeps the window open and says why", async () => {
 	assert.ok(app.view().querySelector(".an-overlay"), "still open");
 	assert.match(app.view().querySelector(".an-msg").textContent, /no moves/);
 });
+
+test("with no notebook, a board can be the start: the first line added opens one", async () => {
+	app.reset();
+	const start = app.view().querySelector(".an-fromboard");
+	assert.ok(start, "offered on the import screen");
+	start.click();
+	assert.ok(app.view().querySelector(".an-overlay .an-board svg"), "the board opens over it");
+	for (const [a, b] of [["e2", "e4"], ["c7", "c5"]]) {
+		for (const s of [a, b])
+			app.view()
+				.querySelector(`.an-board rect[data-sq="${s}"]`)
+				.dispatchEvent(new app.dom.window.MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+	}
+	app.view().querySelector(".an-add").click();
+	assert.strictEqual(app.view().querySelector(".an-overlay"), null, "adding closed the window");
+	const lines = getCurrent().lines;
+	assert.strictEqual(lines.length, 1);
+	assert.strictEqual(lines[0].isMain, true);
+	assert.ok(app.view().querySelector(".pv-table"), "the notebook opened around it");
+});
