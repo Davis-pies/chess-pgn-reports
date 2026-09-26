@@ -182,16 +182,21 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    footnote's own notes collapse to a one-line header saying how much is
    nested beneath, with **Expand all** / **Collapse all** beside the heading.
    Everything starts expanded, and the folding is not saved with the notebook.
-   **Printed tables are headed by what their lines share.** Each printed page
-   of the table writes the moves all of its columns share once, above it, and
-   starts its rows where they split (as MCO does). When a page's lines all come
-   off one branch — sharing moves with each other past where they leave the
-   mainline — that branch is the heading instead, and the mainline column is
-   left off that page, since below the heading it would show moves from a
-   position those lines never reach. A line that is itself the shared base of
-   the others on its page gives up its column to the heading (its notes still
-   print). The first page keeps the mainline, as the reference for the whole
-   opening; with **No mainline**, every page gets its own heading.
+   **Printed tables are headed by what their lines share, and cut to save
+   paper.** Each printed table writes the moves all of its columns share once,
+   above it, and starts its rows where they split (as MCO does). When a
+   table's lines all come off one branch — sharing moves with each other past
+   where they leave the mainline — that branch is the heading instead, and the
+   mainline column is left off that table, since below the heading it would
+   show moves from a position those lines never reach. A line that is itself
+   the shared base of the others on its table gives up its column to the
+   heading (its notes still print). The first table keeps the mainline, as the
+   reference for the whole opening, unless the mainline costs less on a table
+   of its own; with **No mainline**, every table gets its own heading.
+   Where the report is cut into tables is chosen to use as little paper as
+   possible, rather than filling each table to its column limit: a stray line
+   that would cut a table's heading back to move two, and leave it thirty rows
+   of mostly empty column, gets a small table of its own instead.
 5. **Export** — **Export PGN** (editable chess notation for any chess app),
    **Export Markdown** (paste into Google Docs/Word), or **Print → Save as
    PDF** (always the linear card view). Saved workbooks (`localStorage`) are

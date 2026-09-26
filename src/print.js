@@ -202,16 +202,7 @@ export function appendPrintTables(box, g) {
   // its own rather than no table at all.
   const packs = packForPrint(mainV, others, size);
   (packs.length ? packs : [[]]).forEach((lines, i) => {
-    // Later tables stop at the deepest line they actually cover. The FIRST
-    // table is the reader's reference for the whole opening, so it runs the
-    // mainline out to its full length even when its own branches are short.
-    const maxPly = i === 0 ? subMaxPly([mainV, ...lines]) : subMaxPly(lines);
-    const off = offshoot(mainV, lines, i);
-    // An offshoot table is read against its own stem, not the mainline: the
-    // stem is its reference, stated above it, and the lines are grouped from
-    // where they leave it.
-    const pv = off ? printVars(stemRef(off.stem.moves), off.cols) : printVars(mainV, lines);
-    const stem = off ? off.stem.moves.length : stemLength([mainV, ...lines]);
+    const { off, pv, stem, maxPly } = tableShape(mainV, lines, i);
     if (stem) {
       const s = el("div", { className: "print-stem" });
       // the stem's moves, marks and note markers: every column states these
@@ -313,44 +304,125 @@ function renderTableNotes(wrap, vars, showMain) {
   });
 }
 
-// How wide a table of these lines comes out, in columns beside the mainline.
-// NOT the line count: a group costs a column of its own for the moves its
-// lines share, so a table of eight lines can be eleven columns wide.
-function printWidth(mainV, lines) {
-  return printVars(mainV, lines).length - 1; // less the mainline reference
+// Everything about one printed table that depends only on its lines and
+// whether it is the first: its columns, its stem, and the rows it will take.
+// One definition for the renderer and the packer, so the packer's idea of
+// what a table costs is the table that is printed.
+//
+// Later tables stop at the deepest line they actually cover. The FIRST table
+// is the reader's reference for the whole opening, so it runs the mainline
+// out to its full length even when its own branches are short. An offshoot
+// table is read against its own stem, not the mainline: the stem is its
+// reference, stated above it, and the lines are grouped from where they
+// leave it.
+function tableShape(mainV, lines, index) {
+  const { off, stem, maxPly, rows } = tableRows(mainV, lines, index);
+  const pv = off ? printVars(stemRef(off.stem.moves), off.cols) : printVars(mainV, lines);
+  // columns beside the mainline reference, where there is one
+  const width = pv.length - (off || mainV.synthetic ? 0 : 1);
+  return { off, pv, stem, maxPly, width, rows };
 }
 
-// Greedily pack lines into print tables, targeting FULL tables: walk them in
-// trie order, which keeps a fork's lines adjacent, and start a new table as
-// soon as the next line would push this one past the cap. Only the last table
-// is sparse.
+// The part of a table's shape that does not need its columns built: cheap
+// enough for the packer to price every candidate table with.
+function tableRows(mainV, lines, index) {
+  const maxPly = index === 0 ? subMaxPly([mainV, ...lines]) : subMaxPly(lines);
+  const off = offshoot(mainV, lines, index);
+  const stem = off ? off.stem.moves.length : stemLength([mainV, ...lines]);
+  return { off, stem, maxPly, rows: Math.max(maxPly - stem + 1, 0) };
+}
+
+// What a table costs on paper beyond its rows: its header row, the stem above
+// it and the gap its notes block leaves before the next one.
+const TABLE_OVERHEAD = 3;
+
+// Cut the lines into print tables, in the order the report lays them out (a
+// fork's lines adjacent), using as little paper as possible.
 //
-// The cap is measured in COLUMNS, not lines. Counting lines was right while
-// every line was a column of its own; now that a group takes a column too, a
-// line-counted table of 13 could render 20 columns wide and run off the page.
-// The measurement is the same builder that renders the table, so the two
-// cannot disagree about what fits.
+// Tables stack down the page, so what a report costs is the rows its tables
+// take, not how full each one is. Filling each table to the column cap, as
+// this once did, let one stray line cost a page: a table of twelve lines
+// that all run sixteen moves together, plus one that leaves at move two,
+// loses its stem to that one line and prints thirty rows of mostly blank
+// column. So this chooses where to cut by what the cuts cost: the rows each
+// table takes below its stem, plus a few for the table itself so a report is
+// not shredded into many tiny tables to save a row. Columns still cap a
+// table, measured by the same builder that renders it.
+//
+// A dynamic programme over the ordered lines: the cheapest way to print the
+// first j lines is the cheapest way to print the first i, plus one table of
+// lines i..j. A table's width only grows as lines are added to it, so the
+// search back from j stops at the first i that no longer fits.
+// The cut depends only on the lines' moves (and which is the mainline), not
+// on anything else a redraw changes -- and the report redraws the print tables
+// on every edit, hidden on screen. So the last cut is kept, as where each
+// table ends, and reused while the moves are the same.
+let lastCut = { key: null, ends: null };
+
 function packForPrint(mainV, lines, size) {
-  const tables = [];
-  let cur = [];
-  // In the order the report lays the branches out, not the order the PGN
-  // wrote them: pages are cut from this sequence, so packing in a different
-  // order would put a branch on page three that the layout wants beside the
-  // mainline on page one.
-  for (const l of orderedLeaves(mainV, lines)) {
-    // a lone line is one column: it always fits, and this keeps a table from
-    // being closed empty
-    if (!cur.length) {
-      cur = [l];
-      continue;
-    }
-    const next = [...cur, l];
-    if (printWidth(mainV, next) <= size) cur = next;
-    else {
-      tables.push(cur);
-      cur = [l];
+  const order = orderedLeaves(mainV, lines);
+  const key = [
+    size,
+    mainV.synthetic ? "" : mainV.moves.map((m) => m.san).join(" "),
+    ...order.map((l) => l.moves.map((m) => m.san).join(" ")),
+  ].join("|");
+  if (lastCut.key === key) return rebuild(order, lastCut.ends);
+  const tables = packFresh(mainV, order, size);
+  let end = 0;
+  lastCut = { key, ends: tables.map((t) => (end += t.length)) };
+  return tables;
+}
+
+function rebuild(order, ends) {
+  let start = 0;
+  return ends.map((end) => {
+    const t = order.slice(start, end);
+    start = end;
+    return t;
+  });
+}
+
+function packFresh(mainV, order, size) {
+  const withMain = cutForPaper(mainV, order, size, 0);
+  // The first table keeps the mainline, so lines packed beside it can never
+  // be headed by a run of their own. Sometimes the mainline is cheaper on a
+  // table of its own and every other table headed by what its lines share;
+  // price that too, and take whichever costs less. (With no mainline there is
+  // no such table to give it.)
+  if (mainV.synthetic || !order.length) return withMain.tables;
+  const alone = tableRows(mainV, [], 0).rows + TABLE_OVERHEAD;
+  const apart = cutForPaper(mainV, order, size, 1);
+  return alone + apart.cost < withMain.cost ? [[], ...apart.tables] : withMain.tables;
+}
+
+// The cheapest cut of `order` into tables, the first of them numbered
+// `firstIndex` (0: it carries the mainline).
+//
+// Pricing a table is cheap (tableRows); knowing whether it fits means
+// building its columns, which is not. A table only gets wider as lines are
+// added to it, so the first line a table ending at j can start from only
+// moves forward as j does: `lo` walks along with j, and the columns are built
+// about once per line rather than once per candidate table.
+function cutForPaper(mainV, order, size, firstIndex) {
+  const n = order.length;
+  const best = [0];
+  const from = [0];
+  const index = (i) => (i === 0 ? firstIndex : 1);
+  const fits = (i, j) => j - i === 1 || tableShape(mainV, order.slice(i, j), index(i)).width <= size;
+  let lo = 0;
+  for (let j = 1; j <= n; j++) {
+    while (!fits(lo, j)) lo++;
+    best[j] = Infinity;
+    for (let i = j - 1; i >= lo; i--) {
+      const cost = best[i] + tableRows(mainV, order.slice(i, j), index(i)).rows + TABLE_OVERHEAD;
+      // on a tie, the fuller table: fewer tables for the same paper
+      if (cost <= best[j]) {
+        best[j] = cost;
+        from[j] = i;
+      }
     }
   }
-  if (cur.length) tables.push(cur);
-  return tables;
+  const tables = [];
+  for (let j = n; j > 0; j = from[j]) tables.unshift(order.slice(from[j], j));
+  return { tables, cost: best[n] };
 }

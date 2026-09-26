@@ -114,7 +114,9 @@ test("a group mark never stands where a move should be", () => {
   const marked = [...box.querySelectorAll("td.grp-rule")];
   // (the KID group's page is headed by its own stem, so the runs leaving that
   // stem are the stem's to state, not the table's)
-  assert.ok(marked.length >= 12, `only ${marked.length} marked cells`);
+  // (packed for paper, the KID group gets a table of its own whose shared
+  // run is its stem, so most of its rules are the stem's to state)
+  assert.ok(marked.length >= 5, `only ${marked.length} marked cells`);
   // a marked cell is rendered empty, so one carrying text means the mark took
   // a move's place and the move is gone from the report
   for (const td of marked)

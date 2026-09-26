@@ -335,21 +335,66 @@ test("a group split across print tables restates its shared moves", () => {
 // The same rule where the spill is a single line: alone on its table it has no
 // group above it to have said the moves, so it goes back to spelling its whole
 // divergence out rather than eliding against a column that isn't there.
-test("a line alone on a later print table keeps its whole divergence", () => {
+test("a line packed apart from its group keeps its whole divergence", () => {
   const off = installDom();
-  // Without group columns a line costs exactly one column, so the cap is
-  // reached by lines alone: 13 fill the first table, the 14th spills.
+  // 14 lines of one group: 13 fill a table of their own, headed by the moves
+  // they share, and the one left over goes beside the mainline -- where no
+  // group column has stated its moves, so it spells them out itself
   const box = printTables(kid(14));
   const tables = [...box.querySelectorAll("table.tbl")];
-  const last = tables[tables.length - 1];
-  const rows = [...last.querySelectorAll("tr")];
-  const cols = rows[0].querySelectorAll("th").length;
-  assert.strictEqual(cols, 3, "ply label + mainline + the one spilled line");
+  const first = tables[0];
+  const rows = [...first.querySelectorAll("tr")];
+  assert.strictEqual(rows[0].querySelectorAll("th").length, 3, "ply label + mainline + the one line");
   const own = rows
     .slice(1)
     .map((tr) => tr.children[2].textContent)
     .filter((t) => t && t !== "\u2026");
-  assert.deepStrictEqual(own, ["Nf6", "c4", "g6", "Nc3", "Bg7", "e4", "d6", "Qd2"]);
+  assert.deepStrictEqual(own, ["Nf6", "c4", "g6", "Nc3", "Bg7", "e4", "d6", "Nf3"]);
+  off();
+});
+
+// ---- packing for paper
+
+// Twelve lines that run together for sixteen moves, and one that leaves at
+// move two: filled left to right, the stray line joined the twelve and cut
+// their stem back to move two, so the table printed thirty rows of mostly
+// blank column.
+test("a stray line gets a table of its own rather than costing another its stem", () => {
+  const off = installDom();
+  // the mainline, twelve lines off it at White's 11th, and one stray at 2...g6
+  const run = "3. d4 cxd4 4. Nxd4 Nc6 5. Nc3 Qc7 6. Be3 a6 7. Qf3 Nf6 8. O-O-O Ne5 9. Qg3 b5 10. f4 Neg4";
+  const tails = ["Bg1", "Bd2", "Nb3", "Qe1", "Qf3", "Qf2", "Qh3", "Qh4", "Rd2", "Re1", "Kb1", "a3"];
+  const twelve = tails.map((m) => `(2... e6 ${run} 11. ${m})`).join(" ");
+  const box = printTables(`1. e4 c5 2. Nf3 d6 ${twelve} (2... g6 3. d4) 3. d4 *`);
+  const tables = [...box.querySelectorAll("table.tbl")];
+  const stems = tables.map((t) => (t.previousElementSibling?.classList.contains("print-stem") ? t.previousElementSibling.textContent : ""));
+  const deep = stems.findIndex((st) => /10\. f4\s+Neg4/.test(st));
+  assert.ok(deep !== -1, `the twelve are headed by their shared run (stems: ${stems.join(" | ")})`);
+  const rows = (t) => t.querySelectorAll("tr").length - 1;
+  assert.ok(rows(tables[deep]) <= 2, `and take a row or two, not thirty (got ${rows(tables[deep])})`);
+  const all = [...box.querySelectorAll("table.tbl td")].map((c) => c.textContent);
+  assert.ok(all.includes("g6"), "the stray line is still printed");
+  off();
+});
+
+test("lines that cost nothing apart are not split into many tiny tables", () => {
+  const off = installDom();
+  // twelve one-move replies: one table holds them all, as before
+  const box = printTables(`1. e4 e5 ${"c5 e6 c6 d5 d6 Nf6 g6 b6 a6 Nc6 f5 h6".split(" ").map((m) => `(1... ${m})`).join(" ")} 2. Nf3 *`);
+  assert.strictEqual(box.querySelectorAll("table.tbl").length, 1);
+  off();
+});
+
+test("packing a large report stays quick", () => {
+  const off = installDom();
+  const replies = "c5 e6 c6 d5 d6 Nf6 g6 b6 a6 Nc6 f5 h6 a5 b5 Na6 Nh6 g5 h5".split(" ");
+  const seconds = "Nf3 Nc3 d4 c3 Bc4 f4 g3 b3 a3 Be2".split(" ");
+  const lines = replies.flatMap((r) => seconds.map((w) => `(1... ${r} 2. ${w})`)).join(" ");
+  const t0 = Date.now();
+  const box = printTables(`1. e4 e5 ${lines} 2. Nf3 *`);
+  const ms = Date.now() - t0;
+  assert.ok(box.querySelectorAll("table.tbl").length > 5);
+  assert.ok(ms < 5000, `180 lines packed in ${ms} ms`);
   off();
 });
 
@@ -959,5 +1004,28 @@ test("a page whose lines share nothing beyond the mainline keeps it", () => {
     const lines = t.querySelectorAll("tr")[0].children.length - 2;
     if (lines > 1) assert.ok(t.querySelector(".main-col"), `table ${i} keeps its mainline`);
   });
+  off();
+});
+
+test("the packing is worked out again when the lines change", () => {
+  const off = installDom();
+  const run = "3. d4 cxd4 4. Nxd4 Nc6 5. Nc3 Qc7 6. Be3 a6 7. Qf3 Nf6 8. O-O-O Ne5 9. Qg3 b5 10. f4 Neg4";
+  const tails = ["Bg1", "Bd2", "Nb3", "Qe1", "Qf3", "Qf2", "Qh3", "Qh4", "Rd2", "Re1", "Kb1", "a3"];
+  const twelve = tails.map((m) => `(2... e6 ${run} 11. ${m})`).join(" ");
+  const s = loadState(`1. e4 c5 2. Nf3 d6 ${twelve} 3. d4 *`);
+  const count = () => {
+    const box = document.createElement("div");
+    appendPrintTables(box, grid(s.lines));
+    return box.querySelectorAll("table.tbl").length;
+  };
+  const before = count();
+  assert.strictEqual(count(), before, "the same lines, the same tables");
+  // a line added: the old cut must not be reused
+  const extra = loadState(`1. e4 c5 2. Nf3 d6 ${twelve} (2... g6 3. d4) (2... Nc6 3. d4) 3. d4 *`);
+  s.lines = extra.lines;
+  const box = document.createElement("div");
+  appendPrintTables(box, grid(s.lines));
+  const cells = [...box.querySelectorAll("table.tbl td")].map((c) => c.textContent);
+  assert.ok(cells.includes("g6") && cells.includes("Nc6"), "the new lines are printed");
   off();
 });
