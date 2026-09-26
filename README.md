@@ -35,7 +35,14 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
 3. **Analyse** — **Analysis** in the toolbar opens an interactive board in a
    window over the report (close it with ✕, Esc or a click outside), or
    right-click any move (in the table or the line editor) and choose **Analyse
-   from here** to open it at that position. With no PGN at all, **Start from a
+   from here** to open it at that position: every notebook line through it
+   comes onto the board, whole and with its notes, beside any lines you
+   explored from there earlier — so the lines already written are there to
+   extend and annotate. The list is headed **Lines through** that move and
+   picks each line up at it. Lines explored from other positions are kept for
+   the session, off view, and come back whenever you open a position they
+   pass through; **show all** brings every one back. (The board is not saved
+   with the workbook: what you keep goes in as lines and notes.) With no PGN at all, **Start from a
    board** on the import screen opens it on the opening position: the first
    line you add becomes the new notebook's mainline, so a repertoire can be
    built from nothing.
@@ -49,13 +56,18 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
      line above are drawn faintly; a line the notebook already holds is
      badged **in notebook**. ↑/↓ reorder lines (the first is the trunk of the
      copied PGN), ✕ deletes one, and **✂ Delete from here** cuts the selected
-     line after the current move. **↶ Undo** reverses the last delete, cut or
-     **New board**. The board keeps its lines while it is closed: reopening it,
-     or analysing another move, carries on from where you were.
+     line after the current move. **Clear lines** deletes the lines on view.
+     **↶ Undo** reverses the last delete, cut or clear. The toolbar's
+     **Analysis** reopens the board as you left it.
    - **Keys** — ← → step, Home/End jump, ↑ ↓ switch line at the same move,
      F flips, E toggles the engine, Space plays the engine's best move.
    - **Notes** — the box under the lines holds a note on the move just
-     played, which goes into the notebook with the line.
+     played, which goes into the notebook with the line. For a move the
+     notebook already has, **Save note to notebook** puts it straight in (on
+     every notebook line through the move) without adding a line, and **Save
+     all notes** does that for every note on view (it adds and replaces, never
+     clears). When the notebook's note on the move differs from the board's,
+     the board shows it, so a save never overwrites one you could not see.
    - **Copying** — **Copy FEN** for the position, **Copy PGN** for every line
      on the board as one game with variations.
    - **Engine** — **Engine off/on** runs Stockfish 19 *on your own device*,
@@ -162,6 +174,16 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    footnote's own notes collapse to a one-line header saying how much is
    nested beneath, with **Expand all** / **Collapse all** beside the heading.
    Everything starts expanded, and the folding is not saved with the notebook.
+   **Printed tables are headed by what their lines share.** Each printed page
+   of the table writes the moves all of its columns share once, above it, and
+   starts its rows where they split (as MCO does). When a page's lines all come
+   off one branch — sharing moves with each other past where they leave the
+   mainline — that branch is the heading instead, and the mainline column is
+   left off that page, since below the heading it would show moves from a
+   position those lines never reach. A line that is itself the shared base of
+   the others on its page gives up its column to the heading (its notes still
+   print). The first page keeps the mainline, as the reference for the whole
+   opening; with **No mainline**, every page gets its own heading.
 5. **Export** — **Export PGN** (editable chess notation for any chess app),
    **Export Markdown** (paste into Google Docs/Word), or **Print → Save as
    PDF** (always the linear card view). Saved workbooks (`localStorage`) are

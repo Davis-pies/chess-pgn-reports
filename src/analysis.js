@@ -6,6 +6,14 @@
 // Plies are 0-based (see parseSeq), so within a line a move's ply IS its index.
 // The cursor is called `at` -- the number of moves played, and the ply of the
 // next one -- so it is never confused with a move's own ply field.
+//
+// The scratch is a pool: every line explored in the session stays in it. What
+// the board shows is the part of the pool that passes through `root`, the
+// position it was opened at (a list of SANs; empty is the start, where every
+// line passes). Opening another position changes the root, not the pool, so
+// lines explored from one position come back whenever it, or anything before
+// it, is opened again -- the same rule the notebook's own lines are brought
+// onto the board by.
 
 import { Chess } from "chess.js";
 import { defaultLineName } from "./tree.js";
@@ -20,7 +28,34 @@ export function newScratch(moves = []) {
 		active: 0,
 		at: moves.length,
 		flipped: false,
+		root: [],
 	};
+}
+
+const passes = (root, line) =>
+	line.moves.length >= root.length && root.every((san, i) => line.moves[i].san === san);
+
+// The indices of the lines the board shows: those through the root, and the
+// line being played, which is always on view.
+export function shown(s) {
+	const root = s.root || [];
+	const out = [];
+	s.lines.forEach((l, i) => {
+		if (i === s.active || passes(root, l)) out.push(i);
+	});
+	return out;
+}
+
+// Stepping back before the root and playing something else leaves the root
+// behind; the view widens to the position the two share, so the line being
+// played never drops out of the list it is in.
+function widen(s) {
+	const root = s.root || [];
+	const moves = activeLine(s).moves;
+	if (passes(root, activeLine(s))) return;
+	let k = 0;
+	while (k < root.length && k < moves.length && moves[k].san === root[k]) k++;
+	s.root = root.slice(0, k);
 }
 
 export function activeLine(s) {
@@ -96,6 +131,7 @@ export function play(s, san) {
 	if (s.at === line.moves.length) {
 		line.moves.push({ san, ply: s.at });
 		s.at++;
+		widen(s);
 		return s;
 	}
 	// diverging mid-line: fork a sibling rather than discarding the tail, which
@@ -113,6 +149,7 @@ export function play(s, san) {
 	s.lines.push({ moves, comments });
 	s.active = s.lines.length - 1;
 	s.at = moves.length;
+	widen(s);
 	return s;
 }
 
@@ -168,26 +205,39 @@ export function truncate(s) {
 		if (drop < s.active) s.active--;
 		s.at = at;
 	}
+	widen(s);
 	return s;
 }
 
 const keyOf = (moves) => moves.map((m) => m.san).join(" ");
 
+// The next line on view from `idx` in direction `dir`, or -1.
+function neighbour(s, idx, dir) {
+	const on = shown(s);
+	const at = on.indexOf(idx);
+	const to = on[at + dir];
+	return at === -1 || to === undefined ? -1 : to;
+}
+
 // Move a line up or down the list, so the one that matters most can lead.
-// The first line is the trunk of the scratch's PGN.
+// The first line is the trunk of the scratch's PGN. It swaps with its
+// neighbour on view; lines off view keep their places.
 export function moveLine(s, idx, dir) {
-	const to = idx + dir;
-	if (!s.lines[idx] || !s.lines[to]) return s;
+	const to = neighbour(s, idx, dir);
+	if (!s.lines[idx] || to === -1) return s;
 	const activeLineObj = activeLine(s);
 	[s.lines[idx], s.lines[to]] = [s.lines[to], s.lines[idx]];
 	s.active = s.lines.indexOf(activeLineObj);
 	return s;
 }
 
-// The whole scratch as PGN, the first line as the trunk and every other line
-// a variation off it -- written by the same code that writes the notebook's.
+// The lines on view as PGN, the first as the trunk and every other a
+// variation off it -- written by the same code that writes the notebook's.
 export function scratchPgn(s) {
-	const lines = s.lines.filter((l) => l.moves.length).map((l, i) => toLine(l, i));
+	const lines = shown(s)
+		.map((i) => s.lines[i])
+		.filter((l) => l.moves.length)
+		.map((l, i) => toLine(l, i));
 	return buildPgn({ lines });
 }
 
@@ -199,18 +249,38 @@ export function select(s, idx) {
 }
 
 // Drop a line. The cursor moves with the active line if one before it went;
-// if the active line itself went, it lands on the neighbour before it. A
-// scratch always keeps one line, empty if need be, so there is a board to play.
+// if the active line itself went, it lands on the line on view before it (or
+// after, at the top). A board always has a line to play on: if none is left
+// on view, an empty one starts from the root.
 export function removeLine(s, idx) {
 	if (!s.lines[idx]) return s;
+	const wasActive = idx === s.active;
+	const before = neighbour(s, idx, -1);
+	const after = neighbour(s, idx, 1);
 	s.lines.splice(idx, 1);
-	if (!s.lines.length) {
-		s.lines.push({ moves: [] });
-		s.active = 0;
-		s.at = 0;
-	} else if (idx < s.active) s.active--;
-	else if (idx === s.active) select(s, Math.max(0, idx - 1));
+	if (!wasActive) {
+		if (idx < s.active) s.active--;
+		return s;
+	}
+	const next = before !== -1 ? before : after !== -1 ? after - 1 : -1;
+	if (next !== -1) return select(s, next);
+	return rootLine(s);
+}
+
+// A fresh line at the root, selected: somewhere to play when nothing is on view.
+function rootLine(s) {
+	const root = s.root || [];
+	s.lines.push({ moves: root.map((san, ply) => ({ san, ply })) });
+	s.active = s.lines.length - 1;
+	s.at = root.length;
 	return s;
+}
+
+// "Clear": the lines on view go; the rest of the pool stays.
+export function clearShown(s) {
+	const on = new Set(shown(s));
+	s.lines = s.lines.filter((_, i) => !on.has(i));
+	return rootLine(s);
 }
 
 // A scratch line as a notebook line. `idx` is the index it will occupy in
@@ -234,32 +304,33 @@ export function toLine(scratchLine, idx) {
 // cutting one short, starting over. A deep copy, so nothing done after it
 // can reach back into it.
 export function checkpoint(s) {
-	s.undo = JSON.stringify({ lines: s.lines, active: s.active, at: s.at });
+	s.undo = JSON.stringify({ lines: s.lines, active: s.active, at: s.at, root: s.root || [] });
 	return s;
 }
 
 export function undo(s) {
 	if (!s.undo) return s;
-	const { lines, active, at } = JSON.parse(s.undo);
-	Object.assign(s, { lines, active, at, undo: null });
+	const { lines, active, at, root } = JSON.parse(s.undo);
+	Object.assign(s, { lines, active, at, root, undo: null });
 	return s;
 }
 
 // Step to the neighbouring line, keeping the cursor at the same move where
 // that line is long enough -- so Up/Down compares two lines at one position.
 export function stepLine(s, dir) {
-	const idx = s.active + dir;
-	if (!s.lines[idx]) return s;
+	const idx = neighbour(s, s.active, dir);
+	if (idx === -1) return s;
 	s.active = idx;
 	s.at = Math.min(s.at, s.lines[idx].moves.length);
 	return s;
 }
 
-// How many opening moves line `i` shares with the lines above it: the part
-// the list can draw faintly, since it is written out already.
+// How many opening moves line `i` shares with the lines on view above it: the
+// part the list can draw faintly, since it is written out already.
 export function sharedPrefix(s, i) {
 	let best = 0;
-	for (let j = 0; j < i; j++) {
+	for (const j of shown(s)) {
+		if (j >= i) break;
 		const a = s.lines[i].moves;
 		const b = s.lines[j].moves;
 		let k = 0;
@@ -269,22 +340,37 @@ export function sharedPrefix(s, i) {
 	return best;
 }
 
-// Bring a notebook position into a scratch that already has work in it,
-// rather than replacing that work. A line that already passes through the
-// position is selected there; otherwise the moves come in as a new line (or
-// fill the one empty line, if that is all there is).
-export function seedLine(s, moves) {
-	const key = keyOf(moves);
-	const hit = s.lines.findIndex((l) => keyOf(l.moves.slice(0, moves.length)) === key);
-	if (hit !== -1) {
-		s.active = hit;
-		s.at = moves.length;
-		return s;
+// Open the board at a position (`moves`, from move one). The view becomes the
+// lines through it: every notebook line through it comes into the pool, whole
+// and with its notes, beside the lines already explored from there, so the
+// lines written and the lines tried are both there to extend, compare and
+// annotate. Nothing is doubled, and a lone empty line is dropped. The cursor
+// sits at the position on `prefer` (the notebook line the move was picked
+// from) if it is on view, else the first line on view; a position nothing
+// passes through gets a line of its own.
+export function openAt(s, moves, notebookLines = [], prefer = null) {
+	s.root = moves.map((m) => m.san);
+	if (s.lines.length === 1 && !s.lines[0].moves.length) s.lines = [];
+	for (const l of notebookLines) {
+		if (!passes(s.root, l)) continue;
+		const lk = keyOf(l.moves);
+		if (s.lines.some((x) => keyOf(x.moves) === lk)) continue;
+		s.lines.push({
+			moves: l.moves.map((m, i) => ({ san: m.san, ply: i })),
+			comments: (l.comments || []).map((c) => ({ ply: c.ply, text: c.text })),
+		});
 	}
-	const [line] = newScratch(moves).lines;
-	if (s.lines.length === 1 && !s.lines[0].moves.length) s.lines[0] = line;
-	else s.lines.push(line);
-	s.active = s.lines.indexOf(line);
+	const on = s.lines.map((l, i) => (passes(s.root, l) ? i : -1)).filter((i) => i !== -1);
+	if (!on.length) return rootLine(s);
+	const want = prefer && keyOf(prefer.moves);
+	const hit = on.find((i) => keyOf(s.lines[i].moves) === want);
+	s.active = hit !== undefined ? hit : on[0];
 	s.at = moves.length;
+	return s;
+}
+
+// Every line in the pool back on view: the root goes back to the start.
+export function showAll(s) {
+	s.root = [];
 	return s;
 }

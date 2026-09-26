@@ -1529,3 +1529,16 @@ sup {
 .an-full-acts { gap: .3rem; flex-wrap: wrap; }
 .an-progress { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
 .an-progress > div { height: 100%; background: var(--main); transition: width .2s; }
+/* a line the search has not filled yet: holds a row's height */
+.an-pv.empty { color: var(--muted); }
+.an-pv.empty .an-score { background: none; }
+.an-pv { min-height: 1.45em; }
+.an-engine-acts { min-height: 1.6em; }
+.an-note-tools { display: flex; flex-direction: column; gap: .3rem; }
+.an-note-tools:empty { display: none; }
+.an-note-nb { font-size: .8rem; color: var(--muted); }
+.an-note-acts { gap: .3rem; flex-wrap: wrap; }
+.an-note-acts .chip:disabled { opacity: .45; cursor: default; }
+.an-note-msg { font-size: .82rem; color: var(--ok); }
+.an-showall { background: none; border: 0; padding: 0; font: inherit; font-size: .72rem; text-transform: none; letter-spacing: 0; color: var(--main); cursor: pointer; text-decoration: underline; }
+.an-elide { opacity: .5; padding: 0 .2rem; }

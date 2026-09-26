@@ -89,6 +89,92 @@ export function stemLength(vars) {
   return n;
 }
 
+// A table whose lines all come off one branch -- they share moves with each
+// other beyond anything they share with the mainline -- is headed by that
+// branch instead: the shared run is written once above it, the rows start
+// where its lines split, and the mainline column goes, because below the stem
+// it would be showing moves from a position these lines never reach. It is
+// the same thing the mainline stem does, applied to whatever a page's lines
+// have in common.
+//
+// A line that IS that shared base -- every other line on the page carries on
+// from its last move -- has nothing left to say below the stem, so it gives
+// up its column and the stem runs to its end. Its notes still print under the
+// table.
+//
+// Not the first table while there is a mainline: that table is the reader's
+// reference for the whole opening, and the only place the mainline is
+// printed. With no mainline there is no such table, and every page gets its
+// own stem.
+//
+// Returns { stem, cols } -- the stem as a printable var (full moves from move
+// one, with the marks and note markers of the columns that carried them) and
+// the lines that keep a column -- or null.
+function offshoot(mainV, lines, index) {
+  if (!mainV.synthetic && index === 0) return null;
+  const base = baseLine(lines);
+  const cols = base ? lines.filter((l) => l !== base) : lines;
+  const side = Math.max(base ? base.moves.length : 0, stemLength(cols));
+  const withMain = mainV.synthetic ? 0 : stemLength([mainV, ...lines]);
+  if (side <= withMain) return null;
+  // the continuations can share more than the base line has moves
+  const moves = cols[0].moves.slice(0, side);
+  // A move the page's lines share with the mainline was the mainline's cell,
+  // so its marker lives on the mainline var; the rest are the lines' own, the
+  // base line's first (a note on its last move is on it alone).
+  const mainShared = mainV.synthetic ? 0 : divergenceOf(mainV, cols[0]);
+  const pick = (key) => {
+    const out = {};
+    for (const m of moves) {
+      const from = m.ply < mainShared ? [mainV] : [base, cols[0]].filter(Boolean);
+      const v = from.map((x) => x[key] && x[key][m.ply]).find((x) => x !== undefined);
+      if (v !== undefined) out[m.ply] = v;
+    }
+    return out;
+  };
+  return {
+    stem: { tag: "mainline", moves, marks: pick("marks"), noteByPly: pick("noteByPly") },
+    cols,
+  };
+}
+
+// The line on a page that every other line on it continues: a strict prefix
+// of all the rest. Only with at least one line continuing it, or it is not a
+// base of anything.
+function baseLine(lines) {
+  if (lines.length < 2) return null;
+  return (
+    lines.find((b) =>
+      lines.every(
+        (l) =>
+          l === b ||
+          (l.moves.length > b.moves.length && divergenceOf(b, l) === b.moves.length),
+      ),
+    ) || null
+  );
+}
+
+const divergenceOf = (a, b) => {
+  let n = 0;
+  while (n < a.moves.length && n < b.moves.length && a.moves[n].san === b.moves[n].san) n++;
+  return n;
+};
+
+// The reference an offshoot table's columns are grouped against: its stem, as
+// the same kind of empty, never-rendered reference the no-mainline view uses.
+const stemRef = (moves) => ({
+  line: null,
+  tag: "mainline",
+  label: "",
+  name: "",
+  moves,
+  marks: {},
+  cells: {},
+  noteByPly: {},
+  d: 0,
+  synthetic: true,
+});
+
 export function appendPrintTables(box, g) {
   // the whole horizontal-table section can be left out of the printed report
   const wrap = el("div", {
@@ -120,17 +206,22 @@ export function appendPrintTables(box, g) {
     // table is the reader's reference for the whole opening, so it runs the
     // mainline out to its full length even when its own branches are short.
     const maxPly = i === 0 ? subMaxPly([mainV, ...lines]) : subMaxPly(lines);
-    const pv = printVars(mainV, lines);
-    const stem = stemLength([mainV, ...lines]);
+    const off = offshoot(mainV, lines, i);
+    // An offshoot table is read against its own stem, not the mainline: the
+    // stem is its reference, stated above it, and the lines are grouped from
+    // where they leave it.
+    const pv = off ? printVars(stemRef(off.stem.moves), off.cols) : printVars(mainV, lines);
+    const stem = off ? off.stem.moves.length : stemLength([mainV, ...lines]);
     if (stem) {
       const s = el("div", { className: "print-stem" });
-      // the mainline's own moves, marks and note markers: every column states
-      // these moves, and the rows that carried the markers are gone
-      buildCardMoves(s, { ...mainV, moves: mainV.moves.slice(0, stem) });
+      // the stem's moves, marks and note markers: every column states these
+      // moves, and the rows that carried the markers are gone
+      buildCardMoves(s, off ? off.stem : { ...mainV, moves: mainV.moves.slice(0, stem) });
       wrap.appendChild(s);
     }
     renderTable(wrap, {
       ...g,
+      noMain: g.noMain || !!off,
       vars: pv,
       // "branch lines" off: the rules go, and the cells they covered were
       // blank already, so nothing else on the page moves
@@ -139,7 +230,7 @@ export function appendPrintTables(box, g) {
       fromPly: stem,
       byMove: getCurrent().printByMove === true,
     });
-    renderTableNotes(wrap, [mainV, ...lines], i === 0);
+    renderTableNotes(wrap, off ? lines : [mainV, ...lines], i === 0 && !off);
   });
   box.appendChild(wrap);
 }

@@ -16,7 +16,7 @@
 import { getCurrent, openTablePaths } from "./state.js";
 import { defaultLineName, divergence, mainOf } from "./tree.js";
 import { buildPgn } from "./pgn-out.js";
-import { toLine } from "./analysis.js";
+import { shown, toLine } from "./analysis.js";
 
 const keyOf = (moves) => moves.map((m) => m.san).join(" ");
 
@@ -55,10 +55,11 @@ export function commitLine(scratchLine, { tag = "sideline" } = {}) {
 	return { ok: true, line };
 }
 
+// The lines on the board: the ones on view, not the whole session's pool.
 export function commitAll(scratch) {
 	let added = 0;
 	let skipped = 0;
-	for (const line of scratch.lines) {
+	for (const line of shown(scratch).map((i) => scratch.lines[i])) {
 		if (commitLine(line).ok) added++;
 		else skipped++;
 	}
@@ -76,4 +77,67 @@ function revealInTable(line, lines) {
 		key = (key ? key + "/" : "") + m.ply + ":" + m.san;
 		openTablePaths.add(key);
 	}
+}
+
+// ---- notes, without adding a line
+//
+// A note typed on the board belongs to a position, and if the notebook already
+// has that position it can go straight in: onto every notebook line through
+// it, which is what annotating a shared move does everywhere else. Notes
+// travel in the workbook's per-line tags, not the PGN, so nothing else needs
+// rewriting.
+
+// The notebook lines that play these moves up to and including `ply`.
+function linesThrough(moves, ply) {
+	const cur = getCurrent();
+	if (!cur || moves.length <= ply) return [];
+	const key = keyOf(moves.slice(0, ply + 1));
+	return cur.lines.filter(
+		(l) => l.moves.length > ply && keyOf(l.moves.slice(0, ply + 1)) === key,
+	);
+}
+
+const notesAt = (line, ply) =>
+	(line.comments || []).filter((c) => c.ply === ply).map((c) => c.text);
+
+// The notebook's notes on this move, or null if the notebook has not got the
+// move at all.
+export function notebookNotes(moves, ply) {
+	const hits = linesThrough(moves, ply);
+	return hits.length ? notesAt(hits[0], ply) : null;
+}
+
+// Make the notebook's notes on this move exactly the board's -- including
+// none, which clears them. Refused for a move the notebook has not got.
+export function saveNote(scratchLine, ply) {
+	const hits = linesThrough(scratchLine.moves, ply);
+	if (!hits.length)
+		return {
+			ok: false,
+			reason: "That move is not in the notebook yet: add its line, and its notes go in with it.",
+		};
+	const texts = notesAt(scratchLine, ply);
+	for (const l of hits) {
+		l.comments = (l.comments || []).filter((c) => c.ply !== ply);
+		texts.forEach((text) => l.comments.push({ ply, text }));
+	}
+	return { ok: true, notes: texts.length };
+}
+
+// Every note on the lines on view that is on a move the notebook has. Adds and
+// replaces, never clears: a move with no note on the board may simply never
+// have been annotated here, and that is no reason to wipe the notebook's.
+export function saveAllNotes(scratch) {
+	let saved = 0;
+	let missing = 0;
+	const seen = new Set();
+	for (const line of shown(scratch).map((i) => scratch.lines[i]))
+		for (const c of line.comments || []) {
+			const key = keyOf(line.moves.slice(0, c.ply + 1));
+			if (seen.has(key)) continue;
+			seen.add(key);
+			if (saveNote(line, c.ply).ok) saved++;
+			else missing++;
+		}
+	return { saved, missing };
 }

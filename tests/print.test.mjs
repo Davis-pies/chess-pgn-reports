@@ -323,10 +323,11 @@ test("a group split across print tables restates its shared moves", () => {
   const tables = [...box.querySelectorAll("table.tbl")];
   assert.ok(tables.length > 1, "the fixture packs into several tables");
   tables.forEach((t, i) => {
-    const stem = [...t.querySelectorAll("td")].filter(
-      (c) => c.textContent === "Bg7",
-    );
-    assert.strictEqual(stem.length, 1, `table ${i} states the stem exactly once`);
+    // in a cell of the table, or in the stem written above it
+    const cells = [...t.querySelectorAll("td")].filter((c) => c.textContent === "Bg7");
+    const above = t.previousElementSibling;
+    const inStem = above?.classList.contains("print-stem") && /\bBg7\b/.test(above.textContent);
+    assert.strictEqual(cells.length + (inStem ? 1 : 0), 1, `table ${i} states the stem exactly once`);
   });
   off();
 });
@@ -862,13 +863,16 @@ test("branch lines can be left off the printed table without moving a column", (
   off();
 });
 
-test("noMain: the printed report has no mainline column and no stem", () => {
+test("noMain: the printed report has no mainline column, and heads each table with its shared moves", () => {
   const undo = installDom();
   const st = loadState("1. e4 e5 (1... c5 2. Nf3 d6) 2. Nf3 Nc6 3. Bb5");
   st.noMain = true;
   const box = document.createElement("div");
   appendPrintTables(box, grid(st.lines));
-  assert.strictEqual(box.querySelectorAll(".print-stem").length, 0);
+  // the lines share nothing past move one, and a stem stops short of the
+  // shortest line, so the only stem is 1. e4
+  const stems = [...box.querySelectorAll(".print-stem")].map((n) => n.textContent.trim());
+  assert.deepStrictEqual(stems, ["1. e4"]);
   assert.strictEqual(box.querySelectorAll(".main-col").length, 0);
   const heads = [...box.querySelectorAll(".var-head")].map((n) => n.textContent);
   assert.ok(!heads.includes("Mainline"), heads.join("|"));
@@ -877,4 +881,83 @@ test("noMain: the printed report has no mainline column and no stem", () => {
   assert.ok(text.includes("Bb5"), text);
   assert.ok(text.includes("d6"), text);
   undo();
+});
+
+// ---- pages headed by their own branch
+
+test("a later table whose lines share a branch is headed by it, without the mainline", () => {
+  const off = installDom();
+  const box = printTables(kid(16));
+  const tables = [...box.querySelectorAll("table.tbl")];
+  assert.ok(tables.length > 1);
+  const later = tables[1];
+  const stem = later.previousElementSibling;
+  assert.ok(stem.classList.contains("print-stem"), "a stem above it");
+  assert.match(stem.textContent, /1\. d4\s+Nf6\s+2\. c4\s+g6\s+3\. Nc3\s+Bg7\s+4\. e4\s+d6/);
+  assert.strictEqual(later.querySelector(".main-col"), null, "no mainline column");
+  const heads = [...later.querySelectorAll("tr")[0].children].map((th) => th.textContent);
+  assert.ok(!heads.includes("Mainline"), heads.join("|"));
+  assert.strictEqual(later.querySelectorAll("tr")[1].dataset.ply, "8", "rows start at White's 5th");
+  off();
+});
+
+test("the first table keeps the mainline even when its lines share a branch", () => {
+  const off = installDom();
+  const box = printTables(kid(3));
+  const first = box.querySelector("table.tbl");
+  assert.ok(first.querySelector(".main-col"), "the mainline column is there");
+  off();
+});
+
+const BASE = "1. d4 Nf6 2. c4 (2. c4 e6 3. Nc3) (2. c4 e6 3. Nf3) *";
+
+test("a line every other line continues gives its column to the stem", () => {
+  const off = installDom();
+  const st = loadState(BASE);
+  st.noMain = true;
+  st.lines[0].comments = [{ ply: 2, text: "the Indian set-up" }];
+  const box = document.createElement("div");
+  appendPrintTables(box, grid(st.lines));
+  const stem = box.querySelector(".print-stem");
+  assert.match(stem.textContent, /1\. d4\s+Nf6\s+2\. c4\d*\s+e6/);
+  assert.ok(stem.querySelector("sup"), "the base line's note marker rides in the stem");
+  const t = box.querySelector("table.tbl");
+  assert.strictEqual(t.querySelectorAll("tr")[0].children.length, 3, "ply + the two continuations");
+  const cells = [...t.querySelectorAll("td")].map((c) => c.textContent);
+  assert.ok(cells.includes("Nc3") && cells.includes("Nf3"));
+  assert.match(box.querySelector(".print-notes").textContent, /the Indian set-up/, "its note still prints");
+  off();
+});
+
+test("a base line is absorbed on a later page with the mainline shown too", () => {
+  const off = installDom();
+  // 13 replies to 1.e4 fill the first page; the 1.d4 lines leave the mainline
+  // earliest, so they are packed last, onto a page of their own
+  const alts = "c5 d5 f5 g6 b6 e6 c6 d6 Nc6 a6 h6 a5 Nf6"
+    .split(" ")
+    .map((m) => `(1... ${m})`)
+    .join(" ");
+  const box = printTables(
+    `1. e4 (1. d4 Nf6 2. c4) (1. d4 Nf6 2. c4 e6 3. Nc3) (1. d4 Nf6 2. c4 e6 3. Nf3) 1... e5 ${alts} 2. Nf3 *`,
+  );
+  const tables = [...box.querySelectorAll("table.tbl")];
+  const last = tables[tables.length - 1];
+  const stem = last.previousElementSibling;
+  assert.ok(stem?.classList.contains("print-stem"), "the Indian page has a stem");
+  assert.match(stem.textContent, /2\. c4\s+e6/);
+  assert.strictEqual(last.querySelector(".main-col"), null);
+  assert.strictEqual(last.querySelectorAll("tr")[0].children.length, 3);
+  off();
+});
+
+test("a page whose lines share nothing beyond the mainline keeps it", () => {
+  const off = installDom();
+  // two lines leaving the mainline at different moves: nothing to head a page with
+  const box = printTables(`1. e4 e5 ${ALTS} (1... e6 2. d4) ${MAIN}`);
+  box.querySelectorAll("table.tbl").forEach((t, i) => {
+    if (i === 0) return;
+    const lines = t.querySelectorAll("tr")[0].children.length - 2;
+    if (lines > 1) assert.ok(t.querySelector(".main-col"), `table ${i} keeps its mainline`);
+  });
+  off();
 });

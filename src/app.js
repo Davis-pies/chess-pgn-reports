@@ -38,7 +38,7 @@ import {
   setScratch,
 } from "./state.js";
 import { analysisPanel } from "./analysis-view.js";
-import { newScratch, seedLine } from "./analysis.js";
+import { newScratch, openAt } from "./analysis.js";
 import { sharedEngine } from "./engine.js";
 import { sharedFlavors } from "./engine-flavor.js";
 import { allNotes } from "./notes.js";
@@ -286,15 +286,16 @@ function themeBtn() {
   return b;
 }
 
-// Open Analysis mode, seeded with `moves` (a line's moves up to and including
-// the one to branch from). The seed is copied, so exploring never reaches
-// back into the notebook line it came from. Lines already on the board stay:
-// opening it again, from the toolbar or from another move, picks up where
-// the last visit left off rather than throwing that work away.
-export function openAnalysis(moves = []) {
-	const s = getScratch();
-	if (!s) setScratch(newScratch(moves));
-	else if (moves.length) seedLine(s, moves);
+// Open Analysis mode. From the toolbar (no moves) it reopens the board as it
+// was left. From a move, it opens the board at that position (see openAt):
+// the lines through it, from the notebook and from earlier exploring alike,
+// and nothing from elsewhere -- which stays in the session's pool, to come
+// back whenever a position it passes through is opened. Hidden notebook lines
+// stay out: they are out of every other view too. Lines come in as copies, so
+// exploring never reaches back into the notebook.
+export function openAnalysis(moves = [], from = null) {
+	if (!getScratch()) setScratch(newScratch());
+	if (moves.length) openAt(getScratch(), moves, visibleLines(getCurrent().lines), from);
 	setMode("analysis");
 	renderApp();
 }

@@ -18,8 +18,10 @@ import {
 	checkpoint,
 	forward,
 	goTo,
+	clearShown,
 	moveLine,
-	newScratch,
+	shown,
+	showAll,
 	play,
 	playAll,
 	positionOf,
@@ -31,7 +33,14 @@ import {
 	truncate,
 	undo,
 } from "./analysis.js";
-import { commitAll, commitLine, inNotebook } from "./analysis-commit.js";
+import {
+	commitAll,
+	commitLine,
+	inNotebook,
+	notebookNotes,
+	saveAllNotes,
+	saveNote,
+} from "./analysis-commit.js";
 import { commentEditor } from "./line-editor.js";
 import { formatScore, numberedFrom, whiteShare } from "./engine.js";
 import { FULL } from "./engine-store.js";
@@ -48,7 +57,10 @@ export function numberedMoves(moves) {
 const noteOn = (line, ply) =>
 	(line.comments || []).find((c) => c.ply === ply)?.text || "";
 
-const BOARD_SIZE = 480; // viewBox units; CSS scales it to the column
+const BOARD_SIZE = 480;
+// Where the eval bar stood, carried across redraws so a new position starts
+// the bar from the last reading rather than from even.
+let lastShare = 0.5; // viewBox units; CSS scales it to the column
 
 export function analysisPanel(
 	scratch,
@@ -162,12 +174,32 @@ export function analysisPanel(
 	const right = el("div", { className: "an-right" });
 	if (engine) right.appendChild(engineBox(engine, scratch, pos, onChange, { board, bar, flavors }));
 
+	// The lines through the position the board was opened at. The rest of the
+	// session's lines are kept, off view, and one click brings them all back.
+	const on = shown(scratch);
+	const offView = scratch.lines.filter((l) => l.moves.length).length - on.filter((i) => scratch.lines[i].moves.length).length;
+	const root = scratch.root || [];
+	const passesRoot = (l) => l.moves.length >= root.length && root.every((san, k) => l.moves[k].san === san);
 	const listHead = el("div", { className: "an-sec" }, [
-		el("span", { textContent: `Your lines (${scratch.lines.filter((l) => l.moves.length).length})` }),
+		el("span", {
+			textContent:
+				(root.length ? `Lines through ${sanLabel(root)}` : "Lines") +
+				` (${on.filter((i) => scratch.lines[i].moves.length).length})`,
+		}),
 	]);
+	if (offView)
+		listHead.appendChild(
+			el("button", {
+				className: "an-showall",
+				textContent: `show all (${offView} more)`,
+				title: "Show the lines explored from other positions too",
+				onclick: act(() => showAll(scratch)),
+			}),
+		);
 	right.appendChild(listHead);
 	const list = el("div", { className: "an-lines" });
-	scratch.lines.forEach((line, i) => {
+	on.forEach((i, k) => {
+		const line = scratch.lines[i];
 		const row = el("div", {
 			className: "an-line" + (i === scratch.active ? " active" : ""),
 		});
@@ -180,14 +212,20 @@ export function analysisPanel(
 			movesBox.appendChild(el("span", { className: "an-empty", textContent: "(no moves yet — play one on the board)" }));
 		}
 		const shared = sharedPrefix(scratch, i);
+		// Every line on view passes through the position the board was opened
+		// at, so the moves up to it say nothing that the heading does not: the
+		// list picks up at its last move. The cursor's move is never hidden.
+		const skip = passesRoot(line) ? Math.max(0, Math.min(root.length - 1, i === scratch.active ? scratch.at - 1 : Infinity)) : 0;
+		if (skip > 0) movesBox.appendChild(el("span", { className: "an-elide", textContent: "…", title: numberedMoves(line.moves.slice(0, skip)) }));
 		line.moves.forEach((m, j) => {
+			if (j < skip) return;
 			const mv = el("button", {
 				className:
 					"an-move" +
 					(i === scratch.active && j === scratch.at - 1 ? " at" : "") +
 					(j < shared ? " shared" : "") +
 					(noteOn(line, j) ? " has-note" : ""),
-				textContent: j % 2 === 0 ? `${j / 2 + 1}.${m.san}` : m.san,
+				textContent: j % 2 === 0 ? `${j / 2 + 1}.${m.san}` : j === skip ? `${(j + 1) / 2}...${m.san}` : m.san,
 				title: noteOn(line, j),
 			});
 			mv.onclick = (e) => {
@@ -214,10 +252,10 @@ export function analysisPanel(
 					fn();
 				},
 			});
-		if (scratch.lines.length > 1) {
+		if (on.length > 1) {
 			tools.append(
-				small("an-up", "↑", "Move this line up", act(() => moveLine(scratch, i, -1)), i === 0),
-				small("an-down", "↓", "Move this line down", act(() => moveLine(scratch, i, 1)), i === scratch.lines.length - 1),
+				small("an-up", "↑", "Move this line up", act(() => moveLine(scratch, i, -1)), k === 0),
+				small("an-down", "↓", "Move this line down", act(() => moveLine(scratch, i, 1)), k === on.length - 1),
 			);
 		}
 		tools.appendChild(small("an-del", "✕", "Delete this line", risky(() => removeLine(scratch, i))));
@@ -234,6 +272,7 @@ export function analysisPanel(
 			? commentEditor(scratch.at - 1, [activeLine(scratch)])
 			: el("div", { className: "an-note-hint", textContent: "Play a move to note it." }),
 	);
+	right.appendChild(noteTools(scratch, onChange));
 
 	// The commit bar. A line that goes in hands over to onAdded, which closes
 	// the window in the app. A refusal changes nothing, so it does not redraw:
@@ -278,12 +317,7 @@ export function analysisPanel(
 	extra.append(
 		btn("an-copy-fen", "Copy FEN", "Copy this position as FEN", copy(pos.fen, "FEN")),
 		btn("an-copy-pgn", "Copy PGN", "Copy every line here as one PGN, the first line as the main line", copy(scratchPgn(scratch), "PGN")),
-		btn("an-clear", "New board", "Start again from the opening position", risky(() => {
-			const fresh = newScratch();
-			scratch.lines = fresh.lines;
-			scratch.active = 0;
-			scratch.at = 0;
-		})),
+		btn("an-clear", "Clear lines", "Delete the lines on view and start again from this position", risky(() => clearShown(scratch))),
 	);
 	if (scratch.undo) extra.appendChild(btn("an-undo", "↶ Undo", "Undo the last delete", act(() => undo(scratch))));
 	right.appendChild(extra);
@@ -293,11 +327,13 @@ export function analysisPanel(
 }
 
 // "12...Nf6", the move the cursor sits after.
-function moveLabel(s) {
-	const j = s.at - 1;
-	const san = activeLine(s).moves[j].san;
-	return j % 2 === 0 ? `${j / 2 + 1}.${san}` : `${(j + 1) / 2}...${san}`;
+// "8.Qd2" or "7...Qb6": the last move of a list of SANs from move one.
+function sanLabel(sans) {
+	const j = sans.length - 1;
+	return j % 2 === 0 ? `${j / 2 + 1}.${sans[j]}` : `${(j + 1) / 2}...${sans[j]}`;
 }
+
+const moveLabel = (s) => sanLabel(activeLine(s).moves.slice(0, s.at).map((m) => m.san));
 
 // The engine's corner. Built once per panel; `paint` refills it from the
 // engine's state and is what the engine calls as its output comes in.
@@ -369,10 +405,21 @@ function engineBox(engine, scratch, pos, onChange, { board, bar, flavors }) {
 			info.textContent = `depth ${st.depth}${st.status === "done" ? " ✓" : ""}${st.status === "searching" ? knps : ""}`;
 		}
 		// the bar and its number follow the best line, from White's side
+		// Between positions there is no best line yet; the bar holds where it
+		// was rather than dropping to even and climbing back.
 		const best = shown[0];
-		const share = best ? whiteShare(best.score) : 0.5;
-		bar.firstChild.style.height = `${(share * 100).toFixed(1)}%`;
+		if (best) lastShare = whiteShare(best.score);
+		bar.firstChild.style.height = `${(lastShare * 100).toFixed(1)}%`;
 		bar.title = best ? `${formatScore(best.score)} from White's side` : "";
+		// One row per line asked for, whether or not the search has filled it
+		// yet, so the box keeps its height from one move to the next instead
+		// of collapsing while the new search starts and growing back.
+		const slots = pos.over ? 0 : Math.max(engine.multiPv - shown.length, 0);
+		const waiting = Array.from({ length: slots }, () =>
+			el("div", { className: "an-pv empty" }, [
+				el("span", { className: "an-score", textContent: "…" }),
+			]),
+		);
 		lines.replaceChildren(
 			...shown.map((l) => {
 				const sans = l.moves.map((m) => m.san);
@@ -398,8 +445,11 @@ function engineBox(engine, scratch, pos, onChange, { board, bar, flavors }) {
 				});
 				return row;
 			}),
+			...waiting,
 		);
-		if (shown.length) {
+		// The actions keep their place too: disabled, or held invisible, while
+		// there is nothing for them to act on.
+		if (!pos.over) {
 			const acts = el("div", { className: "orow an-engine-acts" });
 			// The verdict into the note on the move just played, where the
 			// notebook and its PGN will carry it.
@@ -409,6 +459,7 @@ function engineBox(engine, scratch, pos, onChange, { board, bar, flavors }) {
 						className: "chip mini an-note-eval",
 						textContent: "Note eval",
 						title: "Add the engine's evaluation to the note on this move",
+						disabled: !best,
 						onclick: () => {
 							const line = activeLine(scratch);
 							line.comments = line.comments || [];
@@ -421,7 +472,8 @@ function engineBox(engine, scratch, pos, onChange, { board, bar, flavors }) {
 					}),
 				);
 			}
-			if (st.status !== "searching") acts.appendChild(deeper);
+			deeper.style.visibility = best && st.status !== "searching" ? "" : "hidden";
+			acts.appendChild(deeper);
 			lines.appendChild(acts);
 		}
 		drawArrows(
@@ -495,5 +547,76 @@ function fullBox(flavors) {
 	};
 	flavors.onUpdate = paint;
 	paint(flavors.state);
+	return box;
+}
+
+// Saving notes into the notebook without adding a line: the one on this move,
+// or all of them. Beside them, what the notebook says on this move now, when
+// that is not what the board says -- so a save never overwrites a note the
+// user could not see. A save redraws the report behind the window, and with it
+// the panel, so its outcome rides on the scratch to the next draw.
+function noteTools(scratch, onChange) {
+	const box = el("div", { className: "an-note-tools" });
+	const line = activeLine(scratch);
+	const ply = scratch.at - 1;
+	const on = () => shown(scratch).map((i) => scratch.lines[i]);
+	const say = (text) => {
+		scratch.flash = text;
+		onChange();
+	};
+	if (scratch.at) {
+		const nb = notebookNotes(line.moves, ply);
+		const here = (line.comments || []).filter((c) => c.ply === ply).map((c) => c.text);
+		if (nb === null) {
+			box.appendChild(
+				el("div", {
+					className: "an-note-nb",
+					textContent: "This move is not in the notebook yet; its notes go in when its line is added.",
+				}),
+			);
+		} else if (nb.join("\n") !== here.join("\n")) {
+			box.appendChild(
+				el("div", {
+					className: "an-note-nb",
+					textContent: "In the notebook: " + (nb.length ? nb.join(" · ") : "no note"),
+				}),
+			);
+		}
+		const one = el("button", {
+			className: "chip mini an-save-note",
+			textContent: "Save note to notebook",
+			title: "Make the notebook's note on this move the one here",
+			disabled: nb === null,
+			onclick: () => {
+				const r = saveNote(activeLine(scratch), ply);
+				say(r.ok ? (r.notes ? "Note saved to the notebook." : "Note cleared in the notebook.") : r.reason);
+			},
+		});
+		box.appendChild(el("div", { className: "orow an-note-acts" }, [one, saveAll()]));
+	} else if (on().some((l) => (l.comments || []).length)) {
+		box.appendChild(el("div", { className: "orow an-note-acts" }, [saveAll()]));
+	}
+	function saveAll() {
+		return el("button", {
+			className: "chip mini an-save-notes",
+			textContent: "Save all notes",
+			title: "Save every note here that is on a move the notebook has",
+			disabled: !on().some((l) => (l.comments || []).length),
+			onclick: () => {
+				const { saved, missing } = saveAllNotes(scratch);
+				const parts = [];
+				parts.push(saved === 1 ? "1 note saved to the notebook." : `${saved} notes saved to the notebook.`);
+				if (missing)
+					parts.push(
+						`${missing} ${missing === 1 ? "is" : "are"} on moves not in the notebook yet; add those lines to keep them.`,
+					);
+				say(parts.join(" "));
+			},
+		});
+	}
+	if (scratch.flash) {
+		box.appendChild(el("div", { className: "an-note-msg", role: "status", textContent: scratch.flash }));
+		scratch.flash = null;
+	}
 	return box;
 }

@@ -118,3 +118,60 @@ test("inNotebook tells a line the notebook holds from one it does not", async ()
 	assert.strictEqual(inNotebook([]), false);
 	done();
 });
+
+// ---- notes straight into the notebook
+
+import { saveNote, saveAllNotes, notebookNotes } from "../src/analysis-commit.js";
+import { openAt } from "../src/analysis.js";
+
+const SIC = "1. e4 c5 2. Nf3 d6 (2... Nc6 3. d4) 3. d4 cxd4 *";
+const m = (...s) => s.map((san, ply) => ({ san, ply }));
+
+test("a note on a move the notebook has goes onto every line through it", () => {
+	const done = installDom();
+	loadState(SIC);
+	const line = { moves: m("e4", "c5", "Nf3"), comments: [{ ply: 2, text: "the Open Sicilian" }] };
+	assert.deepStrictEqual(notebookNotes(line.moves, 2), []);
+	assert.deepStrictEqual(saveNote(line, 2), { ok: true, notes: 1 });
+	for (const l of getCurrent().lines)
+		assert.deepStrictEqual(l.comments.filter((c) => c.ply === 2), [{ ply: 2, text: "the Open Sicilian" }]);
+	assert.deepStrictEqual(notebookNotes(line.moves, 2), ["the Open Sicilian"]);
+	// the board's notes replace the notebook's; none clears them
+	line.comments = [];
+	assert.deepStrictEqual(saveNote(line, 2), { ok: true, notes: 0 });
+	assert.deepStrictEqual(notebookNotes(line.moves, 2), []);
+	done();
+});
+
+test("a note on a move the notebook has not got is refused, and says why", () => {
+	const done = installDom();
+	loadState(SIC);
+	const line = { moves: m("e4", "e5"), comments: [{ ply: 1, text: "x" }] };
+	assert.strictEqual(notebookNotes(line.moves, 1), null);
+	const r = saveNote(line, 1);
+	assert.strictEqual(r.ok, false);
+	assert.match(r.reason, /not in the notebook yet/);
+	assert.strictEqual(notebookNotes(m("e4"), 3), null, "past the end of the moves given");
+	done();
+});
+
+test("Save all saves the notes on view, counts the rest, and never clears", () => {
+	const done = installDom();
+	loadState(SIC);
+	getCurrent().lines[0].comments = [{ ply: 0, text: "best by test" }];
+	const s = newScratch();
+	openAt(s, m("e4", "c5"), getCurrent().lines);
+	// the board's copy of 1.e4's note is dropped, but Save all must not clear it
+	s.lines.forEach((l) => (l.comments = l.comments.filter((c) => c.ply !== 0)));
+	s.lines[0].comments.push({ ply: 3, text: "the Najdorf family" }, { ply: 3, text: "or the Dragon" });
+	s.lines[1].comments.push({ ply: 3, text: "the Classical" });
+	play(s, "a6"); // not in the notebook
+	goTo(s, 1);
+	s.lines[s.active].comments.push({ ply: 4, text: "not saved" });
+	const r = saveAllNotes(s);
+	assert.deepStrictEqual(r, { saved: 2, missing: 1 });
+	assert.deepStrictEqual(notebookNotes(m("e4", "c5", "Nf3", "d6"), 3), ["the Najdorf family", "or the Dragon"]);
+	assert.deepStrictEqual(notebookNotes(m("e4", "c5", "Nf3", "Nc6"), 3), ["the Classical"]);
+	assert.deepStrictEqual(notebookNotes(m("e4"), 0), ["best by test"], "untouched");
+	done();
+});

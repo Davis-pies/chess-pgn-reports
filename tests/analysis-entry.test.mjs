@@ -36,10 +36,10 @@ test("analysing from a table move seeds the scratch with its prefix", async () =
 	const s = getScratch();
 	assert.deepStrictEqual(
 		s.lines[0].moves.map((m) => m.san),
-		["e4", "e5", "Nf3"],
-		"seeded up to and including the clicked move",
+		["e4", "e5", "Nf3", "Nc6", "Bb5", "a6"],
+		"the notebook line through the move comes whole",
 	);
-	assert.strictEqual(s.at, 3, "the cursor is after it, ready to branch");
+	assert.strictEqual(s.at, 3, "the cursor is after the clicked move, ready to branch");
 	assert.ok(app.view().querySelector(".an-board svg"));
 });
 
@@ -74,11 +74,12 @@ test("the line editor's move panel offers the same entry", async () => {
 	assert.strictEqual(getMode(), "analysis");
 	assert.deepStrictEqual(
 		getScratch().lines[0].moves.map((m) => m.san),
-		["e4"],
+		["e4", "e5", "Nf3", "Nc6", "Bb5", "a6"],
 	);
+	assert.strictEqual(getScratch().at, 1);
 });
 
-test("opening the board again keeps its lines; analysing another move adds one", async () => {
+test("the toolbar reopens the board as it was; analysing a move shows only that position's lines", async () => {
 	app.reset();
 	await app.loadPgn(PGN);
 	app.view().querySelector(".an-toggle").click();
@@ -91,6 +92,36 @@ test("opening the board again keeps its lines; analysing another move adds one",
 	app.view().querySelector(".an-close").click();
 	rightClick([...app.view().querySelectorAll(".pv-table td")].find((c) => c.textContent.includes("Nf3")));
 	menuItem("Analyse from here").click();
-	assert.strictEqual(getScratch().lines.length, 2);
-	assert.deepStrictEqual(getScratch().lines[1].moves.map((m) => m.san), ["e4", "e5", "Nf3"]);
+	// a board of that position only: the 1.d4 line explored before is off view
+	const { shown } = await import("../src/analysis.js");
+	const now = getScratch();
+	assert.deepStrictEqual(shown(now).map((i) => now.lines[i].moves[0].san), ["e4"]);
+	assert.strictEqual(now.at, 3);
+	assert.ok(!app.view().querySelector(".an-lines").textContent.includes("d4"));
+	// kept, though: "show all" brings it back
+	app.view().querySelector(".an-showall").click();
+	assert.ok(app.view().querySelector(".an-lines").textContent.includes("1.d4"));
+});
+
+test("every notebook line through the position comes onto the board, with its notes", async () => {
+	app.reset();
+	await app.loadPgn(
+		"1. e4 c5 2. Nf3 d6 (2... Nc6 3. d4) (2... e6 3. d4 {the Taimanov idea}) 3. d4 cxd4 4. Nxd4 Nf6 *",
+	);
+	// right-click White's 2nd: every line goes through it
+	const nf3 = [...app.view().querySelectorAll(".pv-table td")].find((c) => c.textContent.trim() === "Nf3");
+	rightClick(nf3);
+	menuItem("Analyse from here").click();
+	const s = getScratch();
+	assert.deepStrictEqual(
+		s.lines.map((l) => l.moves.map((m) => m.san).join(" ")),
+		["e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6", "e4 c5 Nf3 Nc6 d4", "e4 c5 Nf3 e6 d4"],
+	);
+	assert.strictEqual(s.at, 3);
+	assert.deepStrictEqual(s.lines[2].comments, [{ ply: 4, text: "the Taimanov idea" }], "notes come along");
+	// analysing from the same place again doubles nothing
+	app.view().querySelector(".an-close").click();
+	rightClick([...app.view().querySelectorAll(".pv-table td")].find((c) => c.textContent.trim() === "Nf3"));
+	menuItem("Analyse from here").click();
+	assert.strictEqual(getScratch().lines.length, 3);
 });

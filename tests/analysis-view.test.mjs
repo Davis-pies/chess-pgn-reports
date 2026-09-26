@@ -429,7 +429,7 @@ test("Note eval writes the verdict into the move's note; Go deeper when done", (
 	const s = newScratch([{ san: "e4" }]);
 	const panel = analysisPanel(s, () => {}, { engine });
 	w().reply("info depth 12 multipv 1 score cp -30 pv c7c5 g1f3");
-	assert.strictEqual(panel.querySelector(".an-deeper"), null, "not while searching");
+	assert.strictEqual(panel.querySelector(".an-deeper").style.visibility, "hidden", "not while searching");
 	w().reply("bestmove c7c5");
 	assert.match(panel.querySelector(".an-engine-info").textContent, /depth 12 ✓/);
 	click(panel, ".an-note-eval");
@@ -486,5 +486,103 @@ test("the engine box says when it failed and when the game is over", () => {
 	e2.enable();
 	const mate = newScratch(["f3", "e5", "g4", "Qh4#"].map((san) => ({ san })));
 	assert.match(analysisPanel(mate, () => {}, { engine: e2 }).querySelector(".an-engine-info").textContent, /Game over/);
+	done();
+});
+
+test("the engine box keeps its rows between positions, so it does not jump", () => {
+	const done = installDom();
+	const { engine, w } = engineWith(); // two lines asked for
+	engine.enable();
+	const s = newScratch([{ san: "e4" }]);
+	let panel = analysisPanel(s, () => {}, { engine });
+	assert.strictEqual(panel.querySelectorAll(".an-pv").length, 2, "two rows before anything is found");
+	assert.strictEqual(panel.querySelectorAll(".an-pv.empty").length, 2);
+	assert.ok(panel.querySelector(".an-note-eval").disabled);
+	w().reply("info depth 12 multipv 1 score cp -80 pv c7c5 g1f3");
+	assert.strictEqual(panel.querySelectorAll(".an-pv").length, 2, "one found, one still held");
+	assert.strictEqual(panel.querySelectorAll(".an-pv.empty").length, 1);
+	const height = panel.querySelector(".an-evalfill").style.height;
+	// a move: the new panel starts with its rows held and the bar where it was
+	play(s, "c5");
+	panel = analysisPanel(s, () => {}, { engine });
+	assert.strictEqual(panel.querySelectorAll(".an-pv").length, 2);
+	assert.strictEqual(panel.querySelector(".an-evalfill").style.height, height);
+	done();
+});
+
+// ---- notes into the notebook, and the lines on view
+
+import { openAt, shown } from "../src/analysis.js";
+
+test("the note tools save to the notebook and say so", () => {
+	const done = installDom();
+	loadState("1. e4 c5 2. Nf3 d6 *");
+	const s = newScratch();
+	openAt(s, [{ san: "e4" }, { san: "c5" }], getCurrent().lines);
+	activeLine(s).comments.push({ ply: 1, text: "the Sicilian" });
+	let panel = analysisPanel(s, () => {});
+	assert.match(panel.querySelector(".an-note-nb").textContent, /In the notebook: no note/);
+	click(panel, ".an-save-note");
+	assert.deepStrictEqual(getCurrent().lines[0].comments, [{ ply: 1, text: "the Sicilian" }]);
+	panel = analysisPanel(s, () => {});
+	assert.strictEqual(panel.querySelector(".an-note-msg").textContent, "Note saved to the notebook.");
+	assert.strictEqual(panel.querySelector(".an-note-nb"), null, "the two agree now");
+	assert.strictEqual(analysisPanel(s, () => {}).querySelector(".an-note-msg"), null, "said once");
+	// cleared on the board, cleared in the notebook
+	activeLine(s).comments = [];
+	click(analysisPanel(s, () => {}), ".an-save-note");
+	assert.strictEqual(analysisPanel(s, () => {}).querySelector(".an-note-msg").textContent, "Note cleared in the notebook.");
+	assert.deepStrictEqual(getCurrent().lines[0].comments, []);
+	done();
+});
+
+test("off the notebook, Save note is disabled and Save all says what it could not keep", () => {
+	const done = installDom();
+	loadState("1. e4 c5 *");
+	const s = newScratch([{ san: "d4" }]);
+	activeLine(s).comments = [{ ply: 0, text: "queen's pawn" }];
+	let panel = analysisPanel(s, () => {});
+	assert.ok(panel.querySelector(".an-save-note").disabled);
+	assert.match(panel.querySelector(".an-note-nb").textContent, /not in the notebook yet/);
+	click(panel, ".an-save-notes");
+	panel = analysisPanel(s, () => {});
+	assert.match(panel.querySelector(".an-note-msg").textContent, /0 notes saved.*1 is on moves not in the notebook/);
+	// at the start position, only Save all is offered
+	goTo(s, 0);
+	panel = analysisPanel(s, () => {});
+	assert.strictEqual(panel.querySelector(".an-save-note"), null);
+	assert.ok(panel.querySelector(".an-save-notes"));
+	done();
+});
+
+test("the list names the position and offers the lines off view", () => {
+	const done = installDom();
+	loadState("1. e4 c5 2. Nf3 (2. Nc3) d6 *");
+	const s = newScratch();
+	openAt(s, [{ san: "d4" }], []);
+	openAt(s, [{ san: "e4" }, { san: "c5" }], getCurrent().lines);
+	const panel = analysisPanel(s, () => {});
+	assert.match(panel.querySelector(".an-sec").textContent, /Lines through 1\.\.\.c5 \(2\)/);
+	assert.strictEqual(panel.querySelectorAll(".an-line").length, 2);
+	panel.querySelector(".an-showall").click();
+	assert.strictEqual(shown(s).length, 3);
+	const all = analysisPanel(s, () => {});
+	assert.match(all.querySelector(".an-sec").textContent, /^Lines \(3\)/);
+	assert.strictEqual(all.querySelector(".an-showall"), null);
+	done();
+});
+
+test("lines through the opened position pick up at its move", () => {
+	const done = installDom();
+	loadState("1. e4 c5 2. Nf3 d6 3. d4 (3. c3) *");
+	const s = newScratch();
+	openAt(s, ["e4", "c5", "Nf3", "d6"].map((san) => ({ san })), getCurrent().lines);
+	const rows = analysisPanel(s, () => {}).querySelectorAll(".an-line");
+	const texts = [...rows].map((r) => [...r.querySelectorAll(".an-elide, .an-move")].map((n) => n.textContent).join(" "));
+	assert.deepStrictEqual(texts, ["… 2...d6 3.d4", "… 2...d6 3.c3"]);
+	// the cursor's own move stays in view even when it is before the position
+	goTo(s, 1);
+	const back = analysisPanel(s, () => {}).querySelector(".an-line.active");
+	assert.match(back.textContent, /^1\.e4c5/, "stepped back before it, the line shows whole");
 	done();
 });
