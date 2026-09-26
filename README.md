@@ -41,8 +41,9 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    extend and annotate. The list is headed **Lines through** that move and
    picks each line up at it. Lines explored from other positions are kept for
    the session, off view, and come back whenever you open a position they
-   pass through; **show all** brings every one back. (The board is not saved
-   with the workbook: what you keep goes in as lines and notes.) With no PGN at all, **Start from a
+   pass through; **show all** brings every one back. The board is saved with
+   the workbook (**Save** and **Save to file** alike) and comes back when it is
+   opened, so analysis in progress survives a reload. With no PGN at all, **Start from a
    board** on the import screen opens it on the opening position: the first
    line you add becomes the new notebook's mainline, so a repertoire can be
    built from nothing.
@@ -81,7 +82,7 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
      and load the file. **Remove download** frees the space again. The engine
      shows an eval bar beside the board, the top lines (1–5) with scores from
      White's side, and arrows for their first moves. Click any move in a line
-     to play the line up to it. Search depth is adjustable (up to unlimited);
+     to play the line up to it. Search depth is a number box (0 = no limit);
      **Go deeper** keeps searching a finished position, and **Note eval**
      writes the verdict into the current move's note.
      Evaluations are cached per position, so stepping back to a position shows

@@ -467,9 +467,21 @@ test("the engine's settings change what it searches", () => {
 	pv.onchange();
 	assert.strictEqual(engine.multiPv, 3);
 	const depth = panel.querySelector(".an-engine-depth");
+	assert.strictEqual(depth.type, "number");
+	assert.strictEqual(depth.value, "22", "shows the depth in force");
+	depth.value = "25";
+	depth.onchange();
+	assert.strictEqual(engine.depth, 25, "any depth, not just the old list");
 	depth.value = "0";
 	depth.onchange();
-	assert.strictEqual(engine.depth, 0);
+	assert.strictEqual(engine.depth, 0, "0 is no limit");
+	assert.strictEqual(panel.querySelector(".an-depth-inf").textContent, "∞");
+	for (const bad of ["", "-3", "2.5", "500"]) {
+		depth.value = bad;
+		depth.onchange();
+		assert.strictEqual(engine.depth, 0, `"${bad}" is refused`);
+		assert.strictEqual(depth.value, "0", "and the box is put back");
+	}
 	assert.ok(w().sent.includes("setoption name MultiPV value 3"));
 	done();
 });

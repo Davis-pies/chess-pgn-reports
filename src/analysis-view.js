@@ -364,7 +364,7 @@ function engineBox(engine, scratch, pos, onChange, { board, bar, flavors }) {
 		};
 		opts.append(
 			pick("an-engine-pv", "Lines shown", [[1, "1 line"], [2, "2 lines"], [3, "3 lines"], [5, "5 lines"]], engine.multiPv, (n) => engine.setMultiPv(n)),
-			pick("an-engine-depth", "How deep to search", [[16, "depth 16"], [20, "depth 20"], [22, "depth 22"], [26, "depth 26"], [30, "depth 30"], [0, "∞ no limit"]], engine.depth, (d) => engine.setDepth(d)),
+			depthBox(engine),
 		);
 	}
 	if (on && flavors) {
@@ -619,4 +619,31 @@ function noteTools(scratch, onChange) {
 		scratch.flash = null;
 	}
 	return box;
+}
+
+// Search depth as a number: any depth, 0 for no limit. Applied when the box
+// is left or Enter is pressed, not per keystroke, so typing "25" never starts
+// a depth-2 search on the way. Anything that is not a whole number from 0 to
+// 99 puts the box back to the depth in force.
+function depthBox(engine) {
+	const input = el("input", {
+		type: "number",
+		className: "an-engine-depth",
+		min: "0",
+		max: "99",
+		step: "1",
+		value: String(engine.depth),
+		title: "How deep to search (0 = no limit)",
+	});
+	const hint = el("span", { className: "an-depth-inf", textContent: engine.depth ? "" : "∞" });
+	input.onchange = () => {
+		const d = Number(input.value);
+		if (input.value.trim() === "" || !Number.isInteger(d) || d < 0 || d > 99) {
+			input.value = String(engine.depth);
+			return;
+		}
+		hint.textContent = d ? "" : "∞";
+		engine.setDepth(d);
+	};
+	return el("label", { className: "an-engine-depthbox" }, ["depth ", input, hint]);
 }

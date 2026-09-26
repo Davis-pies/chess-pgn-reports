@@ -62,21 +62,49 @@ test("a line added on the board shows up in the report", async () => {
 	assert.match(app.view().querySelector(".pv-table").textContent, /d4/);
 });
 
-test("the scratch and the mode are never saved into a workbook", async () => {
+test("the board is saved with the workbook and comes back with it; the mode is not", async () => {
+	const { getScratch } = await import("../src/state.js");
 	app.reset();
 	await app.loadPgn(PGN);
 	app.view().querySelector(".an-toggle").click();
+	const sq = (s) =>
+		app
+			.view()
+			.querySelector(`.an-board rect[data-sq="${s}"]`)
+			.dispatchEvent(new app.dom.window.MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+	sq("d2");
+	sq("d4");
+	getScratch().lines[0].comments = [{ ply: 0, text: "queen's pawn" }];
 	app.view().querySelector(".an-close").click();
+	app.view().querySelector("input.name").value = "Boarded";
+	app.view().querySelector("input.name").oninput();
 	app.clickText("Save");
-	// store.js's PREFIX
-	const key = Object.keys(app.dom.window.localStorage).find((k) =>
-		k.startsWith("ott:"),
-	);
-	assert.ok(key, "something was saved");
+	const key = Object.keys(app.dom.window.localStorage).find((k) => k.startsWith("ott:"));
 	const saved = JSON.parse(app.dom.window.localStorage.getItem(key));
-	assert.strictEqual(saved.scratch, undefined);
-	assert.strictEqual(saved.mode, undefined);
+	assert.deepStrictEqual(saved.analysis.lines, [{ moves: ["d4"], comments: [{ ply: 0, text: "queen's pawn" }] }]);
+	assert.strictEqual(saved.mode, undefined, "the window's being open is not saved");
 	assert.ok(Array.isArray(saved.tags) && typeof saved.pgn === "string");
+
+	// a fresh start (the app's own button: the helper's reset clears storage),
+	// then the workbook reopened from the list
+	app.clickText("New / Import");
+	assert.strictEqual(getScratch(), null, "New / Import leaves no board behind");
+	[...app.view().querySelectorAll(".notebooks button")].find((b) => b.textContent.includes("Boarded")).click();
+	await app.settle();
+	const back = getScratch();
+	assert.deepStrictEqual(back.lines[0].moves.map((m) => m.san), ["d4"]);
+	assert.deepStrictEqual(back.lines[0].comments, [{ ply: 0, text: "queen's pawn" }]);
+	assert.strictEqual(app.view().querySelector(".an-overlay"), null, "opened closed, as a report");
+	app.view().querySelector(".an-toggle").click();
+	assert.match(app.view().querySelector(".an-lines").textContent, /1\.d4/);
+});
+
+test("a workbook saved with an empty board carries none", async () => {
+	app.reset();
+	await app.loadPgn(PGN);
+	app.clickText("Save");
+	const key = Object.keys(app.dom.window.localStorage).find((k) => k.startsWith("ott:"));
+	assert.strictEqual(JSON.parse(app.dom.window.localStorage.getItem(key)).analysis, undefined);
 });
 
 test("a line added on the board survives a save and reload", async () => {
@@ -164,4 +192,21 @@ test("with no notebook, a board can be the start: the first line added opens one
 	assert.strictEqual(lines.length, 1);
 	assert.strictEqual(lines[0].isMain, true);
 	assert.ok(app.view().querySelector(".pv-table"), "the notebook opened around it");
+});
+
+test("typing in the window is not cancelled: only Escape is the window's", async () => {
+	app.reset();
+	await app.loadPgn(PGN);
+	app.view().querySelector(".an-toggle").click();
+	const ov = app.view().querySelector(".an-overlay");
+	for (const key of ["a", "e", "f", " ", "ArrowLeft"]) {
+		const ev = new app.dom.window.KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+		// dispatched from inside a text box, as a keystroke there would be
+		const input = app.dom.window.document.createElement("input");
+		ov.querySelector(".analysis").appendChild(input);
+		input.dispatchEvent(ev);
+		input.remove();
+		assert.strictEqual(ev.defaultPrevented, false, `"${key}" reached the text box`);
+	}
+	assert.ok(app.view().querySelector(".an-overlay"), "and the window stayed open");
 });

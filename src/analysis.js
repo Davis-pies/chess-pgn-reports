@@ -374,3 +374,63 @@ export function showAll(s) {
 	s.root = [];
 	return s;
 }
+
+// ---- the board in a workbook
+//
+// A workbook carries the board as it was left, so analysis in progress is
+// there when the workbook is opened again. Moves are stored as SAN only; the
+// plies are their indices. Undo and one-off messages are not state worth
+// keeping and stay behind.
+
+export function packScratch(s) {
+	if (!s || !s.lines.some((l) => l.moves.length)) return null;
+	return {
+		lines: s.lines.map((l) => ({
+			moves: l.moves.map((m) => m.san),
+			...(l.comments && l.comments.length
+				? { comments: l.comments.map((c) => ({ ply: c.ply, text: c.text })) }
+				: {}),
+		})),
+		active: s.active,
+		at: s.at,
+		root: (s.root || []).slice(),
+		flipped: !!s.flipped,
+	};
+}
+
+// The inverse, trusting nothing: a file can be edited by hand. Each line is
+// replayed and cut at its first move that is not legal; notes past the cut or
+// not attached to a move go; the cursor and root are brought back within
+// what survived. Null if nothing usable is left.
+export function unpackScratch(d) {
+	if (!d || !Array.isArray(d.lines)) return null;
+	const lines = [];
+	for (const raw of d.lines) {
+		const sans = Array.isArray(raw && raw.moves) ? raw.moves : [];
+		const chess = new Chess();
+		const moves = [];
+		for (const san of sans) {
+			try {
+				moves.push({ san: chess.move(String(san)).san, ply: moves.length });
+			} catch {
+				break;
+			}
+		}
+		const comments = (Array.isArray(raw && raw.comments) ? raw.comments : [])
+			.filter((c) => c && Number.isInteger(c.ply) && c.ply >= 0 && c.ply < moves.length && typeof c.text === "string")
+			.map((c) => ({ ply: c.ply, text: c.text }));
+		lines.push(comments.length ? { moves, comments } : { moves });
+	}
+	if (!lines.some((l) => l.moves.length)) return null;
+	const s = newScratch();
+	s.lines = lines;
+	s.active = Number.isInteger(d.active) && lines[d.active] ? d.active : 0;
+	const len = lines[s.active].moves.length;
+	s.at = Number.isInteger(d.at) ? Math.max(0, Math.min(d.at, len)) : len;
+	s.root = Array.isArray(d.root) ? d.root.map(String) : [];
+	// a root no line reaches would leave nothing on view: widen it to the
+	// part the active line shares
+	widen(s);
+	s.flipped = !!d.flipped;
+	return s;
+}

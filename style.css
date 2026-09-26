@@ -1542,3 +1542,6 @@ sup {
 .an-note-msg { font-size: .82rem; color: var(--ok); }
 .an-showall { background: none; border: 0; padding: 0; font: inherit; font-size: .72rem; text-transform: none; letter-spacing: 0; color: var(--main); cursor: pointer; text-decoration: underline; }
 .an-elide { opacity: .5; padding: 0 .2rem; }
+.an-engine-depthbox { font-size: .78rem; color: var(--muted); display: inline-flex; align-items: center; gap: .2rem; }
+.an-engine-depthbox input { width: 3.4em; font: inherit; font-size: .78rem; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 5px; padding: 1px 3px; }
+.an-depth-inf { color: var(--text); }

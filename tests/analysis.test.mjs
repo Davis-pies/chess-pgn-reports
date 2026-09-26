@@ -411,3 +411,57 @@ test("moving and stepping skip the lines off view", () => {
 	assert.match(scratchPgn(s), /2\. Nc3 \(2\. Nf3\)/, "the PGN is the lines on view");
 	assert.doesNotMatch(scratchPgn(s), /d4/);
 });
+
+import { packScratch, unpackScratch } from "../src/analysis.js";
+
+test("a board packs to SAN and notes, and unpacks to the same board", () => {
+	const lines = nb("e4 c5 Nf3 d6", "e4 e5 Nf3");
+	const s = newScratch();
+	openAt(s, lines[0].moves.slice(0, 2), lines);
+	play(s, "Nc3");
+	activeLine(s).comments = [{ ply: 2, text: "closed" }];
+	s.flipped = true;
+	checkpoint(s);
+	s.flash = "said once";
+	const packed = JSON.parse(JSON.stringify(packScratch(s)));
+	assert.deepStrictEqual(packed, {
+		lines: [{ moves: ["e4", "c5", "Nf3", "d6"] }, { moves: ["e4", "c5", "Nc3"], comments: [{ ply: 2, text: "closed" }] }],
+		active: 1,
+		at: 3,
+		root: ["e4", "c5"],
+		flipped: true,
+	});
+	const back = unpackScratch(packed);
+	// an empty notes list is not written, so compare with it left out
+	const bare = (ls) => ls.map((l) => (l.comments && l.comments.length ? l : { moves: l.moves }));
+	assert.deepStrictEqual(back.lines, bare(s.lines));
+	assert.deepStrictEqual([back.active, back.at, back.root, back.flipped], [1, 3, ["e4", "c5"], true]);
+	assert.strictEqual(back.undo, undefined, "undo is not kept");
+	assert.strictEqual(packScratch(newScratch()), null, "an empty board packs to nothing");
+	assert.strictEqual(packScratch(null), null);
+});
+
+test("unpacking trusts nothing in a hand-edited file", () => {
+	assert.strictEqual(unpackScratch(undefined), null);
+	assert.strictEqual(unpackScratch({ lines: "no" }), null);
+	assert.strictEqual(unpackScratch({ lines: [{ moves: ["Ke2"] }] }), null, "nothing legal left");
+	const s = unpackScratch({
+		lines: [
+			{ moves: ["e4", "e5", "Qh8", "Nf3"], comments: [{ ply: 1, text: "ok" }, { ply: 3, text: "past the cut" }, { ply: "x", text: "bad" }, null] },
+			null,
+			{ moves: ["d4"] },
+		],
+		active: 9,
+		at: 99,
+		root: ["c4"],
+	});
+	assert.deepStrictEqual(s.lines[0].moves.map((m) => m.san), ["e4", "e5"], "cut at the illegal move");
+	assert.deepStrictEqual(s.lines[0].comments, [{ ply: 1, text: "ok" }]);
+	assert.deepStrictEqual(s.lines[1], { moves: [] });
+	assert.strictEqual(s.active, 0, "an index that is not a line falls back");
+	assert.strictEqual(s.at, 2, "clamped to the line");
+	assert.deepStrictEqual(s.root, [], "a root the board cannot reach is widened");
+	assert.strictEqual(s.flipped, false);
+	const noAt = unpackScratch({ lines: [{ moves: ["e4"] }] });
+	assert.strictEqual(noAt.at, 1, "no cursor: the end of the line");
+});

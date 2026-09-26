@@ -38,7 +38,7 @@ import {
   setScratch,
 } from "./state.js";
 import { analysisPanel } from "./analysis-view.js";
-import { newScratch, openAt } from "./analysis.js";
+import { newScratch, openAt, packScratch, unpackScratch } from "./analysis.js";
 import { sharedEngine } from "./engine.js";
 import { sharedFlavors } from "./engine-flavor.js";
 import { allNotes } from "./notes.js";
@@ -254,6 +254,8 @@ function workbookState() {
     name: c.name,
     pgn: c.pgn,
     lines: c.lines,
+    // analysis in progress travels with the workbook
+    analysis: packScratch(getScratch()),
     view: {
       boardSize: c.boardSize,
       cardFont: c.cardFont,
@@ -482,7 +484,12 @@ function analysisOverlay() {
   };
   const ov = el("div", { className: "modal-overlay an-overlay" });
   ov.onclick = (e) => e.target === ov && close();
-  ov.onkeydown = (e) => e.key === "Escape" && close();
+  // A block body, not `e.key === "Escape" && close()`: an on-handler that
+  // returns false cancels the event, and that expression returns false for
+  // every other key -- which swallowed all typing in the window's note box.
+  ov.onkeydown = (e) => {
+    if (e.key === "Escape") close();
+  };
   const an = analysisPanel(getScratch(), renderApp, {
     onAdded: close,
     engine,
@@ -554,6 +561,9 @@ function installNotebook(nb, id) {
   if (!nodes.length) throw new Error("that workbook has no moves.");
   const lines = applyNotebook(nb, collectLines(nodes));
   const view = nb.view || {};
+  // the workbook's own board, or none: a board left from the workbook open
+  // before this one is not this workbook's analysis
+  setScratch(unpackScratch(nb.analysis));
   setCurrent(
     freshState({
       id,
