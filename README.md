@@ -35,15 +35,21 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
 3. **Analyse** — **Analysis** in the toolbar opens an interactive board in a
    window over the report (close it with ✕, Esc or a click outside), or
    right-click any move (in the table or the line editor) and choose **Analyse
-   from here** to open it at that position: every notebook line through it
-   comes onto the board, whole and with its notes, beside any lines you
-   explored from there earlier — so the lines already written are there to
-   extend and annotate. The list is headed **Lines through** that move and
-   picks each line up at it. Lines explored from other positions are kept for
-   the session, off view, and come back whenever you open a position they
-   pass through; **show all** brings every one back. The board is saved with
-   the workbook (**Save** and **Save to file** alike) and comes back when it is
-   opened, so analysis in progress survives a reload. With no PGN at all, **Start from a
+   from here** to open it at that position; **Analysis** in the toolbar opens
+   it at the start. Every notebook line through the position comes onto the
+   board, whole and with its notes — from the toolbar, the whole workbook.
+   The list then **follows the cursor**: it shows the lines through the
+   position on the board, so stepping into a branch leaves the lines that do
+   not lead there out of view, and stepping back brings them in again. Lines
+   explored on the board are kept the same way. **📌** pins a line in view
+   wherever you go, and **show all … on the board** lists every line the
+   board holds (click again for only the lines through here); both last until
+   the board is closed. Where several lines are listed, each unselected one is
+   a single row starting where it leaves the lines above it; the selected one
+   is written out in full. The board — its lines, notes, position and
+   selection — is saved with the workbook (**Save** and **Save to file**
+   alike) and comes back when it is opened, so analysis in progress survives
+   a reload. With no PGN at all, **Start from a
    board** on the import screen opens it on the opening position: the first
    line you add becomes the new notebook's mainline, so a repertoire can be
    built from nothing.
@@ -89,9 +95,10 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
      its best result at once, and a search picks up from the depth already
      reached instead of starting over (the engine's own hash table is kept
      between positions too, so the re-search is fast).
-   Nothing reaches the notebook until you press **Add as new line** (or **Add
-   all**), which files the line as a sideline you can then tag like any other,
-   or **Add as footnote**. Adding closes the window; if the line cannot be added
+   Nothing reaches the notebook until you press **+ Line** or **+ Footnote** on
+   a line's row (a line the notebook has is badged **in notebook** instead), or
+   **Add all lines on view**; a line goes in as a sideline you can then tag like
+   any other, or as a footnote. Adding closes the window; if the line cannot be added
    (it has no moves, or the notebook already has it) the window stays open and
    says why.
    To correct a wrong move, analyse from the move before it, play the right one,

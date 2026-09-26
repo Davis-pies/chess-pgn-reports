@@ -4,7 +4,7 @@ import assert from "node:assert";
 import { installDom, loadState } from "./helpers.mjs";
 import { getCurrent } from "../src/state.js";
 import { analysisPanel, numberedMoves } from "../src/analysis-view.js";
-import { newScratch, activeLine, play, goTo } from "../src/analysis.js";
+import { newScratch, activeLine, play, goTo, forward } from "../src/analysis.js";
 
 const click = (root, sel) => {
 	const n = root.querySelector(sel);
@@ -113,12 +113,16 @@ test("a fork shows as a second line, and clicking one selects it", () => {
 	const s = newScratch([{ san: "e4" }, { san: "e5" }]);
 	goTo(s, 1);
 	play(s, "c5");
+	// in the fork, the line it left does not lead here
+	assert.strictEqual(analysisPanel(s, () => {}).querySelectorAll(".an-line").length, 1);
+	goTo(s, 1); // back where they split
 	const panel = analysisPanel(s, () => {});
 	const rows = panel.querySelectorAll(".an-line");
 	assert.strictEqual(rows.length, 2);
 	assert.ok(rows[1].classList.contains("active"), "the fork is the active line");
 	rows[0].click();
 	assert.strictEqual(s.active, 0);
+	assert.strictEqual(s.at, 1, "picking a line keeps the position, so the list stays");
 	done();
 });
 
@@ -137,6 +141,7 @@ test("each scratch line has a delete button", () => {
 	const s = newScratch([{ san: "e4" }, { san: "e5" }]);
 	goTo(s, 1);
 	play(s, "c5");
+	goTo(s, 1);
 	let changed = 0;
 	const panel = analysisPanel(s, () => changed++);
 	panel.querySelectorAll(".an-del")[0].click();
@@ -262,6 +267,9 @@ test("Home, End, Up, Down and F work from the keyboard", () => {
 	assert.strictEqual(s.at, 0);
 	keyOn(p(), "End");
 	assert.strictEqual(s.at, 2);
+	keyOn(p(), "ArrowUp"); // in the fork, no other line is on view
+	assert.strictEqual(s.active, 1);
+	keyOn(p(), "Home");
 	keyOn(p(), "ArrowUp");
 	assert.strictEqual(s.active, 0);
 	keyOn(p(), "ArrowDown");
@@ -303,6 +311,7 @@ test("lines can be reordered from the list, and shared opening moves are faint",
 	const s = newScratch([{ san: "e4" }, { san: "e5" }]);
 	goTo(s, 1);
 	play(s, "c5");
+	goTo(s, 1);
 	const panel = analysisPanel(s, () => {});
 	const second = panel.querySelectorAll(".an-line")[1];
 	assert.ok(second.querySelector(".an-move.shared"), "1.e4 is written above");
@@ -326,14 +335,17 @@ test("a line the notebook already has is badged", () => {
 	done();
 });
 
-test("New board starts over, and can be undone", () => {
+test("Clear lines deletes the lines on view, keeps the position, and can be undone", () => {
 	const done = installDom();
-	const s = newScratch([{ san: "e4" }]);
+	const s = newScratch([{ san: "e4" }, { san: "e5" }]);
+	goTo(s, 1);
+	play(s, "c5");
+	goTo(s, 1);
 	click(analysisPanel(s, () => {}), ".an-clear");
 	assert.strictEqual(s.lines.length, 1);
-	assert.strictEqual(activeLine(s).moves.length, 0);
+	assert.deepStrictEqual(activeLine(s).moves.map((m) => m.san), ["e4"], "a fresh line at the position");
 	click(analysisPanel(s, () => {}), ".an-undo");
-	assert.strictEqual(activeLine(s).moves[0].san, "e4");
+	assert.strictEqual(s.lines.length, 2);
 	done();
 });
 
@@ -524,7 +536,7 @@ test("the engine box keeps its rows between positions, so it does not jump", () 
 
 // ---- notes into the notebook, and the lines on view
 
-import { openAt, shown } from "../src/analysis.js";
+import { openAt } from "../src/analysis.js";
 
 test("the note tools save to the notebook and say so", () => {
 	const done = installDom();
@@ -567,20 +579,48 @@ test("off the notebook, Save note is disabled and Save all says what it could no
 	done();
 });
 
-test("the list names the position and offers the lines off view", () => {
+test("the list follows the cursor, and show all toggles", () => {
 	const done = installDom();
 	loadState("1. e4 c5 2. Nf3 (2. Nc3) d6 *");
 	const s = newScratch();
 	openAt(s, [{ san: "d4" }], []);
 	openAt(s, [{ san: "e4" }, { san: "c5" }], getCurrent().lines);
-	const panel = analysisPanel(s, () => {});
+	let panel = analysisPanel(s, () => {});
 	assert.match(panel.querySelector(".an-sec").textContent, /Lines through 1\.\.\.c5 \(2\)/);
 	assert.strictEqual(panel.querySelectorAll(".an-line").length, 2);
+	// into the 2.Nf3 branch: 2.Nc3 no longer leads here
+	forward(s);
+	panel = analysisPanel(s, () => {});
+	assert.match(panel.querySelector(".an-sec").textContent, /Lines through 2\.Nf3 \(1\)/);
+	assert.match(panel.querySelector(".an-showall").textContent, /show all 3 on the board/);
 	panel.querySelector(".an-showall").click();
-	assert.strictEqual(shown(s).length, 3);
-	const all = analysisPanel(s, () => {});
-	assert.match(all.querySelector(".an-sec").textContent, /^Lines \(3\)/);
-	assert.strictEqual(all.querySelector(".an-showall"), null);
+	panel = analysisPanel(s, () => {});
+	assert.match(panel.querySelector(".an-sec").textContent, /^All lines on the board \(3\)/);
+	assert.strictEqual(panel.querySelectorAll(".an-line").length, 3);
+	assert.ok(panel.querySelector(".an-line.elsewhere"), "lines off the position are marked");
+	// and back again: the toggle is the way to hide them
+	panel.querySelector(".an-showall").click();
+	assert.strictEqual(analysisPanel(s, () => {}).querySelectorAll(".an-line").length, 1);
+	done();
+});
+
+test("a pinned line stays in view wherever the cursor goes, until the board closes", async () => {
+	const done = installDom();
+	const { closeBoard } = await import("../src/analysis.js");
+	const s = newScratch([{ san: "e4" }, { san: "e5" }]);
+	goTo(s, 1);
+	play(s, "c5"); // in the fork: 1...e5 is off view
+	goTo(s, 1);
+	let panel = analysisPanel(s, () => {});
+	const pinBtn = panel.querySelectorAll(".an-pin")[0];
+	assert.strictEqual(pinBtn.getAttribute("aria-pressed"), "false");
+	pinBtn.click();
+	forward(s);
+	panel = analysisPanel(s, () => {});
+	assert.strictEqual(panel.querySelectorAll(".an-line").length, 2, "the pinned 1...e5 stays");
+	assert.ok(panel.querySelector(".an-line.elsewhere .an-pin.on"));
+	closeBoard(s);
+	assert.strictEqual(analysisPanel(s, () => {}).querySelectorAll(".an-line").length, 1, "closing unpins");
 	done();
 });
 
@@ -596,5 +636,39 @@ test("lines through the opened position pick up at its move", () => {
 	goTo(s, 1);
 	const back = analysisPanel(s, () => {}).querySelector(".an-line.active");
 	assert.match(back.textContent, /^1\.e4c5/, "stepped back before it, the line shows whole");
+	done();
+});
+
+test("each line on view has its own add buttons, which add that line", () => {
+	const done = installDom();
+	loadState("1. e4 e5 2. Nf3 Nc6 *");
+	const s = newScratch([{ san: "d4" }, { san: "d5" }]);
+	goTo(s, 1);
+	play(s, "Nf6");
+	goTo(s, 1); // both 1.d4 lines on view; the second is selected
+	let added = 0;
+	const panel = analysisPanel(s, () => {}, { onAdded: () => added++ });
+	const rows = panel.querySelectorAll(".an-line");
+	assert.strictEqual(rows.length, 2);
+	rows[0].querySelector(".an-add-foot").click(); // the first, not the selected one
+	const last = getCurrent().lines[getCurrent().lines.length - 1];
+	assert.deepStrictEqual(last.moves.map((m) => m.san), ["d4", "d5"]);
+	assert.strictEqual(last.tag, "foot");
+	assert.strictEqual(added, 1);
+	assert.strictEqual(s.active, 1, "adding did not change the selection");
+	done();
+});
+
+test("an unselected row starts where it leaves the lines above it", () => {
+	const done = installDom();
+	loadState("1. e4 c5 2. Nf3 d6 3. d4 cxd4 (3... Nf6 4. Nc3) 4. Nxd4 *");
+	const s = newScratch();
+	openAt(s, [{ san: "e4" }, { san: "c5" }], getCurrent().lines);
+	const rows = [...analysisPanel(s, () => {}).querySelectorAll(".an-line")].map((r) =>
+		[...r.querySelectorAll(".an-elide, .an-move")].map((n) => n.textContent).join(" "),
+	);
+	// the selected (first) line from the position; the other from the move
+	// before it parts company, so the two can be told apart at a glance
+	assert.deepStrictEqual(rows, ["… 1...c5 2.Nf3 d6 3.d4 cxd4 4.Nxd4", "… 3.d4 Nf6 4.Nc3"]);
 	done();
 });

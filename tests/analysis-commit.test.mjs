@@ -67,6 +67,7 @@ test("commitAll adds every new line and counts what it skipped", () => {
 	play(s, "c5"); // a fork: e4 c5
 	goTo(s, 1);
 	play(s, "e6"); // another fork off the same point: e4 e6
+	goTo(s, 1); // back where they split: all three are on view
 	const r = commitAll(s);
 	assert.strictEqual(r.added, 2, "both forks are new");
 	assert.strictEqual(r.skipped, 1, "the seeded line is already the mainline");
@@ -173,5 +174,17 @@ test("Save all saves the notes on view, counts the rest, and never clears", () =
 	assert.deepStrictEqual(notebookNotes(m("e4", "c5", "Nf3", "d6"), 3), ["the Najdorf family", "or the Dragon"]);
 	assert.deepStrictEqual(notebookNotes(m("e4", "c5", "Nf3", "Nc6"), 3), ["the Classical"]);
 	assert.deepStrictEqual(notebookNotes(m("e4"), 0), ["best by test"], "untouched");
+	done();
+});
+
+test("Add all files the lines on view, not the ones the cursor has left", () => {
+	const done = installDom();
+	loadState(PGN);
+	const before = getCurrent().lines.length;
+	const s = newScratch([{ san: "d4" }, { san: "d5" }]);
+	goTo(s, 1);
+	play(s, "Nf6"); // the cursor is now in the 1...Nf6 branch: 1...d5 is off view
+	assert.deepStrictEqual(commitAll(s), { added: 1, skipped: 0 });
+	assert.strictEqual(getCurrent().lines.length, before + 1);
 	done();
 });

@@ -38,7 +38,7 @@ import {
   setScratch,
 } from "./state.js";
 import { analysisPanel } from "./analysis-view.js";
-import { newScratch, openAt, packScratch, unpackScratch } from "./analysis.js";
+import { closeBoard, newScratch, openAt, packScratch, unpackScratch } from "./analysis.js";
 import { sharedEngine } from "./engine.js";
 import { sharedFlavors } from "./engine-flavor.js";
 import { allNotes } from "./notes.js";
@@ -288,16 +288,17 @@ function themeBtn() {
   return b;
 }
 
-// Open Analysis mode. From the toolbar (no moves) it reopens the board as it
-// was left. From a move, it opens the board at that position (see openAt):
-// the lines through it, from the notebook and from earlier exploring alike,
-// and nothing from elsewhere -- which stays in the session's pool, to come
-// back whenever a position it passes through is opened. Hidden notebook lines
-// stay out: they are out of every other view too. Lines come in as copies, so
-// exploring never reaches back into the notebook.
+// Open Analysis mode at a position -- from a move, the position after it;
+// from the toolbar (no moves), the start. Every notebook line through the
+// position comes onto the board (see openAt), so the toolbar brings in the
+// whole workbook, and the list narrows to the lines through wherever the
+// cursor goes. Lines explored earlier are kept and come back the same way.
+// Hidden notebook lines stay out: they are out of every other view too.
+// Lines come in as copies, so exploring never reaches back into the notebook.
 export function openAnalysis(moves = [], from = null) {
 	if (!getScratch()) setScratch(newScratch());
-	if (moves.length) openAt(getScratch(), moves, visibleLines(getCurrent().lines), from);
+	const lines = visibleLines(getCurrent().lines);
+	openAt(getScratch(), moves, lines, from || lines.find((l) => l.isMain) || null);
 	setMode("analysis");
 	renderApp();
 }
@@ -479,6 +480,8 @@ function analysisOverlay() {
   // where it was the next time the board opens.
   const close = () => {
     engine.pause();
+    // pins and show-all last only while the board is open
+    closeBoard(getScratch());
     setMode("report");
     renderApp();
   };

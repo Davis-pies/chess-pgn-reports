@@ -1545,3 +1545,18 @@ sup {
 .an-engine-depthbox { font-size: .78rem; color: var(--muted); display: inline-flex; align-items: center; gap: .2rem; }
 .an-engine-depthbox input { width: 3.4em; font: inherit; font-size: .78rem; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 5px; padding: 1px 3px; }
 .an-depth-inf { color: var(--text); }
+.an-pin { filter: grayscale(1); opacity: .45; }
+.an-pin.on { filter: none; opacity: 1; border-color: var(--main); }
+/* a pinned line kept on view though the position is not on it */
+.an-line.elsewhere { border-style: dashed; border-color: var(--line); }
+/* With many lines on view, each unselected line is one row, clipped at the
+   right with a fade, so the list can be scanned; the selected line wraps
+   in full. */
+.an-lines { max-height: 22rem; }
+.an-line:not(.active) .an-line-moves {
+  flex-wrap: nowrap;
+  overflow: hidden;
+  white-space: nowrap;
+  mask-image: linear-gradient(to right, #000 85%, transparent);
+  -webkit-mask-image: linear-gradient(to right, #000 85%, transparent);
+}

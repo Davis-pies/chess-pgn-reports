@@ -161,21 +161,23 @@ test("removeLine drops a scratch line and keeps the cursor on a real one", () =>
 	assert.deepStrictEqual(sans(s), ["e4", "c5"]);
 	assert.strictEqual(s.at, 2, "the cursor stays where it was");
 
-	// removing the last line leaves one empty line, never none
+	// removing the last line through the position leaves the board there, on
+	// a fresh line of the moves that reach it -- never no line at all
 	removeLine(s, 0);
 	assert.strictEqual(s.lines.length, 1);
-	assert.deepStrictEqual(sans(s), []);
-	assert.strictEqual(s.at, 0);
+	assert.deepStrictEqual(sans(s), ["e4", "c5"]);
+	assert.strictEqual(s.at, 2);
 });
 
 test("removing the active line selects its neighbour", () => {
 	const s = newScratch([{ san: "e4" }, { san: "e5" }]);
 	goTo(s, 1);
 	play(s, "c5");
+	goTo(s, 1); // where the two split: both on view
 	removeLine(s, 1);
 	assert.strictEqual(s.active, 0);
 	assert.deepStrictEqual(sans(s), ["e4", "e5"]);
-	assert.strictEqual(s.at, 2);
+	assert.strictEqual(s.at, 1, "the board stays at the position");
 });
 
 test("a fork keeps the notes on the moves it shares and none after", () => {
@@ -276,6 +278,7 @@ test("lines move up and down, and the selection follows its line", () => {
 	goTo(s, 0);
 	play(s, "c4");
 	assert.strictEqual(s.active, 2);
+	goTo(s, 0); // the start: all three on view
 	moveLine(s, 2, -1);
 	assert.deepStrictEqual(s.lines.map((l) => l.moves[0].san), ["e4", "c4", "d4"]);
 	assert.strictEqual(s.active, 1);
@@ -287,45 +290,62 @@ test("the scratch as PGN: the first line is the trunk, the rest variations", () 
 	const s = seed("e4", "e5");
 	goTo(s, 1);
 	play(s, "c5");
+	goTo(s, 1);
 	s.lines.push({ moves: [] });
 	assert.match(scratchPgn(s), /1\. e4 e5 \(1\.\.\. c5\) \*/);
 });
 
 test("undo puts back what a delete took, once", () => {
 	const s = seed("e4", "e5");
+	goTo(s, 1);
+	play(s, "c5");
+	goTo(s, 1);
 	checkpoint(s);
 	removeLine(s, 0);
-	assert.deepStrictEqual(sans(s), []);
+	assert.strictEqual(s.lines.length, 1);
 	undo(s);
-	assert.deepStrictEqual(sans(s), ["e4", "e5"]);
+	assert.strictEqual(s.lines.length, 2);
+	assert.deepStrictEqual(sans(s), ["e4", "c5"]);
 	assert.strictEqual(s.undo, null);
 	undo(s); // nothing left to undo
-	assert.deepStrictEqual(sans(s), ["e4", "e5"]);
+	assert.strictEqual(s.lines.length, 2);
 });
 
 test("up and down step between lines at the same move", () => {
 	const s = seed("e4", "e5", "Nf3");
 	goTo(s, 1);
 	play(s, "c5"); // line 1, at 2
+	stepLine(s, -1); // in the fork, 1...e5 is off view: nothing to step to
+	assert.strictEqual(s.active, 1);
+	goTo(s, 1);
 	stepLine(s, -1);
 	assert.strictEqual(s.active, 0);
-	assert.strictEqual(s.at, 2);
+	assert.strictEqual(s.at, 1, "the same move on the other line");
 	stepLine(s, -1); // no line above
 	assert.strictEqual(s.active, 0);
-	goTo(s, 3);
-	stepLine(s, 1);
-	assert.strictEqual(s.at, 2, "clamped to the shorter line");
+	// a pinned line off the position: stepping onto it clamps the cursor
+	const t = seed("e4", "e5");
+	goTo(t, 0);
+	play(t, "d4");
+	pin(t, 0);
+	goTo(t, 1);
+	activeLine(t).moves.push({ san: "d5", ply: 1 }, { san: "c4", ply: 2 });
+	goTo(t, 3);
+	stepLine(t, -1);
+	assert.strictEqual(t.active, 0);
+	assert.strictEqual(t.at, 2, "clamped to the shorter line");
 });
 
 test("sharedPrefix counts the opening moves a line repeats from above", () => {
 	const s = seed("e4", "e5", "Nf3");
 	goTo(s, 2);
 	play(s, "Bc4");
+	goTo(s, 2);
 	assert.strictEqual(sharedPrefix(s, 0), 0);
 	assert.strictEqual(sharedPrefix(s, 1), 2);
 });
 
-import { openAt, shown, showAll, clearShown } from "../src/analysis.js";
+import { openAt, shown, toggleShowAll, clearShown, pin, closeBoard } from "../src/analysis.js";
 
 const nb = (...lines) =>
 	lines.map((str) => ({ moves: str.split(" ").map((san, ply) => ({ san, ply })), comments: [] }));
@@ -344,34 +364,52 @@ test("opening a position brings every notebook line through it", () => {
 	assert.strictEqual(lines[1].comments[0].text, "the Classical", "copies, not the notebook's own");
 });
 
-test("lines from other positions stay in the pool, off view, and come back", () => {
+test("the lines on view are the ones through the position on the board", () => {
 	const lines = nb("e4 c5 Nf3 d6", "e4 e5 Nf3", "d4 d5");
 	const s = newScratch();
 	openAt(s, lines[0].moves.slice(0, 2), lines); // 1.e4 c5
-	play(s, "Nc3"); // explored from here: a fork after 1...c5
+	play(s, "Nc3"); // a fork after 1...c5: 2.Nf3 does not lead here
+	assert.deepStrictEqual(onView(s), ["e4 c5 Nc3"]);
+	back(s); // back to 1...c5: both lead from here
 	assert.deepStrictEqual(onView(s), ["e4 c5 Nf3 d6", "e4 c5 Nc3"]);
 	openAt(s, lines[1].moves.slice(0, 2), lines); // 1.e4 e5
 	assert.deepStrictEqual(onView(s), ["e4 e5 Nf3"], "the Sicilian lines are off view");
 	assert.strictEqual(s.lines.length, 3, "but kept");
+	goTo(s, 1); // 1.e4: everything through it
+	assert.deepStrictEqual(onView(s), ["e4 c5 Nf3 d6", "e4 c5 Nc3", "e4 e5 Nf3"]);
 	openAt(s, lines[0].moves.slice(0, 2), lines); // back to 1.e4 c5
-	assert.deepStrictEqual(onView(s), ["e4 c5 Nf3 d6", "e4 c5 Nc3"], "explored line is back, nothing doubled");
-	openAt(s, lines[0].moves.slice(0, 1), lines); // 1.e4: everything through it
-	assert.strictEqual(shown(s).length, 3);
-	showAll(s);
-	assert.strictEqual(shown(s).length, 3, "d4 d5 was never opened, so never pooled");
-	openAt(s, lines[2].moves, lines);
-	showAll(s);
-	assert.strictEqual(shown(s).length, 4);
+	assert.deepStrictEqual(onView(s), ["e4 c5 Nf3 d6", "e4 c5 Nc3"], "nothing doubled");
+	goTo(s, 0); // the start: all of them
+	assert.strictEqual(shown(s).length, 3, "d4 d5 was never opened, so never brought in");
 });
 
-test("stepping back before the position and playing on widens the view", () => {
-	const lines = nb("e4 c5 Nf3 d6");
+test("show all puts every line on view, and toggles back", () => {
+	const lines = nb("e4 c5", "d4 d5");
 	const s = newScratch();
-	openAt(s, lines[0].moves.slice(0, 3), lines); // 2.Nf3
-	goTo(s, 1);
-	play(s, "e5"); // off the root: 1.e4 e5
-	assert.deepStrictEqual(s.root, ["e4"]);
-	assert.deepStrictEqual(onView(s), ["e4 c5 Nf3 d6", "e4 e5"]);
+	openAt(s, lines[1].moves, lines);
+	openAt(s, lines[0].moves, lines);
+	assert.deepStrictEqual(onView(s), ["e4 c5"]);
+	toggleShowAll(s);
+	assert.deepStrictEqual(onView(s), ["d4 d5", "e4 c5"]);
+	toggleShowAll(s);
+	assert.deepStrictEqual(onView(s), ["e4 c5"]);
+});
+
+test("a pinned line stays on view until the board closes", () => {
+	const lines = nb("e4 c5 Nf3", "e4 c5 Nc3");
+	const s = newScratch();
+	openAt(s, lines[0].moves.slice(0, 2), lines);
+	pin(s, 1); // 2.Nc3
+	forward(s); // into 2.Nf3
+	assert.deepStrictEqual(onView(s), ["e4 c5 Nf3", "e4 c5 Nc3"]);
+	pin(s, 1); // unpinned: it goes
+	assert.deepStrictEqual(onView(s), ["e4 c5 Nf3"]);
+	pin(s, 1);
+	toggleShowAll(s);
+	closeBoard(s);
+	assert.deepStrictEqual(onView(s), ["e4 c5 Nf3"], "pins and show all end with the board");
+	assert.strictEqual(closeBoard(null), null);
+	pin(s, 9); // not a line: nothing
 });
 
 test("a position nothing passes through gets a line of its own", () => {
@@ -394,7 +432,7 @@ test("deleting and clearing work on the lines on view", () => {
 	assert.deepStrictEqual(onView(s), ["e4 c5"], "an empty board starts again at the position");
 	clearShown(s);
 	assert.deepStrictEqual(onView(s), ["e4 c5"]);
-	showAll(s);
+	toggleShowAll(s);
 	assert.ok(onView(s).includes("d4 d5"), "the rest of the pool is untouched");
 });
 
@@ -428,14 +466,13 @@ test("a board packs to SAN and notes, and unpacks to the same board", () => {
 		lines: [{ moves: ["e4", "c5", "Nf3", "d6"] }, { moves: ["e4", "c5", "Nc3"], comments: [{ ply: 2, text: "closed" }] }],
 		active: 1,
 		at: 3,
-		root: ["e4", "c5"],
 		flipped: true,
 	});
 	const back = unpackScratch(packed);
 	// an empty notes list is not written, so compare with it left out
 	const bare = (ls) => ls.map((l) => (l.comments && l.comments.length ? l : { moves: l.moves }));
 	assert.deepStrictEqual(back.lines, bare(s.lines));
-	assert.deepStrictEqual([back.active, back.at, back.root, back.flipped], [1, 3, ["e4", "c5"], true]);
+	assert.deepStrictEqual([back.active, back.at, back.flipped], [1, 3, true]);
 	assert.strictEqual(back.undo, undefined, "undo is not kept");
 	assert.strictEqual(packScratch(newScratch()), null, "an empty board packs to nothing");
 	assert.strictEqual(packScratch(null), null);
@@ -453,14 +490,12 @@ test("unpacking trusts nothing in a hand-edited file", () => {
 		],
 		active: 9,
 		at: 99,
-		root: ["c4"],
 	});
 	assert.deepStrictEqual(s.lines[0].moves.map((m) => m.san), ["e4", "e5"], "cut at the illegal move");
 	assert.deepStrictEqual(s.lines[0].comments, [{ ply: 1, text: "ok" }]);
 	assert.deepStrictEqual(s.lines[1], { moves: [] });
 	assert.strictEqual(s.active, 0, "an index that is not a line falls back");
 	assert.strictEqual(s.at, 2, "clamped to the line");
-	assert.deepStrictEqual(s.root, [], "a root the board cannot reach is widened");
 	assert.strictEqual(s.flipped, false);
 	const noAt = unpackScratch({ lines: [{ moves: ["e4"] }] });
 	assert.strictEqual(noAt.at, 1, "no cursor: the end of the line");

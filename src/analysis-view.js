@@ -20,8 +20,9 @@ import {
 	goTo,
 	clearShown,
 	moveLine,
+	pin,
 	shown,
-	showAll,
+	toggleShowAll,
 	play,
 	playAll,
 	positionOf,
@@ -174,48 +175,86 @@ export function analysisPanel(
 	const right = el("div", { className: "an-right" });
 	if (engine) right.appendChild(engineBox(engine, scratch, pos, onChange, { board, bar, flavors }));
 
-	// The lines through the position the board was opened at. The rest of the
-	// session's lines are kept, off view, and one click brings them all back.
+	// The lines through the position on the board: the list follows the
+	// cursor, so a line that does not lead here is out of view until the
+	// cursor goes back to where it does (or it is pinned). The rest are kept,
+	// and the heading offers them all, or takes the list back to these.
 	const on = shown(scratch);
-	const offView = scratch.lines.filter((l) => l.moves.length).length - on.filter((i) => scratch.lines[i].moves.length).length;
-	const root = scratch.root || [];
-	const passesRoot = (l) => l.moves.length >= root.length && root.every((san, k) => l.moves[k].san === san);
+	const herePos = activeLine(scratch).moves.slice(0, scratch.at);
+	const passesHere = (l) => l.moves.length >= herePos.length && herePos.every((m, k) => l.moves[k].san === m.san);
+	const counted = (idx) => idx.filter((i) => scratch.lines[i].moves.length).length;
+	const throughCount = on.filter((i) => passesHere(scratch.lines[i])).length;
+	const offView = counted(scratch.lines.map((_, i) => i)) - counted(on);
 	const listHead = el("div", { className: "an-sec" }, [
 		el("span", {
 			textContent:
-				(root.length ? `Lines through ${sanLabel(root)}` : "Lines") +
-				` (${on.filter((i) => scratch.lines[i].moves.length).length})`,
+				(scratch.showAll ? "All lines on the board" : herePos.length ? `Lines through ${sanLabel(herePos.map((m) => m.san))}` : "Lines") +
+				` (${counted(on)})`,
 		}),
 	]);
-	if (offView)
+	if (scratch.showAll || offView)
 		listHead.appendChild(
 			el("button", {
 				className: "an-showall",
-				textContent: `show all (${offView} more)`,
-				title: "Show the lines explored from other positions too",
-				onclick: act(() => showAll(scratch)),
+				textContent: scratch.showAll ? "only lines through here" : `show all ${counted(on) + offView} on the board`,
+				title: scratch.showAll
+					? "Back to the lines through the position on the board"
+					: "Show every line on the board, including ones that do not pass through this position",
+				onclick: act(() => toggleShowAll(scratch)),
 			}),
 		);
 	right.appendChild(listHead);
+	// Adding a line hands over to onAdded, which closes the window in the app.
+	// A refusal changes nothing, so it does not redraw: the reason is written
+	// under the list and stays there.
+	const msg = el("div", { className: "an-msg", role: "status" });
+	const addBtn = (cls, text, title, add) =>
+		el("button", {
+			className: "chip mini " + cls,
+			textContent: text,
+			title,
+			onclick: (e) => {
+				e.stopPropagation();
+				const refused = add();
+				if (refused) msg.textContent = refused;
+				else onAdded();
+			},
+		});
+	const addOne = (line, opts) => () => {
+		const r = commitLine(line, opts);
+		return r.ok ? null : r.reason;
+	};
 	const list = el("div", { className: "an-lines" });
 	on.forEach((i, k) => {
 		const line = scratch.lines[i];
 		const row = el("div", {
-			className: "an-line" + (i === scratch.active ? " active" : ""),
+			className:
+				"an-line" +
+				(i === scratch.active ? " active" : "") +
+				(!passesHere(line) ? " elsewhere" : ""),
 		});
-		// Clicking the row anywhere but on a move selects the line; clicking a
-		// move selects the line AND puts the cursor after that move, which is
-		// how you get back to a position you want to branch from again.
+		// Clicking the row anywhere but on a move selects the line, the cursor
+		// staying at the position (so the list stays as it is); clicking a move
+		// selects the line AND puts the cursor after that move, which is how
+		// you get back to a position you want to branch from again.
 		row.onclick = act(() => select(scratch, i));
 		const movesBox = el("div", { className: "an-line-moves" });
 		if (!line.moves.length) {
 			movesBox.appendChild(el("span", { className: "an-empty", textContent: "(no moves yet — play one on the board)" }));
 		}
 		const shared = sharedPrefix(scratch, i);
-		// Every line on view passes through the position the board was opened
-		// at, so the moves up to it say nothing that the heading does not: the
-		// list picks up at its last move. The cursor's move is never hidden.
-		const skip = passesRoot(line) ? Math.max(0, Math.min(root.length - 1, i === scratch.active ? scratch.at - 1 : Infinity)) : 0;
+		// Where several lines pass through the position on the board, each
+		// repeats the moves the heading names, so each picks up at the last of
+		// them. A line alone is written out whole: there is nothing to compare
+		// it with, and the eye needs the moves that got it there.
+		// A row other than the selected one goes further: it starts at the move
+		// before it leaves the lines above it, so a list of lines that all run
+		// the same way for a while reads as where each one differs rather than
+		// as a column of the same opening moves.
+		const skip =
+			passesHere(line) && throughCount > 1
+				? Math.max(herePos.length - 1, i === scratch.active ? 0 : shared - 1, 0)
+				: 0;
 		if (skip > 0) movesBox.appendChild(el("span", { className: "an-elide", textContent: "…", title: numberedMoves(line.moves.slice(0, skip)) }));
 		line.moves.forEach((m, j) => {
 			if (j < skip) return;
@@ -240,6 +279,11 @@ export function analysisPanel(
 		const tools = el("div", { className: "an-line-tools" });
 		if (inNotebook(line.moves)) {
 			tools.appendChild(el("span", { className: "an-badge", textContent: "in notebook", title: "The notebook already has this line" }));
+		} else {
+			tools.append(
+				addBtn("primary an-add", "+ Line", "Add this line to the notebook as a sideline", addOne(line)),
+				addBtn("an-add-foot", "+ Footnote", "Add this line to the notebook as a footnote", addOne(line, { tag: "foot" })),
+			);
 		}
 		const small = (cls, text, title, fn, disabled) =>
 			el("button", {
@@ -258,11 +302,23 @@ export function analysisPanel(
 				small("an-down", "↓", "Move this line down", act(() => moveLine(scratch, i, 1)), k === on.length - 1),
 			);
 		}
+		// A pin holds a line in view wherever the cursor goes, until the board
+		// is closed: for keeping one line to compare against while exploring
+		// another that leaves it.
+		const pinBtn = small(
+			"an-pin" + (line.pinned ? " on" : ""),
+			"📌",
+			line.pinned ? "Unpin: let this line leave the list when it does not pass through the position" : "Pin: keep this line in view until the board is closed",
+			act(() => pin(scratch, i)),
+		);
+		pinBtn.setAttribute("aria-pressed", String(!!line.pinned));
+		tools.appendChild(pinBtn);
 		tools.appendChild(small("an-del", "✕", "Delete this line", risky(() => removeLine(scratch, i))));
 		row.appendChild(tools);
 		list.appendChild(row);
 	});
 	right.appendChild(list);
+	right.appendChild(msg);
 
 	// Notes on the move just played, in the notebook's own note editor: a
 	// scratch line keeps comments in the same shape a notebook line does.
@@ -274,35 +330,16 @@ export function analysisPanel(
 	);
 	right.appendChild(noteTools(scratch, onChange));
 
-	// The commit bar. A line that goes in hands over to onAdded, which closes
-	// the window in the app. A refusal changes nothing, so it does not redraw:
-	// the reason is written into the panel on screen and stays there.
-	const msg = el("div", { className: "an-msg", role: "status" });
-	const addBtn = (cls, text, title, add) =>
-		el("button", {
-			className: "chip " + cls,
-			textContent: text,
-			title,
-			onclick: () => {
-				const refused = add();
-				if (refused) msg.textContent = refused;
-				else onAdded();
-			},
-		});
-	const one = (opts) => {
-		const r = commitLine(activeLine(scratch), opts);
-		return r.ok ? null : r.reason;
-	};
+	// Every line on view can go into the notebook on its own, from its row,
+	// and the lines on view can go in together from here.
 	const commit = el("div", { className: "orow an-commit" });
 	commit.append(
-		addBtn("primary an-add", "Add as new line", "File the selected line in the notebook as a sideline", () => one()),
-		addBtn("an-add-foot", "Add as footnote", "File the selected line in the notebook as a footnote", () => one({ tag: "foot" })),
-		addBtn("an-add-all", "Add all", "File every line here in the notebook", () => {
+		addBtn("an-add-all", "Add all lines on view", "File every line in the list in the notebook as a sideline", () => {
 			const r = commitAll(scratch);
 			return r.added ? null : "Nothing added: every line is empty or already in the notebook.";
 		}),
 	);
-	right.append(el("div", { className: "an-sec", textContent: "Save to notebook" }), commit, msg);
+	right.append(commit);
 
 	// Tools that do not change the lines: copying out, and starting over.
 	const copy = (text, what) => () => {

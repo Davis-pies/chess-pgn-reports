@@ -73,15 +73,19 @@ test("the board is saved with the workbook and comes back with it; the mode is n
 			.querySelector(`.an-board rect[data-sq="${s}"]`)
 			.dispatchEvent(new app.dom.window.MouseEvent("mousedown", { bubbles: true, cancelable: true }));
 	sq("d2");
-	sq("d4");
-	getScratch().lines[0].comments = [{ ply: 0, text: "queen's pawn" }];
+	sq("d4"); // at the start, beside the workbook's 1.e4 line: a line of its own
+	const d4 = getScratch().lines.find((l) => l.moves[0].san === "d4");
+	d4.comments = [{ ply: 0, text: "queen's pawn" }];
 	app.view().querySelector(".an-close").click();
 	app.view().querySelector("input.name").value = "Boarded";
 	app.view().querySelector("input.name").oninput();
 	app.clickText("Save");
 	const key = Object.keys(app.dom.window.localStorage).find((k) => k.startsWith("ott:"));
 	const saved = JSON.parse(app.dom.window.localStorage.getItem(key));
-	assert.deepStrictEqual(saved.analysis.lines, [{ moves: ["d4"], comments: [{ ply: 0, text: "queen's pawn" }] }]);
+	assert.deepStrictEqual(
+		saved.analysis.lines.find((l) => l.moves[0] === "d4"),
+		{ moves: ["d4"], comments: [{ ply: 0, text: "queen's pawn" }] },
+	);
 	assert.strictEqual(saved.mode, undefined, "the window's being open is not saved");
 	assert.ok(Array.isArray(saved.tags) && typeof saved.pgn === "string");
 
@@ -92,8 +96,8 @@ test("the board is saved with the workbook and comes back with it; the mode is n
 	[...app.view().querySelectorAll(".notebooks button")].find((b) => b.textContent.includes("Boarded")).click();
 	await app.settle();
 	const back = getScratch();
-	assert.deepStrictEqual(back.lines[0].moves.map((m) => m.san), ["d4"]);
-	assert.deepStrictEqual(back.lines[0].comments, [{ ply: 0, text: "queen's pawn" }]);
+	const line = back.lines.find((l) => l.moves[0].san === "d4");
+	assert.deepStrictEqual(line.comments, [{ ply: 0, text: "queen's pawn" }]);
 	assert.strictEqual(app.view().querySelector(".an-overlay"), null, "opened closed, as a report");
 	app.view().querySelector(".an-toggle").click();
 	assert.match(app.view().querySelector(".an-lines").textContent, /1\.d4/);
@@ -168,10 +172,12 @@ test("a refused add keeps the window open and says why", async () => {
 	app.reset();
 	await app.loadPgn(PGN);
 	app.view().querySelector(".an-toggle").click();
-	app.view().querySelector(".an-start").click();
-	app.view().querySelector(".an-add").click();
+	// every line on view is the workbook's own: badged, with no add of its own
+	assert.strictEqual(app.view().querySelector(".an-line .an-add"), null);
+	assert.ok(app.view().querySelector(".an-line .an-badge"));
+	app.view().querySelector(".an-add-all").click();
 	assert.ok(app.view().querySelector(".an-overlay"), "still open");
-	assert.match(app.view().querySelector(".an-msg").textContent, /no moves/);
+	assert.match(app.view().querySelector(".an-msg").textContent, /Nothing added/);
 });
 
 test("with no notebook, a board can be the start: the first line added opens one", async () => {

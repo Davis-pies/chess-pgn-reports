@@ -79,16 +79,25 @@ test("the line editor's move panel offers the same entry", async () => {
 	assert.strictEqual(getScratch().at, 1);
 });
 
-test("the toolbar reopens the board as it was; analysing a move shows only that position's lines", async () => {
+test("the toolbar opens the whole workbook at the start; analysing a move shows only that position's lines", async () => {
 	app.reset();
-	await app.loadPgn(PGN);
+	await app.loadPgn("1. e4 e5 2. Nf3 (2. Bc4) Nc6 3. Bb5 a6 *");
 	app.view().querySelector(".an-toggle").click();
 	const s = getScratch();
-	s.lines[0].moves.push({ san: "d4", ply: 0 });
+	assert.strictEqual(s.at, 0, "at the start");
+	assert.deepStrictEqual(
+		s.lines.map((l) => l.moves.map((m) => m.san).join(" ")),
+		["e4 e5 Nf3 Nc6 Bb5 a6", "e4 e5 Bc4"],
+		"every workbook line is on the board",
+	);
+	assert.strictEqual(s.active, 0, "on the mainline");
+	assert.strictEqual(app.view().querySelectorAll(".an-line").length, 2);
+	// explore 1.d4 from the start: kept, and on view from the start
+	s.lines.push({ moves: [{ san: "d4", ply: 0 }] });
 	app.view().querySelector(".an-close").click();
 	app.view().querySelector(".an-toggle").click();
 	assert.strictEqual(getScratch(), s, "the same board");
-	assert.strictEqual(s.lines[0].moves[0].san, "d4");
+	assert.strictEqual(s.lines.length, 3, "nothing doubled");
 	app.view().querySelector(".an-close").click();
 	rightClick([...app.view().querySelectorAll(".pv-table td")].find((c) => c.textContent.includes("Nf3")));
 	menuItem("Analyse from here").click();
