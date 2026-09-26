@@ -112,7 +112,11 @@ test("a group mark never stands where a move should be", () => {
   const off = installDom();
   const { box } = report(AWKWARD);
   const marked = [...box.querySelectorAll("td.grp-rule")];
-  assert.ok(marked.length >= 19, `only ${marked.length} marked cells`);
+  // (the KID group's page is headed by its own stem, so the runs leaving that
+  // stem are the stem's to state, not the table's)
+  // (packed for paper, the KID group gets a table of its own whose shared
+  // run is its stem, so most of its rules are the stem's to state)
+  assert.ok(marked.length >= 5, `only ${marked.length} marked cells`);
   // a marked cell is rendered empty, so one carrying text means the mark took
   // a move's place and the move is gone from the report
   for (const td of marked)
@@ -124,10 +128,10 @@ test("every run is unbroken and ends in its corner", () => {
   const off = installDom();
   const { box } = report(AWKWARD);
   const runs = runsIn(box);
-  // the fixture draws 4 runs across 2 tables (the runs leaving a table's last
-  // stem move are left to the stem) -- asserted so that a change gutting the
-  // marks fails here rather than passing vacuously
-  assert.ok(runs.length >= 4, `only ${runs.length} runs: are any being drawn?`);
+  // the fixture draws 3 runs across its tables (the runs leaving a table's
+  // last stem move are left to the stem) -- asserted so that a change gutting
+  // the marks fails here rather than passing vacuously
+  assert.ok(runs.length >= 3, `only ${runs.length} runs: are any being drawn?`);
   for (const cells of runs) {
     // A run that stopped short and resumed past an obstacle reads as a run
     // leaving THAT line -- the very ambiguity the marks exist to remove. Each
@@ -197,9 +201,15 @@ test("every line reaches some printed table", () => {
   const { state, box } = report(AWKWARD);
   const tables = box.querySelectorAll("table.tbl").length;
   assert.ok(tables > 1, "the fixture really is packed across several tables");
-  // the columns across every table, less one mainline reference column each
+  // the columns across every table, less the ply column and the mainline
+  // reference column where a table has one (a page headed by its own stem
+  // has none)
   const cols = [...box.querySelectorAll("table.tbl")].reduce(
-    (n, t) => n + t.querySelectorAll("tr")[0].children.length - 2,
+    (n, t) =>
+      n +
+      t.querySelectorAll("tr")[0].children.length -
+      1 -
+      (t.querySelector(".main-col") ? 1 : 0),
     0,
   );
   assert.strictEqual(
