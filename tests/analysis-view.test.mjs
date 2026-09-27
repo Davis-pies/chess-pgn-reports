@@ -855,3 +855,18 @@ test("the branch-point buttons and [ ] jump to where lines meet", () => {
 	assert.strictEqual(s.at, 1);
 	done();
 });
+
+test("a move in a capitalised heading keeps its case (Nbd7, not NBD7)", () => {
+	const done = installDom();
+	loadState("1. e4 d5 2. exd5 c6 3. dxc6 Nf6 4. cxb7 Nbd7 *");
+	const s = newScratch();
+	for (const san of ["e4", "d5", "exd5", "c6", "dxc6", "Nf6", "cxb7", "Nbd7"]) play(s, san);
+	const panel = analysisPanel(s, () => {});
+	const heads = [...panel.querySelectorAll(".an-sec")];
+	// the heading is text-transform: uppercase; the move sits in its own span
+	// that the stylesheet exempts
+	const sans = heads.flatMap((h) => [...h.querySelectorAll(".an-san")].map((x) => x.textContent));
+	assert.ok(sans.some((t) => t.includes("Nbd7")), "Note on … names the move in a span");
+	assert.ok(heads.some((h) => /^Note on/.test(h.textContent)));
+	done();
+});

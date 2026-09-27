@@ -332,3 +332,85 @@ test("a promoted mainline is still recorded while noMain is on", () => {
   // unticking the box must restore the table the user had
   assert.strictEqual(nb.main, "d4");
 });
+
+test("toNotebook falls back to the first line as main, and to '' with no lines", () => {
+  const lines = linesOf("1. e4 e5 (1... c5)");
+  lines.forEach((l) => (l.isMain = false));
+  assert.strictEqual(toNotebook({ name: "", pgn: "", lines }).main, "e4 e5");
+  const empty = toNotebook({ name: "", pgn: "", lines: [] });
+  assert.strictEqual(empty.main, "");
+  assert.deepStrictEqual(empty.tags, []);
+});
+
+test("toNotebook fills defaults for a bare line and omits an absent analysis", () => {
+  const nb = toNotebook({
+    name: "n",
+    pgn: "1. e4",
+    lines: [{ isMain: true, moves: [{ san: "e4", ply: 0 }] }],
+  });
+  assert.ok(!("analysis" in nb), "no analysis key when there is none");
+  assert.deepStrictEqual(nb.tags, [
+    { key: "e4", tag: "sideline", name: "", meta: {}, marks: {}, comments: [], hidden: false },
+  ]);
+  const withA = toNotebook({ name: "n", pgn: "", lines: [], analysis: { moves: [] } });
+  assert.deepStrictEqual(withA.analysis, { moves: [] });
+});
+
+test("applyNotebook tolerates a workbook with no tags and a stale main", () => {
+  const pgn = "1. e4 e5 (1... c5)";
+  const fresh = linesOf(pgn);
+  const before = fresh.map((l) => !!l.isMain);
+  applyNotebook({ main: "d4 d5" }, fresh);
+  assert.deepStrictEqual(
+    fresh.map((l) => !!l.isMain),
+    before,
+    "a main key naming no line leaves the parsed mainline alone",
+  );
+  assert.ok(fresh.every((l) => l.name === undefined), "nothing applied");
+});
+
+test("applyNotebook fills missing annotation fields and maps legacy tags", () => {
+  const pgn = "1. e4 e5 (1... c5) (1... e6)";
+  const fresh = linesOf(pgn);
+  applyNotebook(
+    {
+      tags: [
+        // legacy tags from before the mainline was structural
+        { key: "e4 c5", tag: "minor", name: "Sicilian" },
+        { key: "e4 e6", tag: "main", name: "French", hidden: true },
+        { key: "e4 e5", tag: "main", name: "Open", hidden: true },
+      ],
+    },
+    fresh,
+  );
+  const sic = findLine(fresh, "e4 c5");
+  assert.strictEqual(sic.tag, "sideline", "an unknown tag becomes a sideline");
+  assert.deepStrictEqual([sic.meta, sic.marks, sic.comments], [{}, {}, []]);
+  assert.strictEqual(sic.hidden, false, "no hidden field loads visible");
+  assert.strictEqual(findLine(fresh, "e4 e6").tag, "sideline");
+  const main = findLine(fresh, "e4 e5");
+  assert.strictEqual(main.tag, undefined, "the mainline carries no tag");
+  assert.strictEqual(main.hidden, false, "the mainline is never hidden");
+});
+
+test("parseWorkbook accepts a file with no version stamp", () => {
+  const d = parseWorkbook(JSON.stringify({ pgn: "1. e4", tags: [] }));
+  assert.strictEqual(d.pgn, "1. e4");
+});
+
+test("parseWorkbook rejects null and a non-array tags field", () => {
+  assert.throws(() => parseWorkbook("null"), /not a workbook/);
+  assert.throws(
+    () => parseWorkbook(JSON.stringify({ pgn: "1. e4", tags: {} })),
+    /not a workbook/,
+  );
+});
+
+test("loadNotebook of a missing id is null and listNotebooks skips foreign keys", () => {
+  withStorage(() => {
+    assert.strictEqual(loadNotebook("nope"), null);
+    localStorage.setItem("other", "x");
+    localStorage.setItem("ott:a", JSON.stringify({ name: "A", tags: [] }));
+    assert.deepStrictEqual(listNotebooks(), [{ id: "a", name: "A" }]);
+  });
+});
