@@ -246,7 +246,8 @@ different chess.js from the deployed site. Any plain static server works too
 Tests:
 
 ```bash
-npm test
+npm test         # the suite
+npm run check    # everything CI runs: lint, knip, tests with coverage floors
 ```
 
 ## Deploy to GitHub Pages

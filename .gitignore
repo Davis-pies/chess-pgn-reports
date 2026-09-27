@@ -1,5 +1,7 @@
 node_modules/
-.claude/
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
 coverage/
 .worktrees/
 reference/
