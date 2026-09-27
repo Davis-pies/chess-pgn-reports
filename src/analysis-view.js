@@ -185,12 +185,19 @@ export function analysisPanel(
 	const counted = (idx) => idx.filter((i) => scratch.lines[i].moves.length).length;
 	const throughCount = on.filter((i) => passesHere(scratch.lines[i])).length;
 	const offView = counted(scratch.lines.map((_, i) => i)) - counted(on);
+	// The heading is set in capitals; a move inside it keeps its own case, or
+	// "Nbd7" reads "NBD7" -- a bishop that isn't there.
+	const san = (text) => el("span", { className: "an-san", textContent: text });
 	const listHead = el("div", { className: "an-sec" }, [
-		el("span", {
-			textContent:
-				(scratch.showAll ? "All lines on the board" : herePos.length ? `Lines through ${sanLabel(herePos.map((m) => m.san))}` : "Lines") +
-				` (${counted(on)})`,
-		}),
+		el(
+			"span",
+			{},
+			scratch.showAll
+				? ["All lines on the board", ` (${counted(on)})`]
+				: herePos.length
+					? ["Lines through ", san(sanLabel(herePos.map((m) => m.san))), ` (${counted(on)})`]
+					: ["Lines", ` (${counted(on)})`],
+		),
 	]);
 	if (scratch.showAll || offView)
 		listHead.appendChild(
@@ -322,7 +329,7 @@ export function analysisPanel(
 
 	// Notes on the move just played, in the notebook's own note editor: a
 	// scratch line keeps comments in the same shape a notebook line does.
-	right.appendChild(el("div", { className: "an-sec", textContent: scratch.at ? `Note on ${moveLabel(scratch)}` : "Note" }));
+	right.appendChild(el("div", { className: "an-sec" }, scratch.at ? ["Note on ", san(moveLabel(scratch))] : ["Note"]));
 	right.appendChild(
 		scratch.at
 			? commentEditor(scratch.at - 1, [activeLine(scratch)])

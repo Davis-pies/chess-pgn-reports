@@ -58,7 +58,11 @@ export function toNotebook({ name, pgn, lines, view, analysis }) {
 // -- but every mark set from here on is exact.
 function migrate(d) {
   if (d && Array.isArray(d.tags))
-    d.tags = d.tags.map((t) => ({ ...t, marks: migrateMarks(t.marks) }));
+    // a hand-edited file can hold anything in the list; a non-object entry
+    // has no key to match a line by, so it is dropped rather than crash
+    d.tags = d.tags
+      .filter((t) => t && typeof t === "object")
+      .map((t) => ({ ...t, marks: migrateMarks(t.marks) }));
   return d;
 }
 
@@ -144,7 +148,11 @@ export function listNotebooks() {
 
 export function loadNotebook(id) {
   try {
-    return migrate(JSON.parse(localStorage.getItem(PREFIX + id)));
+    const d = JSON.parse(localStorage.getItem(PREFIX + id));
+    // the same shape check a workbook file gets: an entry some other script
+    // or an old bug left behind reads as unreadable, not as a TypeError
+    if (!d || typeof d.pgn !== "string" || !Array.isArray(d.tags)) return null;
+    return migrate(d);
   } catch {
     return null;
   }

@@ -1485,6 +1485,7 @@ sup {
 .an-keys { font-size: .75rem; color: var(--muted); }
 
 .an-sec { font-size: .72rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-top: .3rem; display: flex; justify-content: space-between; align-items: center; }
+.an-sec .an-san { text-transform: none; letter-spacing: normal; }
 
 .an-engine { border: 1px solid var(--line); border-radius: 8px; padding: .45rem .55rem; background: var(--lift); display: flex; flex-direction: column; gap: .35rem; }
 .an-engine-head { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
