@@ -1,51 +1,9 @@
 // src/share.js
-// Getting a position off the analysis board: as a link that reopens the board
-// there, as a picture of the board, and as a PGN file. The pure parts (the
-// link's format, the standalone SVG) are separate from the buttons, so they
-// can be tested without a browser.
+// Getting a position off the analysis board: as a picture of the board, and
+// as a PGN file. The pure parts (the standalone SVG, the filename) are
+// separate from the buttons, so they can be tested without a browser.
 
-import { Chess } from "chess.js";
 import { boardSvg } from "./render.js";
-
-// ---- position links
-//
-// A link carries the moves from move one, not a FEN: the board is a list of
-// lines played from the start, and a FEN cannot be replayed into one. The
-// moves go in the hash so nothing reaches a server, SAN by SAN, each escaped
-// (SAN has "+", "#" and "=" in it) and joined by commas.
-
-const HASH_KEY = "moves";
-
-export function positionHash(sans, { flipped = false } = {}) {
-	const moves = sans.map(encodeURIComponent).join(",");
-	return `#${HASH_KEY}=${moves}${flipped ? "&flip=1" : ""}`;
-}
-
-// The page's own address with the position's hash in place of any other.
-export function positionLink(sans, opts = {}, href = window.location.href) {
-	return href.split("#")[0] + positionHash(sans, opts);
-}
-
-// The inverse, trusting nothing: a link can be typed or cut short. The moves
-// are replayed and cut at the first that is not legal. Null when the hash is
-// not a position link at all; an empty move list is the start position.
-export function parsePositionHash(hash) {
-	const params = new URLSearchParams(String(hash || "").replace(/^#/, ""));
-	if (!params.has(HASH_KEY)) return null;
-	// URLSearchParams has already decoded the value once, so a SAN's own
-	// escaped "+" is back to "+" and the commas are the only separators left
-	const raw = params.get(HASH_KEY).split(",").filter(Boolean);
-	const chess = new Chess();
-	const moves = [];
-	for (const san of raw) {
-		try {
-			moves.push({ san: chess.move(san).san });
-		} catch {
-			break;
-		}
-	}
-	return { moves, flipped: params.get("flip") === "1" };
-}
 
 // ---- board pictures
 //

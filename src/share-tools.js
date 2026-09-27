@@ -1,13 +1,11 @@
 // src/share-tools.js
 // The analysis panel's row of ways out: copying the position or its lines,
-// saving them as files, and a link that reopens the board here. None of them
-// changes the scratch.
+// saving them as files. None of them changes the scratch.
 
 import { el } from "./dom.js";
-import { newScratch, openAt, playedMoves, scratchPgn } from "./analysis.js";
+import { playedMoves, scratchPgn } from "./analysis.js";
 import { download } from "./export.js";
-import { getScratch, setMode, setScratch } from "./state.js";
-import { parsePositionHash, positionLink, positionSlug, standaloneBoardSvg, svgToPng } from "./share.js";
+import { positionSlug, standaloneBoardSvg, svgToPng } from "./share.js";
 
 // the size a saved board is drawn at, in px
 const IMAGE_SIZE = 480;
@@ -41,25 +39,9 @@ export function shareTools(scratch, pos, msg) {
 		btn("an-save-pgn", "Save PGN", "Save every line here as a PGN file, the first line as the main line", () =>
 			download(name + ".pgn", scratchPgn(scratch), "application/x-chess-pgn"),
 		),
-		btn("an-copy-link", "Copy link", "Copy a link that opens the board at this position", copy(positionLink(sans, { flipped: scratch.flipped }), "Link")),
 		btn("an-save-svg", "Save SVG", "Save this board as an SVG image", () => download(name + ".svg", svg(), "image/svg+xml")),
 		btn("an-save-png", "Save PNG", "Save this board as a PNG image", png),
 	);
 	return row;
 }
 
-// Open the board at the position a link carries, if the page's hash is one.
-// Onto the analysis already on the board when there is some, so following a
-// link never throws work away. The hash is cleared afterwards: it has done
-// its job, and leaving it would reopen the board at that position on every
-// reload. True if the board was opened.
-export function openLinkedPosition() {
-	const link = parsePositionHash(window.location.hash);
-	if (!link) return false;
-	if (getScratch()) openAt(getScratch(), link.moves);
-	else setScratch(newScratch(link.moves));
-	getScratch().flipped = link.flipped;
-	setMode("analysis");
-	window.history.replaceState(null, "", window.location.pathname + window.location.search);
-	return true;
-}
