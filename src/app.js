@@ -54,7 +54,7 @@ import {
   collectKeys,
   renderTrieNode,
 } from "./trie-view.js";
-import { lineEditor } from "./line-editor.js";
+import { assignLineNames, lineEditor } from "./line-editor.js";
 import { exportBar, download, slug } from "./export.js";
 import { notesPanel } from "./notes-view.js";
 
@@ -307,6 +307,7 @@ function renderApp() {
   const v = $("view");
   computeShared(); // which lines carry each move (identical position + SAN)
   computeUnique(); // each line's first move unique to it among all lines
+  assignLineNames(); // before anything reads a name (see line-editor.js)
   v.replaceChildren();
   v.appendChild(viewRoot());
 }

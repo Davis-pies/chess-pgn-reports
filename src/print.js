@@ -203,6 +203,10 @@ export function appendPrintTables(box, g) {
   const packs = packForPrint(mainV, others, size);
   (packs.length ? packs : [[]]).forEach((lines, i) => {
     const { off, pv, stem, maxPly } = tableShape(mainV, lines, i);
+    // the lines no table of their own was worth: say so, so the table reads
+    // as a section of its own rather than as a page that lost its thread
+    if (lines.odds)
+      wrap.appendChild(el("div", { className: "print-odds", textContent: "Other lines" }));
     if (stem) {
       const s = el("div", { className: "print-stem" });
       // the stem's moves, marks and note markers: every column states these
@@ -336,6 +340,9 @@ function tableRows(mainV, lines, index) {
 // it and the gap its notes block leaves before the next one.
 const TABLE_OVERHEAD = 3;
 
+// A table narrower than this is small: see combineSmall.
+const MIN_COLS = 4;
+
 // Cut the lines into print tables, in the order the report lays them out (a
 // fork's lines adjacent), using as little paper as possible.
 //
@@ -355,9 +362,9 @@ const TABLE_OVERHEAD = 3;
 // search back from j stops at the first i that no longer fits.
 // The cut depends only on the lines' moves (and which is the mainline), not
 // on anything else a redraw changes -- and the report redraws the print tables
-// on every edit, hidden on screen. So the last cut is kept, as where each
-// table ends, and reused while the moves are the same.
-let lastCut = { key: null, ends: null };
+// on every edit, hidden on screen. So the last cut is kept, as which lines
+// each table holds, and reused while the moves are the same.
+let lastCut = { key: null, cut: null };
 
 function packForPrint(mainV, lines, size) {
   const order = orderedLeaves(mainV, lines);
@@ -366,20 +373,60 @@ function packForPrint(mainV, lines, size) {
     mainV.synthetic ? "" : mainV.moves.map((m) => m.san).join(" "),
     ...order.map((l) => l.moves.map((m) => m.san).join(" ")),
   ].join("|");
-  if (lastCut.key === key) return rebuild(order, lastCut.ends);
-  const tables = packFresh(mainV, order, size);
-  let end = 0;
-  lastCut = { key, ends: tables.map((t) => (end += t.length)) };
+  if (lastCut.key === key) return rebuild(order, lastCut.cut);
+  const tables = combineSmall(mainV, packFresh(mainV, order, size), size);
+  lastCut = {
+    key,
+    cut: tables.map((t) => ({ at: t.map((l) => order.indexOf(l)), odds: !!t.odds })),
+  };
   return tables;
 }
 
-function rebuild(order, ends) {
-  let start = 0;
-  return ends.map((end) => {
-    const t = order.slice(start, end);
-    start = end;
+// A kept cut, as tables of this render's lines.
+function rebuild(order, cut) {
+  return cut.map(({ at, odds }) => {
+    const t = at.map((k) => order[k]);
+    if (odds) t.odds = true;
     return t;
   });
+}
+
+// The cut above is by paper alone, and paper alone is happy to leave a line
+// or two on a table of their own: a table a column or two wide, which reads
+// as a scrap on the page. So, once the cut is made, the small tables leave
+// their places and their lines are packed together, in report order, into an
+// "odds and ends" table (or as many as they need) at the end of the report.
+// The first table stays where it is, small or not, when it carries the
+// mainline.
+// A table of these is flagged `odds`, for its caption.
+function combineSmall(mainV, tables, size) {
+  const width = (lines, i) => tableShape(mainV, lines, i).width;
+  const keep = [];
+  const odds = [];
+  tables.forEach((t, i) => {
+    // the first table stays only when it carries the mainline
+    if ((i > 0 || mainV.synthetic) && width(t, i) < MIN_COLS) odds.push(...t);
+    else keep.push(t);
+  });
+  if (!odds.length) return tables;
+  // Shortest first: a table is as tall as its longest line, so lines of a
+  // length share a table rather than a one-move stub waiting down the column
+  // of a forty-move line. Split evenly across as few tables as the column cap
+  // allows, so the last is not a lone scrap of its own.
+  odds.sort((a, b) => a.moves.length - b.moves.length);
+  const per = Math.ceil(odds.length / Math.ceil(odds.length / size));
+  let cur = [];
+  const close = () => {
+    cur.odds = true;
+    keep.push(cur);
+    cur = [];
+  };
+  for (const l of odds) {
+    if (cur.length && (cur.length >= per || width([...cur, l], 1) > size)) close();
+    cur.push(l);
+  }
+  close();
+  return keep;
 }
 
 function packFresh(mainV, order, size) {

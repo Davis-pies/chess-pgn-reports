@@ -1029,3 +1029,79 @@ test("the packing is worked out again when the lines change", () => {
   assert.ok(cells.includes("g6") && cells.includes("Nc6"), "the new lines are printed");
   off();
 });
+
+// ---- odds and ends
+
+// Twelve lines running together for sixteen moves, beside the mainline, and
+// two strays that leave at move two: the cut sets the strays apart, and they
+// are gathered at the end under their own caption rather than left as scraps.
+function withStrays(strays) {
+  const run = "3. d4 cxd4 4. Nxd4 Nc6 5. Nc3 Qc7 6. Be3 a6 7. Qf3 Nf6 8. O-O-O Ne5 9. Qg3 b5 10. f4 Neg4";
+  const tails = ["Bg1", "Bd2", "Nb3", "Qe1", "Qf3", "Qf2", "Qh3", "Qh4", "Rd2", "Re1", "Kb1", "a3"];
+  const twelve = tails.map((m) => `(2... e6 ${run} 11. ${m})`).join(" ");
+  return `1. e4 c5 2. Nf3 d6 ${twelve} ${strays} 3. d4 *`;
+}
+const tablesOf = (box) =>
+  [...box.querySelectorAll("table.tbl")].map((t) => {
+    let p = t.previousElementSibling;
+    const stem = p?.classList.contains("print-stem") ? p.textContent : "";
+    if (stem) p = p.previousElementSibling;
+    return {
+      odds: !!p?.classList.contains("print-odds"),
+      cols: t.querySelectorAll("tr")[0].children.length - 1,
+      cells: [...t.querySelectorAll("td")].map((c) => c.textContent),
+      stem,
+    };
+  });
+
+test("small tables are gathered into an odds-and-ends table at the end", () => {
+  const off = installDom();
+  const st = loadState(withStrays("(2... g6) (2... Nc6 3. d4 cxd4 4. Nxd4 g6 5. c4)"));
+  st.noMain = true;
+  const box = document.createElement("div");
+  appendPrintTables(box, grid(st.lines));
+  const ts = tablesOf(box);
+  const odds = ts.filter((t) => t.odds);
+  assert.strictEqual(odds.length, 1, "one odds-and-ends table");
+  assert.strictEqual(ts[ts.length - 1].odds, true, "at the end");
+  assert.ok(odds[0].cells.includes("g6") && odds[0].cells.includes("c4"), "holding both strays");
+  assert.strictEqual(box.querySelector(".print-odds").textContent, "Other lines");
+  // none of the other tables is a scrap
+  for (const t of ts.filter((x) => !x.odds)) assert.ok(t.cols >= 4, `a ${t.cols}-column table was left`);
+  // the twelve keep their stem
+  assert.ok(ts.some((t) => /10\. f4\s+Neg4/.test(t.stem)));
+  off();
+});
+
+test("with nothing small, there is no odds-and-ends table", () => {
+  const off = installDom();
+  const box = printTables(`1. e4 e5 ${"c5 e6 c6 d5 d6 Nf6 g6 b6 a6 Nc6 f5 h6".split(" ").map((m) => `(1... ${m})`).join(" ")} 2. Nf3 *`);
+  assert.strictEqual(box.querySelector(".print-odds"), null);
+  off();
+});
+
+test("odds and ends are ordered shortest first", () => {
+  const off = installDom();
+  // the long stray is written first in the PGN; the short one leads the table
+  const st = loadState(withStrays("(2... Nc6 3. d4 cxd4 4. Nxd4 g6 5. c4) (2... g6)"));
+  st.noMain = true;
+  const box = document.createElement("div");
+  appendPrintTables(box, grid(st.lines));
+  const table = [...box.querySelectorAll("table.tbl")].pop();
+  const firstCol = [...table.querySelectorAll("tr")].slice(1).map((tr) => tr.children[1].textContent).filter(Boolean);
+  assert.deepStrictEqual(firstCol, ["g6"], "the one-move stub is the first column");
+  off();
+});
+
+test("a redraw keeps the odds-and-ends table", () => {
+  const off = installDom();
+  const st = loadState(withStrays("(2... g6) (2... Nc6 3. d4 cxd4 4. Nxd4 g6 5. c4)"));
+  st.noMain = true;
+  const draw = () => {
+    const box = document.createElement("div");
+    appendPrintTables(box, grid(st.lines));
+    return tablesOf(box).map((t) => (t.odds ? "odds" : "") + t.cols).join(" ");
+  };
+  assert.strictEqual(draw(), draw(), "the kept cut draws the same tables, caption and all");
+  off();
+});
