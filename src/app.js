@@ -288,17 +288,13 @@ function themeBtn() {
   return b;
 }
 
-// Open Analysis mode at a position -- from a move, the position after it;
-// from the toolbar (no moves), the start. Every notebook line through the
-// position comes onto the board (see openAt), so the toolbar brings in the
-// whole workbook, and the list narrows to the lines through wherever the
-// cursor goes. Lines explored earlier are kept and come back the same way.
-// Hidden notebook lines stay out: they are out of every other view too.
-// Lines come in as copies, so exploring never reaches back into the notebook.
-export function openAnalysis(moves = [], from = null) {
+// Open Analysis mode. From a move, the board goes to the position after it
+// (see openAt); from the toolbar, it reopens as it was left, or at the start.
+// The workbook's lines through the position are shown beside the board's own
+// analysis, read from the workbook as it stands, not copied onto the board.
+export function openAnalysis(moves = []) {
 	if (!getScratch()) setScratch(newScratch());
-	const lines = visibleLines(getCurrent().lines);
-	openAt(getScratch(), moves, lines, from || lines.find((l) => l.isMain) || null);
+	if (moves.length) openAt(getScratch(), moves);
 	setMode("analysis");
 	renderApp();
 }
@@ -433,7 +429,8 @@ function viewRoot() {
     className: "side-resize",
     title: "Drag to resize",
   });
-  handle.onmousedown = (e) => {
+  // Pointer events, so a finger on a tablet drags it as a mouse does.
+  handle.onpointerdown = (e) => {
     e.preventDefault();
     sideDragging = true;
   };
@@ -510,8 +507,9 @@ function analysisOverlay() {
   ]);
   ov.appendChild(el("div", { className: "modal an-window" }, [head, an]));
   // Focus after the tree is live, so the arrow keys and Escape work without a
-  // click first. Re-render rebuilds and re-focuses it.
-  queueMicrotask(() => an.focus());
+  // click first. Re-render rebuilds and re-focuses it. Without scrolling: on a
+  // phone the focus scrolled the sheet so the board sat under its header.
+  queueMicrotask(() => an.focus({ preventScroll: true }));
   return ov;
 }
 
@@ -1216,15 +1214,17 @@ document.addEventListener("DOMContentLoaded", () => {
   if (saved) document.documentElement.dataset.theme = saved;
   renderApp();
   // drag-resize for the table panel (updates main margin to match)
-  document.addEventListener("mousemove", (e) => {
+  document.addEventListener("pointermove", (e) => {
     if (!sideDragging) return;
     const w = Math.max(280, Math.min(window.innerWidth * 0.7, e.clientX));
     getCurrent().sideWidth = w;
     document.documentElement.style.setProperty("--side-w", w + "px");
   });
-  document.addEventListener("mouseup", () => {
+  const stopSideDrag = () => {
     sideDragging = false;
-  });
+  };
+  document.addEventListener("pointerup", stopSideDrag);
+  document.addEventListener("pointercancel", stopSideDrag);
   // inject the cburnett piece sprite so board <use href="#wK"> works & prints,
   // then re-render once it's in the DOM
   fetch("assets/pieces.svg")

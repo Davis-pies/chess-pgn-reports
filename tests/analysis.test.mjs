@@ -347,47 +347,54 @@ test("sharedPrefix counts the opening moves a line repeats from above", () => {
 
 import { openAt, shown, toggleShowAll, clearShown, pin, closeBoard } from "../src/analysis.js";
 
-const nb = (...lines) =>
-	lines.map((str) => ({ moves: str.split(" ").map((san, ply) => ({ san, ply })), comments: [] }));
+// A board already holding these analysis lines (SAN strings), on the first.
+const boardOf = (...lines) => {
+	const s = newScratch();
+	s.lines = lines.map((str) => ({ moves: str.split(" ").map((san, ply) => ({ san, ply })) }));
+	s.at = s.lines[0].moves.length;
+	return s;
+};
+const posOf = (str) => str.split(" ").map((san) => ({ san }));
 const onView = (s) => shown(s).map((i) => s.lines[i].moves.map((m) => m.san).join(" "));
 
-test("opening a position brings every notebook line through it", () => {
-	const lines = nb("e4 c5 Nf3 d6", "e4 c5 Nf3 Nc6 d4", "e4 e5 Nf3", "d4 d5");
-	lines[1].comments = [{ ply: 3, text: "the Classical" }];
-	const s = newScratch();
-	openAt(s, lines[1].moves.slice(0, 2), lines, lines[1]);
-	assert.deepStrictEqual(onView(s), ["e4 c5 Nf3 d6", "e4 c5 Nf3 Nc6 d4"], "the empty line went");
-	assert.strictEqual(s.active, 1, "on the line it was opened from");
+test("opening a position selects an analysis line through it, at that position", () => {
+	const s = boardOf("e4 e5 Nf3", "e4 c5 Nf3 d6", "e4 c5 Nc3");
+	openAt(s, posOf("e4 c5"));
+	assert.strictEqual(s.active, 1, "the first line through it");
 	assert.strictEqual(s.at, 2);
-	assert.deepStrictEqual(s.lines[1].comments, [{ ply: 3, text: "the Classical" }]);
-	s.lines[1].comments[0].text = "edited";
-	assert.strictEqual(lines[1].comments[0].text, "the Classical", "copies, not the notebook's own");
+	assert.strictEqual(s.lines.length, 3, "nothing is added");
+	select(s, 2);
+	openAt(s, posOf("e4 c5"));
+	assert.strictEqual(s.active, 2, "the line being played, when it passes through");
+});
+
+test("a position no analysis line passes through gets a line of its own", () => {
+	const s = newScratch();
+	openAt(s, posOf("c4 e5"));
+	assert.deepStrictEqual(onView(s), ["c4 e5"], "the lone empty line is replaced");
+	assert.strictEqual(s.at, 2);
+	openAt(s, posOf("d4"));
+	assert.strictEqual(s.lines.length, 2);
+	assert.deepStrictEqual(onView(s), ["d4"]);
 });
 
 test("the lines on view are the ones through the position on the board", () => {
-	const lines = nb("e4 c5 Nf3 d6", "e4 e5 Nf3", "d4 d5");
-	const s = newScratch();
-	openAt(s, lines[0].moves.slice(0, 2), lines); // 1.e4 c5
+	const s = boardOf("e4 c5 Nf3 d6", "e4 e5 Nf3");
+	openAt(s, posOf("e4 c5"));
 	play(s, "Nc3"); // a fork after 1...c5: 2.Nf3 does not lead here
 	assert.deepStrictEqual(onView(s), ["e4 c5 Nc3"]);
 	back(s); // back to 1...c5: both lead from here
 	assert.deepStrictEqual(onView(s), ["e4 c5 Nf3 d6", "e4 c5 Nc3"]);
-	openAt(s, lines[1].moves.slice(0, 2), lines); // 1.e4 e5
+	openAt(s, posOf("e4 e5"));
 	assert.deepStrictEqual(onView(s), ["e4 e5 Nf3"], "the Sicilian lines are off view");
 	assert.strictEqual(s.lines.length, 3, "but kept");
 	goTo(s, 1); // 1.e4: everything through it
-	assert.deepStrictEqual(onView(s), ["e4 c5 Nf3 d6", "e4 c5 Nc3", "e4 e5 Nf3"]);
-	openAt(s, lines[0].moves.slice(0, 2), lines); // back to 1.e4 c5
-	assert.deepStrictEqual(onView(s), ["e4 c5 Nf3 d6", "e4 c5 Nc3"], "nothing doubled");
-	goTo(s, 0); // the start: all of them
-	assert.strictEqual(shown(s).length, 3, "d4 d5 was never opened, so never brought in");
+	assert.deepStrictEqual(onView(s), ["e4 c5 Nf3 d6", "e4 e5 Nf3", "e4 c5 Nc3"]);
 });
 
 test("show all puts every line on view, and toggles back", () => {
-	const lines = nb("e4 c5", "d4 d5");
-	const s = newScratch();
-	openAt(s, lines[1].moves, lines);
-	openAt(s, lines[0].moves, lines);
+	const s = boardOf("d4 d5", "e4 c5");
+	openAt(s, posOf("e4 c5"));
 	assert.deepStrictEqual(onView(s), ["e4 c5"]);
 	toggleShowAll(s);
 	assert.deepStrictEqual(onView(s), ["d4 d5", "e4 c5"]);
@@ -396,9 +403,8 @@ test("show all puts every line on view, and toggles back", () => {
 });
 
 test("a pinned line stays on view until the board closes", () => {
-	const lines = nb("e4 c5 Nf3", "e4 c5 Nc3");
-	const s = newScratch();
-	openAt(s, lines[0].moves.slice(0, 2), lines);
+	const s = boardOf("e4 c5 Nf3", "e4 c5 Nc3");
+	openAt(s, posOf("e4 c5"));
 	pin(s, 1); // 2.Nc3
 	forward(s); // into 2.Nf3
 	assert.deepStrictEqual(onView(s), ["e4 c5 Nf3", "e4 c5 Nc3"]);
@@ -406,24 +412,17 @@ test("a pinned line stays on view until the board closes", () => {
 	assert.deepStrictEqual(onView(s), ["e4 c5 Nf3"]);
 	pin(s, 1);
 	toggleShowAll(s);
+	s.wbAll = true;
 	closeBoard(s);
 	assert.deepStrictEqual(onView(s), ["e4 c5 Nf3"], "pins and show all end with the board");
+	assert.strictEqual(s.wbAll, false);
 	assert.strictEqual(closeBoard(null), null);
 	pin(s, 9); // not a line: nothing
 });
 
-test("a position nothing passes through gets a line of its own", () => {
-	const s = newScratch();
-	openAt(s, [{ san: "c4" }], nb("e4 e5"));
-	assert.deepStrictEqual(onView(s), ["c4"]);
-	assert.strictEqual(s.at, 1);
-});
-
 test("deleting and clearing work on the lines on view", () => {
-	const lines = nb("e4 c5 Nf3", "e4 c5 Nc3", "d4 d5");
-	const s = newScratch();
-	openAt(s, lines[2].moves, lines);
-	openAt(s, lines[0].moves.slice(0, 2), lines);
+	const s = boardOf("d4 d5", "e4 c5 Nf3", "e4 c5 Nc3");
+	openAt(s, posOf("e4 c5"));
 	assert.deepStrictEqual(onView(s), ["e4 c5 Nf3", "e4 c5 Nc3"]);
 	removeLine(s, shown(s)[0]);
 	assert.deepStrictEqual(onView(s), ["e4 c5 Nc3"], "the neighbour on view is selected, not the d4 line");
@@ -433,14 +432,12 @@ test("deleting and clearing work on the lines on view", () => {
 	clearShown(s);
 	assert.deepStrictEqual(onView(s), ["e4 c5"]);
 	toggleShowAll(s);
-	assert.ok(onView(s).includes("d4 d5"), "the rest of the pool is untouched");
+	assert.ok(onView(s).includes("d4 d5"), "the rest is untouched");
 });
 
 test("moving and stepping skip the lines off view", () => {
-	const lines = nb("e4 c5 Nf3", "d4 d5", "e4 c5 Nc3");
-	const s = newScratch();
-	openAt(s, lines[1].moves, lines);
-	openAt(s, lines[0].moves.slice(0, 2), lines);
+	const s = boardOf("e4 c5 Nf3", "d4 d5", "e4 c5 Nc3");
+	openAt(s, posOf("e4 c5"));
 	assert.deepStrictEqual(onView(s), ["e4 c5 Nf3", "e4 c5 Nc3"]);
 	stepLine(s, 1);
 	assert.strictEqual(s.lines[s.active].moves[2].san, "Nc3", "stepped over d4 d5");
@@ -453,9 +450,8 @@ test("moving and stepping skip the lines off view", () => {
 import { packScratch, unpackScratch } from "../src/analysis.js";
 
 test("a board packs to SAN and notes, and unpacks to the same board", () => {
-	const lines = nb("e4 c5 Nf3 d6", "e4 e5 Nf3");
-	const s = newScratch();
-	openAt(s, lines[0].moves.slice(0, 2), lines);
+	const s = boardOf("e4 c5 Nf3 d6", "e4 e5 Nf3");
+	openAt(s, posOf("e4 c5"));
 	play(s, "Nc3");
 	activeLine(s).comments = [{ ply: 2, text: "closed" }];
 	s.flipped = true;
@@ -463,8 +459,12 @@ test("a board packs to SAN and notes, and unpacks to the same board", () => {
 	s.flash = "said once";
 	const packed = JSON.parse(JSON.stringify(packScratch(s)));
 	assert.deepStrictEqual(packed, {
-		lines: [{ moves: ["e4", "c5", "Nf3", "d6"] }, { moves: ["e4", "c5", "Nc3"], comments: [{ ply: 2, text: "closed" }] }],
-		active: 1,
+		lines: [
+			{ moves: ["e4", "c5", "Nf3", "d6"] },
+			{ moves: ["e4", "e5", "Nf3"] },
+			{ moves: ["e4", "c5", "Nc3"], comments: [{ ply: 2, text: "closed" }] },
+		],
+		active: 2,
 		at: 3,
 		flipped: true,
 	});
@@ -472,7 +472,7 @@ test("a board packs to SAN and notes, and unpacks to the same board", () => {
 	// an empty notes list is not written, so compare with it left out
 	const bare = (ls) => ls.map((l) => (l.comments && l.comments.length ? l : { moves: l.moves }));
 	assert.deepStrictEqual(back.lines, bare(s.lines));
-	assert.deepStrictEqual([back.active, back.at, back.flipped], [1, 3, true]);
+	assert.deepStrictEqual([back.active, back.at, back.flipped], [2, 3, true]);
 	assert.strictEqual(back.undo, undefined, "undo is not kept");
 	assert.strictEqual(packScratch(newScratch()), null, "an empty board packs to nothing");
 	assert.strictEqual(packScratch(null), null);

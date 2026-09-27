@@ -199,7 +199,7 @@ function buildInto(box, target) {
 		if (target.ply != null)
 			box.appendChild(
 				item("Analyse from here", () =>
-					getRenderHooks().openAnalysis(movesUpTo(target.lines[0], target.ply), target.lines[0]),
+					getRenderHooks().openAnalysis(movesUpTo(target.lines[0], target.ply)),
 				),
 			);
 		box.appendChild(section(target.lines.length + " lines"));
@@ -211,7 +211,7 @@ function buildInto(box, target) {
 		if (ply != null)
 			box.appendChild(
 				item("Analyse from here", () =>
-					getRenderHooks().openAnalysis(movesUpTo(line, ply), line),
+					getRenderHooks().openAnalysis(movesUpTo(line, ply)),
 				),
 			);
 		box.appendChild(section(line.name || "this line"));
