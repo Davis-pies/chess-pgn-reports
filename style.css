@@ -1431,3 +1431,14 @@ sup {
 .optsel:hover {
   border-color: var(--main);
 }
+/* the caption over the table the small tables were gathered into */
+.print-odds {
+  text-align: center;
+  font-weight: 600;
+  font-size: 0.85em;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin: 0 0 2px;
+  break-after: avoid;
+  page-break-after: avoid;
+}
