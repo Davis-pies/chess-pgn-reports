@@ -1212,3 +1212,16 @@ test("with no mainline, every table that shows a noted move lists the note", () 
   });
   off();
 });
+
+test("a table's notes are listed in number order", () => {
+  const off = installDom();
+  // notes numbered in PGN order, but met in a different order walking the
+  // columns: the mainline's late note, a sideline's early one
+  const box = printTables(
+    "1. e4 e5 2. Nf3 {two} 2... Nc6 (2... d6 {one-and-a-half} 3. d4) 3. Bb5 {three} (3. Bc4 {four} 3... Bc5) 3... a6 *",
+  );
+  const nums = [...box.querySelectorAll(".print-notes .nt sup")].map((s) => Number(s.textContent.replace(/\D/g, "")));
+  assert.ok(nums.length >= 3, `notes printed (${nums})`);
+  assert.deepStrictEqual(nums, [...nums].sort((a, b) => a - b));
+  off();
+});

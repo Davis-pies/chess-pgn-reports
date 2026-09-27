@@ -295,6 +295,9 @@ function renderTableNotes(wrap, lines, { mainV, showMain }) {
       rows.push(n);
     });
   });
+  // In note-number order, not the order the columns were walked in: the
+  // numbers are how the reader finds a note from its marker.
+  rows.sort((a, b) => a.n - b.n);
   // Always emitted, even with nothing in it: this block carries the gap to the
   // next table, so every table gets the same separation without the spacing
   // having to depend on whether notes happen to exist.
