@@ -1,8 +1,8 @@
 // src/prefs.js
 // What the app remembers about the viewer between visits, apart from the
 // workbooks themselves: the theme, which way up new analysis boards start,
-// the table panel's width, and the workbook and board position they were on
-// when they left. Browser-local and never part of a workbook: a file you send
+// the table panel's width, whether the board's workbook lines are folded, and
+// the workbook and board position they were on when they left. Browser-local and never part of a workbook: a file you send
 // someone should not carry your panel width.
 //
 // Everything is read defensively. Storage can be blocked, full, or hold a
@@ -26,6 +26,8 @@ const DEFAULTS = Object.freeze({
 	restore: true,
 	// { id, mode, board } -- the workbook open when the page was left
 	last: null,
+	// the analysis board's list of workbook lines folded to its heading
+	wbCollapsed: false,
 });
 
 const store = () => {
@@ -73,6 +75,7 @@ export function loadPrefs() {
 		sideWidth: cleanWidth(d.sideWidth) ?? DEFAULTS.sideWidth,
 		restore: typeof d.restore === "boolean" ? d.restore : DEFAULTS.restore,
 		last: cleanLast(d.last) ?? DEFAULTS.last,
+		wbCollapsed: typeof d.wbCollapsed === "boolean" ? d.wbCollapsed : DEFAULTS.wbCollapsed,
 	};
 }
 
