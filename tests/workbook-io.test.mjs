@@ -449,3 +449,36 @@ test("choosing a file in the dialog previews it without a click", async () => {
   assert.ok(!u.btn("Apply").disabled);
 });
 
+
+test("loading a PGN with a second game says only the first was loaded", async () => {
+  app.reset();
+  await app.loadPgn('[Event "a"]\n1. e4 e5 *\n\n[Event "b"]\n1. d4 d5 *');
+  assert.strictEqual(getCurrent().lines.length, 1, "the first game is open");
+  assert.match(app.alerts.join("\n"), /Only the first game was loaded/);
+});
+
+test("Load & Tag on an empty box asks for a PGN instead of 'no moves found'", async () => {
+  app.reset();
+  await app.loadPgn("   \n");
+  assert.deepStrictEqual(app.alerts, [
+    "Paste a PGN first, or load one with Load PGN file.",
+  ]);
+});
+
+test("an empty PGN file is named, and the same file can be picked again", async () => {
+  app.reset();
+  const input = app.dom.window.document.querySelector("input.filein");
+  choose(input, "blank.pgn", "");
+  await new Promise((r) => setTimeout(r, 20));
+  assert.deepStrictEqual(app.alerts, ["blank.pgn is empty."]);
+  assert.strictEqual(input.value, "", "cleared, so re-picking fires change");
+});
+
+test("the update dialog warns when the new PGN holds more than one game", async () => {
+  app.reset();
+  await app.loadPgn(PGN);
+  app.clickText("Update PGN");
+  const dlg = app.dom.window.document.getElementById("updpgn");
+  await setPgn(dlg, PGN + " *\n\n1. d4 d5 *");
+  assert.match(dlg.textContent, /Only the first game is used/);
+});

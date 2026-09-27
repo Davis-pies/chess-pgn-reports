@@ -162,14 +162,3 @@ test("the parser's SAN and FEN match chess.js's own move() for every move", asyn
 		}
 	}
 });
-
-test("a loose SAN replayed elsewhere is still refused by the parser", () => {
-	// fenMap replays stored lines loosely; the step cache must not carry that
-	// leniency into the parser, which only takes standard SAN.
-	fenMap([
-		{ san: "e4", ply: 0 },
-		{ san: "e5", ply: 1 },
-		{ san: "Ng1f3", ply: 2 },
-	]);
-	assert.throws(() => parsePgn("1. e4 e5 2. Ng1f3 *"), /Illegal or ambiguous/);
-});

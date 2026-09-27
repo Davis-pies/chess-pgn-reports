@@ -27,7 +27,6 @@ import {
 	playAll,
 	positionOf,
 	removeLine,
-	scratchPgn,
 	select,
 	sharedPrefix,
 	stepLine,
@@ -44,6 +43,7 @@ import {
 	saveNote,
 } from "./analysis-commit.js";
 import { commentEditor } from "./line-editor.js";
+import { shareTools } from "./share-tools.js";
 import { formatScore, numberedFrom, whiteShare } from "./engine.js";
 import { FULL } from "./engine-store.js";
 import { getCurrent } from "./state.js";
@@ -342,7 +342,10 @@ export function analysisPanel(
 
 	// Notes on the move just played, in the notebook's own note editor: a
 	// scratch line keeps comments in the same shape a notebook line does.
-	right.appendChild(el("div", { className: "an-sec", textContent: scratch.at ? `Note on ${moveLabel(scratch)}` : "Note" }));
+	// The heading is set in capitals; the move inside it keeps its own case,
+	// or "Nbd7" reads "NBD7" -- a bishop that isn't there.
+	const san = el("span", { className: "an-san", textContent: scratch.at ? moveLabel(scratch) : "" });
+	right.appendChild(el("div", { className: "an-sec" }, scratch.at ? ["Note on ", san] : ["Note"]));
 	right.appendChild(
 		scratch.at
 			? commentEditor(scratch.at - 1, [activeLine(scratch)])
@@ -361,19 +364,11 @@ export function analysisPanel(
 	);
 	right.append(commit);
 
-	// Tools that do not change the lines: copying out, and starting over.
-	const copy = (text, what) => () => {
-		const done = () => (msg.textContent = `${what} copied.`);
-		try {
-			navigator.clipboard.writeText(text).then(done, () => (msg.textContent = text));
-		} catch {
-			msg.textContent = text;
-		}
-	};
+	// Ways out that do not change the lines: copying, saving, a link.
+	right.appendChild(shareTools(scratch, pos, msg));
+
 	const extra = el("div", { className: "orow an-tools" });
 	extra.append(
-		btn("an-copy-fen", "Copy FEN", "Copy this position as FEN", copy(pos.fen, "FEN")),
-		btn("an-copy-pgn", "Copy PGN", "Copy every line here as one PGN, the first line as the main line", copy(scratchPgn(scratch), "PGN")),
 		btn("an-clear", "Clear lines", "Delete the lines on view and start again from this position", risky(() => clearShown(scratch))),
 	);
 	if (scratch.undo) extra.appendChild(btn("an-undo", "↶ Undo", "Undo the last delete", act(() => undo(scratch))));

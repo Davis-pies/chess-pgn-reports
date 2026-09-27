@@ -2,6 +2,13 @@ import { Chess } from "chess.js";
 
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
+// Suffix annotations written straight onto a move ("e4!", "Nf3?!") or as
+// their own token ("e4 !"): the PGN spec's shorthand for NAGs $1-$6.
+const SUFFIX_NAG = { "!": 1, "?": 2, "!!": 3, "??": 4, "!?": 5, "?!": 6 };
+
+// Figurine notation ("♘f3") as some sites and books export it.
+const FIGURINE = { "♔": "K", "♕": "Q", "♖": "R", "♗": "B", "♘": "N", "♚": "K", "♛": "Q", "♜": "R", "♝": "B", "♞": "N" };
+
 function tokenize(mt) {
 	// A '{' with no matching '}' can't form a valid \{[^}]*\} token, so it's
 	// silently dropped by the main regex below and its body gets retokenized
@@ -24,27 +31,59 @@ export function parsePgn(mt) {
 	const tags = {};
 	for (const m of mt.matchAll(TAG_LINE))
 		tags[m[1]] = m[2].replace(/\\(["\\])/g, "$1");
-	const cleaned = mt.replace(TAG_LINE, " ");
+	// A set-up position would be replayed from the standard start by every
+	// consumer (fenAt, fenMap, the board), so its first move reads as illegal:
+	// say what is actually unsupported instead.
+	if (tags.SetUp === "1" || (tags.FEN && tags.FEN.trim() !== START_FEN)) {
+		throw new Error(
+			"this PGN starts from a set-up position (FEN tag); only games from the standard starting position are supported",
+		);
+	}
+	// "%" in the first column escapes the whole line (PGN spec 6).
+	const cleaned = mt.replace(TAG_LINE, " ").replace(/^%.*$/gm, " ");
 	const tokens = tokenize(cleaned);
 	const ctx = { i: 0, result: "*", comments: [] };
 	const nodes = parseSeq(tokens, ctx, { fen: START_FEN, ply: 0 });
-	return { nodes, result: ctx.result, comments: ctx.comments, tags };
+	// Anything after the result other than comments is a further game (a
+	// multi-game file) or stray text: only the first game is read, so report it
+	// rather than drop it without a word.
+	const moreGames = tokens
+		.slice(ctx.i)
+		.some((t) => !t.startsWith("{") && !t.startsWith(";"));
+	return { nodes, result: ctx.result, comments: ctx.comments, tags, moreGames };
 }
 
 function stepFrom(w, state, san) {
+	const suffix = /[!?]{1,2}$/.exec(san)?.[0];
+	const bare = san
+		.replace(/[!?]{1,2}$/, "")
+		.replace(/[♔♕♖♗♘♚♛♜♝♞]/g, (c) => FIGURINE[c])
+		// zeros for castling: common in older and hand-typed PGN
+		.replace(/^0-0-0(?=[+#]?$)/, "O-O-O")
+		.replace(/^0-0(?=[+#]?$)/, "O-O");
 	let m;
 	try {
-		m = w.play(san, true);
+		m = w.play(bare, true);
 	} catch {
-		throw new Error("Illegal or ambiguous move in PGN: " + san);
+		// chess.js's permissive parser: "a8Q" without the "=", long algebraic
+		// "e2-e4"/"e2e4", "Ng1f3". The node keeps the canonical SAN.
+		try {
+			m = w.play(bare);
+		} catch {
+			throw new Error(
+				`Illegal or ambiguous move in PGN: ${san} (move ${Math.floor(state.ply / 2) + 1}${state.ply % 2 ? "..." : "."})`,
+			);
+		}
 	}
-	return {
+	const node = {
 		san: m.san,
 		fen: m.fen,
 		ply: state.ply,
 		variations: [],
 		comments: [],
 	};
+	if (suffix && SUFFIX_NAG[suffix]) node.nags = [SUFFIX_NAG[suffix]];
+	return node;
 }
 
 // PGN null move: swap the side to move in a FEN string (no board change).
@@ -65,8 +104,8 @@ function attachPending(pending) {
 // the opening it shares with its siblings, and every render replays every line
 // (see fenMap). A cached step is a string key and a Map lookup instead.
 //
-// Only a move chess.js accepts in strict mode is kept, so a lookup never lets
-// the parser accept a loose SAN ("Ng1f3") it would otherwise have refused.
+// A loose SAN ("Ng1f3", "a8Q") is kept too: the parser falls back to loose
+// parsing anyway, and the step stores the canonical SAN either way.
 // Bounded: it starts over once full rather than growing without limit.
 const steps = new Map();
 const STEPS_MAX = 200000;
@@ -142,8 +181,7 @@ function walker(fen = START_FEN) {
 			// move by what it accepts, so the fast strict path serves both.
 			const fast = fastStrict(chess, san);
 			const step = fast || slowStep(chess, san, strict);
-			// a loose SAN that only non-strict parsing took is not cached
-			if (fast || strict || step.san === san) remember(key, step);
+			remember(key, step);
 			fen = boardAt = step.fen;
 			return step;
 		},
@@ -267,6 +305,9 @@ function parseSeq(tokens, ctx, state, inVariation = false, intro = null) {
 			continue;
 		}
 		if (t === ")") {
+			// at the top level there is no variation for it to close; returning
+			// here would silently drop the rest of the game
+			if (!inVariation) throw new Error("Unmatched ')' with no variation open");
 			ctx.i++;
 			flushNarrative();
 			return nodes;
@@ -288,6 +329,17 @@ function parseSeq(tokens, ctx, state, inVariation = false, intro = null) {
 		if (/^\d+\.\.?/.test(t) || t === "...") {
 			// move-number token (and a standalone spaced ellipsis, e.g.
 			// "3. ... a6"), redundant with ply; skip
+			ctx.i++;
+			continue;
+		}
+		if (t === "e.p." || t === "ep") {
+			// en passant marker some exporters write after the capture
+			ctx.i++;
+			continue;
+		}
+		if (SUFFIX_NAG[t]) {
+			// a suffix annotation written as its own token: the NAG it stands for
+			if (last) (last.nags ||= []).push(SUFFIX_NAG[t]);
 			ctx.i++;
 			continue;
 		}
