@@ -104,12 +104,12 @@ test("the dragged panel width is remembered, and Settings resets it", async () =
 	app.reset();
 	await app.loadPgn(PGN);
 	const w = app.dom.window;
-	app.view().querySelector(".side-resize").dispatchEvent(new w.MouseEvent("mousedown", { bubbles: true }));
-	w.document.dispatchEvent(new w.MouseEvent("mousemove", { clientX: 500, bubbles: true }));
-	w.document.dispatchEvent(new w.MouseEvent("mouseup", { bubbles: true }));
+	app.view().querySelector(".side-resize").dispatchEvent(new w.MouseEvent("pointerdown", { bubbles: true }));
+	w.document.dispatchEvent(new w.MouseEvent("pointermove", { clientX: 500, bubbles: true }));
+	w.document.dispatchEvent(new w.MouseEvent("pointerup", { bubbles: true }));
 	assert.strictEqual(prefs().sideWidth, 500);
 	// a plain click elsewhere does not overwrite it
-	w.document.dispatchEvent(new w.MouseEvent("mouseup", { bubbles: true }));
+	w.document.dispatchEvent(new w.MouseEvent("pointerup", { bubbles: true }));
 	assert.strictEqual(prefs().sideWidth, 500);
 
 	app.clickText("Reset panel width");

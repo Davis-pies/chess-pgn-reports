@@ -254,8 +254,15 @@ different chess.js from the deployed site. Any plain static server works too
 Tests:
 
 ```bash
-npm test
+npm test          # unit tests, under jsdom
+npm run test:e2e  # browser tests (e2e/), Playwright + Chromium
 ```
+
+The browser tests start the dev server themselves and drive the real page:
+importing, the report's editor, the analysis board, the engine, saving and
+reopening workbooks. They answer the importmap's esm.sh request for chess.js
+from `node_modules`, so they run offline. First run needs a browser:
+`npx playwright install chromium`.
 
 ## Deploy to GitHub Pages
 
