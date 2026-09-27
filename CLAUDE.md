@@ -52,6 +52,9 @@ intercept `https://esm.sh/**` and serve `node_modules/chess.js/dist/esm/chess.js
 - **Workbook format changes** go through `store.js`. Keep old files readable:
   migrate on the way in, and bump `VERSION` only when older builds could not
   read the new data correctly.
+- **Viewer preferences live in `prefs.js`, not the workbook.** A workbook
+  holds what travels with the analysis; theme, panel width and the like stay
+  in this browser.
 - **Build DOM with `el()`** from `dom.js` or `createElementNS`, not
   `innerHTML`, so modules run identically in jsdom.
 - **Plies are 0-based.** A variation's first move is an alternative at the

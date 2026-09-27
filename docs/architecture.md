@@ -57,7 +57,9 @@ the shape of `current.lines` so committing a line is an array push.
 A **workbook** (`store.js`) is the raw PGN plus per-line annotations keyed by
 the line's move string (`"e4 c5 Nf3 …"`), the view settings, and optionally
 the analysis board as it was left. It is stored as JSON in `localStorage` or
-written to a `.json` file; both use the same format. On load the PGN is
+written to a `.json` file; both use the same format. The viewer's own preferences
+(theme, orientation, panel width, the last workbook) are kept apart in
+`prefs.js`, so a workbook file never carries them. On load the PGN is
 re-parsed and the annotations re-applied by key, so **the PGN is the source of
 truth for the moves**. That is why `analysis-commit.js` regenerates the PGN
 when it adds a line: a line missing from the PGN would vanish on reload.
@@ -100,6 +102,8 @@ way in (see `migrate()`).
 | `src/engine.js` | Stockfish in a Web Worker over UCI: search sequencing, eval cache, SAN conversion |
 | `src/engine-store.js` | the full engine's one-time download and its IndexedDB copy |
 | `src/engine-flavor.js` | which engine build runs (lite or full) and the download box's state |
+| `src/prefs.js` | what the viewer's browser remembers between visits: theme, board orientation, panel width, the last workbook and its board |
+| `src/settings-view.js` | the Settings drop-down over `prefs.js` |
 | `vendor/stockfish/` | Stockfish 19 WebAssembly builds (GPL-3.0, unmodified; not linted) |
 | `tools/dev-server.mjs` | the dependency-free live-reload dev server |
 | `style.css` | all styles, including `@media print` rules for the report |

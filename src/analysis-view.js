@@ -342,7 +342,10 @@ export function analysisPanel(
 
 	// Notes on the move just played, in the notebook's own note editor: a
 	// scratch line keeps comments in the same shape a notebook line does.
-	right.appendChild(el("div", { className: "an-sec", textContent: scratch.at ? `Note on ${moveLabel(scratch)}` : "Note" }));
+	// The heading is set in capitals; the move inside it keeps its own case,
+	// or "Nbd7" reads "NBD7" -- a bishop that isn't there.
+	const san = el("span", { className: "an-san", textContent: scratch.at ? moveLabel(scratch) : "" });
+	right.appendChild(el("div", { className: "an-sec" }, scratch.at ? ["Note on ", san] : ["Note"]));
 	right.appendChild(
 		scratch.at
 			? commentEditor(scratch.at - 1, [activeLine(scratch)])

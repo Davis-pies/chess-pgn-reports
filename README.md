@@ -28,6 +28,8 @@ a `.json` file you keep.
 - **Export** to PGN or Markdown, or save the whole workbook to a `.json` file.
 - **Update the PGN** under your annotations: notes, symbols and tags follow
   the moves to the new file, with a preview of anything that would be lost.
+- **Pick up where you left off**: the app remembers your theme, board
+  orientation, panel width and last workbook in this browser (**Settings**).
 
 ![The analysis board, stepping through the Poisoned Pawn line](docs/images/analysis.png)
 

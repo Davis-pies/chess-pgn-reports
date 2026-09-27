@@ -219,3 +219,11 @@ For a shorter overview see the [README](../README.md).
    nothing can be lost. The pasted text then no longer describes the line set,
    so the workbook's stored PGN is rebuilt from its lines (the same way Export
    PGN builds one) rather than being the file that was pasted.
+8. **Settings** — the **Settings** menu beside the theme button, and what the
+   app remembers in this browser between visits: the theme, which way up new
+   analysis boards start (the way the last one was left, or White/Black picked
+   here), the table panel's dragged width, and the saved workbook you were on
+   — reopened on the next visit with its board where you left it. **Reopen the
+   last workbook on start** turns that off; **Forget settings** clears it all
+   (saved workbooks are kept). A workbook never carries these: a file you send
+   someone does not bring your panel width with it.

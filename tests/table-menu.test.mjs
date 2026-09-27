@@ -8,8 +8,9 @@ import {
 	setTraced,
 	getTraced,
 	getCurrent,
+	setSharedInfo,
 } from "../src/state.js";
-import { closeTableMenu } from "../src/table-menu.js";
+import { closeTableMenu, openTableMenu } from "../src/table-menu.js";
 
 const GROUP = "1. e4 e5 (1... c5 2. Nf3 d6 3. d4 (3. Bb5+)) 2. Nf3";
 const GROUP_KEY = "1:c5";
@@ -535,5 +536,149 @@ test("a finger that moves or lifts early is a scroll or a tap, not a long press"
 	t.mock.timers.tick(600);
 	assert.strictEqual(document.querySelector(".tmenu"), null, "lifted: a tap");
 	assert.ok(!lift.defaultPrevented, "the tap's click goes through");
+	off();
+});
+
+// The menu opened straight on a target, as the header and cell handlers do,
+// so each branch of what it offers can be reached without a rendered table.
+const open = (target, at = {}) =>
+	openTableMenu({ x: 10, y: 10, target, ...at });
+const lineOf = (s, san) => s.lines.find((l) => l.moves.some((m) => m.san === san));
+
+test("a footnoted line is offered the way back out", () => {
+	const off = installDom();
+	const { s } = preview();
+	const line = lineOf(s, "d4");
+	line.tag = "foot";
+	const menu = open({ line, ply: 4 });
+	assert.ok(items(menu).includes("Move out of footnotes"));
+	assert.ok(
+		[...menu.querySelectorAll(".tmenu-item.on")].some(
+			(b) => b.textContent === "Move out of footnotes",
+		),
+		"lit, since the line is in the footnotes",
+	);
+	click(menu, "Move out of footnotes");
+	assert.strictEqual(line.tag, "sideline");
+	off();
+});
+
+test("a group whose every line is footnoted moves them all back out", () => {
+	const off = installDom();
+	const { s } = preview(GROUP_PLUS);
+	const lines = s.lines.filter((l) => l.moves.some((m) => m.san === "d6"));
+	lines.forEach((l) => (l.tag = "foot"));
+	click(open({ lines }), "Move out of footnotes");
+	assert.ok(lines.every((l) => l.tag === "sideline"));
+	off();
+});
+
+test("Stop focusing shows every line again", () => {
+	const off = installDom();
+	const { s } = preview(GROUP_PLUS);
+	const line = lineOf(s, "d4");
+	click(open({ line, ply: 4 }), "Focus");
+	assert.ok(s.lines.some((l) => l.hidden), "focusing hid the others");
+	const menu = open({ line, ply: 4 });
+	assert.ok(items(menu).includes("Stop focusing"));
+	click(menu, "Stop focusing");
+	assert.ok(s.lines.every((l) => !l.hidden), "everything is back");
+	off();
+});
+
+test("a hidden line is offered Unhide", () => {
+	const off = installDom();
+	const { s } = preview();
+	const line = lineOf(s, "d4");
+	line.hidden = true;
+	const menu = open({ line });
+	assert.ok(items(menu).includes("Unhide"));
+	click(menu, "Unhide");
+	assert.ok(!("hidden" in line), "cleared, not written as false");
+	off();
+});
+
+test("a move with no shared group or marks still gets a picker for its own line", () => {
+	const off = installDom();
+	const { s } = preview();
+	const line = lineOf(s, "d4");
+	delete line.marks;
+	setSharedInfo({ byLine: new Map(), idLines: new Map() });
+	const menu = open({ line, ply: 4 });
+	const sec = menu.querySelector(".tmenu-sec").textContent;
+	assert.match(sec, /^@ 3\.d4$/, "no shared count when it reaches one line");
+	assert.ok(menu.querySelector(".sympick"));
+	closeTableMenu();
+	off();
+});
+
+test("a ply the line never reaches names the move number alone", () => {
+	const off = installDom();
+	const { s } = preview();
+	const menu = open({ line: lineOf(s, "d4"), ply: 40 });
+	assert.match(menu.querySelector(".tmenu-sec").textContent, /^@ 21\.$/);
+	closeTableMenu();
+	off();
+});
+
+test("closing returns focus to the cell the menu came from, if still there", () => {
+	const off = installDom();
+	const { s } = preview();
+	const from = document.createElement("button");
+	document.body.appendChild(from);
+	open({ line: lineOf(s, "d4") }, { from });
+	assert.notStrictEqual(document.activeElement, from, "focus moved into the menu");
+	closeTableMenu();
+	assert.strictEqual(document.activeElement, from);
+	// a cell re-rendered away in the meantime is not focused
+	const gone = document.createElement("button");
+	open({ line: lineOf(s, "d4") }, { from: gone });
+	closeTableMenu();
+	assert.notStrictEqual(document.activeElement, gone);
+	off();
+});
+
+test("a stale menu's click does not rebuild the menu that replaced it", () => {
+	const off = installDom();
+	const { s } = preview();
+	const first = open({ line: lineOf(s, "d4"), ply: 4 });
+	const btn = first.querySelector(".sympick button");
+	open({ line: lineOf(s, "Bb5+"), ply: 4 });
+	// the first menu is detached; its handler must not touch the open one
+	const second = document.querySelector(".tmenu");
+	const before = second.innerHTML;
+	btn.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+	assert.strictEqual(document.querySelector(".tmenu"), second);
+	assert.strictEqual(second.innerHTML, before);
+	closeTableMenu();
+	off();
+});
+
+test("the menu is nudged back inside the viewport near an edge", () => {
+	const off = installDom();
+	const { s } = preview();
+	window.innerWidth = 300;
+	window.innerHeight = 200;
+	const proto = window.HTMLElement.prototype;
+	const real = proto.getBoundingClientRect;
+	proto.getBoundingClientRect = () => ({ width: 120, height: 150 });
+	try {
+		const menu = open({ line: lineOf(s, "d4") }, { x: 250, y: 100 });
+		assert.strictEqual(menu.style.left, "180px");
+		assert.strictEqual(menu.style.top, "50px");
+		closeTableMenu();
+		const fits = open({ line: lineOf(s, "d4") }, { x: 20, y: 30 });
+		assert.strictEqual(fits.style.left, "20px", "left alone when it fits");
+		assert.strictEqual(fits.style.top, "30px");
+		closeTableMenu();
+		// a menu wider than the viewport pins to its left edge
+		proto.getBoundingClientRect = () => ({ width: 500, height: 0 });
+		const wide = open({ line: lineOf(s, "d4") }, { x: 250, y: 100 });
+		assert.strictEqual(wide.style.left, "0px");
+		assert.strictEqual(wide.style.top, "100px", "a zero height is not clamped");
+		closeTableMenu();
+	} finally {
+		proto.getBoundingClientRect = real;
+	}
 	off();
 });
