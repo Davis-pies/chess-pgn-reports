@@ -423,7 +423,6 @@ export function movePanel(l) {
 				onclick: () =>
 					getRenderHooks().openAnalysis(
 						l.moves.filter((m) => m.ply <= selPly),
-						l,
 					),
 			}),
 		);

@@ -288,17 +288,13 @@ function themeBtn() {
   return b;
 }
 
-// Open Analysis mode at a position -- from a move, the position after it;
-// from the toolbar (no moves), the start. Every notebook line through the
-// position comes onto the board (see openAt), so the toolbar brings in the
-// whole workbook, and the list narrows to the lines through wherever the
-// cursor goes. Lines explored earlier are kept and come back the same way.
-// Hidden notebook lines stay out: they are out of every other view too.
-// Lines come in as copies, so exploring never reaches back into the notebook.
-export function openAnalysis(moves = [], from = null) {
+// Open Analysis mode. From a move, the board goes to the position after it
+// (see openAt); from the toolbar, it reopens as it was left, or at the start.
+// The workbook's lines through the position are shown beside the board's own
+// analysis, read from the workbook as it stands, not copied onto the board.
+export function openAnalysis(moves = []) {
 	if (!getScratch()) setScratch(newScratch());
-	const lines = visibleLines(getCurrent().lines);
-	openAt(getScratch(), moves, lines, from || lines.find((l) => l.isMain) || null);
+	if (moves.length) openAt(getScratch(), moves);
 	setMode("analysis");
 	renderApp();
 }
