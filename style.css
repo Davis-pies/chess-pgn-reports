@@ -618,6 +618,7 @@ select:focus {
 }
 .ledge-head {
   display: flex;
+  flex-wrap: wrap; /* the tag chips drop to a second row on a phone */
   flex: 1 1 100%;
   gap: 8px;
   align-items: center;
@@ -710,6 +711,7 @@ select:focus {
 }
 .tags {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: 4px;
 }
 .ln {
@@ -1671,6 +1673,7 @@ sup {
 	.tmenu-open { padding: 4px 8px; }
 	.an-keys { display: none; }
 	.an-touch-hint { display: block; }
+	.move-chip { padding: 6px 10px; font-size: .85rem; }
 	/* iOS zooms the page into any field set under 16px when it takes focus */
 	input, textarea, select { font-size: 16px; }
 	/* a long press opens the move's menu; without these it selects the text
