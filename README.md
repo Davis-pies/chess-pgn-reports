@@ -224,6 +224,14 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    nothing can be lost. The pasted text then no longer describes the line set,
    so the workbook's stored PGN is rebuilt from its lines (the same way Export
    PGN builds one) rather than being the file that was pasted.
+8. **Settings** — the **Settings** menu beside the theme button, and what the
+   app remembers in this browser between visits: the theme, which way up new
+   analysis boards start (the way the last one was left, or White/Black picked
+   here), the table panel's dragged width, and the saved workbook you were on
+   — reopened on the next visit with its board where you left it. **Reopen the
+   last workbook on start** turns that off; **Forget settings** clears it all
+   (saved workbooks are kept). A workbook never carries these: a file you send
+   someone does not bring your panel width with it.
 
 ## Run locally
 
@@ -278,6 +286,8 @@ Because it's fully client-side, the same URL works on your phone's browser.
 | `src/engine.js` | local Stockfish in a Web Worker over UCI: search sequencing, per-position eval cache, SAN conversion, swapping builds |
 | `src/engine-store.js` | the full build's one-time download (with progress and mirror fallback) and its IndexedDB copy |
 | `src/engine-flavor.js` | which build runs (lite/full), the download box's state, the viewer's preference |
+| `src/prefs.js` | what the viewer's browser remembers between visits: theme, board orientation, panel width, the last workbook and its board |
+| `src/settings-view.js` | the Settings drop-down over `prefs.js` |
 | `vendor/stockfish/` | Stockfish 19 single-threaded (lite bundled, full loader) WebAssembly build (GPL-3.0, unmodified) |
 | `src/app.js` | browser glue: import, tag buttons, orientation toggle, print |
 
