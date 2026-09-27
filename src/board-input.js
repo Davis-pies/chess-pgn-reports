@@ -36,18 +36,49 @@ function centre(sq, size, flipped) {
 	return [col * s + s / 2, row * s + s / 2];
 }
 
+const NAMES = { k: "King", q: "Queen", r: "Rook", b: "Bishop", n: "Knight", p: "Pawn" };
+const ORDER = "kqrbnp";
+
+// "White: King g1, Queen d1, Rooks a1 f1, … Black: …" -- the position in
+// words, piece by piece, in the order a player would name them.
+export function describePieces(fen) {
+	const board = new Chess(fen).board();
+	const side = (color) => {
+		const parts = [];
+		for (const t of ORDER) {
+			const sqs = board
+				.flat()
+				.filter((p) => p && p.color === color && p.type === t)
+				.map((p) => p.square)
+				.sort();
+			if (sqs.length) parts.push(`${NAMES[t]}${sqs.length > 1 ? "s" : ""} ${sqs.join(" ")}`);
+		}
+		return parts.join(", ");
+	};
+	return `White: ${side("w")}. Black: ${side("b")}.`;
+}
+
 // `lastMove` ({from, to}) and `check` (a square) are marked on the squares
 // under the pieces; they are what a player looks for first on a board they
 // did not just move on.
 export function interactiveBoard(
 	fen,
 	onMove,
-	{ size = 320, flipped = false, lastMove = null, check = null } = {},
+	{ size = 320, flipped = false, lastMove = null, check = null, label = null } = {},
 ) {
 	const wrap = document.createElement("div");
 	wrap.className = "an-board";
 	const svg = boardSvg(fen, size, { flipped });
 	wrap.appendChild(svg);
+	// A picture of a board says nothing to a screen reader, so the pieces are
+	// also listed in words, hidden from sight, for the board to be described by.
+	if (label) svg.setAttribute("aria-label", label);
+	const desc = document.createElement("p");
+	desc.id = "an-board-desc";
+	desc.className = "sr-only";
+	desc.textContent = describePieces(fen);
+	svg.setAttribute("aria-describedby", desc.id);
+	wrap.appendChild(desc);
 	wrap._geom = { size, flipped };
 
 	const rectOf = (sq) => svg.querySelector(`rect[data-sq="${sq}"]`);
@@ -120,6 +151,14 @@ export function interactiveBoard(
 	function askPromotion() {
 		const box = document.createElement("div");
 		box.className = "an-promo";
+		box.setAttribute("role", "dialog");
+		box.setAttribute("aria-label", "Promote to");
+		// Escape backs out of the promotion, not out of the board around it
+		box.addEventListener("keydown", (e) => {
+			if (e.key !== "Escape") return;
+			e.stopPropagation();
+			cancel.click();
+		});
 		PROMO_PIECES.forEach(([piece, label]) => {
 			const b = document.createElement("button");
 			b.className = "an-promo-pick";
@@ -148,6 +187,7 @@ export function interactiveBoard(
 		};
 		box.appendChild(cancel);
 		wrap.appendChild(box);
+		box.querySelector("button").focus();
 	}
 
 	function squareOf(e) {

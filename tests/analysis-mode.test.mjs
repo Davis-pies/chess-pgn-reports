@@ -216,3 +216,114 @@ test("typing in the window is not cancelled: only Escape is the window's", async
 	}
 	assert.ok(app.view().querySelector(".an-overlay"), "and the window stayed open");
 });
+
+// ---- keyboard
+
+const tick = () => new Promise((r) => setTimeout(r, 0));
+const keydown = (node, key, opts = {}) =>
+	node.dispatchEvent(new app.dom.window.KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...opts }));
+
+test("the board is a modal dialog named by its heading", async () => {
+	app.reset();
+	await app.loadPgn(PGN);
+	app.view().querySelector(".an-toggle").click();
+	const win = app.view().querySelector(".an-window");
+	assert.strictEqual(win.getAttribute("role"), "dialog");
+	assert.strictEqual(win.getAttribute("aria-modal"), "true");
+	assert.strictEqual(app.dom.window.document.getElementById(win.getAttribute("aria-labelledby")).textContent, "Analysis");
+	assert.strictEqual(app.view().querySelector(".an-close").getAttribute("aria-label"), "Close the analysis board");
+	app.view().querySelector(".an-close").click();
+});
+
+test("a pressed button keeps the focus through the redraw it causes", async () => {
+	app.reset();
+	await app.loadPgn(PGN);
+	app.view().querySelector(".an-toggle").click();
+	await tick();
+	const doc = app.dom.window.document;
+	assert.ok(doc.activeElement.classList.contains("analysis"), "the panel has it on opening");
+	// a line to walk: 1.e4 e5, typed, then back to the start
+	for (const m of ["e4", "e5"]) {
+		const box = app.view().querySelector(".an-type");
+		box.value = m;
+		keydown(box, "Enter");
+	}
+	app.view().querySelector(".an-start").click();
+	await tick();
+	const fwd = app.view().querySelector(".an-fwd");
+	fwd.focus();
+	fwd.click();
+	await tick();
+	assert.ok(doc.activeElement.classList.contains("an-fwd"), "the new ▶ has it");
+	assert.notStrictEqual(doc.activeElement, fwd, "a new node: the panel was redrawn");
+	// at the end ▶ is disabled, so the panel takes it
+	app.view().querySelector(".an-end").focus();
+	app.view().querySelector(".an-end").click();
+	await tick();
+	assert.ok(doc.activeElement.classList.contains("analysis"));
+	app.view().querySelector(".an-close").click();
+});
+
+test("closing the board gives the focus back to what opened it", async () => {
+	app.reset();
+	await app.loadPgn(PGN);
+	const doc = app.dom.window.document;
+	app.view().querySelector(".an-toggle").focus();
+	app.view().querySelector(".an-toggle").click();
+	await tick();
+	keydown(app.view().querySelector(".an-overlay"), "Escape");
+	assert.strictEqual(app.view().querySelector(".an-overlay"), null);
+	assert.ok(doc.activeElement.classList.contains("an-toggle"));
+});
+
+test("Escape shuts the help, and only then the board", async () => {
+	app.reset();
+	await app.loadPgn(PGN);
+	const doc = app.dom.window.document;
+	app.view().querySelector(".an-toggle").click();
+	await tick();
+	keydown(doc.activeElement, "?");
+	await tick();
+	assert.ok(app.view().querySelector(".an-help"), "the help is open");
+	assert.ok(doc.activeElement.classList.contains("an-help-close"), "on its Close");
+	keydown(doc.activeElement, "Escape");
+	await tick();
+	assert.strictEqual(app.view().querySelector(".an-help"), null);
+	assert.ok(app.view().querySelector(".an-overlay"), "the board is still open");
+	keydown(doc.activeElement, "Escape");
+	assert.strictEqual(app.view().querySelector(".an-overlay"), null);
+});
+
+test("a move typed in the board's box is played, and the box keeps the focus", async () => {
+	app.reset();
+	await app.loadPgn(PGN);
+	const doc = app.dom.window.document;
+	app.view().querySelector(".an-toggle").click();
+	app.view().querySelector(".an-start").click();
+	await tick();
+	keydown(doc.activeElement, "m");
+	const box = app.view().querySelector(".an-type");
+	assert.strictEqual(doc.activeElement, box);
+	box.value = "d4";
+	keydown(box, "Enter");
+	await tick();
+	assert.match(app.view().querySelector(".an-line.active").textContent, /1\.d4/);
+	assert.ok(doc.activeElement.classList.contains("an-type"), "ready for the next move");
+	assert.strictEqual(doc.activeElement.value, "");
+	app.view().querySelector(".an-close").click();
+});
+
+test("Tab stays inside the board", async () => {
+	app.reset();
+	await app.loadPgn(PGN);
+	const doc = app.dom.window.document;
+	app.view().querySelector(".an-toggle").click();
+	await tick();
+	const close = app.view().querySelector(".an-close");
+	close.focus();
+	const e = new app.dom.window.KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true });
+	close.dispatchEvent(e);
+	assert.ok(e.defaultPrevented, "Shift+Tab from the first control wraps");
+	assert.ok(app.view().querySelector(".an-window").contains(doc.activeElement));
+	close.click();
+});

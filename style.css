@@ -1574,3 +1574,85 @@ sup {
 }
 .an-wb-name { flex: none; font-size: .72rem; color: var(--muted); min-width: 4.2rem; padding-top: .15rem; }
 .an-wb .an-showall { align-self: flex-start; }
+
+/* ---- keyboard and screen-reader support ---- */
+/* read out, never seen: the live region and the board's piece list */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+/* One visible focus ring for every control, shown for the keyboard only
+   (a mouse click does not light it). Inputs keep their border change, and
+   get the ring too, since a border alone is easy to miss. */
+:focus-visible {
+  outline: 2px solid var(--main);
+  outline-offset: 2px;
+}
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--main);
+  outline-offset: 0;
+}
+.analysis:focus-visible { outline: none; } /* focused only so the arrow keys land */
+.an-move:focus-visible,
+.an-pvmove:focus-visible {
+  outline-offset: 0;
+}
+/* Moves repeated from a line above were drawn at 45% opacity, which put them
+   under 3:1 against the panel; the muted text colour is faint and still reads. */
+.an-move.shared { opacity: 1; color: var(--muted); }
+.an-move.at { color: inherit; }
+.an-elide, .an-empty, .an-note-hint { opacity: 1; color: var(--muted); }
+
+.an-type-row { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.an-type { flex: 1; min-width: 10rem; font-size: .88rem; padding: 4px 8px; }
+.an-type[aria-invalid="true"] { border-color: var(--danger); }
+.an-type-msg { font-size: .8rem; color: var(--danger); }
+.an-type-msg:empty { display: none; }
+.an-help-open { background: none; border: 0; padding: 0; font: inherit; color: var(--main); text-decoration: underline; cursor: pointer; }
+
+.analysis { position: relative; }
+.an-help-wrap {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 1rem;
+  background: color-mix(in srgb, var(--bg) 60%, transparent);
+}
+.an-help { width: min(440px, 100%); }
+.an-help-keys { width: 100%; border-collapse: collapse; font-size: .9rem; margin-top: .5rem; }
+.an-help-keys th { text-align: left; font-weight: normal; padding: .25rem .75rem .25rem 0; white-space: nowrap; width: 1%; }
+.an-help-keys td { padding: .25rem 0; }
+.an-help-keys tr + tr > * { border-top: 1px solid var(--line); }
+.an-help-note { font-size: .82rem; color: var(--muted); margin: .75rem 0 0; }
+kbd {
+  font: inherit;
+  font-size: .85em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--head-bg);
+}
+
+/* Motion is decoration here; take it away for anyone who has asked for less. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}

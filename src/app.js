@@ -22,6 +22,7 @@ import {
 import { mergeAnnotations } from "./merge.js";
 import { buildPgn } from "./pgn-out.js";
 import { el } from "./dom.js";
+import { focusKey, restoreFocus, trapTab } from "./a11y.js";
 import {
   getCurrent,
   setCurrent,
@@ -293,6 +294,7 @@ function themeBtn() {
 // The workbook's lines through the position are shown beside the board's own
 // analysis, read from the workbook as it stands, not copied onto the board.
 export function openAnalysis(moves = []) {
+	if (getMode() !== "analysis") opener = focusKey($("view"), document.activeElement);
 	if (!getScratch()) setScratch(newScratch());
 	if (moves.length) openAt(getScratch(), moves);
 	setMode("analysis");
@@ -301,6 +303,10 @@ export function openAnalysis(moves = []) {
 
 function renderApp() {
   const v = $("view");
+  // The redraw below replaces the focused control with a copy; note which
+  // one it was, so the copy can have the focus back (see analysisOverlay).
+  const win = v.querySelector(".an-window");
+  keepFocus = win ? focusKey(win, document.activeElement) : null;
   computeShared(); // which lines carry each move (identical position + SAN)
   computeUnique(); // each line's first move unique to it among all lines
   assignLineNames(); // before anything reads a name (see line-editor.js)
@@ -467,6 +473,9 @@ function viewRoot() {
   return wrap;
 }
 
+let keepFocus = null; // which control of the board had the focus before a redraw
+let opener = null; // what opened the board, to have the focus back when it shuts
+
 // The analysis board as a window over the report rather than a page of its
 // own, so the table it was opened from stays in view behind it. It closes on
 // the ✕, Escape, or a click on the backdrop; the scratch is kept either way.
@@ -479,8 +488,14 @@ function analysisOverlay() {
     engine.pause();
     // pins and show-all last only while the board is open
     closeBoard(getScratch());
+    if (getScratch()) getScratch().help = false;
     setMode("report");
+    const back = opener;
+    opener = null;
     renderApp();
+    // The button that opened the board was redrawn with the rest of the page;
+    // its copy takes the focus back, so the keyboard is where it left off.
+    restoreFocus($("view"), back);
   };
   const ov = el("div", { className: "modal-overlay an-overlay" });
   ov.onclick = (e) => e.target === ov && close();
@@ -489,6 +504,7 @@ function analysisOverlay() {
   // every other key -- which swallowed all typing in the window's note box.
   ov.onkeydown = (e) => {
     if (e.key === "Escape") close();
+    else trapTab(ov, e);
   };
   const an = analysisPanel(getScratch(), renderApp, {
     onAdded: close,
@@ -496,7 +512,7 @@ function analysisOverlay() {
     flavors: sharedFlavors(),
   });
   const head = el("div", { className: "an-head" }, [
-    el("h3", { textContent: "Analysis" }),
+    el("h3", { id: "an-title", textContent: "Analysis" }),
     el("button", {
       className: "chip mini an-close",
       textContent: "✕",
@@ -504,10 +520,23 @@ function analysisOverlay() {
       onclick: close,
     }),
   ]);
-  ov.appendChild(el("div", { className: "modal an-window" }, [head, an]));
+  head.lastChild.setAttribute("aria-label", "Close the analysis board");
+  const win = el("div", { className: "modal an-window" }, [head, an]);
+  win.setAttribute("role", "dialog");
+  win.setAttribute("aria-modal", "true");
+  win.setAttribute("aria-labelledby", "an-title");
+  ov.appendChild(win);
   // Focus after the tree is live, so the arrow keys and Escape work without a
-  // click first. Re-render rebuilds and re-focuses it.
-  queueMicrotask(() => an.focus());
+  // click first. A redraw gives it back to the control that had it -- so Enter
+  // on ▶ can be pressed again and again -- or to the help's Close while the
+  // help is open, and otherwise to the panel.
+  const keep = keepFocus;
+  keepFocus = null;
+  queueMicrotask(() => {
+    const help = win.querySelector(".an-help-close");
+    if (help) help.focus();
+    else if (!restoreFocus(win, keep)) an.focus();
+  });
   return ov;
 }
 

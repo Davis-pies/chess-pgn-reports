@@ -432,3 +432,26 @@ export function unpackScratch(d) {
 	s.flipped = !!d.flipped;
 	return s;
 }
+
+// A move typed rather than played on the board -- the way in for a keyboard or
+// a screen reader. Takes SAN ("Nf3", "exd5", "O-O", "e8=Q"), with the check
+// marks, zeros for castling and a lower-case piece letter forgiven, or a
+// from-to pair ("g1f3", "e7e8q"). The SAN it comes to, or null if it is not a
+// legal move in the position on the board.
+export function typedMove(s, text) {
+	const t = String(text || "").trim().replace(/[+#!?]+$/, "").replace(/0/g, "O");
+	if (!t) return null;
+	const chess = replay(playedMoves(s));
+	const tries = [t];
+	if (/^[nrqk]/.test(t)) tries.push(t[0].toUpperCase() + t.slice(1));
+	if (/^o-o(-o)?$/i.test(t)) tries.push(t.toUpperCase());
+	for (const x of tries) {
+		try {
+			return chess.move(x).san;
+		} catch {
+			// not this reading; try the next
+		}
+	}
+	const m = /^([a-h][1-8])-?([a-h][1-8])=?([qrbn])?$/i.exec(t);
+	return m ? sanFor(s, m[1].toLowerCase(), m[2].toLowerCase(), m[3] && m[3].toLowerCase()) : null;
+}
