@@ -56,6 +56,7 @@ import { shareTools } from "./share-tools.js";
 import { formatScore, numberedFrom, whiteShare } from "./engine.js";
 import { FULL } from "./engine-store.js";
 import { getCurrent } from "./state.js";
+import { loadPrefs, savePrefs } from "./prefs.js";
 import { visibleLines } from "./visibility.js";
 
 // "1.e4 e5 2.Nf3". Deliberately not render.js's movesText: that one formats a
@@ -984,15 +985,26 @@ function workbookLines(scratch, herePos, onChange) {
 	const played = activeLine(scratch).moves;
 	const following = (l) =>
 		played.length >= herePos.length && played.every((m, k) => !l.moves[k] || l.moves[k].san === m.san) && played.length <= l.moves.length;
-	box.appendChild(
-		el("div", { className: "an-sec" }, [
-			el("span", {
-				textContent:
-					(herePos.length ? `Workbook lines through ${sanLabel(herePos.map((m) => m.san))}` : "Workbook lines") +
-					` (${lines.length})`,
-			}),
-		]),
-	);
+	// The heading folds the list away and back: a long workbook pushes the
+	// note box and the rest of the panel off the bottom, and some sittings
+	// want the board's own lines only. The fold is the viewer's, not the
+	// workbook's, so it is kept in prefs and lasts across boards and visits.
+	const collapsed = loadPrefs().wbCollapsed;
+	const toggle = el("button", {
+		// the ▸/▾ is drawn by the stylesheet, so the text is the heading alone
+		className: "an-wb-toggle" + (collapsed ? " collapsed" : ""),
+		textContent:
+			(herePos.length ? `Workbook lines through ${sanLabel(herePos.map((m) => m.san))}` : "Workbook lines") +
+			` (${lines.length})`,
+		title: collapsed ? "Show the workbook's lines" : "Hide the workbook's lines",
+		onclick: () => {
+			savePrefs({ wbCollapsed: !collapsed });
+			onChange();
+		},
+	});
+	toggle.setAttribute("aria-expanded", String(!collapsed));
+	box.appendChild(el("div", { className: "an-sec" }, [toggle]));
+	if (collapsed) return box;
 	if (!lines.length) {
 		box.appendChild(el("div", { className: "an-note-hint", textContent: "None: this position is new to the workbook." }));
 		return box;

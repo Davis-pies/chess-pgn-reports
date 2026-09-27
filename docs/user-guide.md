@@ -41,7 +41,10 @@ For a shorter overview see the [README](../README.md).
    board holds (click again for only the lines through here); both last until
    the board is closed. Where several lines are listed, each unselected one is
    a single row starting where it leaves the lines above it; the selected one
-   is written out in full. The board — its lines, notes, position and
+   is written out in full. The workbook's own lines through the position are
+   listed under the board's, under a **Workbook lines** heading; clicking the
+   heading folds that list away (▸) and back (▾), and the fold is remembered
+   in this browser. The board — its lines, notes, position and
    selection — is saved with the workbook (**Save** and **Save to file**
    alike) and comes back when it is opened, so analysis in progress survives
    a reload. With no PGN at all, **Start from a
@@ -259,7 +262,8 @@ For a shorter overview see the [README](../README.md).
 8. **Settings** — the **Settings** menu beside the theme button, and what the
    app remembers in this browser between visits: the theme, which way up new
    analysis boards start (the way the last one was left, or White/Black picked
-   here), the table panel's dragged width, and the saved workbook you were on
+   here), the table panel's dragged width, whether the analysis board's
+   workbook lines are folded, and the saved workbook you were on
    — reopened on the next visit with its board where you left it. **Reopen the
    last workbook on start** turns that off; **Forget settings** clears it all
    (saved workbooks are kept). A workbook never carries these: a file you send

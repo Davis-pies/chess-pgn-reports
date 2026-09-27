@@ -36,6 +36,7 @@ test("defaults when nothing is stored", () => {
 		sideWidth: null,
 		restore: true,
 		last: null,
+		wbCollapsed: false,
 	});
 });
 
@@ -46,18 +47,22 @@ test("saved fields round-trip and merge", () => {
 	assert.strictEqual(p.orientation, "black");
 	assert.strictEqual(p.sideWidth, 512);
 	assert.strictEqual(p.restore, true);
+	assert.ok(savePrefs({ wbCollapsed: true }));
+	assert.strictEqual(loadPrefs().wbCollapsed, true);
+	assert.strictEqual(loadPrefs().orientation, "black", "the other fields stay");
 });
 
 test("junk in storage falls back to defaults field by field", () => {
 	localStorage.setItem(
 		"ott-prefs",
-		JSON.stringify({ orientation: "sideways", sideWidth: "wide", restore: "no", last: { id: 7 } }),
+		JSON.stringify({ orientation: "sideways", sideWidth: "wide", restore: "no", last: { id: 7 }, wbCollapsed: "yes" }),
 	);
 	assert.deepStrictEqual(loadPrefs(), {
 		orientation: "white",
 		sideWidth: null,
 		restore: true,
 		last: null,
+		wbCollapsed: false,
 	});
 	localStorage.setItem("ott-prefs", "{not json");
 	assert.strictEqual(loadPrefs().orientation, "white");

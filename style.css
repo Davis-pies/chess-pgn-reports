@@ -2041,3 +2041,9 @@ kbd {
 		user-select: none;
 	}
 }
+
+/* the workbook-lines heading is its own fold toggle */
+.an-wb-toggle { all: unset; cursor: pointer; }
+.an-wb-toggle::before { content: "▾"; display: inline-block; width: 1em; }
+.an-wb-toggle.collapsed::before { content: "▸"; }
+.an-wb-toggle:focus-visible { outline: 2px solid var(--main); outline-offset: 2px; border-radius: .2rem; }
