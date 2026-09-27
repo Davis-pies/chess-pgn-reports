@@ -17,12 +17,15 @@ the same:
 
 ```bash
 npm ci
-npm run lint       # ESLint; `npm run lint:fix` fixes what it can
-npm run knip       # fails on unused files, exports or dependencies
-npm test           # node --test 'tests/**/*.test.mjs'
-npm run coverage   # CI fails below 97% lines, 87% branches, 97% functions
-npm run test:e2e   # Playwright browser tests in e2e/ (separate CI job)
+npm run check      # lint + knip + tests with coverage floors: CI's static and test jobs
+npm run test:e2e   # Playwright browser tests in e2e/ (CI's e2e job)
 ```
+
+Separately: `npm run lint` (ESLint, zero warnings; `npm run lint:fix`),
+`npm run knip` (unused files, exports or dependencies), `npm test` (the unit
+suite), `npm run coverage:check` (the suite with the 97/87/97 floors, set in
+`package.json`). In Claude Code on the web, `.claude/hooks/session-start.sh`
+installs dependencies at session start.
 
 Run a single test file with `node --test tests/pgn.test.mjs`. The browser tests
 need Chromium once (`npx playwright install chromium`); they start the dev

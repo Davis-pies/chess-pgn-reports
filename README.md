@@ -20,14 +20,17 @@ a `.json` file you keep.
   column you can open level by level, and clicking a move traces its whole
   line.
 - **Analyse** on an interactive board: play moves, build several lines at
-  once, write notes, and add what you found to the workbook. Stockfish 19
-  runs locally in your browser; nothing is sent anywhere.
+  once, write notes, and add what you found to the workbook. Save the board
+  as a PNG or SVG, or its lines as PGN. Stockfish 19 runs locally in your
+  browser; nothing is sent anywhere.
 - **Print** a paper-saving report (**Print → Save as PDF**): tables headed by
   the moves their lines share, sliced to fit the page, with footnotes and
   lettered sub-notes.
 - **Export** to PGN or Markdown, or save the whole workbook to a `.json` file.
 - **Update the PGN** under your annotations: notes, symbols and tags follow
   the moves to the new file, with a preview of anything that would be lost.
+- **Use it on a phone or tablet**: the layout stacks on narrow screens, and
+  touch gets swipe-to-step on the board and long-press menus in the table.
 - **Pick up where you left off**: the app remembers your theme, board
   orientation, panel width and last workbook in this browser (**Settings**).
 
@@ -72,14 +75,15 @@ importmap pointing at esm.sh, and a bundler would rewrite that to a
 deployed site. Any plain static server works too (`python3 -m http.server`),
 just without the reload.
 
-The checks CI runs on every pull request:
+The checks CI runs on every pull request (`npm run check` runs the first
+four together):
 
 | Command | What it checks |
 | ------- | -------------- |
-| `npm run lint` | ESLint (`npm run lint:fix` to auto-fix) |
+| `npm run lint` | ESLint, with warnings failing too (`npm run lint:fix` to auto-fix) |
 | `npm run knip` | no unused files, exports or dependencies |
 | `npm test` | the `node:test` suite under `tests/`, with jsdom for the DOM |
-| `npm run coverage` | the same suite with coverage (CI fails below 97% lines, 87% branches, 97% functions) |
+| `npm run coverage:check` | the same suite with coverage floors: 97% lines, 87% branches, 97% functions |
 | `npm run test:e2e` | browser tests in `e2e/`, Playwright + Chromium |
 
 The browser tests start the dev server themselves and drive the real page:

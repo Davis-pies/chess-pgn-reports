@@ -140,8 +140,10 @@ test("toggling a group records the key without rebuilding the panel", async () =
 	});
 	const box = notesPanel();
 	const g = box.querySelector("details.nt.ngroup");
-	// <details> fires `toggle` asynchronously, in a browser and in jsdom alike
-	const settle = () => new Promise((r) => setTimeout(r, 0));
+	// <details> fires `toggle` asynchronously, in a browser and in jsdom alike,
+	// so wait for the event itself rather than guess which tick it lands on
+	const settle = () =>
+		new Promise((r) => g.addEventListener("toggle", r, { once: true }));
 	g.open = false;
 	await settle();
 	assert.strictEqual(closedNotePaths.size, 1, "the close is recorded");

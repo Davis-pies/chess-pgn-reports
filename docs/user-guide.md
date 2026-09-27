@@ -70,13 +70,17 @@ For a shorter overview see the [README](../README.md).
      all notes** does that for every note on view (it adds and replaces, never
      clears). When the notebook's note on the move differs from the board's,
      the board shows it, so a save never overwrites one you could not see.
-   - **Copying** — **Copy FEN** for the position, **Copy PGN** for every line
-     on the board as one game with variations.
+   - **Copying and saving** — **Copy FEN** for the position, **Copy PGN** for
+     every line on the board as one game with variations. **Save PGN** writes
+     the same lines to a `.pgn` file, and **Save PNG** / **Save SVG** save a
+     picture of the board as it stands (the right way up for how it is
+     flipped).
    - **Engine** — **Engine off/on** runs Stockfish 19 *on your own device*,
      in a background worker: nothing is sent anywhere. Two builds:
      **Lite** (1.8 MB, bundled with the app, downloaded the first time you
      switch the engine on) and **Full** (99 MB, noticeably stronger).
-     Choosing Full offers a one-time download, which is kept in the browser
+     Choosing Full offers a one-time download, checked against a known
+     SHA-256 before it is used, which is kept in the browser
      (IndexedDB) so later visits start it from disk; if the download is
      blocked, you can download `stockfish-19-single.wasm` yourself from the
      [Stockfish.js releases](https://github.com/nmrugg/stockfish.js/releases/tag/v19.0.0)
@@ -227,3 +231,10 @@ For a shorter overview see the [README](../README.md).
    last workbook on start** turns that off; **Forget settings** clears it all
    (saved workbooks are kept). A workbook never carries these: a file you send
    someone does not bring your panel width with it.
+9. **Phones and tablets** — on a narrow screen the report stacks with the
+   toolbar first, and the table scrolls sideways in its own box rather than
+   widening the page. The analysis window becomes a full-screen sheet; in
+   landscape the board is sized to the height so it and its step buttons fit.
+   On a touch screen the controls grow to finger size, a sideways swipe on the
+   board steps through the moves, and a long press on a table move opens its
+   menu (the same one right-click opens on a desktop).

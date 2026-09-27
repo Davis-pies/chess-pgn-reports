@@ -1550,6 +1550,8 @@ sup {
 .an-msg:empty { display: none; }
 .an-msg { font-size: .85rem; color: var(--warn); overflow-wrap: anywhere; white-space: pre-wrap; max-height: 8rem; overflow: auto; }
 .an-tools { flex-wrap: wrap; gap: .3rem; padding-top: .5rem; border-top: 1px solid var(--line); }
+.an-share { flex-wrap: wrap; gap: .3rem; padding-top: .5rem; border-top: 1px solid var(--line); }
+.an-share + .an-tools { border-top: none; padding-top: .3rem; }
 .an-engine-acts { gap: .3rem; }
 .an-full { display: flex; flex-direction: column; gap: .35rem; font-size: .82rem; padding: .4rem .5rem; border-radius: 6px; background: color-mix(in srgb, var(--main) 7%, transparent); }
 .an-full[hidden] { display: none; }
