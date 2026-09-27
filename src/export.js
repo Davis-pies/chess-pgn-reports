@@ -152,8 +152,6 @@ export function exportBar() {
     ]),
   );
   pOpts.append(
-    // the report's head: its title, the PGN's opening and game, and the tally
-    group("Report", [["summary at the top", "printSummary", true]]),
     cards,
     table,
     // Applies everywhere a line's name would prefix a note — the notes panel,

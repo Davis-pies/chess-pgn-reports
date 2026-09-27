@@ -192,18 +192,18 @@ test("exportBar's print options toggle state and trigger a re-render", () => {
   const boxes = [...bar.querySelectorAll('.printopts input[type="checkbox"]')];
   assert.strictEqual(
     boxes.length,
-    10,
-    "one report option, three card options, five table options, one notes option",
+    9,
+    "three card options, five table options, one notes option",
   );
-  // defaults: summary printed; cards printed, final-position on,
-  // latest-divergence off; table printed with borders, one row per ply, no
-  // stripes, branch lines; footnote line names off
+  // defaults: cards printed, final-position on, latest-divergence off;
+  // table printed with borders, one row per ply, no stripes, branch lines;
+  // footnote line names off
   assert.deepStrictEqual(
     boxes.map((b) => b.checked),
-    [true, true, true, false, true, true, false, false, true, false],
+    [true, true, false, true, true, false, false, true, false],
   );
-  boxes[3].checked = true;
-  boxes[3].onchange({ target: boxes[3] });
+  boxes[2].checked = true;
+  boxes[2].onchange({ target: boxes[2] });
   assert.strictEqual(s.showFirstDivBoard, true);
   assert.strictEqual(renders, 1);
   off();

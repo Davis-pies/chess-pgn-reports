@@ -53,9 +53,10 @@ test("full app flow: import PGN, tag a line, render table preview", async () => 
 	view = doc("view");
 	// Now in labeling view: line editors + a live table preview
 	assert.ok(view.querySelector(".markup"), "tagging panel present");
-	// headed by the report's summary, on screen and in print
+	// headed by the report's summary: on screen only, left off paper
 	const head = view.querySelector(".side-panel > .report-head");
 	assert.ok(head, "report summary heads the preview");
+	assert.ok(head.classList.contains("noprint"), "not printed");
 	assert.strictEqual(head.querySelector(".rh-counts").textContent, "2 lines · to move 2");
 	assert.ok(view.querySelector("table.tbl"), "table preview rendered");
 	// main + 1 variation -> 2 line editors
