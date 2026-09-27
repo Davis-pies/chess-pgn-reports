@@ -1,4 +1,4 @@
-import { test, expect, loadPgn, FIXTURE } from "./fixtures.mjs";
+import { test, expect, loadPgn, openApp, FIXTURE } from "./fixtures.mjs";
 
 test("pasted PGN opens as a table with one column per line", async ({ page }) => {
   await loadPgn(page);
@@ -21,13 +21,19 @@ test("a PGN file loads straight into the report", async ({ page }) => {
 });
 
 test("a PGN with no moves is refused and the import panel stays", async ({ page }) => {
-  await page.goto("./");
-  const dialog = page.waitForEvent("dialog");
+  await openApp(page);
+  // Dismissed from inside the listener, the moment it opens: awaiting the
+  // dialog and dismissing it afterwards raced the click, and now and then the
+  // dismiss never landed and the test timed out.
+  const message = new Promise((resolve) =>
+    page.once("dialog", (d) => {
+      resolve(d.message());
+      d.dismiss().catch(() => {});
+    }),
+  );
   await page.locator("textarea.pgnin").fill('[Event "empty"]\n\n*');
   await page.getByRole("button", { name: "Load & Tag" }).click();
-  const d = await dialog;
-  expect(d.message()).toBe("No moves found in PGN");
-  await d.dismiss();
+  expect(await message).toBe("No moves found in PGN");
   await expect(page.locator("textarea.pgnin")).toBeVisible();
   await expect(page.locator(".toolbar")).toHaveCount(0);
 });
