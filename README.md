@@ -32,7 +32,78 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    it doesn't forget which line you had promoted, so unticking restores the
    table you had. PGN export is the exception: a `.pgn` has no way to say "no
    mainline", so it keeps writing the first line as the trunk.
-3. **Render** — a table (plies down, lines across), or a linear
+3. **Analyse** — **Analysis** in the toolbar opens an interactive board in a
+   window over the report (close it with ✕, Esc or a click outside), or
+   right-click any move (in the table or the line editor) and choose **Analyse
+   from here** to open it at that position; **Analysis** in the toolbar opens
+   it at the start. Every notebook line through the position comes onto the
+   board, whole and with its notes — from the toolbar, the whole workbook.
+   The list then **follows the cursor**: it shows the lines through the
+   position on the board, so stepping into a branch leaves the lines that do
+   not lead there out of view, and stepping back brings them in again. Lines
+   explored on the board are kept the same way. **📌** pins a line in view
+   wherever you go, and **show all … on the board** lists every line the
+   board holds (click again for only the lines through here); both last until
+   the board is closed. Where several lines are listed, each unselected one is
+   a single row starting where it leaves the lines above it; the selected one
+   is written out in full. The board — its lines, notes, position and
+   selection — is saved with the workbook (**Save** and **Save to file**
+   alike) and comes back when it is opened, so analysis in progress survives
+   a reload. With no PGN at all, **Start from a
+   board** on the import screen opens it on the opening position: the first
+   line you add becomes the new notebook's mainline, so a repertoire can be
+   built from nothing.
+   - **Playing** — drag a piece or click it then its square (a finger works
+     too). Legal squares are dotted, captures ringed; the last move and a king
+     in check are highlighted; a promotion asks for the piece. The status line
+     says whose move it is, and names checkmate, stalemate and the draws.
+   - **Lines** — diverging from a position you have already visited keeps
+     both continuations, so you can build up several lines in one sitting
+     without losing the one you came from. Each line's moves repeated from a
+     line above are drawn faintly; a line the notebook already holds is
+     badged **in notebook**. ↑/↓ reorder lines (the first is the trunk of the
+     copied PGN), ✕ deletes one, and **✂ Delete from here** cuts the selected
+     line after the current move. **Clear lines** deletes the lines on view.
+     **↶ Undo** reverses the last delete, cut or clear. The toolbar's
+     **Analysis** reopens the board as you left it.
+   - **Keys** — ← → step, Home/End jump, ↑ ↓ switch line at the same move,
+     F flips, E toggles the engine, Space plays the engine's best move.
+   - **Notes** — the box under the lines holds a note on the move just
+     played, which goes into the notebook with the line. For a move the
+     notebook already has, **Save note to notebook** puts it straight in (on
+     every notebook line through the move) without adding a line, and **Save
+     all notes** does that for every note on view (it adds and replaces, never
+     clears). When the notebook's note on the move differs from the board's,
+     the board shows it, so a save never overwrites one you could not see.
+   - **Copying** — **Copy FEN** for the position, **Copy PGN** for every line
+     on the board as one game with variations.
+   - **Engine** — **Engine off/on** runs Stockfish 19 *on your own device*,
+     in a background worker: nothing is sent anywhere. Two builds:
+     **Lite** (1.8 MB, bundled with the app, downloaded the first time you
+     switch the engine on) and **Full** (99 MB, noticeably stronger).
+     Choosing Full offers a one-time download, which is kept in the browser
+     (IndexedDB) so later visits start it from disk; if the download is
+     blocked, you can download `stockfish-19-single.wasm` yourself from the
+     [Stockfish.js releases](https://github.com/nmrugg/stockfish.js/releases/tag/v19.0.0)
+     and load the file. **Remove download** frees the space again. The engine
+     shows an eval bar beside the board, the top lines (1–5) with scores from
+     White's side, and arrows for their first moves. Click any move in a line
+     to play the line up to it. Search depth is a number box (0 = no limit);
+     **Go deeper** keeps searching a finished position, and **Note eval**
+     writes the verdict into the current move's note.
+     Evaluations are cached per position, so stepping back to a position shows
+     its best result at once, and a search picks up from the depth already
+     reached instead of starting over (the engine's own hash table is kept
+     between positions too, so the re-search is fast).
+   Nothing reaches the notebook until you press **+ Line** or **+ Footnote** on
+   a line's row (a line the notebook has is badged **in notebook** instead), or
+   **Add all lines on view**; a line goes in as a sideline you can then tag like
+   any other, or as a footnote. Adding closes the window; if the line cannot be added
+   (it has no moves, or the notebook already has it) the window stays open and
+   says why.
+   To correct a wrong move, analyse from the move before it, play the right one,
+   add it, and hide the old line.
+4. **Render** — a table (plies down, lines across), or a linear
    **card** view (each table row with a board diagram of its end position) for
    print — footnotes don't get their own card, since they're not a table row.
    Boards use the open-source **cburnett** piece set (white + black) with
@@ -126,18 +197,18 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    possible, rather than filling each table to its column limit: a stray line
    that would cut a table's heading back to move two, and leave it thirty rows
    of mostly empty column, gets a small table of its own instead.
-4. **Export** — **Export PGN** (editable chess notation for any chess app),
+5. **Export** — **Export PGN** (editable chess notation for any chess app),
    **Export Markdown** (paste into Google Docs/Word), or **Print → Save as
    PDF** (always the linear card view). Saved workbooks (`localStorage`) are
    listed under **My saved workbooks** on the import screen to reopen/delete.
-5. **Save and reload as a file** — **Save to file** asks for a name (prefilled
+6. **Save and reload as a file** — **Save to file** asks for a name (prefilled
    with the workbook's current one) and writes the whole workbook, PGN and all
    annotations together, to one `.json` you can back up, share or keep in
    version control; the import screen reopens one. It's the same format
    `localStorage` holds, so nothing is lost either way. A file opens with no
    `localStorage` id of its own — pressing **Save** files it as a new entry
    rather than overwriting one.
-6. **Update the PGN under your annotations** — **Update PGN…** replaces the
+7. **Update the PGN under your annotations** — **Update PGN…** replaces the
    moves without throwing the markup away. Notes and symbols are re-attached by
    **move path**, so a note on a move several lines share reaches all of them,
    however the new PGN re-cuts the lines around it; a line's own name, tag,
@@ -200,6 +271,14 @@ Because it's fully client-side, the same URL works on your phone's browser.
 | `src/notes-view.js` | the on-screen Notes list, grouped into collapsible `<details>` |
 | `src/store.js` | the workbook format: `localStorage` and `.json` file persistence, and re-applying a saved workbook's annotations to freshly parsed lines |
 | `src/merge.js` | re-homing a workbook's annotations onto a NEW PGN — move-path matching for notes/symbols, longest-prefix matching for line attributes, plus the report of what could not be carried |
+| `src/analysis.js` | the analysis board's scratch lines: play / fork / cut / reorder / undo, position status, commit shape |
+| `src/board-input.js` | the interactive board over `render.js`'s SVG: click, drag and touch input, promotion, highlights, arrows |
+| `src/analysis-view.js` | the analysis window: board, lines, notes, engine box, commit bar |
+| `src/analysis-commit.js` | the only write from the board into the notebook (line + regenerated PGN) |
+| `src/engine.js` | local Stockfish in a Web Worker over UCI: search sequencing, per-position eval cache, SAN conversion, swapping builds |
+| `src/engine-store.js` | the full build's one-time download (with progress and mirror fallback) and its IndexedDB copy |
+| `src/engine-flavor.js` | which build runs (lite/full), the download box's state, the viewer's preference |
+| `vendor/stockfish/` | Stockfish 19 single-threaded (lite bundled, full loader) WebAssembly build (GPL-3.0, unmodified) |
 | `src/app.js` | browser glue: import, tag buttons, orientation toggle, print |
 
 A variation's first move is an **alternative at the same ply** as the move it
@@ -208,6 +287,10 @@ replaces (standard PGN `(1... e5)` semantics).
 ## License
 
 The project's own source is released under the [MIT](LICENSE) license.
+
+The analysis engine in `vendor/stockfish/` is Stockfish (Stockfish.js),
+distributed unmodified under the GNU GPL v3; it runs as a separate program in
+a Web Worker. See [vendor/stockfish/README.md](vendor/stockfish/README.md).
 
 The chess piece graphics in `assets/pieces.svg` are third-party work by
 Wikimedia Commons user *Cburnett*, used under the BSD 3-clause license. See

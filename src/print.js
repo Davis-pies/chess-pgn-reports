@@ -132,8 +132,23 @@ function offshoot(mainV, lines, index) {
     }
     return out;
   };
+  // Note markers are gathered from every line on the table, not just the one
+  // the moves were read off: a note on a stem move belongs to whichever line
+  // owns that node, and the stem is the only place the move is printed on
+  // this table. Except the moves the table shares with the mainline: those are
+  // the mainline's, annotated once, in the mainline's table -- a note on one
+  // is copied onto every line through it, and marking it again on every later
+  // table that happens to pass through that move is noise.
+  const noteByPly = {};
+  for (const m of moves) {
+    if (m.ply < mainShared) continue;
+    const refs = new Set();
+    for (const v of lines)
+      ((v.noteByPly && v.noteByPly[m.ply]) || []).forEach((n) => refs.add(n));
+    if (refs.size) noteByPly[m.ply] = [...refs].sort((a, b) => a - b);
+  }
   return {
-    stem: { tag: "mainline", moves, marks: pick("marks"), noteByPly: pick("noteByPly") },
+    stem: { tag: "mainline", moves, marks: pick("marks"), noteByPly },
     cols,
   };
 }
@@ -207,7 +222,7 @@ export function appendPrintTables(box, g) {
       const s = el("div", { className: "print-stem" });
       // the stem's moves, marks and note markers: every column states these
       // moves, and the rows that carried the markers are gone
-      buildCardMoves(s, off ? off.stem : { ...mainV, moves: mainV.moves.slice(0, stem) });
+      buildCardMoves(s, off ? off.stem : { ...referenceFor(mainV, i), moves: mainV.moves.slice(0, stem) });
       wrap.appendChild(s);
     }
     renderTable(wrap, {
@@ -221,7 +236,7 @@ export function appendPrintTables(box, g) {
       fromPly: stem,
       byMove: getCurrent().printByMove === true,
     });
-    renderTableNotes(wrap, off ? lines : [mainV, ...lines], i === 0 && !off);
+    renderTableNotes(wrap, lines, { mainV, showMain: i === 0 && !off });
   });
   box.appendChild(wrap);
 }
@@ -253,24 +268,27 @@ function notesForVar(v) {
 // A table's notes rendered beneath it in the print report. `showMain` includes
 // the mainline's notes (first table only — the mainline column repeats in
 // every packed table).
-function renderTableNotes(wrap, vars, showMain) {
+function renderTableNotes(wrap, lines, { mainV, showMain }) {
   const rows = [];
   // Notes are shared: the editor writes one note onto every line in an
   // equal-position group, and identical PGN comment text at the same ply
-  // collapses to a single note in allNotes(). So dedupe ACROSS lines here —
-  // notesForVar only dedupes within one line.
-  const seen = new Set();
-  // Skipping the mainline var is not enough to keep its notes off later
+  // collapses to a single note in allNotes(). So dedupe ACROSS lines here --
+  // notesForVar only dedupes within one line. Every table lists the notes it
+  // marks, so it stands on its own, like the rest of the printed report.
+  //
+  // The mainline's notes are listed under the mainline's table and nowhere
+  // else. Skipping the mainline var is not enough to keep them off later
   // tables: a note written on the mainline is copied onto every line in its
   // equal-position group, so a sideline in a later table carries it too and
-  // would reprint it. Suppress the mainline's notes by number instead.
+  // would reprint it. Suppress the mainline's notes by number instead -- on
+  // every later table, including one headed by its own stem, which has no
+  // mainline column at all.
   const mainOnly = new Set();
-  if (!showMain) {
-    const mainV = vars.find((v) => v.tag === "mainline");
-    if (mainV) notesForVar(mainV).forEach((n) => mainOnly.add(n.n));
-  }
+  const main = mainV && !mainV.synthetic ? mainV : null;
+  if (main && !showMain) notesForVar(main).forEach((n) => mainOnly.add(n.n));
+  const vars = showMain && main ? [main, ...lines] : lines;
+  const seen = new Set();
   vars.forEach((v) => {
-    if (v.tag === "mainline" && !showMain) return;
     notesForVar(v).forEach((n) => {
       if (seen.has(n.n) || mainOnly.has(n.n)) return;
       seen.add(n.n);
@@ -317,10 +335,22 @@ function renderTableNotes(wrap, vars, showMain) {
 // leave it.
 function tableShape(mainV, lines, index) {
   const { off, stem, maxPly, rows } = tableRows(mainV, lines, index);
-  const pv = off ? printVars(stemRef(off.stem.moves), off.cols) : printVars(mainV, lines);
+  const pv = off ? printVars(stemRef(off.stem.moves), off.cols) : printVars(referenceFor(mainV, index), lines);
   // columns beside the mainline reference, where there is one
   const width = pv.length - (off || mainV.synthetic ? 0 : 1);
   return { off, pv, stem, maxPly, width, rows };
+}
+
+// The mainline as a later table's reference column: its moves and symbols,
+// but not its note markers. Its notes are listed under the mainline's own
+// table, and a note on a mainline move is copied onto every line through that
+// move -- so marking it again in every later table that repeats the mainline
+// is a marker pointing at a note that table does not list.
+const quiet = new WeakMap();
+function referenceFor(mainV, index) {
+  if (index === 0 || mainV.synthetic) return mainV;
+  if (!quiet.has(mainV)) quiet.set(mainV, { ...mainV, noteByPly: {} });
+  return quiet.get(mainV);
 }
 
 // The part of a table's shape that does not need its columns built: cheap
@@ -328,13 +358,20 @@ function tableShape(mainV, lines, index) {
 function tableRows(mainV, lines, index) {
   const maxPly = index === 0 ? subMaxPly([mainV, ...lines]) : subMaxPly(lines);
   const off = offshoot(mainV, lines, index);
-  const stem = off ? off.stem.moves.length : stemLength([mainV, ...lines]);
+  // The table carrying the mainline states it whole, from move one: it is the
+  // reference the rest of the report is read against, and a stem above it
+  // would take the mainline's opening moves out of its own column.
+  const carriesMain = index === 0 && !mainV.synthetic;
+  const stem = off ? off.stem.moves.length : carriesMain ? 0 : stemLength([mainV, ...lines]);
   return { off, stem, maxPly, rows: Math.max(maxPly - stem + 1, 0) };
 }
 
 // What a table costs on paper beyond its rows: its header row, the stem above
 // it and the gap its notes block leaves before the next one.
 const TABLE_OVERHEAD = 3;
+
+// A table narrower than this is small: see combineSmall.
+const MIN_COLS = 4;
 
 // Cut the lines into print tables, in the order the report lays them out (a
 // fork's lines adjacent), using as little paper as possible.
@@ -355,9 +392,9 @@ const TABLE_OVERHEAD = 3;
 // search back from j stops at the first i that no longer fits.
 // The cut depends only on the lines' moves (and which is the mainline), not
 // on anything else a redraw changes -- and the report redraws the print tables
-// on every edit, hidden on screen. So the last cut is kept, as where each
-// table ends, and reused while the moves are the same.
-let lastCut = { key: null, ends: null };
+// on every edit, hidden on screen. So the last cut is kept, as which lines
+// each table holds, and reused while the moves are the same.
+let lastCut = { key: null, cut: null };
 
 function packForPrint(mainV, lines, size) {
   const order = orderedLeaves(mainV, lines);
@@ -366,20 +403,51 @@ function packForPrint(mainV, lines, size) {
     mainV.synthetic ? "" : mainV.moves.map((m) => m.san).join(" "),
     ...order.map((l) => l.moves.map((m) => m.san).join(" ")),
   ].join("|");
-  if (lastCut.key === key) return rebuild(order, lastCut.ends);
-  const tables = packFresh(mainV, order, size);
-  let end = 0;
-  lastCut = { key, ends: tables.map((t) => (end += t.length)) };
+  if (lastCut.key === key) return rebuild(order, lastCut.cut);
+  const tables = combineSmall(mainV, packFresh(mainV, order, size), size);
+  lastCut = { key, cut: tables.map((t) => t.map((l) => order.indexOf(l))) };
   return tables;
 }
 
-function rebuild(order, ends) {
-  let start = 0;
-  return ends.map((end) => {
-    const t = order.slice(start, end);
-    start = end;
-    return t;
+// A kept cut, as tables of this render's lines.
+function rebuild(order, cut) {
+  return cut.map((at) => at.map((k) => order[k]));
+}
+
+// The cut above is by paper alone, and paper alone is happy to leave a line
+// or two on a table of their own: a table a column or two wide, which reads
+// as a scrap on the page. So, once the cut is made, the small tables leave
+// their places and their lines are packed together, in report order, into an
+// "odds and ends" table (or as many as they need) at the end of the report.
+// The first table stays where it is, small or not, when it carries the
+// mainline.
+function combineSmall(mainV, tables, size) {
+  const width = (lines, i) => tableShape(mainV, lines, i).width;
+  const keep = [];
+  const odds = [];
+  tables.forEach((t, i) => {
+    // the first table stays only when it carries the mainline
+    if ((i > 0 || mainV.synthetic) && width(t, i) < MIN_COLS) odds.push(...t);
+    else keep.push(t);
   });
+  if (!odds.length) return tables;
+  // Shortest first: a table is as tall as its longest line, so lines of a
+  // length share a table rather than a one-move stub waiting down the column
+  // of a forty-move line. Split evenly across as few tables as the column cap
+  // allows, so the last is not a lone scrap of its own.
+  odds.sort((a, b) => a.moves.length - b.moves.length);
+  const per = Math.ceil(odds.length / Math.ceil(odds.length / size));
+  let cur = [];
+  const close = () => {
+    keep.push(cur);
+    cur = [];
+  };
+  for (const l of odds) {
+    if (cur.length && (cur.length >= per || width([...cur, l], 1) > size)) close();
+    cur.push(l);
+  }
+  close();
+  return keep;
 }
 
 function packFresh(mainV, order, size) {

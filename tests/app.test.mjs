@@ -704,10 +704,9 @@ test("a note added at a shared move still reaches a hidden line", async () => {
 
 	const box = doc("view").querySelector(".markup .cedit");
 	assert.ok(box, "the comment editor opened");
-	box.querySelector("input.lno").value = "shared idea";
-	[...box.querySelectorAll("button")]
-		.find((b) => b.textContent === "Add note")
-		.click();
+	const inp = box.querySelector(".nt.new input");
+	inp.value = "shared idea";
+	inp.dispatchEvent(new (doc("view").ownerDocument.defaultView.Event)("input"));
 	await tick();
 
 	assert.ok(

@@ -28,6 +28,7 @@ const MIME = {
 	".png": "image/png",
 	".jpg": "image/jpeg",
 	".ico": "image/x-icon",
+	".wasm": "application/wasm",
 	".woff2": "font/woff2",
 	".pgn": "application/x-chess-pgn; charset=utf-8",
 	".md": "text/plain; charset=utf-8",

@@ -48,6 +48,20 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 ```
 
+## Chess engine — `vendor/stockfish/`
+
+`stockfish-19-lite-single.js`, `stockfish-19-lite-single.wasm` and
+`stockfish-19-single.js` (and `stockfish-19-single.wasm`, which is not stored
+here but downloaded by the app on request) are **Stockfish 19** as compiled to WebAssembly by the Stockfish.js project
+(Nathan Rugg / Chess.com), taken unmodified from the `stockfish` npm package,
+version 19.0.0. They are licensed under the **GNU General Public License,
+version 3**; the full text is in `vendor/stockfish/COPYING.txt`.
+
+The engine is a separate program: the app starts it in a Web Worker and
+exchanges UCI text commands with it, and does not link or modify it. Source
+code: <https://github.com/official-stockfish/Stockfish> and
+<https://github.com/nmrugg/stockfish.js>.
+
 ## Runtime dependency
 
 `chess.js` (ISC) is used for SAN legality checking and FEN generation. It is a

@@ -32,7 +32,15 @@ import {
   setSharedInfo,
   setRenderHooks,
   setTraced,
+  getMode,
+  setMode,
+  getScratch,
+  setScratch,
 } from "./state.js";
+import { analysisPanel } from "./analysis-view.js";
+import { closeBoard, newScratch, openAt, packScratch, unpackScratch } from "./analysis.js";
+import { sharedEngine } from "./engine.js";
+import { sharedFlavors } from "./engine-flavor.js";
 import { allNotes } from "./notes.js";
 import {
   visibleLines,
@@ -46,7 +54,7 @@ import {
   collectKeys,
   renderTrieNode,
 } from "./trie-view.js";
-import { lineEditor } from "./line-editor.js";
+import { assignLineNames, lineEditor } from "./line-editor.js";
 import { exportBar, download, slug } from "./export.js";
 import { notesPanel } from "./notes-view.js";
 
@@ -90,12 +98,15 @@ setCurrent(freshState());
 openPaths.clear();
 openTablePaths.clear();
 setTraced(null);
+setMode("report");
+setScratch(null);
 closedNotePaths.clear();
 // Point the extracted view modules' callbacks at *this* app.js instance --
 // see the comment on setRenderHooks() in state.js for why this indirection
 // (rather than a static `import ... from "./app.js"`) is necessary.
 setRenderHooks({
   renderApp,
+  openAnalysis,
   rerenderTable,
   rerenderMarkup,
   rerenderNotes,
@@ -243,6 +254,8 @@ function workbookState() {
     name: c.name,
     pgn: c.pgn,
     lines: c.lines,
+    // analysis in progress travels with the workbook
+    analysis: packScratch(getScratch()),
     view: {
       boardSize: c.boardSize,
       cardFont: c.cardFont,
@@ -275,10 +288,26 @@ function themeBtn() {
   return b;
 }
 
+// Open Analysis mode at a position -- from a move, the position after it;
+// from the toolbar (no moves), the start. Every notebook line through the
+// position comes onto the board (see openAt), so the toolbar brings in the
+// whole workbook, and the list narrows to the lines through wherever the
+// cursor goes. Lines explored earlier are kept and come back the same way.
+// Hidden notebook lines stay out: they are out of every other view too.
+// Lines come in as copies, so exploring never reaches back into the notebook.
+export function openAnalysis(moves = [], from = null) {
+	if (!getScratch()) setScratch(newScratch());
+	const lines = visibleLines(getCurrent().lines);
+	openAt(getScratch(), moves, lines, from || lines.find((l) => l.isMain) || null);
+	setMode("analysis");
+	renderApp();
+}
+
 function renderApp() {
   const v = $("view");
   computeShared(); // which lines carry each move (identical position + SAN)
   computeUnique(); // each line's first move unique to it among all lines
+  assignLineNames(); // before anything reads a name (see line-editor.js)
   v.replaceChildren();
   v.appendChild(viewRoot());
 }
@@ -287,12 +316,17 @@ function viewRoot() {
   const wrap = el("div", { className: "app" });
   if (!getCurrent().lines.length) {
     wrap.appendChild(importPanel());
+    if (getMode() === "analysis") wrap.appendChild(analysisOverlay());
     return wrap;
   }
   const top = el("div", { className: "toolbar" });
   top.appendChild(
     el("button", {
       onclick: () => {
+        // Starting over goes back to the report: an analysis board of the
+        // notebook you just discarded is not a place to land.
+        setMode("report");
+        setScratch(null);
         setCurrent(
           freshState({
             boardSize: getCurrent().boardSize,
@@ -304,6 +338,13 @@ function viewRoot() {
       },
       className: "chip",
       textContent: "New / Import",
+    }),
+  );
+  top.appendChild(
+    el("button", {
+      className: "chip an-toggle",
+      textContent: "Analysis",
+      onclick: () => openAnalysis(),
     }),
   );
   const name = el("input", {
@@ -426,7 +467,52 @@ function viewRoot() {
     "--card-font",
     cardFont() / 100 + "rem",
   );
+  if (getMode() === "analysis") wrap.appendChild(analysisOverlay());
   return wrap;
+}
+
+// The analysis board as a window over the report rather than a page of its
+// own, so the table it was opened from stays in view behind it. It closes on
+// the ✕, Escape, or a click on the backdrop; the scratch is kept either way.
+function analysisOverlay() {
+  if (!getScratch()) setScratch(newScratch());
+  const engine = sharedEngine();
+  // Closing stops the engine's search but keeps its switch, so it is back on
+  // where it was the next time the board opens.
+  const close = () => {
+    engine.pause();
+    // pins and show-all last only while the board is open
+    closeBoard(getScratch());
+    setMode("report");
+    renderApp();
+  };
+  const ov = el("div", { className: "modal-overlay an-overlay" });
+  ov.onclick = (e) => e.target === ov && close();
+  // A block body, not `e.key === "Escape" && close()`: an on-handler that
+  // returns false cancels the event, and that expression returns false for
+  // every other key -- which swallowed all typing in the window's note box.
+  ov.onkeydown = (e) => {
+    if (e.key === "Escape") close();
+  };
+  const an = analysisPanel(getScratch(), renderApp, {
+    onAdded: close,
+    engine,
+    flavors: sharedFlavors(),
+  });
+  const head = el("div", { className: "an-head" }, [
+    el("h3", { textContent: "Analysis" }),
+    el("button", {
+      className: "chip mini an-close",
+      textContent: "✕",
+      title: "Close (Esc)",
+      onclick: close,
+    }),
+  ]);
+  ov.appendChild(el("div", { className: "modal an-window" }, [head, an]));
+  // Focus after the tree is live, so the arrow keys and Escape work without a
+  // click first. Re-render rebuilds and re-focuses it.
+  queueMicrotask(() => an.focus());
+  return ov;
 }
 
 function notebookList() {
@@ -479,6 +565,9 @@ function installNotebook(nb, id) {
   if (!nodes.length) throw new Error("that workbook has no moves.");
   const lines = applyNotebook(nb, collectLines(nodes));
   const view = nb.view || {};
+  // the workbook's own board, or none: a board left from the workbook open
+  // before this one is not this workbook's analysis
+  setScratch(unpackScratch(nb.analysis));
   setCurrent(
     freshState({
       id,
@@ -807,7 +896,15 @@ function importPanel() {
     textContent: "Load & Tag",
     onclick: () => loadPgnText(ta.value),
   });
-  box.append(ta, el("div", { className: "importbar" }, [go]));
+  // No PGN to start from: play the lines in on the board instead. The first
+  // one added becomes the mainline, and the notebook opens around it.
+  const fromBoard = el("button", {
+    className: "chip an-fromboard",
+    textContent: "Start from a board",
+    title: "Play your lines on an analysis board and add them to a new notebook",
+    onclick: () => openAnalysis(),
+  });
+  box.append(ta, el("div", { className: "importbar" }, [go, fromBoard]));
 
   // Loading from a file. Two sources, so two buttons that say which is which,
   // stacked rather than side by side: they are alternatives, not a pair of

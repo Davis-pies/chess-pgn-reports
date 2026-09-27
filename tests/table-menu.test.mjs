@@ -69,6 +69,7 @@ test("right-clicking a line's move offers the move and the line", () => {
 	assert.ok(menu.querySelector(".sympick"), "the editor's symbol picker");
 	assert.ok(menu.querySelector(".cedit"), "the editor's note editor");
 	assert.deepStrictEqual(items(menu), [
+		"Analyse from here",
 		"★ Make mainline",
 		"Move to footnote",
 		"Focus",
@@ -96,7 +97,7 @@ test("a group column's menu acts on every line under it and offers no promote", 
 	const menu = rightClick(box, "d6");
 	assert.deepStrictEqual(
 		items(menu),
-		["Move to footnote", "Focus", "Hide"],
+		["Analyse from here", "Move to footnote", "Focus", "Hide"],
 		"no Make mainline: a group is not one line",
 	);
 	assert.ok(menu.querySelector(".sympick"), "but its shared move is editable");
@@ -114,7 +115,13 @@ test("the mainline is offered none of the line controls", () => {
 	const off = installDom();
 	const { box } = preview();
 	const menu = rightClick(box, "e5"); // a mainline-only move
-	assert.deepStrictEqual(items(menu), [], "no promote, hide, focus or footnote");
+	// Analysing from a mainline move is exactly how you add a variation to it,
+	// so it stays; what the mainline is refused is the LINE controls.
+	assert.deepStrictEqual(
+		items(menu),
+		["Analyse from here"],
+		"no promote, hide, focus or footnote",
+	);
 	assert.ok(menu.querySelector(".tmenu-note"), "and says why");
 	assert.ok(menu.querySelector(".sympick"), "but its moves are still editable");
 	closeTableMenu();
@@ -303,21 +310,23 @@ test("the menu refreshes itself after a symbol is picked inside it", () => {
 	off();
 });
 
-test("the menu refreshes itself after a note is added inside it", () => {
+test("a note typed in the menu is saved and another box opens, without a rebuild", () => {
 	const off = installDom();
 	const { box } = preview();
 	const menu = rightClick(box, "d4");
-	assert.strictEqual(menu.querySelectorAll(".cedit .nt").length, 0);
-	const input = menu.querySelector(".cedit input");
+	assert.strictEqual(menu.querySelectorAll(".cedit .nt:not(.new)").length, 0);
+	assert.ok(
+		![...menu.querySelectorAll("button")].some((b) => b.textContent === "Add note"),
+		"there is no Add note button",
+	);
+	const input = menu.querySelector(".cedit .nt.new input");
 	input.value = "a note";
-	input.oninput && input.oninput();
-	[...menu.querySelectorAll(".cedit button")]
-		.find((b) => b.textContent === "Add note")
-		.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
-	assert.strictEqual(
-		document.querySelectorAll(".tmenu .cedit .nt").length,
-		1,
-		"the note it just added is listed",
+	input.dispatchEvent(new window.Event("input", { bubbles: true }));
+	assert.strictEqual(input.isConnected, true, "the box typed in was not rebuilt");
+	assert.strictEqual(menu.querySelectorAll(".cedit .nt").length, 2);
+	assert.ok(
+		getCurrent().lines.some((l) => (l.comments || []).some((c) => c.text === "a note")),
+		"the note is on the line",
 	);
 	closeTableMenu();
 	off();
@@ -387,29 +396,6 @@ test("the table offers Hide all and Show all", () => {
 	off();
 });
 
-test("Enter saves a note from the menu, and the menu shows it", () => {
-	const off = installDom();
-	const { s, box } = preview();
-	const menu = rightClick(box, "d4");
-	const add = [...menu.querySelectorAll(".cedit input")].at(-1);
-	add.value = "from the menu";
-	// a real dispatch: Enter goes through add.click(), which is what the menu's
-	// own rebuild listens for
-	add.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-	const line = s.lines.find((l) => l.moves.some((m) => m.san === "d4"));
-	assert.deepStrictEqual(
-		(line.comments || []).map((c) => c.text),
-		["from the menu"],
-	);
-	assert.strictEqual(
-		document.querySelectorAll(".tmenu .cedit .nt").length,
-		1,
-		"and the menu lists it without being reopened",
-	);
-	closeTableMenu();
-	off();
-});
-
 test("the menu draws the position after the move it was opened on", () => {
 	const off = installDom();
 	const { box } = preview();
@@ -455,11 +441,9 @@ test("a note on a group's move lands on every line under it", () => {
 	const off = installDom();
 	const { s, box } = preview();
 	const menu = rightClick(box, "d6");
-	const add = [...menu.querySelectorAll(".cedit input")].at(-1);
+	const add = menu.querySelector(".cedit .nt.new input");
 	add.value = "shared from the group column";
-	add.dispatchEvent(
-		new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
-	);
+	add.dispatchEvent(new window.Event("input", { bubbles: true }));
 	const under = s.lines.filter((l) => l.moves.some((m) => m.san === "d6"));
 	assert.ok(
 		under.every((l) =>

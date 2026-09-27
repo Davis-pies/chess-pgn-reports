@@ -2,6 +2,7 @@ import { fenAt } from "./pgn.js";
 import { appendBoard, fullmoveLabel } from "./render.js";
 import { el } from "./dom.js";
 import {
+	buildTrie,
 	defaultLineName,
 	isDefaultLineName,
 	mainOf,
@@ -12,8 +13,45 @@ import { getCurrent, getSharedInfo, getRenderHooks } from "./state.js";
 import { NAGS, markSym, markOf, nagFor } from "./nags.js";
 import { numberNotes } from "./notes.js";
 import { branchContext } from "./export.js";
-import { visibleLines, setHidden, isFocused } from "./visibility.js";
+import { visibleLines, hiddenLines, setHidden, isFocused } from "./visibility.js";
 import { focusLines, clearFocus } from "./trie-view.js";
+
+// Settle every placeholder name before anything is drawn.
+//
+// lineEditor writes a line's placeholder ("Line 7") back onto it as it draws,
+// numbered by where the editor draws it. Everything else -- the table
+// headers, the printed tables, the exports -- reads that name back. Left to
+// the editor alone, anything drawn before it in the same render read the
+// previous render's names: blank right after a load, and one out after
+// ticking No mainline renumbered every line. So the numbering is done here,
+// once, at the start of each render, walking the lines in exactly the order
+// the editor draws them: the mainline, then the visible lines (grouped by
+// their trie, or flat), then the hidden drawer's, which carries on the count.
+// A name the user typed is left alone.
+export function assignLineNames() {
+	const cur = getCurrent();
+	if (!cur || !cur.lines.length) return;
+	const main = mainOf(cur.lines);
+	let n = 1;
+	const name = (l, idx) => {
+		if (!l.name || isDefaultLineName(l.name)) l.name = defaultLineName(isMainLine(l), idx);
+	};
+	const walk = (node) =>
+		node.children.forEach((c) => {
+			if (c.leaf) name(c.leaf, n++);
+			walk(c);
+		});
+	if (!noMain()) name(main, 0);
+	const shown = visibleLines(cur.lines);
+	if (cur.groupView === "flat") {
+		shown.forEach((l) => {
+			if (!isMainLine(l)) name(l, n++);
+		});
+	} else walk(buildTrie(shown, main));
+	const hid = buildTrie(hiddenLines(cur.lines), main);
+	if (hid.leaf) name(hid.leaf, n++);
+	walk(hid);
+}
 
 export function lineEditor(l, idx, showBoard = false) {
 	const row = el("div", { className: "ledge" });
@@ -372,6 +410,23 @@ export function movePanel(l) {
 	}
 	box.appendChild(symbolRow(atEnd ? null : selPly, lines, cur));
 	if (!atEnd) box.appendChild(commentEditor(selPly, lines));
+	// Branching from a move needs every move before it, since a line is a
+	// root-to-leaf path. Reached through the hooks registry rather than a
+	// static import of app.js: this module is a seam, and a static binding
+	// would keep pointing at the first app.js instance a test loaded.
+	if (!atEnd)
+		box.appendChild(
+			el("button", {
+				type: "button",
+				className: "chip mini",
+				textContent: "Analyse from here",
+				onclick: () =>
+					getRenderHooks().openAnalysis(
+						l.moves.filter((m) => m.ply <= selPly),
+						l,
+					),
+			}),
+		);
 	const done = el("button", {
 		type: "button",
 		className: "chip mini",
@@ -416,18 +471,45 @@ export function commentEditor(ply, lines) {
 		});
 	};
 	const texts = snapshot(); // live row order; edits update this array
-	texts.forEach((_, i) => {
-		const row = el("div", { className: "nt" });
-		const inp = el("input", { className: "lno", value: texts[i] });
-		inp.oninput = () => {
-			texts[i] = inp.value;
-			writeAll(texts);
-		};
+	// One row per note, then an empty box. Every keystroke saves: there is no
+	// Add button to forget. The first keystroke in the empty box makes it a
+	// note and opens a fresh empty box beneath it, so the next note always has
+	// somewhere to go. Nothing here redraws the editor, which would steal the
+	// focus mid-word; only the table and the notes list, which show the note
+	// and live outside it, are redrawn.
+	const addRow = (i) => {
+		const isNew = i === texts.length;
+		const row = el("div", { className: "nt" + (isNew ? " new" : "") });
+		const inp = el("input", {
+			className: "lno",
+			value: isNew ? "" : texts[i],
+			placeholder: isNew ? (i ? "add another note…" : "note at this move…") : "",
+		});
 		const del = el("button", {
 			type: "button",
 			className: "chip mini danger",
 			textContent: "✕",
+			hidden: isNew,
 		});
+		inp.oninput = () => {
+			if (row.classList.contains("new")) {
+				row.classList.remove("new");
+				del.hidden = false;
+				texts.push("");
+				addRow(texts.length);
+			}
+			texts[i] = inp.value;
+			writeAll(texts);
+			const hooks = getRenderHooks();
+			hooks.rerenderTable?.();
+			hooks.rerenderNotes?.();
+		};
+		// Enter moves on to the empty box, for the next note.
+		inp.onkeydown = (e) => {
+			if (e.key !== "Enter") return;
+			e.preventDefault();
+			wrap.querySelector(".nt.new input")?.focus();
+		};
 		del.onclick = () => {
 			texts.splice(i, 1);
 			writeAll(texts);
@@ -435,35 +517,7 @@ export function commentEditor(ply, lines) {
 		};
 		row.append(inp, del);
 		wrap.appendChild(row);
-	});
-	const addInp = el("input", {
-		className: "lno",
-		placeholder: texts.length ? "add another note…" : "note at this move…",
-	});
-	const add = el("button", {
-		type: "button",
-		className: "chip",
-		textContent: "Add note",
-	});
-	add.onclick = () => {
-		if (addInp.value.trim()) {
-			texts.push(addInp.value.trim());
-			writeAll(texts);
-			addInp.value = "";
-			getRenderHooks().renderApp();
-		}
 	};
-	// Enter saves, so a note can be typed and committed without leaving the
-	// keyboard. Routed through add.click() rather than calling the handler
-	// directly, so it is the same DISPATCHED event as a real click: the table's
-	// context menu rebuilds itself on clicks inside .cedit, and a handler called
-	// straight would add the note but leave the menu still showing the empty
-	// field it was typed into.
-	addInp.onkeydown = (e) => {
-		if (e.key !== "Enter") return;
-		e.preventDefault();
-		add.click();
-	};
-	wrap.append(addInp, add);
+	for (let i = 0; i <= texts.length; i++) addRow(i);
 	return wrap;
 }
