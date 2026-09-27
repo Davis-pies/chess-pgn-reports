@@ -12,6 +12,7 @@
     "lint:fix": "eslint . --fix",
     "coverage": "node --test --experimental-test-coverage --test-coverage-exclude='tests/**' 'tests/**/*.test.mjs'",
     "knip": "knip",
+    "test:e2e": "playwright test",
     "bench": "node tools/bench.mjs"
   },
   "keywords": [
@@ -29,6 +30,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.56.1",
     "eslint": "^10.9.0",
     "fake-indexeddb": "^6.2.5",
     "globals": "^17.11.0",

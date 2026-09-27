@@ -505,11 +505,13 @@ test("opening a saved notebook carries forward the dragged side panel width", as
 
 	// drag the side-resize handle to a non-default width
 	const handle = doc("view").querySelector(".side-resize");
-	handle.dispatchEvent(new dom.window.Event("mousedown"));
+	// pointer events, which a mouse and a finger both send; jsdom's
+	// MouseEvent carries clientX under any type name
+	handle.dispatchEvent(new dom.window.MouseEvent("pointerdown"));
 	dom.window.document.dispatchEvent(
-		new dom.window.MouseEvent("mousemove", { clientX: 555 }),
+		new dom.window.MouseEvent("pointermove", { clientX: 555 }),
 	);
-	dom.window.document.dispatchEvent(new dom.window.MouseEvent("mouseup"));
+	dom.window.document.dispatchEvent(new dom.window.MouseEvent("pointerup"));
 	assert.strictEqual(
 		dom.window.document.documentElement.style.getPropertyValue("--side-w"),
 		"555px",

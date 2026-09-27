@@ -5,23 +5,14 @@
 // layout pass the change forces, not only the script. BENCH_SIZES=50,200 picks
 // the sizes (variations per workbook).
 //
-// Needs Playwright, which is not a dependency of the app: it is taken from
-// node_modules if present, else from the global install (`npm i -g
-// playwright`). Set CHROMIUM to use a browser binary of your own.
+// Uses the browser tests' Playwright and Chromium (`npx playwright install
+// chromium` once). The page is served from this checkout, and chess.js from
+// node_modules, as in e2e/fixtures.mjs.
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
-import { createRequire } from "node:module";
 import { join, extname, resolve } from "node:path";
+import { chromium } from "@playwright/test";
 import { genPgn } from "./gen-pgn.mjs";
-
-const require = createRequire(import.meta.url);
-let chromium;
-try {
-	({ chromium } = require("playwright"));
-} catch {
-	const g = require("node:child_process").execSync("npm root -g").toString().trim();
-	({ chromium } = require(join(g, "playwright")));
-}
 
 const ROOT = resolve(new URL("..", import.meta.url).pathname);
 const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml" };
@@ -39,9 +30,7 @@ await new Promise((r) => server.listen(0, "127.0.0.1", r));
 const base = `http://127.0.0.1:${server.address().port}/`;
 
 const SIZES = (process.env.BENCH_SIZES || "50,200,800").split(",").map(Number);
-const browser = await chromium.launch({
-	executablePath: process.env.CHROMIUM || undefined,
-});
+const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
 // the importmap points at esm.sh; serve the installed copy instead, so the
 // run needs no network and measures the version the tests pin

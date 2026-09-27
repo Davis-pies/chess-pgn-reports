@@ -128,7 +128,17 @@ export function analysisPanel(
 			play(scratch, san);
 			onChange();
 		},
-		{ flipped: scratch.flipped, size: BOARD_SIZE, lastMove: pos.lastMove, check: pos.check },
+		{
+			flipped: scratch.flipped,
+			size: BOARD_SIZE,
+			lastMove: pos.lastMove,
+			check: pos.check,
+			onSwipe: (dir) => {
+				if (dir > 0) forward(scratch);
+				else back(scratch);
+				onChange();
+			},
+		},
 	);
 	const bar = el("div", { className: "an-evalbar" + (scratch.flipped ? " flipped" : "") }, [
 		el("div", { className: "an-evalfill" }),
@@ -171,6 +181,13 @@ export function analysisPanel(
 		el("div", {
 			className: "an-keys",
 			textContent: "Keys: ← → step · Home/End · ↑ ↓ switch line · F flip" + (engine ? " · E engine · Space best move" : ""),
+		}),
+	);
+	// shown in place of the keys on a touch screen (see style.css)
+	left.appendChild(
+		el("div", {
+			className: "an-touch-hint",
+			textContent: "Swipe the board left or right to step through the moves",
 		}),
 	);
 
