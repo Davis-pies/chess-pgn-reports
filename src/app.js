@@ -629,7 +629,7 @@ function openNotebook(id) {
 function loadPgnText(text) {
   withLoading(() => {
     try {
-      const { nodes } = parsePgn(text);
+      const { nodes, moreGames } = parsePgn(text);
       if (!nodes.length) {
         alert("No moves found in PGN");
         return;
@@ -646,6 +646,10 @@ function loadPgnText(text) {
         }),
       );
       renderApp();
+      if (moreGames)
+        alert(
+          "Only the first game was loaded: this PGN holds more than one game (or text after the result).",
+        );
     } catch (e) {
       alert("Could not read PGN: " + e.message);
     }
@@ -892,7 +896,10 @@ function importPanel() {
   const go = el("button", {
     className: "chip primary",
     textContent: "Load & Tag",
-    onclick: () => loadPgnText(ta.value),
+    onclick: () =>
+      ta.value.trim()
+        ? loadPgnText(ta.value)
+        : alert("Paste a PGN first, or load one with Load PGN file."),
   });
   // No PGN to start from: play the lines in on the board instead. The first
   // one added becomes the mainline, and the notebook opens around it.
@@ -919,7 +926,13 @@ function importPanel() {
   // says Load, and a file the user picked by name needs no second confirmation.
   pickPgn.onchange = () => {
     const f = pickPgn.files[0];
-    if (f) f.text().then(loadPgnText);
+    // cleared so picking the same file again (after fixing it on disk, say)
+    // still fires a change
+    pickPgn.value = "";
+    if (f)
+      f.text().then((t) =>
+        t.trim() ? loadPgnText(t) : alert(`${f.name} is empty.`),
+      );
   };
   const pickWb = el("input", {
     type: "file",
@@ -929,6 +942,7 @@ function importPanel() {
   });
   pickWb.onchange = () => {
     const f = pickWb.files[0];
+    pickWb.value = "";
     if (f) f.text().then(openWorkbookFile);
   };
   const fileBtn = (cls, label, input) =>
@@ -1005,7 +1019,7 @@ function openUpdateDialog() {
     pending = null;
     apply.disabled = true;
     try {
-      const { nodes } = parsePgn(ta.value);
+      const { nodes, moreGames } = parsePgn(ta.value);
       if (!nodes.length) {
         report.replaceChildren(
           el("p", { className: "bad", textContent: "No moves found in PGN." }),
@@ -1018,7 +1032,18 @@ function openUpdateDialog() {
       });
       pending = { pgn: ta.value, lines, keepDropped: keep.checked };
       apply.disabled = false;
-      report.replaceChildren(...reportNodes(r));
+      report.replaceChildren(
+        ...(moreGames
+          ? [
+              el("p", {
+                className: "bad",
+                textContent:
+                  "Only the first game is used: this PGN holds more than one game (or text after the result).",
+              }),
+            ]
+          : []),
+        ...reportNodes(r),
+      );
     } catch (e) {
       report.replaceChildren(
         el("p", {

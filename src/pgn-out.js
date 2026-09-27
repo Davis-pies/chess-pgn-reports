@@ -58,7 +58,10 @@ export function buildTree(lines) {
 	const rest = lines
 		.filter((l) => l !== main)
 		.map((l) => ({ l, d: divergence(l, main) }))
-		.sort((a, b) => a.d - b.d);
+		// shorter first among equals: a line that is a prefix of another
+		// must be placed before it, or the longer one swallows it and the
+		// shorter line has no moves of its own left to write
+		.sort((a, b) => a.d - b.d || a.l.moves.length - b.l.moves.length);
 
 	for (const { l } of rest) {
 		// the placed line sharing the most moves with l; ties go to the
@@ -73,7 +76,14 @@ export function buildTree(lines) {
 			}
 		}
 		const pd = divergence(l, parent);
-		const nodes = tailNodes(l, pd);
+		const { nodes: pn, start } = placed.get(parent);
+		// A line running past its parent's end has no parent move to replace.
+		// Hanging its tail on the parent's last move as-is wrote "(1... c5
+		// (2. Nf3))" -- an alternative to c5 that is White's move, which no
+		// reader (ours included) can parse. Re-stating that last move opens a
+		// variation that replaces it with itself and then carries on.
+		const past = pd - start >= pn.length && l.moves.length > pd;
+		const nodes = tailNodes(l, past ? pd - 1 : pd);
 		if (!nodes.length) {
 			// l duplicates its parent: no moves of its own, so it draws none —
 			// but it still needs a map, and its parent's is exactly right.
@@ -82,12 +92,11 @@ export function buildTree(lines) {
 			ownFirst.set(l, ownFirst.get(parent));
 			continue;
 		}
-		const { nodes: pn, start } = placed.get(parent);
 		// l replaces its parent's move at index pd, so the variation hangs on
-		// that move. A line running past its parent's end hangs on the last.
+		// that move; a line running past its parent's end hangs on the last.
 		const host = pn[Math.min(pd - start, pn.length - 1)];
 		host.variations.push(nodes);
-		placed.set(l, { nodes, start: pd });
+		placed.set(l, { nodes, start: past ? pd - 1 : pd });
 		// inherited moves come from the parent's map; a variation's first move
 		// shares a ply with the move it REPLACES, so the parent's entry at that
 		// ply must not be inherited — hence the strict `<`.
@@ -124,7 +133,7 @@ function fullmove(ply) {
 // Emits one run of moves into `out`. `forceNumber` starts true so the first
 // move of a run always carries its number — a variation opening on Black's
 // move must read "1... c5", not a bare "c5".
-function emitSeq(nodes, out) {
+function emitSeq(nodes, out, trunk = false) {
 	let forceNumber = true;
 	for (const n of nodes) {
 		if (n.ply % 2 === 0) out.push(fullmove(n.ply) + ".");
@@ -141,8 +150,20 @@ function emitSeq(nodes, out) {
 		// One brace group, not one per comment: a move can carry a line label
 		// and a note at once, and readers render two adjacent {} groups
 		// inconsistently.
-		if (n.comments.length) {
-			out.push("{" + n.comments.map(commentText).join(" ") + "}");
+		const comment = n.comments.length
+			? "{" + n.comments.map(commentText).join(" ") + "}"
+			: null;
+		// pgn.js reads a trunk comment that runs straight into "(" without
+		// closing punctuation as the variation's lead-in ("White threatened
+		// (…)") and moves it there. Written after the variations instead, it
+		// stays on this move when the file is imported again.
+		const late =
+			comment &&
+			trunk &&
+			n.variations.length &&
+			!/[.!?、。！？]$/.test(n.comments.map(commentText).join(" ").trim());
+		if (comment && !late) {
+			out.push(comment);
 			forceNumber = true;
 		}
 		for (const v of n.variations) {
@@ -151,6 +172,7 @@ function emitSeq(nodes, out) {
 			out.push("(" + inner.join(" ") + ")");
 			forceNumber = true;
 		}
+		if (late) out.push(comment);
 	}
 }
 
@@ -158,7 +180,7 @@ function emitSeq(nodes, out) {
 // move it follows, which is also how annotate() anchors notes and marks.
 export function writeMovetext(nodes, result) {
 	const out = [];
-	emitSeq(nodes, out);
+	emitSeq(nodes, out, true);
 	out.push(result);
 	const lines = [];
 	let line = "";
