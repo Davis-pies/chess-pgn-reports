@@ -1775,6 +1775,10 @@ sup {
 .an-wb-name { flex: none; font-size: .72rem; font-weight: 600; color: var(--muted); min-width: 4.2rem; padding-top: .2rem; }
 .an-wb .an-showall { align-self: flex-start; }
 
+/* analysis line names */
+.an-line-name { flex: none; font-weight: 600; font-size: .78rem; padding: .1rem .35rem; border-radius: .25rem; background: color-mix(in srgb, var(--main) 14%, transparent); white-space: nowrap; max-width: 10rem; overflow: hidden; text-overflow: ellipsis; }
+.an-line-name-input { flex: none; width: 9rem; font: inherit; font-size: .8rem; padding: .1rem .3rem; }
+
 /* Settings drop-down beside the theme button (see settings-view.js) */
 .settings {
   position: relative;

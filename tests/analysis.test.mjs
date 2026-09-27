@@ -211,6 +211,13 @@ import {
 	undo,
 	stepLine,
 	sharedPrefix,
+	undoLabel,
+	redo,
+	redoLabel,
+	rename,
+	moveToTop,
+	branchPoints,
+	stepBranch,
 } from "../src/analysis.js";
 
 const seed = (...m) => newScratch(m.map((san) => ({ san })));
@@ -295,20 +302,54 @@ test("the scratch as PGN: the first line is the trunk, the rest variations", () 
 	assert.match(scratchPgn(s), /1\. e4 e5 \(1\.\.\. c5\) \*/);
 });
 
-test("undo puts back what a delete took, once", () => {
+test("undo puts back what a delete took, and redo takes it again", () => {
 	const s = seed("e4", "e5");
 	goTo(s, 1);
 	play(s, "c5");
 	goTo(s, 1);
-	checkpoint(s);
+	checkpoint(s, "delete line");
 	removeLine(s, 0);
 	assert.strictEqual(s.lines.length, 1);
+	assert.strictEqual(undoLabel(s), "delete line");
 	undo(s);
 	assert.strictEqual(s.lines.length, 2);
 	assert.deepStrictEqual(sans(s), ["e4", "c5"]);
-	assert.strictEqual(s.undo, null);
+	assert.strictEqual(undoLabel(s), null);
+	assert.strictEqual(redoLabel(s), "delete line");
 	undo(s); // nothing left to undo
 	assert.strictEqual(s.lines.length, 2);
+	redo(s);
+	assert.strictEqual(s.lines.length, 1);
+	assert.strictEqual(redoLabel(s), null);
+	assert.strictEqual(undoLabel(s), "delete line");
+});
+
+test("undo goes back several steps, and a new change drops the redo", () => {
+	const s = seed("e4", "e5", "Nf3", "Nc6");
+	goTo(s, 3);
+	checkpoint(s, "delete from here");
+	truncate(s);
+	goTo(s, 2);
+	checkpoint(s, "delete from here");
+	truncate(s);
+	assert.deepStrictEqual(sans(s), ["e4", "e5"]);
+	undo(s);
+	undo(s);
+	assert.deepStrictEqual(sans(s), ["e4", "e5", "Nf3", "Nc6"]);
+	redo(s);
+	assert.deepStrictEqual(sans(s), ["e4", "e5", "Nf3"]);
+	checkpoint(s, "rename");
+	rename(s, 0, "Italian");
+	assert.strictEqual(redoLabel(s), null, "a new change forgets what could be redone");
+	undo(s);
+	assert.strictEqual(activeLine(s).name, undefined);
+});
+
+test("the undo history is capped", () => {
+	const s = seed("e4");
+	for (let i = 0; i < 80; i++) checkpoint(s, "x" + i);
+	assert.strictEqual(s.undo.length, 50);
+	assert.strictEqual(undoLabel(s), "x79");
 });
 
 test("up and down step between lines at the same move", () => {
@@ -499,4 +540,126 @@ test("unpacking trusts nothing in a hand-edited file", () => {
 	assert.strictEqual(s.flipped, false);
 	const noAt = unpackScratch({ lines: [{ moves: ["e4"] }] });
 	assert.strictEqual(noAt.at, 1, "no cursor: the end of the line");
+});
+
+// ---- no duplicate lines, names, move to top, branch points
+
+test("playing a move another line already has from here follows that line", () => {
+	const s = seed("e4", "e5", "Nf3");
+	goTo(s, 1);
+	play(s, "c5"); // line 1: e4 c5
+	select(s, 0);
+	goTo(s, 1);
+	play(s, "c5"); // not a third line
+	assert.strictEqual(s.lines.length, 2);
+	assert.strictEqual(s.active, 1);
+	assert.strictEqual(s.at, 2);
+});
+
+test("extending a line into one that already goes on drops the prefix", () => {
+	const s = seed("e4", "e5", "Nf3");
+	goTo(s, 1);
+	play(s, "c5");
+	truncate(s); // nothing after: no-op
+	s.lines.push({ moves: [{ san: "d4", ply: 0 }] });
+	// a fresh line of just 1.e4, noted and named, then 1...e5 played on it
+	s.lines.push({ moves: [{ san: "e4", ply: 0 }], comments: [{ ply: 0, text: "king pawn" }], name: "KP" });
+	s.active = 3;
+	s.at = 1;
+	play(s, "e5");
+	assert.strictEqual(s.lines.length, 3, "the one-move line went");
+	assert.deepStrictEqual(sans(s), ["e4", "e5", "Nf3"]);
+	assert.strictEqual(s.at, 2);
+	assert.deepStrictEqual(activeLine(s).comments, [{ ply: 0, text: "king pawn" }]);
+	assert.strictEqual(activeLine(s).name, "KP");
+});
+
+test("a line's own note wins over the prefix's on the same move", () => {
+	const s = seed("e4", "e5");
+	activeLine(s).comments = [{ ply: 0, text: "mine" }];
+	s.lines.push({ moves: [{ san: "e4", ply: 0 }], comments: [{ ply: 0, text: "theirs" }] });
+	s.active = 1;
+	s.at = 1;
+	play(s, "e5");
+	assert.strictEqual(s.lines.length, 1);
+	assert.deepStrictEqual(activeLine(s).comments, [{ ply: 0, text: "mine" }]);
+});
+
+test("opening on an empty board follows a line that is already there", () => {
+	const s = seed("e4", "e5");
+	s.lines.push({ moves: [] });
+	s.active = 1;
+	s.at = 0;
+	play(s, "e4");
+	assert.strictEqual(s.lines.length, 1);
+	assert.strictEqual(s.at, 1);
+});
+
+test("rename names a line, trims, and clears with an empty name", () => {
+	const s = seed("e4");
+	rename(s, 0, "  Open game ");
+	assert.strictEqual(activeLine(s).name, "Open game");
+	assert.strictEqual(toLine(activeLine(s), 3).name, "Open game", "the name goes into the notebook");
+	rename(s, 0, "   ");
+	assert.ok(!("name" in activeLine(s)));
+	assert.strictEqual(toLine(activeLine(s), 3).name, "Line 3");
+	rename(s, 9, "nothing there"); // no such line: nothing
+});
+
+test("names survive a save and load; bad ones are dropped", () => {
+	const s = seed("e4");
+	rename(s, 0, "KP");
+	const back = unpackScratch(JSON.parse(JSON.stringify(packScratch(s))));
+	assert.strictEqual(back.lines[0].name, "KP");
+	assert.ok(!("name" in unpackScratch({ lines: [{ moves: ["e4"], name: 5 }] }).lines[0]));
+	assert.ok(!("name" in packScratch(seed("d4")).lines[0]));
+});
+
+test("move to top makes a line the first, the selection following", () => {
+	const s = seed("e4");
+	goTo(s, 0);
+	play(s, "d4");
+	goTo(s, 0);
+	play(s, "c4");
+	moveToTop(s, 2);
+	assert.deepStrictEqual(s.lines.map((l) => l.moves[0].san), ["c4", "e4", "d4"]);
+	assert.strictEqual(s.active, 0);
+	moveToTop(s, 2);
+	assert.deepStrictEqual(s.lines.map((l) => l.moves[0].san), ["d4", "c4", "e4"]);
+	assert.strictEqual(s.active, 1);
+	moveToTop(s, 0); // already first
+	assert.strictEqual(s.lines[0].moves[0].san, "d4");
+});
+
+test("branch points are where the line meets another", () => {
+	const s = seed("e4", "e5", "Nf3", "Nc6", "Bb5");
+	goTo(s, 1);
+	play(s, "c5"); // leaves at 1
+	select(s, 0);
+	goTo(s, 3);
+	play(s, "d6"); // leaves at 3
+	select(s, 0);
+	s.lines.push({ moves: [{ san: "e4", ply: 0 }, { san: "e5", ply: 1 }] }); // a prefix: no branch
+	assert.deepStrictEqual(branchPoints(s), [1, 3]);
+	goTo(s, 5);
+	stepBranch(s, -1);
+	assert.strictEqual(s.at, 3);
+	stepBranch(s, -1);
+	assert.strictEqual(s.at, 1);
+	stepBranch(s, -1); // none before
+	assert.strictEqual(s.at, 1);
+	stepBranch(s, 1);
+	assert.strictEqual(s.at, 3);
+	stepBranch(s, 1); // none after
+	assert.strictEqual(s.at, 3);
+});
+
+test("a pin carries over when its line folds into another", () => {
+	const s = seed("e4", "e5");
+	s.lines.push({ moves: [{ san: "e4", ply: 0 }] });
+	pin(s, 1);
+	s.active = 1;
+	s.at = 1;
+	play(s, "e5");
+	assert.ok(activeLine(s).pinned);
 });
