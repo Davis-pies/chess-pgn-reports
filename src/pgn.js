@@ -15,15 +15,23 @@ function tokenize(mt) {
 	return mt.match(re) || [];
 }
 
-export function parsePgn(mt) {
-	// Tag pairs are read off, then stripped. Anchored per line and matched
-	// against the real tag-pair shape on purpose: a looser pattern removes ANY
-	// bracketed text anywhere, which also eats "[%...]" markers inside comments
-	// (an imported file's [%eval] or [%clk] annotations, say).
-	const TAG_LINE = /^[ \t]*\[([A-Za-z0-9_]+)\s+"((?:[^"\\]|\\.)*)"\][ \t]*$/gm;
+// Tag pairs are read off, then stripped. Anchored per line and matched
+// against the real tag-pair shape on purpose: a looser pattern removes ANY
+// bracketed text anywhere, which also eats "[%...]" markers inside comments
+// (an imported file's [%eval] or [%clk] annotations, say).
+const TAG_LINE = /^[ \t]*\[([A-Za-z0-9_]+)\s+"((?:[^"\\]|\\.)*)"\][ \t]*$/gm;
+
+// A PGN's tag pairs alone, without parsing its moves: the report reads them on
+// every redraw, and a full parse replays every move through chess.js.
+export function pgnTags(mt) {
 	const tags = {};
-	for (const m of mt.matchAll(TAG_LINE))
+	for (const m of String(mt || "").matchAll(TAG_LINE))
 		tags[m[1]] = m[2].replace(/\\(["\\])/g, "$1");
+	return tags;
+}
+
+export function parsePgn(mt) {
+	const tags = pgnTags(mt);
 	const cleaned = mt.replace(TAG_LINE, " ");
 	const tokens = tokenize(cleaned);
 	const ctx = { i: 0, result: "*", comments: [] };

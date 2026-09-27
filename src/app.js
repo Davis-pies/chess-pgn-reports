@@ -56,6 +56,7 @@ import {
 } from "./trie-view.js";
 import { assignLineNames, lineEditor } from "./line-editor.js";
 import { exportBar, download, slug } from "./export.js";
+import { appendReportSummary, reportSummary } from "./report-summary.js";
 import { notesPanel } from "./notes-view.js";
 
 // Canonical reset for `current`. Every "start over" path (New/Import, Load &
@@ -259,6 +260,7 @@ function workbookState() {
     view: {
       boardSize: c.boardSize,
       cardFont: c.cardFont,
+      printSummary: c.printSummary,
       printCards: c.printCards,
       printTables: c.printTables,
       printBorders: c.printBorders,
@@ -404,6 +406,9 @@ function viewRoot() {
   const g = grid(getCurrent().lines);
 
   // side: the preview (table, or print lines) with its own scroll, resizable
+  appendReportSummary(side, reportSummary(getCurrent(), g, allNotes()), {
+    print: getCurrent().printSummary !== false,
+  });
   const t = el("div", { className: "pv-table" });
   tableBox = t;
   t.appendChild(el("h3", { textContent: "Table" }));
@@ -579,6 +584,7 @@ function installNotebook(nb, id) {
       noMain: !!view.noMain,
       boardSize: view.boardSize || getCurrent().boardSize,
       cardFont: view.cardFont || getCurrent().cardFont,
+      printSummary: view.printSummary ?? getCurrent().printSummary,
       printCards: view.printCards ?? getCurrent().printCards,
       printTables: view.printTables ?? getCurrent().printTables,
       printBorders: view.printBorders ?? getCurrent().printBorders,

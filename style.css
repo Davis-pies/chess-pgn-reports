@@ -704,6 +704,20 @@ select:focus {
 .hidden {
   display: none !important;
 }
+/* the report's head: title, the PGN's opening and game, counts, verdicts */
+.report-head {
+  margin: 0 0 12px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.report-head h1 {
+  font-size: 1.2rem;
+  margin: 0 0 4px;
+  color: var(--text);
+}
+.report-head .rh-verdicts {
+  color: var(--text);
+}
 /* the horizontal table is rendered for print only; hidden on screen */
 .pv-htable {
   display: none;
@@ -1285,7 +1299,8 @@ sup {
      !important that reveals each section for print, hence the compound
      selectors and !important. */
   .pv-cards.noprint,
-  .pv-htable.noprint {
+  .pv-htable.noprint,
+  .report-head.noprint {
     display: none !important;
   }
   /* the screen-only label for this section. Printed it was both unwanted and

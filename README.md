@@ -197,10 +197,22 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
    possible, rather than filling each table to its column limit: a stray line
    that would cut a table's heading back to move two, and leave it thirty rows
    of mostly empty column, gets a small table of its own instead.
+   **The report opens with a summary**: its title (the notebook's name, or
+   the PGN's Opening and Variation when it has none), the PGN's ECO code and
+   opening, the source game's players, event and year when the header names
+   them, how many lines, footnote lines and notes follow and how deep they
+   go, and a tally of the lines' verdicts — White better, equal, unclear,
+   Black better — read from each line's end evaluation, or an assessment on
+   its last move. It heads the preview, the printed report (untick
+   **Report → summary at the top** to leave it off paper) and the Markdown
+   export.
 5. **Export** — **Export PGN** (editable chess notation for any chess app),
    **Export Markdown** (paste into Google Docs/Word), or **Print → Save as
    PDF** (always the linear card view). Saved workbooks (`localStorage`) are
    listed under **My saved workbooks** on the import screen to reopen/delete.
+   Export PGN keeps the imported file's header: its players, event, date and
+   tags like ECO and Opening go back out with the lines (Event is the
+   notebook's name when it has one).
 6. **Save and reload as a file** — **Save to file** asks for a name (prefilled
    with the workbook's current one) and writes the whole workbook, PGN and all
    annotations together, to one `.json` you can back up, share or keep in
@@ -267,6 +279,7 @@ Because it's fully client-side, the same URL works on your phone's browser.
 | `src/tree.js` | flatten the tree into root-to-leaf "lines" (mainline + each variation) |
 | `src/table.js` | tagged lines -> a ply-keyed cell grid shared by both layouts |
 | `src/group-cols.js` | grid -> grouped columns (a branch's shared moves in a column of their own), shared by the editor's table and the printed one |
+| `src/report-summary.js` | the report's head: title, PGN header facts, counts and the verdict tally, for print and Markdown |
 | `src/render.js` | grid -> DOM table (vertical/horizontal) + SVG board diagrams from FEN |
 | `src/notes-view.js` | the on-screen Notes list, grouped into collapsible `<details>` |
 | `src/store.js` | the workbook format: `localStorage` and `.json` file persistence, and re-applying a saved workbook's annotations to freshly parsed lines |

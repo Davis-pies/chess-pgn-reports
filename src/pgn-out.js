@@ -2,6 +2,7 @@ import { divergence } from "./tree.js";
 import { markNag, markSym } from "./nags.js";
 import { numberNotes } from "./notes.js";
 import { visibleLines } from "./visibility.js";
+import { pgnTags } from "./pgn.js";
 
 // Serializes the live editor state back to PGN.
 //
@@ -241,20 +242,34 @@ function tagValue(s) {
 		.replace(/"/g, '\\"');
 }
 
-// The full Seven Tag Roster. It is not decoration: importers (lichess,
-// chesstempo) reject or mangle a file that omits it, and the report has no
-// player or event data to put there, so the spec's "?" / "????.??.??"
-// placeholders stand in.
+// Tags the export must not copy from the source: Result is the export's own,
+// and a start position or ply count describes the source's movetext, not the
+// lines this file writes.
+const OWN_TAGS = new Set(["Result", "FEN", "SetUp", "PlyCount"]);
+
+// The full Seven Tag Roster, then the source PGN's other tags (ECO, Opening,
+// Annotator, ...). The roster is not decoration: importers (lichess,
+// chesstempo) reject or mangle a file that omits it. Its values come from the
+// PGN the workbook was loaded from, so an export does not strip the players
+// and event off a model game; what the source never said falls back to the
+// spec's "?" / "????.??.??" placeholders. Event is the workbook's name when it
+// has one: that is what the user called this analysis.
 function tagPairs(state, result) {
-	return [
-		["Event", state.name || "?"],
-		["Site", "?"],
-		["Date", "????.??.??"],
-		["Round", "?"],
-		["White", "?"],
-		["Black", "?"],
+	const src = pgnTags(state.pgn);
+	const roster = [
+		["Event", state.name || src.Event || "?"],
+		["Site", src.Site || "?"],
+		["Date", src.Date || "????.??.??"],
+		["Round", src.Round || "?"],
+		["White", src.White || "?"],
+		["Black", src.Black || "?"],
 		["Result", result],
-	]
+	];
+	const named = new Set(roster.map(([k]) => k));
+	const extra = Object.entries(src).filter(
+		([k]) => !named.has(k) && !OWN_TAGS.has(k),
+	);
+	return [...roster, ...extra]
 		.map(([k, v]) => `[${k} "${tagValue(v)}"]`)
 		.join("\n");
 }
