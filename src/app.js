@@ -435,7 +435,8 @@ function viewRoot() {
     className: "side-resize",
     title: "Drag to resize",
   });
-  handle.onmousedown = (e) => {
+  // Pointer events, so a finger on a tablet drags it as a mouse does.
+  handle.onpointerdown = (e) => {
     e.preventDefault();
     sideDragging = true;
   };
@@ -529,13 +530,14 @@ function analysisOverlay() {
   // Focus after the tree is live, so the arrow keys and Escape work without a
   // click first. A redraw gives it back to the control that had it -- so Enter
   // on ▶ can be pressed again and again -- or to the help's Close while the
-  // help is open, and otherwise to the panel.
+  // help is open, and otherwise to the panel. Without scrolling: on a phone
+  // the focus scrolled the sheet so the board sat under its header.
   const keep = keepFocus;
   keepFocus = null;
   queueMicrotask(() => {
     const help = win.querySelector(".an-help-close");
-    if (help) help.focus();
-    else if (!restoreFocus(win, keep)) an.focus();
+    if (help) help.focus({ preventScroll: true });
+    else if (!restoreFocus(win, keep)) an.focus({ preventScroll: true });
   });
   return ov;
 }
@@ -1216,15 +1218,17 @@ document.addEventListener("DOMContentLoaded", () => {
   if (saved) document.documentElement.dataset.theme = saved;
   renderApp();
   // drag-resize for the table panel (updates main margin to match)
-  document.addEventListener("mousemove", (e) => {
+  document.addEventListener("pointermove", (e) => {
     if (!sideDragging) return;
     const w = Math.max(280, Math.min(window.innerWidth * 0.7, e.clientX));
     getCurrent().sideWidth = w;
     document.documentElement.style.setProperty("--side-w", w + "px");
   });
-  document.addEventListener("mouseup", () => {
+  const stopSideDrag = () => {
     sideDragging = false;
-  });
+  };
+  document.addEventListener("pointerup", stopSideDrag);
+  document.addEventListener("pointercancel", stopSideDrag);
   // inject the cburnett piece sprite so board <use href="#wK"> works & prints,
   // then re-render once it's in the DOM
   fetch("assets/pieces.svg")

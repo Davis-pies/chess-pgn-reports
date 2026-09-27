@@ -44,7 +44,7 @@ export function restoreFocus(root, key) {
 	const all = root.querySelectorAll(key.sel);
 	const node = all[Math.min(key.n, all.length - 1)];
 	if (!node || node.disabled) return false;
-	node.focus();
+	node.focus({ preventScroll: true });
 	return true;
 }
 

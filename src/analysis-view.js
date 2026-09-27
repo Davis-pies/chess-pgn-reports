@@ -203,6 +203,11 @@ export function analysisPanel(
 			label: scratch.at
 				? `Board after ${spokenMove(scratch.at - 1, activeLine(scratch).moves[scratch.at - 1].san)}, ${pos.turn === "w" ? "White" : "Black"} to move`
 				: `Board at the start, White to move`,
+			onSwipe: (dir) => {
+				if (dir > 0) forward(scratch);
+				else back(scratch);
+				onChange();
+			},
 		},
 	);
 	const bar = el("div", { className: "an-evalbar" + (scratch.flipped ? " flipped" : "") }, [
@@ -265,6 +270,13 @@ export function analysisPanel(
 			"Keys: ← → step · Home/End · ↑ ↓ switch line · F flip" + (engine ? " · E engine · Space best move" : "") + " · ",
 			helpBtn,
 		]),
+	);
+	// shown in place of the keys on a touch screen (see style.css)
+	left.appendChild(
+		el("div", {
+			className: "an-touch-hint",
+			textContent: "Swipe the board left or right to step through the moves",
+		}),
 	);
 
 	// ---- right column: engine, lines, note, commit
