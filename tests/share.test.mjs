@@ -30,7 +30,10 @@ test("a saved board carries the pieces it draws and nothing it does not", () => 
 test("the panel's share row saves PGN and SVG files", async () => {
 	const done = installDom();
 	const saved = [];
-	URL.createObjectURL = (b) => (saved.push(b), "blob:x");
+	URL.createObjectURL = (b) => {
+		saved.push(b);
+		return "blob:x";
+	};
 	URL.revokeObjectURL = () => {};
 	const s = newScratch();
 	playAll(s, ["d4", "d5", "c4"]);
