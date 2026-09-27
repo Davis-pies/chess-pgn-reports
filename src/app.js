@@ -57,6 +57,7 @@ import {
 import { assignLineNames, lineEditor } from "./line-editor.js";
 import { exportBar, download, slug } from "./export.js";
 import { notesPanel } from "./notes-view.js";
+import { openLinkedPosition } from "./share-tools.js";
 
 // Canonical reset for `current`. Every "start over" path (New/Import, Load &
 // Tag, opening a saved notebook, a failed open) rebuilt this object from an
@@ -1185,7 +1186,10 @@ document.addEventListener("DOMContentLoaded", () => {
     saved = localStorage.getItem(THEME_KEY);
   } catch {}
   if (saved) document.documentElement.dataset.theme = saved;
+  // a position link opens the board there, on load or pasted into this tab
+  openLinkedPosition();
   renderApp();
+  window.addEventListener("hashchange", () => openLinkedPosition() && renderApp());
   // drag-resize for the table panel (updates main margin to match)
   document.addEventListener("mousemove", (e) => {
     if (!sideDragging) return;
