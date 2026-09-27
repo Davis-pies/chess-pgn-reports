@@ -351,7 +351,6 @@ function workbookState() {
     view: {
       boardSize: c.boardSize,
       cardFont: c.cardFont,
-      printSummary: c.printSummary,
       printCards: c.printCards,
       printTables: c.printTables,
       printBorders: c.printBorders,
@@ -539,8 +538,11 @@ function viewRoot() {
   const g = grid(getCurrent().lines);
 
   // side: the preview (table, or print lines) with its own scroll, resizable
+  // The summary is a reading aid on screen for now, not part of the printed
+  // report: it had its own "Report" print option, and was that group's only
+  // entry. appendReportSummary's print mode is kept for when it returns.
   appendReportSummary(side, reportSummary(getCurrent(), g, allNotes()), {
-    print: getCurrent().printSummary !== false,
+    print: false,
   });
   const t = el("div", { className: "pv-table" });
   tableBox = t;
@@ -762,7 +764,6 @@ function installNotebook(nb, id) {
       noMain: !!view.noMain,
       boardSize: view.boardSize || getCurrent().boardSize,
       cardFont: view.cardFont || getCurrent().cardFont,
-      printSummary: view.printSummary ?? getCurrent().printSummary,
       printCards: view.printCards ?? getCurrent().printCards,
       printTables: view.printTables ?? getCurrent().printTables,
       printBorders: view.printBorders ?? getCurrent().printBorders,
