@@ -429,7 +429,8 @@ function viewRoot() {
     className: "side-resize",
     title: "Drag to resize",
   });
-  handle.onmousedown = (e) => {
+  // Pointer events, so a finger on a tablet drags it as a mouse does.
+  handle.onpointerdown = (e) => {
     e.preventDefault();
     sideDragging = true;
   };
@@ -506,8 +507,9 @@ function analysisOverlay() {
   ]);
   ov.appendChild(el("div", { className: "modal an-window" }, [head, an]));
   // Focus after the tree is live, so the arrow keys and Escape work without a
-  // click first. Re-render rebuilds and re-focuses it.
-  queueMicrotask(() => an.focus());
+  // click first. Re-render rebuilds and re-focuses it. Without scrolling: on a
+  // phone the focus scrolled the sheet so the board sat under its header.
+  queueMicrotask(() => an.focus({ preventScroll: true }));
   return ov;
 }
 
@@ -1187,15 +1189,17 @@ document.addEventListener("DOMContentLoaded", () => {
   if (saved) document.documentElement.dataset.theme = saved;
   renderApp();
   // drag-resize for the table panel (updates main margin to match)
-  document.addEventListener("mousemove", (e) => {
+  document.addEventListener("pointermove", (e) => {
     if (!sideDragging) return;
     const w = Math.max(280, Math.min(window.innerWidth * 0.7, e.clientX));
     getCurrent().sideWidth = w;
     document.documentElement.style.setProperty("--side-w", w + "px");
   });
-  document.addEventListener("mouseup", () => {
+  const stopSideDrag = () => {
     sideDragging = false;
-  });
+  };
+  document.addEventListener("pointerup", stopSideDrag);
+  document.addEventListener("pointercancel", stopSideDrag);
   // inject the cburnett piece sprite so board <use href="#wK"> works & prints,
   // then re-render once it's in the DOM
   fetch("assets/pieces.svg")
