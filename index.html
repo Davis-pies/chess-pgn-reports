@@ -4,6 +4,15 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Chess Opening Theory Table Builder</title>
+    <!-- The saved theme, set before the first paint. app.js applies it too, but
+         only after the page has painted light, and body's background
+         transition then faded a dark-theme load in from white. -->
+    <script>
+      try {
+        var t = localStorage.getItem("ott-theme");
+        if (t) document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
     <link rel="stylesheet" href="style.css" />
     <script type="importmap">
       {

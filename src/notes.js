@@ -47,7 +47,38 @@ function anchorPly(parent, d) {
 // here, where the foot tree is BUILT, so every renderer — the notes panel,
 // print, Markdown and the PGN exporter — follows one gate instead of each
 // stripping the name itself.
+//
+// Numbering walks every line against every other, and one render asks for it
+// many times over -- the table, the cards, the print tables, the notes panel,
+// and every line editor's markers. Inside renderPass() the answer is kept for
+// the rest of the pass, keyed on the same lines (by identity, in order) and
+// the same options; outside one it is computed fresh every call.
+let passMemo = null; // [{ lines, footNames, result }] while a pass runs
+
+export function renderPass(fn) {
+	if (passMemo) return fn(); // nested: the outer pass owns the memo
+	passMemo = [];
+	try {
+		return fn();
+	} finally {
+		passMemo = null;
+	}
+}
+
+const sameLines = (a, b) =>
+	a.length === b.length && a.every((l, i) => l === b[i]);
+
 export function numberNotes(lines, opts = {}) {
+	if (!passMemo) return computeNotes(lines, opts);
+	const footNames = !!opts.footNames;
+	const hit = passMemo.find((m) => m.footNames === footNames && sameLines(m.lines, lines));
+	if (hit) return hit.result;
+	const result = computeNotes(lines, opts);
+	passMemo.push({ lines: lines.slice(), footNames, result });
+	return result;
+}
+
+function computeNotes(lines, opts) {
 	const entries = [];
 	// Pre-seeded so every line's map is created exactly once, up front: a
 	// footnote can write into the mainline's map before the mainline's own

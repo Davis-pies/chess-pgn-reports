@@ -27,9 +27,19 @@ export const FIXTURE = fileURLToPath(new URL("../tests/fixtures/capablanca.pgn",
 
 export const SMALL_PGN = "1. e4 e5 2. Nf3 Nc6 (2... Nf6 3. d4) 3. Bb5 (3. Bc4 Bc5) a6";
 
+// Open the app and wait for its start-up to settle. app.js fetches the piece
+// sprite after the first render and renders again once it lands, which
+// rebuilds the import panel: text typed into the PGN box before that is
+// wiped, and Load & Tag then finds no moves. Waiting for the sprite puts
+// every fill after that second render.
+export async function openApp(page) {
+  await page.goto("./");
+  await page.locator("#wK").waitFor({ state: "attached" });
+}
+
 // Paste a PGN into the import box and load it.
 export async function loadPgn(page, pgn = SMALL_PGN) {
-  await page.goto("./");
+  await openApp(page);
   await page.locator("textarea.pgnin").fill(pgn);
   await page.getByRole("button", { name: "Load & Tag" }).click();
   await expect(page.locator(".toolbar")).toBeVisible();

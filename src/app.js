@@ -42,14 +42,14 @@ import { analysisPanel } from "./analysis-view.js";
 import { closeBoard, newScratch, openAt, packScratch, unpackScratch } from "./analysis.js";
 import { sharedEngine } from "./engine.js";
 import { sharedFlavors } from "./engine-flavor.js";
-import { allNotes } from "./notes.js";
+import { allNotes, renderPass } from "./notes.js";
 import {
   visibleLines,
   hiddenLines,
   hideAll,
   showAll,
 } from "./visibility.js";
-import { appendPrintTables } from "./print.js";
+import { fillPrintTables, printTablesBox } from "./print.js";
 import {
   renderTrieTable,
   collectKeys,
@@ -135,10 +135,12 @@ let markupBox = null; // the .markup container
 let notesBox = null; // the .notes container
 export function rerenderTable() {
   if (!tableBox || !hasNotebook()) return;
-  const g = grid(getCurrent().lines);
-  tableBox.replaceChildren();
-  tableBox.appendChild(el("h3", { textContent: "Table" }));
-  renderTrieTable(tableBox, g);
+  renderPass(() => {
+    const g = grid(getCurrent().lines);
+    tableBox.replaceChildren();
+    tableBox.appendChild(el("h3", { textContent: "Table" }));
+    renderTrieTable(tableBox, g);
+  });
 }
 // A <details> toggle queued by a previous render can fire after the app has
 // gone back to the import panel (the element is detached by then, but the
@@ -151,7 +153,7 @@ function hasNotebook() {
 }
 export function rerenderMarkup() {
   if (!markupBox || !hasNotebook()) return;
-  const nb = markupPanel();
+  const nb = renderPass(markupPanel);
   markupBox.replaceChildren(...nb.children);
 }
 // In place, like rerenderMarkup: rebuilding the whole app would reset the
@@ -160,7 +162,7 @@ export function rerenderMarkup() {
 // itself, which lives on the element rather than in its children.
 export function rerenderNotes() {
   if (!notesBox || !hasNotebook()) return;
-  const nb = notesPanel();
+  const nb = renderPass(notesPanel);
   notesBox.open = nb.open;
   notesBox.replaceChildren(...nb.children);
 }
@@ -201,20 +203,34 @@ function computeShared() {
 // index of this line's first move that no other line matches (its "latest
 // divergence" / first moment of true uniqueness).
 const uniqInfo = new Map(); // moves-array -> first-unique-move index
+//
+// Counted on a trie of the lines' moves rather than by comparing every pair:
+// a move is shared exactly when another line passes through the same node,
+// so the answer is how far a line runs through nodes more than one line
+// reaches. One walk per line instead of one per pair of lines.
 function computeUnique() {
   uniqInfo.clear();
   const lines = getCurrent().lines;
+  const root = new Map(); // san -> { n: lines through here, next: Map }
   for (const l of lines) {
-    let best = 0;
-    const a = l.moves;
-    for (const y of lines) {
-      if (y === l) continue;
-      const b = y.moves;
-      let i = 0;
-      while (i < a.length && i < b.length && a[i].san === b[i].san) i++;
-      if (i > best) best = i;
+    let at = root;
+    for (const m of l.moves) {
+      let node = at.get(m.san);
+      if (!node) at.set(m.san, (node = { n: 0, next: new Map() }));
+      node.n++;
+      at = node.next;
     }
-    uniqInfo.set(a, best);
+  }
+  for (const l of lines) {
+    let at = root;
+    let best = 0;
+    for (const m of l.moves) {
+      const node = at.get(m.san);
+      if (node.n < 2) break;
+      best++;
+      at = node.next;
+    }
+    uniqInfo.set(l.moves, best);
   }
 }
 
@@ -370,10 +386,39 @@ export function openAnalysis(moves = []) {
 	if (!getScratch()) setScratch(newBoard());
 	if (moves.length) openAt(getScratch(), moves);
 	setMode("analysis");
-	renderApp();
+	// Opening the board changes nothing in the report behind it, so the window
+	// goes over the page as it stands rather than rebuilding it.
+	const wrap = $("view").firstElementChild;
+	if (wrap && !overlayBox?.isConnected) wrap.appendChild(analysisOverlay());
+	else renderApp();
 }
 
+// The analysis window alone. Stepping through a line, switching lines and
+// flipping the board touch only the scratch, and the report behind the window
+// (table, print cards, editor) can run to tens of thousands of elements on a
+// big workbook -- rebuilding all of that per arrow key made the board lag. A
+// change to the notebook itself goes through renderApp instead.
+let overlayBox = null;
+function rerenderAnalysis() {
+  if (getMode() !== "analysis" || !overlayBox?.isConnected) return renderApp();
+  const win = overlayBox.querySelector(".an-window");
+  keepFocus = win ? focusKey(win, document.activeElement) : null;
+  overlayBox.replaceWith(analysisOverlay());
+}
+
+// The print-only parts of the page on view, not built yet (see viewRoot).
+// Printing builds them: beforeprint fires for the toolbar's Print button and
+// the browser's own print command alike, and before the page is laid out.
+let pendingPrint = null;
+function preparePrint() {
+  const build = pendingPrint;
+  pendingPrint = null;
+  if (build && hasNotebook()) build();
+}
+window.addEventListener("beforeprint", preparePrint);
+
 function renderApp() {
+  pendingPrint = null;
   const v = $("view");
   // The redraw below replaces the focused control with a copy; note which
   // one it was, so the copy can have the focus back (see analysisOverlay).
@@ -383,7 +428,7 @@ function renderApp() {
   computeUnique(); // each line's first move unique to it among all lines
   assignLineNames(); // before anything reads a name (see line-editor.js)
   v.replaceChildren();
-  v.appendChild(viewRoot());
+  v.appendChild(renderPass(viewRoot));
 }
 
 function viewRoot() {
@@ -495,15 +540,30 @@ function viewRoot() {
   c.appendChild(
     el("h3", { textContent: "Print view — one line, one position" }),
   );
-  renderCards(c, g, {
-    notes: allNotes(),
-    boardSize: getCurrent().boardSize,
-    showFinalBoard: getCurrent().showFinalBoard,
-    showFirstDivBoard: getCurrent().showFirstDivBoard,
-    uniq: uniqInfo,
-  });
+  const fillCards = (grid) =>
+    renderCards(c, grid, {
+      notes: allNotes(),
+      boardSize: getCurrent().boardSize,
+      showFinalBoard: getCurrent().showFinalBoard,
+      showFirstDivBoard: getCurrent().showFirstDivBoard,
+      uniq: uniqInfo,
+    });
+  // `preview` flips the LEFT panel between the table and the print lines
+  const useCards = getCurrent().preview === "cards";
+  if (useCards) fillCards(g);
   side.appendChild(c);
-  appendPrintTables(side, g); // print-only horizontal slices (hidden on screen)
+  // print-only horizontal slices (hidden on screen)
+  const tables = printTablesBox(side);
+  // What only paper shows -- the print tables always, the cards unless they
+  // are the preview -- was most of the cost of every render on a big
+  // workbook: a board per card, and the tables packed page by page. It is
+  // built when the page is printed instead, from the notebook as it is then.
+  pendingPrint = () =>
+    renderPass(() => {
+      const now = grid(getCurrent().lines);
+      if (!useCards) fillCards(now);
+      fillPrintTables(tables, now);
+    });
   const handle = el("div", {
     className: "side-resize",
     title: "Drag to resize",
@@ -529,8 +589,6 @@ function viewRoot() {
   layout.appendChild(main);
   wrap.appendChild(layout);
 
-  // `preview` flips the LEFT panel between the table and the print lines
-  const useCards = getCurrent().preview === "cards";
   t.classList.toggle("hidden", useCards);
   c.classList.toggle("hidden", !useCards);
   // apply the (drag-resized) table panel width — one CSS var drives the side
@@ -558,7 +616,10 @@ function analysisOverlay() {
   const engine = sharedEngine();
   // Closing stops the engine's search but keeps its switch, so it is back on
   // where it was the next time the board opens.
-  const close = () => {
+  // Closing leaves the report as it is: anything the board wrote into the
+  // notebook redrew it already (onNotebook). Adding lines does write to it,
+  // and closes the window too, so that path rebuilds everything.
+  const close = (rebuild = false) => {
     engine.pause();
     // pins and show-all last only while the board is open
     closeBoard(getScratch());
@@ -566,12 +627,14 @@ function analysisOverlay() {
     setMode("report");
     const back = opener;
     opener = null;
-    renderApp();
-    // The button that opened the board was redrawn with the rest of the page;
-    // its copy takes the focus back, so the keyboard is where it left off.
+    if (rebuild || !ov.isConnected) renderApp();
+    else ov.remove();
+    // The button that opened the board takes the focus back -- the same node,
+    // or its copy if the page was redrawn -- so the keyboard is where it left off.
     restoreFocus($("view"), back);
   };
   const ov = el("div", { className: "modal-overlay an-overlay" });
+  overlayBox = ov;
   ov.onclick = (e) => e.target === ov && close();
   // A block body, not `e.key === "Escape" && close()`: an on-handler that
   // returns false cancels the event, and that expression returns false for
@@ -580,8 +643,9 @@ function analysisOverlay() {
     if (e.key === "Escape") close();
     else trapTab(ov, e);
   };
-  const an = analysisPanel(getScratch(), renderApp, {
-    onAdded: close,
+  const an = analysisPanel(getScratch(), rerenderAnalysis, {
+    onAdded: () => close(true),
+    onNotebook: renderApp,
     engine,
     flavors: sharedFlavors(),
   });
@@ -591,7 +655,7 @@ function analysisOverlay() {
       className: "chip mini an-close",
       textContent: "✕",
       title: "Close (Esc)",
-      onclick: close,
+      onclick: () => close(),
     }),
   ]);
   head.lastChild.setAttribute("aria-label", "Close the analysis board");
