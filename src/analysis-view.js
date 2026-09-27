@@ -31,6 +31,7 @@ import {
 	select,
 	sharedPrefix,
 	stepLine,
+	through,
 	truncate,
 	undo,
 } from "./analysis.js";
@@ -700,9 +701,7 @@ function workbookLines(scratch, herePos, onChange) {
 	const box = el("div", { className: "an-wb" });
 	const cur = getCurrent();
 	if (!cur || !cur.lines.length) return box;
-	const passes = (l) =>
-		l.moves.length >= herePos.length && herePos.every((m, k) => l.moves[k].san === m.san);
-	const lines = visibleLines(cur.lines).filter(passes);
+	const lines = visibleLines(cur.lines).filter((l) => through(herePos, l));
 	const played = activeLine(scratch).moves;
 	const following = (l) =>
 		played.length >= herePos.length && played.every((m, k) => !l.moves[k] || l.moves[k].san === m.san) && played.length <= l.moves.length;

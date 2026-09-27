@@ -1559,6 +1559,7 @@ sup {
   white-space: nowrap;
   mask-image: linear-gradient(to right, #000 85%, transparent);
   -webkit-mask-image: linear-gradient(to right, #000 85%, transparent);
+}
 /* the workbook's lines through the position, read-only beside the board's own */
 .an-wb { display: flex; flex-direction: column; gap: .2rem; }
 .an-wb-lines { display: flex; flex-direction: column; gap: .15rem; max-height: 16rem; overflow: auto; }
