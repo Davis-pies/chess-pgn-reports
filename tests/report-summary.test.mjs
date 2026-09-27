@@ -59,9 +59,19 @@ test("headerFacts leaves out the spec's unknown placeholders", () => {
     ECO: "C60",
   };
   assert.deepStrictEqual(headerFacts(tags), ["ECO C60"]);
-  // one player alone is not a pairing
+  // one player alone is not a game
   assert.deepStrictEqual(headerFacts({ White: "Carlsen" }), []);
-  assert.deepStrictEqual(headerFacts({ Date: "2024.??.??" }), ["2024"]);
+  // nor are an event and date without players: the app's own PGN export
+  // writes the notebook's name as the Event
+  assert.deepStrictEqual(
+    headerFacts({ Event: "My Pirc", Site: "Oslo", Date: "2024.??.??" }),
+    [],
+  );
+  // with players, only what is known follows them
+  assert.deepStrictEqual(
+    headerFacts({ White: "A", Black: "B", Event: "?", Date: "????.??.??" }),
+    ["A – B"],
+  );
 });
 
 test("verdictOf reads the line-end eval, else the last move's assessment", () => {

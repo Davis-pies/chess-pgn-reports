@@ -30,6 +30,13 @@ export function pgnTags(mt) {
 	return tags;
 }
 
+// The header a workbook reports and exports: its PGN's tags, overridden by
+// what was typed in the Game info dialog (state.header). An edit to "" is a
+// deliberate blank, not "no edit", so it overrides too.
+export function headerTags(state) {
+	return { ...pgnTags(state.pgn), ...(state.header || {}) };
+}
+
 export function parsePgn(mt) {
 	const tags = pgnTags(mt);
 	const cleaned = mt.replace(TAG_LINE, " ");

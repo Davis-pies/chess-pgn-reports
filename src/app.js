@@ -57,6 +57,7 @@ import {
 import { assignLineNames, lineEditor } from "./line-editor.js";
 import { exportBar, download, slug } from "./export.js";
 import { appendReportSummary, reportSummary } from "./report-summary.js";
+import { openGameInfo } from "./game-info.js";
 import { notesPanel } from "./notes-view.js";
 
 // Canonical reset for `current`. Every "start over" path (New/Import, Load &
@@ -255,6 +256,7 @@ function workbookState() {
     name: c.name,
     pgn: c.pgn,
     lines: c.lines,
+    header: c.header,
     // analysis in progress travels with the workbook
     analysis: packScratch(getScratch()),
     view: {
@@ -392,6 +394,13 @@ function viewRoot() {
     renderApp();
   };
   top.appendChild(toFile);
+  top.appendChild(
+    el("button", {
+      className: "chip",
+      textContent: "Game info…",
+      onclick: () => openGameInfo(getCurrent(), renderApp),
+    }),
+  );
   top.appendChild(
     el("button", {
       className: "chip",
@@ -574,6 +583,7 @@ function installNotebook(nb, id) {
       id,
       name: nb.name || "",
       pgn: nb.pgn,
+      header: nb.header || undefined,
       lines,
       // a saved notebook carries its own board settings; fall back to the
       // session's for notebooks saved before `view` existed

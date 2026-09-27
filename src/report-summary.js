@@ -8,7 +8,7 @@
 // thrown away. So the head states those, then counts what follows and tallies
 // the lines' final verdicts, which is the question a theory table is read to
 // answer: who comes out of this opening better, and how often.
-import { pgnTags } from "./pgn.js";
+import { headerTags } from "./pgn.js";
 import { nagFor, markNag } from "./nags.js";
 import { el } from "./dom.js";
 
@@ -30,13 +30,18 @@ export function headerFacts(tags) {
   const eco = t("ECO");
   if (eco || opening)
     out.push([eco && "ECO " + eco, opening].filter(Boolean).join(" · "));
-  const players = t("White") && t("Black") ? t("White") + " – " + t("Black") : "";
+  // The game line only for a real game: both players named. Without them the
+  // event, site and date are the app's own round-trip filler at best -- its
+  // PGN export writes the notebook's name as the Event -- so they are left out
+  // too rather than printed as facts about a game that was never played.
+  if (!t("White") || !t("Black")) return out;
   const year = (t("Date").match(/^\d{4}/) || [""])[0];
   const where = [t("Event"), t("Site")].filter(Boolean).join(", ");
-  const game = [players, [where, year].filter(Boolean).join(" ")]
-    .filter(Boolean)
-    .join(", ");
-  if (game) out.push(game);
+  out.push(
+    [t("White") + " – " + t("Black"), [where, year].filter(Boolean).join(" ")]
+      .filter(Boolean)
+      .join(", "),
+  );
   return out;
 }
 
@@ -69,7 +74,7 @@ export function verdictOf(line) {
 // the verdict tally (buckets with no lines left out). `g` is grid()'s output,
 // so the counts are of what the report prints -- hidden lines are not in it.
 export function reportSummary(state, g, notes) {
-  const tags = pgnTags(state.pgn);
+  const tags = headerTags(state);
   const title =
     (state.name || "").trim() ||
     [known(tags.Opening), known(tags.Variation)].filter(Boolean).join(", ");

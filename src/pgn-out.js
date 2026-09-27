@@ -2,7 +2,7 @@ import { divergence } from "./tree.js";
 import { markNag, markSym } from "./nags.js";
 import { numberNotes } from "./notes.js";
 import { visibleLines } from "./visibility.js";
-import { pgnTags } from "./pgn.js";
+import { headerTags } from "./pgn.js";
 
 // Serializes the live editor state back to PGN.
 //
@@ -253,11 +253,13 @@ const OWN_TAGS = new Set(["Result", "FEN", "SetUp", "PlyCount"]);
 // PGN the workbook was loaded from, so an export does not strip the players
 // and event off a model game; what the source never said falls back to the
 // spec's "?" / "????.??.??" placeholders. Event is the workbook's name when it
-// has one: that is what the user called this analysis.
+// has one: that is what the user called this analysis -- unless an Event was
+// typed into the Game info dialog, which says so outright.
 function tagPairs(state, result) {
-	const src = pgnTags(state.pgn);
+	const src = headerTags(state);
+	const typed = state.header && state.header.Event;
 	const roster = [
-		["Event", state.name || src.Event || "?"],
+		["Event", typed || state.name || src.Event || "?"],
 		["Site", src.Site || "?"],
 		["Date", src.Date || "????.??.??"],
 		["Round", src.Round || "?"],
@@ -267,7 +269,7 @@ function tagPairs(state, result) {
 	];
 	const named = new Set(roster.map(([k]) => k));
 	const extra = Object.entries(src).filter(
-		([k]) => !named.has(k) && !OWN_TAGS.has(k),
+		([k, v]) => !named.has(k) && !OWN_TAGS.has(k) && v,
 	);
 	return [...roster, ...extra]
 		.map(([k, v]) => `[${k} "${tagValue(v)}"]`)

@@ -1292,3 +1292,25 @@ test("clicking a lit group Focus chip clears the focus", async () => {
 		"every line is back",
 	);
 });
+
+test("Game info edits head the report and survive a save and reopen", async () => {
+	app.reset();
+	await app.loadPgn("1. e4 d6 2. d4");
+	app.clickText("Game info…");
+	const ov = dom.window.document.getElementById("gameinfo");
+	assert.ok(ov, "dialog open");
+	ov.querySelector("input.gi-White").value = "Kasparov";
+	ov.querySelector("input.gi-Black").value = "Topalov";
+	ov.querySelector("input.gi-Opening").value = "Pirc";
+	[...ov.querySelectorAll("button")].find((b) => b.textContent === "Save").click();
+	const facts = () =>
+		[...doc("view").querySelectorAll(".report-head .rh-fact")].map((f) => f.textContent);
+	assert.deepStrictEqual(facts(), ["Pirc", "Kasparov – Topalov"]);
+	saveNotebook("gi", { ...getCurrent(), name: "GI" });
+	app.clickText("New / Import");
+	[...doc("view").querySelectorAll("button")]
+		.find((b) => b.textContent.includes("Open: GI"))
+		.click();
+	await tick();
+	assert.deepStrictEqual(facts(), ["Pirc", "Kasparov – Topalov"], "reopened");
+});

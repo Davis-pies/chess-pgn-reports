@@ -1100,6 +1100,23 @@ sup {
 .modal .pgnin {
   width: 100%;
 }
+/* the Game info dialog: label over field, two to a row where there is room */
+.gi-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px 14px;
+}
+.gi-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.gi-field input {
+  font: inherit;
+  color: var(--text);
+}
 .modal-actions {
   display: flex;
   justify-content: flex-end;
