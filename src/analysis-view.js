@@ -31,6 +31,7 @@ import {
 	select,
 	sharedPrefix,
 	stepLine,
+	through,
 	truncate,
 	undo,
 } from "./analysis.js";
@@ -45,6 +46,8 @@ import {
 import { commentEditor } from "./line-editor.js";
 import { formatScore, numberedFrom, whiteShare } from "./engine.js";
 import { FULL } from "./engine-store.js";
+import { getCurrent } from "./state.js";
+import { visibleLines } from "./visibility.js";
 
 // "1.e4 e5 2.Nf3". Deliberately not render.js's movesText: that one formats a
 // notebook line's divergent tail against a mainline, which a scratch has no
@@ -185,21 +188,20 @@ export function analysisPanel(
 	const counted = (idx) => idx.filter((i) => scratch.lines[i].moves.length).length;
 	const throughCount = on.filter((i) => passesHere(scratch.lines[i])).length;
 	const offView = counted(scratch.lines.map((_, i) => i)) - counted(on);
+	// The board's own lines, as distinct from the workbook's (listed below).
 	const listHead = el("div", { className: "an-sec" }, [
-		el("span", {
-			textContent:
-				(scratch.showAll ? "All lines on the board" : herePos.length ? `Lines through ${sanLabel(herePos.map((m) => m.san))}` : "Lines") +
-				` (${counted(on)})`,
-		}),
+		el("span", { textContent: `Analysis lines (${counted(on)})` }),
 	]);
 	if (scratch.showAll || offView)
 		listHead.appendChild(
 			el("button", {
 				className: "an-showall",
-				textContent: scratch.showAll ? "only lines through here" : `show all ${counted(on) + offView} on the board`,
+				textContent: scratch.showAll
+					? "hide lines not through here"
+					: `${offView} more elsewhere — show`,
 				title: scratch.showAll
-					? "Back to the lines through the position on the board"
-					: "Show every line on the board, including ones that do not pass through this position",
+					? "List only the analysis lines through the position on the board"
+					: "Also list the analysis lines that do not pass through this position",
 				onclick: act(() => toggleShowAll(scratch)),
 			}),
 		);
@@ -319,6 +321,7 @@ export function analysisPanel(
 	});
 	right.appendChild(list);
 	right.appendChild(msg);
+	right.appendChild(workbookLines(scratch, herePos, onChange));
 
 	// Notes on the move just played, in the notebook's own note editor: a
 	// scratch line keeps comments in the same shape a notebook line does.
@@ -683,4 +686,86 @@ function depthBox(engine) {
 		engine.setDepth(d);
 	};
 	return el("label", { className: "an-engine-depthbox" }, ["depth ", input, hint]);
+}
+
+// How many workbook lines are listed before the rest wait behind "show".
+const WORKBOOK_SHOWN = 30;
+
+// The workbook's lines through the position on the board, read from the
+// workbook as it stands -- never copied onto the board, so they are always
+// the lines as written, and the board's own list stays the board's analysis.
+// Each shows where it goes from here; a click on one of its moves plays the
+// line on the board up to that move. The line the board is following is
+// marked. Hidden lines stay out, as they do from every other view.
+function workbookLines(scratch, herePos, onChange) {
+	const box = el("div", { className: "an-wb" });
+	const cur = getCurrent();
+	if (!cur || !cur.lines.length) return box;
+	const lines = visibleLines(cur.lines).filter((l) => through(herePos, l));
+	const played = activeLine(scratch).moves;
+	const following = (l) =>
+		played.length >= herePos.length && played.every((m, k) => !l.moves[k] || l.moves[k].san === m.san) && played.length <= l.moves.length;
+	box.appendChild(
+		el("div", { className: "an-sec" }, [
+			el("span", {
+				textContent:
+					(herePos.length ? `Workbook lines through ${sanLabel(herePos.map((m) => m.san))}` : "Workbook lines") +
+					` (${lines.length})`,
+			}),
+		]),
+	);
+	if (!lines.length) {
+		box.appendChild(el("div", { className: "an-note-hint", textContent: "None: this position is new to the workbook." }));
+		return box;
+	}
+	const all = scratch.wbAll || lines.length <= WORKBOOK_SHOWN;
+	const list = el("div", { className: "an-wb-lines" });
+	const rows = all ? lines : lines.slice(0, WORKBOOK_SHOWN);
+	rows.forEach((l, i) => {
+		const row = el("div", { className: "an-wb-line" + (following(l) ? " active" : "") });
+		row.appendChild(el("span", { className: "an-wb-name", textContent: l.name || (l.isMain ? "Mainline" : "") }));
+		const moves = el("div", { className: "an-line-moves" });
+		// From the move before it leaves the rows above it -- or, for the first,
+		// the move that reached the position -- so rows that run together for a
+		// while read as where each one differs.
+		let shared = 0;
+		for (let k = 0; k < i; k++) {
+			let n = 0;
+			while (n < l.moves.length && n < rows[k].moves.length && l.moves[n].san === rows[k].moves[n].san) n++;
+			shared = Math.max(shared, n);
+		}
+		const from = Math.max(herePos.length - 1, shared - 1, 0);
+		if (from > 0) moves.appendChild(el("span", { className: "an-elide", textContent: "…" }));
+		for (let j = from; j < l.moves.length; j++) {
+			const san = l.moves[j].san;
+			const label = j % 2 === 0 ? `${j / 2 + 1}.${san}` : j === from ? `${(j + 1) / 2}...${san}` : san;
+			moves.appendChild(
+				el("button", {
+					className: "an-move" + (j < herePos.length || j < shared ? " shared" : ""),
+					textContent: label,
+					title: j < herePos.length ? "" : "Play this line on the board up to here",
+					onclick: () => {
+						if (j < herePos.length) return;
+						playAll(scratch, l.moves.slice(herePos.length, j + 1).map((m) => m.san));
+						onChange();
+					},
+				}),
+			);
+		}
+		row.appendChild(moves);
+		list.appendChild(row);
+	});
+	box.appendChild(list);
+	if (!all)
+		box.appendChild(
+			el("button", {
+				className: "an-showall",
+				textContent: `show all ${lines.length}`,
+				onclick: () => {
+					scratch.wbAll = true;
+					onChange();
+				},
+			}),
+		);
+	return box;
 }

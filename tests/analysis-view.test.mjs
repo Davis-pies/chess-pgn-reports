@@ -542,8 +542,8 @@ test("the note tools save to the notebook and say so", () => {
 	const done = installDom();
 	loadState("1. e4 c5 2. Nf3 d6 *");
 	const s = newScratch();
-	openAt(s, [{ san: "e4" }, { san: "c5" }], getCurrent().lines);
-	activeLine(s).comments.push({ ply: 1, text: "the Sicilian" });
+	openAt(s, [{ san: "e4" }, { san: "c5" }]);
+	activeLine(s).comments = [{ ply: 1, text: "the Sicilian" }];
 	let panel = analysisPanel(s, () => {});
 	assert.match(panel.querySelector(".an-note-nb").textContent, /In the notebook: no note/);
 	click(panel, ".an-save-note");
@@ -579,28 +579,78 @@ test("off the notebook, Save note is disabled and Save all says what it could no
 	done();
 });
 
-test("the list follows the cursor, and show all toggles", () => {
+// The board's own lines, as distinct from the workbook's rows below them.
+const analysisRows = (panel) => panel.querySelectorAll(".an-lines .an-line");
+const lines = (...strs) => strs.map((str) => ({ moves: str.split(" ").map((san, ply) => ({ san, ply })) }));
+
+test("the analysis list follows the cursor, and the rest can be shown", () => {
 	const done = installDom();
-	loadState("1. e4 c5 2. Nf3 (2. Nc3) d6 *");
+	loadState("1. e4 c5 2. Nf3 d6 *");
 	const s = newScratch();
-	openAt(s, [{ san: "d4" }], []);
-	openAt(s, [{ san: "e4" }, { san: "c5" }], getCurrent().lines);
+	s.lines = lines("d4 d5", "e4 c5 Nf3 d6", "e4 c5 Nc3");
+	openAt(s, [{ san: "e4" }, { san: "c5" }]);
 	let panel = analysisPanel(s, () => {});
-	assert.match(panel.querySelector(".an-sec").textContent, /Lines through 1\.\.\.c5 \(2\)/);
-	assert.strictEqual(panel.querySelectorAll(".an-line").length, 2);
+	assert.match(panel.querySelector(".an-sec").textContent, /^Analysis lines \(2\)/);
+	assert.strictEqual(analysisRows(panel).length, 2);
+	assert.match(panel.querySelector(".an-showall").textContent, /1 more elsewhere — show/);
 	// into the 2.Nf3 branch: 2.Nc3 no longer leads here
 	forward(s);
 	panel = analysisPanel(s, () => {});
-	assert.match(panel.querySelector(".an-sec").textContent, /Lines through 2\.Nf3 \(1\)/);
-	assert.match(panel.querySelector(".an-showall").textContent, /show all 3 on the board/);
+	assert.match(panel.querySelector(".an-sec").textContent, /^Analysis lines \(1\)/);
+	assert.match(panel.querySelector(".an-showall").textContent, /2 more elsewhere — show/);
 	panel.querySelector(".an-showall").click();
 	panel = analysisPanel(s, () => {});
-	assert.match(panel.querySelector(".an-sec").textContent, /^All lines on the board \(3\)/);
-	assert.strictEqual(panel.querySelectorAll(".an-line").length, 3);
+	assert.strictEqual(analysisRows(panel).length, 3);
 	assert.ok(panel.querySelector(".an-line.elsewhere"), "lines off the position are marked");
-	// and back again: the toggle is the way to hide them
+	assert.match(panel.querySelector(".an-showall").textContent, /hide lines not through here/);
 	panel.querySelector(".an-showall").click();
-	assert.strictEqual(analysisPanel(s, () => {}).querySelectorAll(".an-line").length, 1);
+	assert.strictEqual(analysisRows(analysisPanel(s, () => {})).length, 1);
+	done();
+});
+
+test("the workbook's lines through the position are listed apart, and followed", () => {
+	const done = installDom();
+	loadState("1. e4 c5 2. Nf3 d6 3. d4 (3. c3) (3. Bb5+) *");
+	const s = newScratch();
+	openAt(s, ["e4", "c5", "Nf3", "d6"].map((san) => ({ san })));
+	let panel = analysisPanel(s, () => {});
+	const wb = panel.querySelector(".an-wb");
+	assert.match(wb.querySelector(".an-sec").textContent, /Workbook lines through 2\.\.\.d6 \(3\)/);
+	const rows = [...wb.querySelectorAll(".an-wb-line")].map((r) =>
+		[...r.querySelectorAll(".an-elide, .an-move")].map((n) => n.textContent).join(" "),
+	);
+	// each from the move that reached the position, or where it leaves the rows above
+	assert.deepStrictEqual(rows, ["… 2...d6 3.d4", "… 2...d6 3.c3", "… 2...d6 3.Bb5+"]);
+	assert.strictEqual(wb.querySelectorAll(".an-wb-line.active").length, 3, "the board is on all three so far");
+	// a click plays the line on the board
+	[...wb.querySelectorAll(".an-move")].find((b) => b.textContent === "3.c3").click();
+	assert.deepStrictEqual(activeLine(s).moves.map((m) => m.san), ["e4", "c5", "Nf3", "d6", "c3"]);
+	panel = analysisPanel(s, () => {});
+	assert.match(panel.querySelector(".an-wb .an-sec").textContent, /through 3\.c3 \(1\)/);
+	// the shared moves are not moves to play: clicking one does nothing
+	const before = activeLine(s).moves.length;
+	panel.querySelector(".an-wb .an-move.shared").click();
+	assert.strictEqual(activeLine(s).moves.length, before);
+	done();
+});
+
+test("a position the workbook has not got says so; a long list waits behind show all", () => {
+	const done = installDom();
+	loadState("1. e4 c5 *");
+	const s = newScratch([{ san: "d4" }]);
+	assert.match(analysisPanel(s, () => {}).querySelector(".an-wb").textContent, /new to the workbook/);
+	// 35 lines: nineteen replies to 1.e4, and fifteen second moves after 1...e5
+	const replies = "a6 b6 c6 d6 e6 f6 g6 h6 a5 b5 c5 d5 f5 g5 h5 Na6 Nc6 Nf6 Nh6".split(" ");
+	const seconds = "Nc3 Bc4 d4 f4 c3 d3 Qh5 Qf3 Be2 Bb5 Bd3 Ne2 g3 b3 a3".split(" ");
+	loadState(`1. e4 e5 ${replies.map((b) => `(1... ${b})`).join(" ")} 2. Nf3 ${seconds.map((w) => `(2. ${w})`).join(" ")} *`);
+	const t = newScratch();
+	let panel = analysisPanel(t, () => {});
+	const count = Number(panel.querySelector(".an-wb .an-sec").textContent.match(/\((\d+)\)/)[1]);
+	assert.ok(count > 30, `a long list (${count})`);
+	assert.strictEqual(panel.querySelectorAll(".an-wb-line").length, 30);
+	panel.querySelector(".an-wb .an-showall").click();
+	panel = analysisPanel(t, () => {});
+	assert.strictEqual(panel.querySelectorAll(".an-wb-line").length, count);
 	done();
 });
 
@@ -617,19 +667,19 @@ test("a pinned line stays in view wherever the cursor goes, until the board clos
 	pinBtn.click();
 	forward(s);
 	panel = analysisPanel(s, () => {});
-	assert.strictEqual(panel.querySelectorAll(".an-line").length, 2, "the pinned 1...e5 stays");
+	assert.strictEqual(analysisRows(panel).length, 2, "the pinned 1...e5 stays");
 	assert.ok(panel.querySelector(".an-line.elsewhere .an-pin.on"));
 	closeBoard(s);
-	assert.strictEqual(analysisPanel(s, () => {}).querySelectorAll(".an-line").length, 1, "closing unpins");
+	assert.strictEqual(analysisRows(analysisPanel(s, () => {})).length, 1, "closing unpins");
 	done();
 });
 
 test("lines through the opened position pick up at its move", () => {
 	const done = installDom();
-	loadState("1. e4 c5 2. Nf3 d6 3. d4 (3. c3) *");
 	const s = newScratch();
-	openAt(s, ["e4", "c5", "Nf3", "d6"].map((san) => ({ san })), getCurrent().lines);
-	const rows = analysisPanel(s, () => {}).querySelectorAll(".an-line");
+	s.lines = lines("e4 c5 Nf3 d6 d4", "e4 c5 Nf3 d6 c3");
+	openAt(s, ["e4", "c5", "Nf3", "d6"].map((san) => ({ san })));
+	const rows = analysisRows(analysisPanel(s, () => {}));
 	const texts = [...rows].map((r) => [...r.querySelectorAll(".an-elide, .an-move")].map((n) => n.textContent).join(" "));
 	assert.deepStrictEqual(texts, ["… 2...d6 3.d4", "… 2...d6 3.c3"]);
 	// the cursor's own move stays in view even when it is before the position
@@ -661,10 +711,10 @@ test("each line on view has its own add buttons, which add that line", () => {
 
 test("an unselected row starts where it leaves the lines above it", () => {
 	const done = installDom();
-	loadState("1. e4 c5 2. Nf3 d6 3. d4 cxd4 (3... Nf6 4. Nc3) 4. Nxd4 *");
 	const s = newScratch();
-	openAt(s, [{ san: "e4" }, { san: "c5" }], getCurrent().lines);
-	const rows = [...analysisPanel(s, () => {}).querySelectorAll(".an-line")].map((r) =>
+	s.lines = lines("e4 c5 Nf3 d6 d4 cxd4 Nxd4", "e4 c5 Nf3 d6 d4 Nf6 Nc3");
+	openAt(s, [{ san: "e4" }, { san: "c5" }]);
+	const rows = [...analysisRows(analysisPanel(s, () => {}))].map((r) =>
 		[...r.querySelectorAll(".an-elide, .an-move")].map((n) => n.textContent).join(" "),
 	);
 	// the selected (first) line from the position; the other from the move

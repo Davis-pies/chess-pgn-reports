@@ -1559,3 +1559,18 @@ sup {
   white-space: nowrap;
   mask-image: linear-gradient(to right, #000 85%, transparent);
   -webkit-mask-image: linear-gradient(to right, #000 85%, transparent);
+}
+/* the workbook's lines through the position, read-only beside the board's own */
+.an-wb { display: flex; flex-direction: column; gap: .2rem; }
+.an-wb-lines { display: flex; flex-direction: column; gap: .15rem; max-height: 16rem; overflow: auto; }
+.an-wb-line { display: flex; align-items: flex-start; gap: .4rem; padding: .15rem .4rem; border-radius: .3rem; border: 1px solid transparent; }
+.an-wb-line.active { background: color-mix(in srgb, var(--ok) 10%, transparent); border-color: color-mix(in srgb, var(--ok) 35%, transparent); }
+.an-wb-line .an-line-moves {
+  flex-wrap: nowrap;
+  overflow: hidden;
+  white-space: nowrap;
+  mask-image: linear-gradient(to right, #000 85%, transparent);
+  -webkit-mask-image: linear-gradient(to right, #000 85%, transparent);
+}
+.an-wb-name { flex: none; font-size: .72rem; color: var(--muted); min-width: 4.2rem; padding-top: .15rem; }
+.an-wb .an-showall { align-self: flex-start; }

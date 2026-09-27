@@ -7,13 +7,14 @@
 // The cursor is called `at` -- the number of moves played, and the ply of the
 // next one -- so it is never confused with a move's own ply field.
 //
-// The scratch is a pool: every line explored stays in it. What the list shows
-// follows the cursor: the lines that pass through the position on the board,
-// so stepping into a branch leaves the lines that do not lead there out of
-// view, and stepping back brings them in again -- the same rule the notebook's
-// own lines are brought onto the board by. Two things override it for as long
-// as the board is open: a line can be pinned in view, and the whole pool can
-// be shown at once (`showAll`). Both are cleared when the board closes.
+// The scratch holds the board's own analysis: the lines played on it. The
+// workbook's lines are never copied in; the panel reads the ones through the
+// position straight from the workbook. What the analysis list shows follows
+// the cursor: the lines that pass through the position on the board, so
+// stepping into a branch leaves the lines that do not lead there out of view,
+// and stepping back brings them in again. Two things override it for as long
+// as the board is open: a line can be pinned in view, and every analysis line
+// can be shown at once (`showAll`). Both are cleared when the board closes.
 
 import { Chess } from "chess.js";
 import { defaultLineName } from "./tree.js";
@@ -36,7 +37,7 @@ export function newScratch(moves = []) {
 const here = (s) => activeLine(s).moves.slice(0, s.at);
 
 // Whether a line passes through the position reached by `moves`.
-const through = (moves, line) =>
+export const through = (moves, line) =>
 	line.moves.length >= moves.length && moves.every((m, i) => line.moves[i].san === m.san);
 
 // The indices of the lines on view: those through the position on the board,
@@ -69,6 +70,7 @@ export function closeBoard(s) {
 	if (!s) return s;
 	s.lines.forEach((l) => delete l.pinned);
 	s.showAll = false;
+	s.wbAll = false;
 	return s;
 }
 
@@ -362,29 +364,16 @@ export function sharedPrefix(s, i) {
 	return best;
 }
 
-// Open the board at a position (`moves`, from move one): every notebook line
-// through it comes into the pool, whole and with its notes, beside the lines
-// already explored from there -- which, being through the position, are on
-// view with them. Nothing is doubled, and a lone empty line is dropped. The
-// cursor sits at the position on `prefer` (the notebook line the move was
-// picked from) if it is there, else on the first line through it; a position
-// nothing passes through gets a line of its own.
-export function openAt(s, moves, notebookLines = [], prefer = null) {
+// Open the board at a position (`moves`, from move one): on an analysis line
+// that already passes through it -- the one being played if it does -- or on
+// a fresh line of just those moves. The workbook's own lines are not copied
+// in: the panel shows the ones through the position straight from the
+// workbook, beside the board's own analysis.
+export function openAt(s, moves) {
 	if (s.lines.length === 1 && !s.lines[0].moves.length) s.lines = [];
-	for (const l of notebookLines) {
-		if (!through(moves, l)) continue;
-		const lk = keyOf(l.moves);
-		if (s.lines.some((x) => keyOf(x.moves) === lk)) continue;
-		s.lines.push({
-			moves: l.moves.map((m, i) => ({ san: m.san, ply: i })),
-			comments: (l.comments || []).map((c) => ({ ply: c.ply, text: c.text })),
-		});
-	}
 	const on = s.lines.map((l, i) => (through(moves, l) ? i : -1)).filter((i) => i !== -1);
 	if (!on.length) return lineAt(s, moves);
-	const want = prefer && keyOf(prefer.moves);
-	const hit = on.find((i) => keyOf(s.lines[i].moves) === want);
-	s.active = hit !== undefined ? hit : on[0];
+	s.active = on.includes(s.active) ? s.active : on[0];
 	s.at = moves.length;
 	return s;
 }

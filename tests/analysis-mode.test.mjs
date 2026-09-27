@@ -172,11 +172,11 @@ test("a refused add keeps the window open and says why", async () => {
 	app.reset();
 	await app.loadPgn(PGN);
 	app.view().querySelector(".an-toggle").click();
-	// every line on view is the workbook's own: badged, with no add of its own
-	assert.strictEqual(app.view().querySelector(".an-line .an-add"), null);
-	assert.ok(app.view().querySelector(".an-line .an-badge"));
-	app.view().querySelector(".an-add-all").click();
+	// a new board: one line, with no moves yet
+	app.view().querySelector(".an-line .an-add").click();
 	assert.ok(app.view().querySelector(".an-overlay"), "still open");
+	assert.match(app.view().querySelector(".an-msg").textContent, /no moves/);
+	app.view().querySelector(".an-add-all").click();
 	assert.match(app.view().querySelector(".an-msg").textContent, /Nothing added/);
 });
 
