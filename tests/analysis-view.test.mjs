@@ -882,3 +882,32 @@ test("✕ on the only line, at its end, really deletes it", () => {
 	assert.deepStrictEqual(activeLine(s).moves.map((m) => m.san), ["d4", "d5"]);
 	done();
 });
+
+test("the workbook's lines fold under their heading, and stay folded", () => {
+	const done = installDom();
+	// installDom leaves storage out; the fold lives in prefs, so lend it jsdom's
+	global.localStorage = window.localStorage;
+	loadState("1. e4 c5 2. Nf3 d6 3. d4 (3. c3) *");
+	const s = newScratch();
+	openAt(s, ["e4", "c5"].map((san) => ({ san })));
+	let changed = 0;
+	let wb = analysisPanel(s, () => changed++).querySelector(".an-wb");
+	const toggle = wb.querySelector(".an-wb-toggle");
+	assert.strictEqual(toggle.getAttribute("aria-expanded"), "true");
+	assert.strictEqual(wb.querySelectorAll(".an-wb-line").length, 2);
+	toggle.click();
+	assert.strictEqual(changed, 1);
+	wb = analysisPanel(s, () => {}).querySelector(".an-wb");
+	assert.strictEqual(wb.querySelectorAll(".an-wb-line").length, 0, "folded away");
+	assert.match(wb.textContent, /Workbook lines through 1\.\.\.c5 \(2\)/, "the heading still counts them");
+	assert.ok(wb.querySelector(".an-wb-toggle.collapsed"));
+	assert.strictEqual(wb.querySelector(".an-wb-toggle").getAttribute("aria-expanded"), "false");
+	// a new board, and a new position, keep the fold: it is the viewer's
+	const t = newScratch();
+	openAt(t, [{ san: "e4" }]);
+	assert.strictEqual(analysisPanel(t, () => {}).querySelectorAll(".an-wb-line").length, 0);
+	analysisPanel(t, () => {}).querySelector(".an-wb-toggle").click();
+	assert.strictEqual(analysisPanel(t, () => {}).querySelectorAll(".an-wb-line").length, 2);
+	delete global.localStorage;
+	done();
+});

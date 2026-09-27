@@ -1210,10 +1210,12 @@ sup {
   flex: 1 1 auto;
   margin: 0 0 14px;
 }
-.panel > .chip {
+/* the Settings menu sits on the title's line beside the theme switch */
+.panel > .chip,
+.panel > .settings {
   margin-bottom: 14px;
 }
-.panel > :not(h2, .chip) {
+.panel > :not(h2, .chip, .settings) {
   flex: 1 1 100%;
 }
 .panel > .pgnin {
@@ -1908,8 +1910,10 @@ kbd {
   right: 0;
   top: calc(100% + 6px);
   z-index: 20;
-  min-width: 260px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
   padding: 10px 12px;
+  font-size: 0.9rem;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1923,11 +1927,33 @@ kbd {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
+  white-space: nowrap;
+}
+.settings-row > input {
+  margin: 0;
 }
 .settings-label {
   min-width: 110px;
   color: var(--muted);
+}
+/* On a phone the menu spans the screen under its button rather than hanging
+   off the button's right edge, which runs it off the left of the screen. */
+@media (max-width: 760px) {
+  .settings {
+    position: static;
+  }
+  .settings-body {
+    top: auto;
+    left: 16px;
+    right: 16px;
+    width: auto;
+    max-width: none;
+    margin-top: 6px;
+  }
+  .settings-row {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
 }
 @media print {
   .settings {
@@ -2015,3 +2041,9 @@ kbd {
 		user-select: none;
 	}
 }
+
+/* the workbook-lines heading is its own fold toggle */
+.an-wb-toggle { all: unset; cursor: pointer; }
+.an-wb-toggle::before { content: "▾"; display: inline-block; width: 1em; }
+.an-wb-toggle.collapsed::before { content: "▸"; }
+.an-wb-toggle:focus-visible { outline: 2px solid var(--main); outline-offset: 2px; border-radius: .2rem; }
