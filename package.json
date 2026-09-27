@@ -13,7 +13,8 @@
     "coverage": "node --test --experimental-test-coverage --test-coverage-exclude='tests/**' 'tests/**/*.test.mjs'",
     "coverage:check": "node --test --experimental-test-coverage --test-coverage-exclude='tests/**' --test-coverage-lines=97 --test-coverage-branches=87 --test-coverage-functions=97 'tests/**/*.test.mjs'",
     "check": "npm run lint && npm run knip && npm run coverage:check",
-    "knip": "knip"
+    "knip": "knip",
+    "test:e2e": "playwright test"
   },
   "keywords": [
     "chess",
@@ -30,6 +31,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.56.1",
     "eslint": "^10.9.0",
     "fake-indexeddb": "^6.2.5",
     "globals": "^17.11.0",

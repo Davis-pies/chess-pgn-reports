@@ -160,12 +160,15 @@ test("Save all saves the notes on view, counts the rest, and never clears", () =
 	const done = installDom();
 	loadState(SIC);
 	getCurrent().lines[0].comments = [{ ply: 0, text: "best by test" }];
+	// the board's analysis follows both notebook lines; its moves carry no note
+	// on 1.e4, and Save all must not take that as a reason to clear the
+	// notebook's
 	const s = newScratch();
-	openAt(s, m("e4", "c5"), getCurrent().lines);
-	// the board's copy of 1.e4's note is dropped, but Save all must not clear it
-	s.lines.forEach((l) => (l.comments = l.comments.filter((c) => c.ply !== 0)));
-	s.lines[0].comments.push({ ply: 3, text: "the Najdorf family" }, { ply: 3, text: "or the Dragon" });
-	s.lines[1].comments.push({ ply: 3, text: "the Classical" });
+	s.lines = [
+		{ moves: m("e4", "c5", "Nf3", "d6"), comments: [{ ply: 3, text: "the Najdorf family" }, { ply: 3, text: "or the Dragon" }] },
+		{ moves: m("e4", "c5", "Nf3", "Nc6"), comments: [{ ply: 3, text: "the Classical" }] },
+	];
+	openAt(s, m("e4", "c5"));
 	play(s, "a6"); // not in the notebook
 	goTo(s, 1);
 	s.lines[s.active].comments.push({ ply: 4, text: "not saved" });

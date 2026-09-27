@@ -2,7 +2,7 @@ import js from '@eslint/js';
 import globals from 'globals';
 
 export default [
-  { ignores: ['node_modules/**', 'coverage/**', '.claude/**', 'vendor/**'] },
+  { ignores: ['node_modules/**', 'coverage/**', 'test-results/**', 'playwright-report/**', '.claude/**', 'vendor/**'] },
 
   js.configs.recommended,
 
@@ -58,6 +58,16 @@ export default [
       ecmaVersion: 'latest',
       sourceType: 'module',
       globals: { ...globals.node, ...globals.browser },
+    },
+  },
+
+  {
+    // Playwright browser tests: Node modules driving a real browser.
+    files: ['e2e/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: globals.node,
     },
   },
 
