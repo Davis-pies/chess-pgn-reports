@@ -870,3 +870,15 @@ test("a move in a capitalised heading keeps its case (Nbd7, not NBD7)", () => {
 	assert.ok(heads.some((h) => /^Note on/.test(h.textContent)));
 	done();
 });
+
+test("✕ on the only line, at its end, really deletes it", () => {
+	const done = installDom();
+	const s = newScratch([{ san: "d4" }, { san: "d5" }]);
+	click(analysisPanel(s, () => {}), ".an-del");
+	const panel = analysisPanel(s, () => {});
+	assert.strictEqual(panel.querySelectorAll(".an-line .an-move").length, 0, "no moves left on view");
+	assert.ok(panel.querySelector(".an-empty"));
+	click(panel, ".an-undo");
+	assert.deepStrictEqual(activeLine(s).moves.map((m) => m.san), ["d4", "d5"]);
+	done();
+});

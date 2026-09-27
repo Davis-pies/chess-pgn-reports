@@ -317,6 +317,10 @@ export function select(s, idx) {
 // another line through it if there is one -- the one on view before it, else
 // after it -- and on a fresh line of just those moves if not, so there is
 // always a board to play on.
+// Except with the cursor at the line's end: a fresh line of those moves would
+// be the deleted line again, and the ✕ would seem to do nothing. The board
+// goes back instead, to where the line left the other lines (on the longest
+// of them), or to the start when it shared nothing.
 export function removeLine(s, idx) {
 	if (!s.lines[idx]) return s;
 	if (idx !== s.active) {
@@ -328,11 +332,26 @@ export function removeLine(s, idx) {
 	const on = shown(s).filter((i) => i !== idx && through(pos, s.lines[i]));
 	const pick = on.filter((i) => i < idx).pop() ?? on[0];
 	const keep = pick === undefined ? null : s.lines[pick];
-	s.lines.splice(idx, 1);
+	const [gone] = s.lines.splice(idx, 1);
 	if (keep) {
 		s.active = s.lines.indexOf(keep);
 		s.at = pos.length;
 		return s;
+	}
+	if (pos.length && pos.length === gone.moves.length) {
+		let best = -1;
+		let k = 0;
+		s.lines.forEach((l, i) => {
+			let n = 0;
+			while (n < pos.length && n < l.moves.length && l.moves[n].san === pos[n].san) n++;
+			if (n > k) [best, k] = [i, n];
+		});
+		if (best !== -1) {
+			s.active = best;
+			s.at = k;
+			return s;
+		}
+		return lineAt(s, []);
 	}
 	return lineAt(s, pos);
 }
