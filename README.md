@@ -39,7 +39,7 @@ a `.json` file you keep.
 
 ![The analysis board, stepping through the Poisoned Pawn line](docs/images/analysis.png)
 
-![The printed theory table with one row per move and zebra stripes, shown in the dark theme (paper always prints dark on white)](docs/images/print-table.png)
+![The printed theory table, with one row per move and zebra stripes](docs/images/print-table.png)
 
 The [user guide](docs/user-guide.md) walks through every feature in detail.
 
