@@ -161,12 +161,34 @@ test("removeLine drops a scratch line and keeps the cursor on a real one", () =>
 	assert.deepStrictEqual(sans(s), ["e4", "c5"]);
 	assert.strictEqual(s.at, 2, "the cursor stays where it was");
 
-	// removing the last line through the position leaves the board there, on
-	// a fresh line of the moves that reach it -- never no line at all
+	// removing the last line through the position from mid-line leaves the
+	// board there, on a fresh line of the moves that reach it -- never no line
+	goTo(s, 1);
 	removeLine(s, 0);
 	assert.strictEqual(s.lines.length, 1);
-	assert.deepStrictEqual(sans(s), ["e4", "c5"]);
-	assert.strictEqual(s.at, 2);
+	assert.deepStrictEqual(sans(s), ["e4"]);
+	assert.strictEqual(s.at, 1);
+});
+
+test("deleting the only line from its end empties the board", () => {
+	// a fresh line of all its moves would be the deleted line over again
+	const s = newScratch([{ san: "d4" }, { san: "d5" }]);
+	removeLine(s, 0);
+	assert.strictEqual(s.lines.length, 1);
+	assert.deepStrictEqual(sans(s), []);
+	assert.strictEqual(s.at, 0);
+});
+
+test("deleting a line from its end goes back to where it left the others", () => {
+	const s = newScratch(["e4", "e5", "Nf3"].map((san) => ({ san })));
+	goTo(s, 1);
+	play(s, "c5");
+	play(s, "Nf3"); // line 1: e4 c5 Nf3, the cursor at its end, alone on view
+	s.lines.push({ moves: [{ san: "d4", ply: 0 }] });
+	removeLine(s, 1);
+	assert.strictEqual(s.lines.length, 2);
+	assert.deepStrictEqual(sans(s), ["e4", "e5", "Nf3"], "on the line it shared 1.e4 with");
+	assert.strictEqual(s.at, 1);
 });
 
 test("removing the active line selects its neighbour", () => {

@@ -871,6 +871,18 @@ test("a move in a capitalised heading keeps its case (Nbd7, not NBD7)", () => {
 	done();
 });
 
+test("✕ on the only line, at its end, really deletes it", () => {
+	const done = installDom();
+	const s = newScratch([{ san: "d4" }, { san: "d5" }]);
+	click(analysisPanel(s, () => {}), ".an-del");
+	const panel = analysisPanel(s, () => {});
+	assert.strictEqual(panel.querySelectorAll(".an-line .an-move").length, 0, "no moves left on view");
+	assert.ok(panel.querySelector(".an-empty"));
+	click(panel, ".an-undo");
+	assert.deepStrictEqual(activeLine(s).moves.map((m) => m.san), ["d4", "d5"]);
+	done();
+});
+
 test("the workbook's lines fold under their heading, and stay folded", () => {
 	const done = installDom();
 	// installDom leaves storage out; the fold lives in prefs, so lend it jsdom's

@@ -168,6 +168,15 @@ test("a deleted line comes back with undo", async ({ page }) => {
   await expect(activeMoves(page)).toHaveText(["1.d4"]);
 });
 
+test("a line deleted from its last move is gone, not recreated", async ({ page }) => {
+  await loadPgn(page);
+  await openBoard(page);
+  await playOnBoard(page, "d2", "d4");
+  await playOnBoard(page, "d7", "d5");
+  await page.locator(".an-line.active .an-del").click();
+  await expect(page.locator(".an-line .an-move")).toHaveCount(0);
+});
+
 test("a notebook can be started from a board with no PGN", async ({ page }) => {
   await page.goto("./");
   await page.getByRole("button", { name: "Start from a board" }).click();
