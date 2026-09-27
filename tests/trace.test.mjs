@@ -150,3 +150,41 @@ test("tracing a line under nested groups lights every column above it", () => {
 	assert.ok(!lit.has(vars.find((v) => v.traceKey === "@1:c5/2:Nf3/3:Nc6")));
 	off();
 });
+
+// Hand-built columns, so the path rule is checked apart from grid()'s layout.
+const col = (sans, from = 0, extra = {}) => {
+	const cells = {};
+	sans.forEach((s, i) => (cells[from + i] = { text: s, cls: "x" }));
+	return { cells, ...extra };
+};
+const mv = (...sans) => sans.map((san, ply) => ({ san, ply }));
+
+test("tracedKey is null for no var, and a group's own key wins over its stem", () => {
+	assert.strictEqual(tracedKey(null), null);
+	assert.strictEqual(tracedKey(undefined), null);
+	assert.strictEqual(
+		tracedKey({ traceKey: "@1:c5", moves: mv("e4", "c5") }),
+		"@1:c5",
+	);
+});
+
+test("an ellipsis cell never spells a move, even with matching text", () => {
+	const main = col(["e4", "e5"]);
+	const line = {
+		...col(["e4", "c5"]),
+		moves: mv("e4", "c5"),
+	};
+	line.cells[0] = { text: "e4", cls: "ellip" };
+	const lit = tracePath([main, line], "e4 c5");
+	assert.deepStrictEqual([...lit.get(main)], [0]);
+	assert.deepStrictEqual([...lit.get(line)], [1], "the ellipsis is not lit");
+});
+
+test("a column with no cells in the chain is skipped, not a crash", () => {
+	const main = col(["e4"]);
+	const group = { traceKey: "@g", moves: mv("e4") }; // no cells at all
+	const line = { ...col(["c5"], 1), moves: mv("e4", "c5"), trail: [group] };
+	const lit = tracePath([main, group, line], "e4 c5");
+	assert.ok(!lit.has(group));
+	assert.deepStrictEqual([...lit.get(line)], [1]);
+});

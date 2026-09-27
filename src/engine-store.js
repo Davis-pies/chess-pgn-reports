@@ -16,6 +16,9 @@
 export const FULL = {
 	file: "stockfish-19-single.wasm",
 	size: 99102793,
+	// SHA-256 of the file in the npm tarball (which the registry signs); a
+	// mirror that sends anything else is refused, since this runs as code
+	sha256: "8725c26572762617fd96b2ea83ff130e6640b85815890d682bf8c49db0820721",
 	// tried in order; both are npm mirrors that send CORS headers
 	urls: [
 		"https://unpkg.com/stockfish@19.0.0/bin/stockfish-19-single.wasm",
@@ -72,9 +75,14 @@ export async function isWasm(blob) {
 	return head[0] === 0 && head[1] === 0x61 && head[2] === 0x73 && head[3] === 0x6d;
 }
 
+async function sha256Hex(blob) {
+	const d = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
+	return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 // Download, check and store the full engine, reporting bytes as they come.
 // Each mirror is tried in turn; the error of the last is what is thrown.
-export async function downloadFull(onProgress = () => {}, fetchImpl = fetch) {
+export async function downloadFull(onProgress = () => {}, fetchImpl = fetch, sha256 = FULL.sha256) {
 	let last = null;
 	for (const url of FULL.urls) {
 		try {
@@ -93,6 +101,8 @@ export async function downloadFull(onProgress = () => {}, fetchImpl = fetch) {
 			}
 			const blob = new Blob(chunks, { type: "application/wasm" });
 			if (!(await isWasm(blob))) throw new Error(`${new URL(url).host} did not send the engine`);
+			if ((await sha256Hex(blob)) !== sha256)
+				throw new Error(`${new URL(url).host} sent an engine that does not match the expected checksum`);
 			await storeFull(blob);
 			return blob;
 		} catch (e) {
