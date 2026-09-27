@@ -111,6 +111,12 @@ against jsdom: `tests/helpers.mjs` has `installDom()` to put a window on the
 globals and helpers that build `current` from a PGN string. IndexedDB is faked
 with `fake-indexeddb`. `tests/fixtures/` holds real PGNs.
 
+`e2e/*.spec.mjs` are Playwright tests against the real page in Chromium
+(`npm run test:e2e`, configured in `playwright.config.js`): importing, the
+report's editor, the analysis board, the engine, and saving and reopening
+workbooks. They start the dev server themselves and answer the esm.sh request
+for chess.js from `node_modules`.
+
 Coverage is enforced in CI with floors just below the current numbers, so new
 code needs tests to keep them.
 

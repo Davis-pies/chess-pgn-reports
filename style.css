@@ -122,6 +122,16 @@ main {
   cursor: ew-resize;
   z-index: 6;
 }
+.side-resize {
+  touch-action: none; /* a finger drags the edge rather than scrolling */
+}
+/* a finger needs a wider edge to catch than a mouse pointer does */
+@media (pointer: coarse) {
+  .side-resize {
+    width: 20px;
+    left: calc(var(--side-w, 420px) - 10px);
+  }
+}
 .side-resize:hover,
 .side-resize:active {
   background: var(--main);
@@ -136,22 +146,39 @@ main {
   margin-right: auto;
   padding: 16px;
 }
-@media (max-width: 1000px) {
+@media screen and (max-width: 1000px) {
   .app-layout {
     width: auto;
     margin-left: 0;
   }
+  /* Stacked, the toolbar leads: it used to sit under the whole table, a long
+     scroll away on a phone. display: contents lets the toolbar be reordered
+     out of the main panel without moving it in the DOM. */
+  .app-layout {
+    display: flex;
+    flex-direction: column;
+  }
+  .main-panel {
+    display: contents;
+  }
+  .main-panel > .toolbar {
+    order: -1;
+  }
   .side-panel {
     position: static;
     width: auto;
-    max-height: none;
-    overflow: visible;
-  }
-  .main-panel {
-    margin-left: 0;
-  }
-  .main-panel {
     max-width: 100%;
+    max-height: none;
+    padding: 0;
+    /* the table scrolls sideways inside its own box, with the ply column
+       pinned, instead of widening the page (which made phones zoom out) */
+    overflow-x: auto;
+    overflow-y: visible;
+  }
+  /* nothing to resize once the panels are stacked; left in place it was an
+     invisible fixed strip across the page, swallowing taps */
+  .side-resize {
+    display: none;
   }
 }
 
@@ -591,6 +618,7 @@ select:focus {
 }
 .ledge-head {
   display: flex;
+  flex-wrap: wrap; /* the tag chips drop to a second row on a phone */
   flex: 1 1 100%;
   gap: 8px;
   align-items: center;
@@ -683,6 +711,7 @@ select:focus {
 }
 .tags {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: 4px;
 }
 .ln {
@@ -1574,3 +1603,84 @@ sup {
 }
 .an-wb-name { flex: none; font-size: .72rem; color: var(--muted); min-width: 4.2rem; padding-top: .15rem; }
 .an-wb .an-showall { align-self: flex-start; }
+
+/* --- phones and touch screens --- */
+.an-touch-hint { display: none; font-size: .75rem; color: var(--muted); }
+
+/* A phone gets the analysis board as a full-screen sheet rather than a window
+   with a margin round it: the margin cost the board a sixth of its width, and
+   the page behind scrolled under a finger that ran past the sheet's end. */
+@media (max-width: 760px), (max-height: 500px) and (orientation: landscape) and (max-width: 1000px) {
+	.an-overlay { padding: 0; align-items: stretch; }
+	.an-overlay .an-window {
+		width: 100%;
+		height: 100dvh;
+		max-height: none;
+		border: 0;
+		border-radius: 0;
+		padding: 0 12px calc(12px + env(safe-area-inset-bottom));
+		overscroll-behavior: contain;
+	}
+	/* the close button stays in reach however far the sheet is scrolled */
+	.an-overlay .an-head {
+		position: sticky;
+		top: 0;
+		z-index: 3;
+		margin: 0 -12px .4rem;
+		padding: calc(6px + env(safe-area-inset-top)) 12px 6px;
+		background: var(--panel);
+		border-bottom: 1px solid var(--line);
+	}
+	.an-overlay .an-head h3 { margin: 0; }
+	.an-overlay .an-close { min-width: 2.75rem; min-height: 2.5rem; font-size: 1rem; }
+	/* the four steppers share the row evenly, as big as the thumb wants */
+	.an-nav .chip { flex: 1 1 auto; }
+	.an-nav .an-cut { flex-basis: 100%; margin-left: 0; }
+	/* a line's buttons drop under its moves rather than squeezing them into
+	   a column a move or two wide */
+	.an-line { flex-wrap: wrap; }
+	.an-line-moves { flex-basis: 100%; }
+	.an-line-tools { margin-left: auto; }
+}
+
+/* Landscape phone: board beside the rest, sized off the height so the whole
+   of it, and the steppers under it, fit on the screen at once. */
+@media (max-height: 500px) and (orientation: landscape) and (max-width: 1000px) {
+	.analysis {
+		grid-template-columns: minmax(0, min(calc(100dvh - 9.5rem), 480px)) minmax(0, 1fr);
+	}
+	.an-overlay .an-head { padding-top: 2px; padding-bottom: 2px; }
+	.an-left { gap: .35rem; }
+	/* the four steppers and Flip on one row under the board */
+	.an-nav { flex-wrap: wrap; gap: .25rem; }
+	.an-nav .chip { flex: 1 1 0; min-width: 0; padding-left: 4px; padding-right: 4px; white-space: nowrap; }
+	.an-nav .an-flip { flex-grow: 1.6; }
+	.an-nav .an-cut { flex-basis: 100%; }
+	.an-touch-hint { display: none !important; }
+}
+
+/* A finger is blunter than a pointer: controls grow to a size it can hit
+   without catching a neighbour, and the keyboard hints give way to the
+   gesture that stands in for them. */
+@media (pointer: coarse) {
+	.chip { min-height: 2.5rem; padding-left: 16px; padding-right: 16px; }
+	.chip.mini { min-height: 2.1rem; padding: 4px 11px; font-size: .85rem; }
+	.sympick .chip.mini { height: 2.4rem; min-width: 2.6rem; }
+	.an-nav .chip { min-height: 2.75rem; font-size: 1.05rem; }
+	.an-move, .an-pvmove { padding: .2rem .35rem; }
+	.an-line, .an-wb-line { padding-top: .4rem; padding-bottom: .4rem; }
+	.tmenu-item { padding: 10px 8px; }
+	.tmenu-open { padding: 4px 8px; }
+	.an-keys { display: none; }
+	.an-touch-hint { display: block; }
+	.move-chip { padding: 6px 10px; font-size: .85rem; }
+	/* iOS zooms the page into any field set under 16px when it takes focus */
+	input, textarea, select { font-size: 16px; }
+	/* a long press opens the move's menu; without these it selects the text
+	   or raises the system's own callout on top of it */
+	.tbl .traceable {
+		-webkit-touch-callout: none;
+		-webkit-user-select: none;
+		user-select: none;
+	}
+}

@@ -485,3 +485,55 @@ test("noMain: the line that carries isMain gets the ordinary line actions", () =
 	closeTableMenu();
 	off();
 });
+
+// jsdom has no TouchEvent constructor to speak of, so a plain Event carrying
+// the touch list stands in for one.
+function touch(target, type, x = 10, y = 10) {
+	const e = new window.Event(type, { bubbles: true, cancelable: true });
+	e.touches = type === "touchend" ? [] : [{ clientX: x, clientY: y }];
+	target.dispatchEvent(e);
+	return e;
+}
+
+test("a long press on a move opens its menu, and the lift traces nothing", (t) => {
+	const off = installDom();
+	t.mock.timers.enable({ apis: ["setTimeout", "Date"] });
+	const { box } = preview();
+	const cell = [...box.querySelectorAll("td")].find((c) => moveOf(c) === "d4");
+	touch(cell, "touchstart");
+	t.mock.timers.tick(499);
+	assert.strictEqual(document.querySelector(".tmenu"), null, "not yet");
+	t.mock.timers.tick(1);
+	const menu = document.querySelector(".tmenu");
+	assert.ok(menu, "held long enough");
+	assert.match(menu.querySelector(".tmenu-sec").textContent, /^@ 3\.d4/);
+	const lift = touch(cell, "touchend");
+	assert.ok(lift.defaultPrevented, "no click is synthesized to trace the column");
+	// Android sends its own contextmenu for the same press: not a second menu
+	closeTableMenu();
+	cell.oncontextmenu(evt(cell));
+	assert.strictEqual(document.querySelector(".tmenu"), null);
+	t.mock.timers.tick(1000);
+	cell.oncontextmenu(evt(cell));
+	assert.ok(document.querySelector(".tmenu"), "a later right-click still opens it");
+	closeTableMenu();
+	off();
+});
+
+test("a finger that moves or lifts early is a scroll or a tap, not a long press", (t) => {
+	const off = installDom();
+	t.mock.timers.enable({ apis: ["setTimeout", "Date"] });
+	const { box } = preview();
+	const cell = [...box.querySelectorAll("td")].find((c) => moveOf(c) === "d4");
+	touch(cell, "touchstart", 10, 10);
+	touch(cell, "touchmove", 10, 40);
+	t.mock.timers.tick(600);
+	assert.strictEqual(document.querySelector(".tmenu"), null, "moved: a scroll");
+	touch(cell, "touchstart");
+	t.mock.timers.tick(200);
+	const lift = touch(cell, "touchend");
+	t.mock.timers.tick(600);
+	assert.strictEqual(document.querySelector(".tmenu"), null, "lifted: a tap");
+	assert.ok(!lift.defaultPrevented, "the tap's click goes through");
+	off();
+});

@@ -78,6 +78,13 @@ The checks CI runs on every pull request:
 | `npm run knip` | no unused files, exports or dependencies |
 | `npm test` | the `node:test` suite under `tests/`, with jsdom for the DOM |
 | `npm run coverage` | the same suite with coverage (CI fails below 97% lines, 87% branches, 97% functions) |
+| `npm run test:e2e` | browser tests in `e2e/`, Playwright + Chromium |
+
+The browser tests start the dev server themselves and drive the real page:
+importing, the report's editor, the analysis board, the engine, saving and
+reopening workbooks. They answer the importmap's esm.sh request for chess.js
+from `node_modules`, so they run offline. First run needs a browser:
+`npx playwright install chromium`.
 
 See [docs/architecture.md](docs/architecture.md) for how the code is laid
 out, and [CLAUDE.md](CLAUDE.md) for the conventions contributors (human or

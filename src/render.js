@@ -222,6 +222,51 @@ function moveCell(c, ply, noteByPly, tag = "td") {
 	return e;
 }
 
+// iOS Safari fires no contextmenu for a long press, so a finger held still on
+// a cell opens the menu here instead. preventDefault on the touchend that
+// follows stops the click the browser would synthesize, which would otherwise
+// also trace the column the menu was opened on.
+const LONG_PRESS_MS = 500;
+function longPress(el, fire) {
+	let timer = null;
+	let fired = false;
+	let x0 = 0;
+	let y0 = 0;
+	const cancel = () => {
+		clearTimeout(timer);
+		timer = null;
+	};
+	el.addEventListener(
+		"touchstart",
+		(e) => {
+			cancel();
+			fired = false;
+			if (e.touches.length !== 1) return;
+			x0 = e.touches[0].clientX;
+			y0 = e.touches[0].clientY;
+			timer = setTimeout(() => {
+				timer = null;
+				fired = true;
+				fire(x0, y0);
+			}, LONG_PRESS_MS);
+		},
+		{ passive: true },
+	);
+	el.addEventListener(
+		"touchmove",
+		(e) => {
+			const t = e.touches[0];
+			if (t && Math.hypot(t.clientX - x0, t.clientY - y0) > 10) cancel();
+		},
+		{ passive: true },
+	);
+	el.addEventListener("touchend", (e) => {
+		cancel();
+		if (fired) e.preventDefault();
+	});
+	el.addEventListener("touchcancel", cancel);
+}
+
 // Populates `container` with the table (+ optional board diagrams).
 // `trace` is the line the preview is highlighting: { litByVar, onTrace }, where
 // litByVar is trace.js's Map(var -> Set(ply)) — or null when nothing is traced,
@@ -326,11 +371,18 @@ export function renderTable(container, grid, trace) {
 	};
 	const wireMenu = (el, v, ply) => {
 		if (!trace || !trace.onMenu || !v.moves) return;
+		let heldAt = 0; // when a long press last opened the menu
 		el.oncontextmenu = (e) => {
 			e.preventDefault();
 			e.stopPropagation();
+			// Android fires contextmenu for the same long press as well
+			if (Date.now() - heldAt < 1000) return;
 			trace.onMenu(v, ply, e);
 		};
+		longPress(el, (x, y) => {
+			heldAt = Date.now();
+			trace.onMenu(v, ply, { clientX: x, clientY: y, currentTarget: el });
+		});
 	};
 	const labels = {};
 	// number every WHITE (even) ply, not just the mainline's — rows that only

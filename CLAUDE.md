@@ -21,9 +21,12 @@ npm run lint       # ESLint; `npm run lint:fix` fixes what it can
 npm run knip       # fails on unused files, exports or dependencies
 npm test           # node --test 'tests/**/*.test.mjs'
 npm run coverage   # CI fails below 97% lines, 87% branches, 97% functions
+npm run test:e2e   # Playwright browser tests in e2e/ (separate CI job)
 ```
 
-Run a single test file with `node --test tests/pgn.test.mjs`.
+Run a single test file with `node --test tests/pgn.test.mjs`. The browser tests
+need Chromium once (`npx playwright install chromium`); they start the dev
+server themselves and serve chess.js from `node_modules`, so they run offline.
 
 `npm run dev` serves the app at http://127.0.0.1:8000 with live reload. esm.sh
 must be reachable for the page to load `chess.js`; in a sandbox without it,
@@ -64,6 +67,8 @@ intercept `https://esm.sh/**` and serve `node_modules/chess.js/dist/esm/chess.js
 
 - Every behaviour change comes with a test in `tests/`. Use `installDom()`
   and the state builders in `tests/helpers.mjs` for anything touching the DOM.
+- Flows that need a real browser (drag, layout, the engine worker) belong in
+  `e2e/`, using the fixtures in `e2e/fixtures.mjs`.
 - Never skip, disable or loosen a test, or lower a coverage floor, to get
   green. Raise the floors when coverage improves.
 
