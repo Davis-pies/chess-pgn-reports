@@ -168,9 +168,12 @@ export function exportBar() {
 }
 
 export function slug() {
-  return (getCurrent().name || "opening-table")
-    .replace(/[^a-z0-9_-]+/gi, "-")
+  // Letters of any script survive ("Königsindisch", "日本語"); a name with
+  // none at all ("///", spaces) falls back rather than yielding ".json".
+  const s = (getCurrent().name || "")
+    .replace(/[^\p{L}\p{N}_-]+/gu, "-")
     .replace(/^-+|-+$/g, "");
+  return s || "opening-table";
 }
 
 // Clipboard write with the execCommand fallback browsers without the async

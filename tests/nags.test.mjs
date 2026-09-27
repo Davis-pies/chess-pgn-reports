@@ -1,6 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { NAGS, nagFor, symFor, markSym, markOf } from "../src/nags.js";
+import {
+	NAGS,
+	nagFor,
+	symFor,
+	markSym,
+	markOf,
+	markNag,
+	migrateMarks,
+} from "../src/nags.js";
 
 test("maps the traditional move assessments", () => {
 	assert.equal(nagFor("!"), 1);
@@ -123,4 +131,45 @@ test("the crushing advantage pair is offered alongside the decisive one", () => 
 	// distinct codes, so the two are never confused on export
 	assert.strictEqual(nagFor("+−"), 18);
 	assert.strictEqual(nagFor("+−−"), 20);
+});
+
+// Zugzwang: one glyph, $22 for White and $23 for Black.
+const ZUG = symFor(22);
+
+test("markSym: empty is blank, an unknown code is blank, a legacy glyph passes", () => {
+	assert.equal(markSym(""), "");
+	assert.equal(markSym(undefined), "");
+	assert.equal(markSym("$1"), "!");
+	assert.equal(markSym("$9999"), "", "a code outside the table draws nothing");
+	assert.equal(markSym("TN"), "TN", "a mark with no code is its own glyph");
+});
+
+test("markNag: a coded mark exports its code, a glyph is looked up by side", () => {
+	assert.equal(markNag(""), undefined);
+	assert.equal(markNag("$14"), 14);
+	assert.equal(markNag("$9999"), 9999, "the code is kept even if we draw nothing");
+	assert.equal(markNag("!"), 1);
+	assert.equal(markNag(ZUG, 0), 22);
+	assert.equal(markNag(ZUG, 1), 23, "a Black move takes the Black half");
+	assert.equal(markNag("TN"), nagFor("TN"));
+	assert.equal(markNag("not a glyph"), undefined);
+});
+
+test("nagFor with no symbol is undefined", () => {
+	assert.equal(nagFor(""), undefined);
+	assert.equal(nagFor(undefined, 1), undefined);
+});
+
+test("migrateMarks converts glyphs by side, keeps codes, drops blanks", () => {
+	assert.deepEqual(migrateMarks(undefined), {});
+	assert.deepEqual(migrateMarks(null), {});
+	assert.deepEqual(
+		migrateMarks({ 0: "!", 1: ZUG, 2: "$3", 3: "", 4: "weird" }),
+		{
+			0: "$1",
+			1: "$23",
+			2: "$3",
+			4: "weird",
+		},
+	);
 });

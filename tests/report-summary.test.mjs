@@ -40,6 +40,11 @@ test("pgnTags reads tag pairs without touching the moves", () => {
     Variation: "Austrian attack",
   });
   assert.deepStrictEqual(pgnTags(undefined), {});
+  // a multi-game file: the first game's header, not the last one's
+  assert.deepStrictEqual(
+    pgnTags('[White "A"]\n\n1. e4 *\n\n[White "B"]\n\n1. d4 *'),
+    { White: "A" },
+  );
 });
 
 test("headerFacts states the opening, then the game", () => {
