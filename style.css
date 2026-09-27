@@ -1605,6 +1605,48 @@ sup {
 .an-wb-name { flex: none; font-size: .72rem; color: var(--muted); min-width: 4.2rem; padding-top: .15rem; }
 .an-wb .an-showall { align-self: flex-start; }
 
+/* Settings drop-down beside the theme button (see settings-view.js) */
+.settings {
+  position: relative;
+}
+.settings > summary {
+  list-style: none;
+}
+.settings > summary::-webkit-details-marker {
+  display: none;
+}
+.settings-body {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+  min-width: 260px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.settings-label {
+  min-width: 110px;
+  color: var(--muted);
+}
+@media print {
+  .settings {
+    display: none;
+  }
+}
+
 /* --- phones and touch screens --- */
 .an-touch-hint { display: none; font-size: .75rem; color: var(--muted); }
 
