@@ -61,13 +61,20 @@ accounts). Your notebooks are saved in your own browser's `localStorage`.
      both continuations, so you can build up several lines in one sitting
      without losing the one you came from. Each line's moves repeated from a
      line above are drawn faintly; a line the notebook already holds is
-     badged **in notebook**. ↑/↓ reorder lines (the first is the trunk of the
-     copied PGN), ✕ deletes one, and **✂ Delete from here** cuts the selected
-     line after the current move. **Clear lines** deletes the lines on view.
-     **↶ Undo** reverses the last delete, cut or clear. The toolbar's
+     badged **in notebook**. Playing a move another line already plays from
+     the same position follows that line instead of adding a copy of it.
+     ↑/↓ reorder lines and **⤒** makes one the first (the trunk of the
+     copied PGN), **✎** names one (the name goes into the notebook with it,
+     and is saved with the workbook), ✕ deletes one, and **✂ Delete from
+     here** cuts the selected line after the current move. **Clear lines**
+     deletes the lines on view. **↶ Undo** steps back through deletes, cuts,
+     clears, renames and moves to the top, saying which it will undo, and
+     **↷ Redo** steps forward again. **⤺ / ⤻** jump to the previous or next
+     move where the line being played meets another. The toolbar's
      **Analysis** reopens the board as you left it.
    - **Keys** — ← → step, Home/End jump, ↑ ↓ switch line at the same move,
-     F flips, E toggles the engine, Space plays the engine's best move.
+     [ ] jump between branch points, Ctrl+Z / Ctrl+Shift+Z (or Ctrl+Y) undo
+     and redo, F flips, E toggles the engine, Space plays the engine's best move.
    - **Notes** — the box under the lines holds a note on the move just
      played, which goes into the notebook with the line. For a move the
      notebook already has, **Save note to notebook** puts it straight in (on

@@ -4,7 +4,7 @@ import assert from "node:assert";
 import { installDom, loadState } from "./helpers.mjs";
 import { getCurrent } from "../src/state.js";
 import { analysisPanel, numberedMoves } from "../src/analysis-view.js";
-import { newScratch, activeLine, play, goTo, forward } from "../src/analysis.js";
+import { newScratch, activeLine, play, goTo, forward, select } from "../src/analysis.js";
 
 const click = (root, sel) => {
 	const n = root.querySelector(sel);
@@ -302,7 +302,10 @@ test("the end button and Delete from here", () => {
 	// and it can be undone
 	click(analysisPanel(s, () => {}), ".an-undo");
 	assert.deepStrictEqual(activeLine(s).moves.map((m) => m.san), ["e4", "e5", "Nf3"]);
-	assert.strictEqual(analysisPanel(s, () => {}).querySelector(".an-undo"), null, "one undo only");
+	assert.strictEqual(analysisPanel(s, () => {}).querySelector(".an-undo"), null, "nothing more to undo");
+	// and redone
+	click(analysisPanel(s, () => {}), ".an-redo");
+	assert.deepStrictEqual(activeLine(s).moves.map((m) => m.san), ["e4"]);
 	done();
 });
 
@@ -720,5 +723,135 @@ test("an unselected row starts where it leaves the lines above it", () => {
 	// the selected (first) line from the position; the other from the move
 	// before it parts company, so the two can be told apart at a glance
 	assert.deepStrictEqual(rows, ["… 1...c5 2.Nf3 d6 3.d4 cxd4 4.Nxd4", "… 3.d4 Nf6 4.Nc3"]);
+	done();
+});
+
+// ---- undo/redo labels and keys, naming, move to top, branch points
+
+const key = (panel, k, opts = {}) =>
+	panel.dispatchEvent(new window.KeyboardEvent("keydown", { key: k, bubbles: true, cancelable: true, ...opts }));
+
+const twoLines = () => {
+	const s = newScratch([{ san: "e4" }, { san: "e5" }]);
+	goTo(s, 1);
+	play(s, "c5");
+	goTo(s, 1);
+	return s;
+};
+
+test("Undo and Redo say what they will do", () => {
+	const done = installDom();
+	const s = twoLines();
+	analysisPanel(s, () => {}).querySelectorAll(".an-del")[0].click();
+	const panel = analysisPanel(s, () => {});
+	assert.strictEqual(panel.querySelector(".an-undo").textContent, "↶ Undo delete line");
+	assert.strictEqual(panel.querySelector(".an-redo"), null);
+	panel.querySelector(".an-undo").click();
+	assert.strictEqual(analysisPanel(s, () => {}).querySelector(".an-redo").textContent, "↷ Redo delete line");
+	done();
+});
+
+test("Ctrl+Z undoes and Ctrl+Shift+Z / Ctrl+Y redo, but not while typing", () => {
+	const done = installDom();
+	const s = twoLines();
+	analysisPanel(s, () => {}).querySelectorAll(".an-del")[0].click();
+	assert.strictEqual(s.lines.length, 1);
+	let changed = 0;
+	let panel = analysisPanel(s, () => changed++);
+	key(panel, "z", { ctrlKey: true });
+	assert.strictEqual(s.lines.length, 2);
+	key(panel, "Z", { ctrlKey: true, shiftKey: true });
+	assert.strictEqual(s.lines.length, 1);
+	key(panel, "z", { metaKey: true });
+	key(panel, "y", { ctrlKey: true });
+	assert.strictEqual(s.lines.length, 1);
+	assert.strictEqual(changed, 4);
+	panel = analysisPanel(s, () => {});
+	document.body.appendChild(panel);
+	panel.querySelector("textarea, input").dispatchEvent(new window.KeyboardEvent("keydown", { key: "z", ctrlKey: true, bubbles: true }));
+	assert.strictEqual(s.lines.length, 1, "the note box keeps its own undo");
+	panel.remove();
+	done();
+});
+
+test("a line is named in place, and the name shows on its row", () => {
+	const done = installDom();
+	const s = twoLines();
+	click(analysisPanel(s, () => {}), ".an-rename");
+	let panel = analysisPanel(s, () => {});
+	const input = panel.querySelector(".an-line-name-input");
+	assert.ok(input, "a name box on the first row");
+	input.value = "  Open game ";
+	input.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+	assert.strictEqual(s.lines[0].name, "Open game");
+	panel = analysisPanel(s, () => {});
+	assert.strictEqual(panel.querySelector(".an-line-name").textContent, "Open game");
+	assert.strictEqual(panel.querySelector(".an-line-name-input"), null);
+	assert.match(panel.querySelector(".an-undo").textContent, /rename/);
+	done();
+});
+
+test("Escape leaves the name as it was and does not reach the window", () => {
+	const done = installDom();
+	const s = twoLines();
+	s.lines[1].name = "Sicilian";
+	let reached = 0;
+	const panel = analysisPanel(s, () => {});
+	panel.querySelectorAll(".an-line-name")[0].dispatchEvent(new window.MouseEvent("dblclick", { bubbles: true }));
+	assert.strictEqual(s.renaming, 1);
+	const wrap = document.createElement("div");
+	wrap.onkeydown = () => reached++;
+	const again = analysisPanel(s, () => {});
+	wrap.appendChild(again);
+	const input = again.querySelector(".an-line-name-input");
+	assert.strictEqual(input.value, "Sicilian");
+	input.value = "changed";
+	input.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+	assert.strictEqual(s.lines[1].name, "Sicilian");
+	assert.strictEqual(reached, 0);
+	assert.strictEqual(s.renaming, null);
+	assert.strictEqual(s.undo, undefined, "nothing to undo");
+	done();
+});
+
+test("a named line goes into the notebook under its name", () => {
+	const done = installDom();
+	loadState("1. d4 d5 *");
+	const s = newScratch([{ san: "e4" }, { san: "c5" }]);
+	s.lines[0].name = "Sicilian";
+	click(analysisPanel(s, () => {}), ".an-add");
+	assert.strictEqual(getCurrent().lines.at(-1).name, "Sicilian");
+	done();
+});
+
+test("move to top puts a line first", () => {
+	const done = installDom();
+	const s = twoLines();
+	const panel = analysisPanel(s, () => {});
+	assert.ok(panel.querySelectorAll(".an-top")[0].disabled);
+	panel.querySelectorAll(".an-top")[1].click();
+	assert.deepStrictEqual(s.lines[0].moves.map((m) => m.san), ["e4", "c5"]);
+	assert.match(analysisPanel(s, () => {}).querySelector(".an-undo").textContent, /move to top/);
+	done();
+});
+
+test("the branch-point buttons and [ ] jump to where lines meet", () => {
+	const done = installDom();
+	const s = newScratch(["e4", "e5", "Nf3", "Nc6"].map((san) => ({ san })));
+	goTo(s, 1);
+	play(s, "c5");
+	select(s, 0);
+	goTo(s, 4);
+	let panel = analysisPanel(s, () => {});
+	assert.ok(panel.querySelector(".an-nextbranch").disabled);
+	panel.querySelector(".an-prevbranch").click();
+	assert.strictEqual(s.at, 1);
+	panel = analysisPanel(s, () => {});
+	assert.ok(panel.querySelector(".an-prevbranch").disabled);
+	key(panel, "]");
+	assert.strictEqual(s.at, 1, "no branch point after this one");
+	goTo(s, 3);
+	key(analysisPanel(s, () => {}), "[");
+	assert.strictEqual(s.at, 1);
 	done();
 });

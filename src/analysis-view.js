@@ -15,12 +15,17 @@ import { drawArrows, interactiveBoard } from "./board-input.js";
 import {
 	activeLine,
 	back,
+	branchPoints,
 	checkpoint,
 	forward,
 	goTo,
 	clearShown,
 	moveLine,
+	moveToTop,
 	pin,
+	redo,
+	redoLabel,
+	rename,
 	shown,
 	toggleShowAll,
 	play,
@@ -30,10 +35,12 @@ import {
 	scratchPgn,
 	select,
 	sharedPrefix,
+	stepBranch,
 	stepLine,
 	through,
 	truncate,
 	undo,
+	undoLabel,
 } from "./analysis.js";
 import {
 	commitAll,
@@ -82,9 +89,10 @@ export function analysisPanel(
 		fn();
 		onChange();
 	};
-	// ... and the ones that throw work away keep an undo first.
-	const risky = (fn) => act(() => {
-		checkpoint(scratch);
+	// ... and the ones that change the lines keep an undo first, labelled
+	// with what they do so the Undo button can say what it will put back.
+	const risky = (label, fn) => act(() => {
+		checkpoint(scratch, label);
 		fn();
 	});
 
@@ -99,6 +107,8 @@ export function analysisPanel(
 		End: () => goTo(scratch, activeLine(scratch).moves.length),
 		ArrowUp: () => stepLine(scratch, -1),
 		ArrowDown: () => stepLine(scratch, 1),
+		"[": () => stepBranch(scratch, -1),
+		"]": () => stepBranch(scratch, 1),
 		f: () => (scratch.flipped = !scratch.flipped),
 	};
 	if (engine) {
@@ -110,8 +120,19 @@ export function analysisPanel(
 		};
 	}
 	panel.onkeydown = (e) => {
-		if (e.ctrlKey || e.metaKey || e.altKey) return;
 		if (e.target.closest("input, textarea, select")) return; // the caret's, while typing a note
+		// Ctrl/Cmd+Z undoes, Ctrl/Cmd+Shift+Z or Ctrl+Y redoes; any other
+		// modified key is the browser's.
+		if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+			const k = e.key.toLowerCase();
+			const fn = k === "z" ? (e.shiftKey ? redo : undo) : k === "y" ? redo : null;
+			if (!fn) return;
+			e.preventDefault();
+			fn(scratch);
+			onChange();
+			return;
+		}
+		if (e.ctrlKey || e.metaKey || e.altKey) return;
 		if (e.key === " " && e.target.closest("button")) return; // Space presses a focused button
 		const fn = keys[e.key];
 		if (!fn) return;
@@ -150,8 +171,10 @@ export function analysisPanel(
 	const nav = el("div", { className: "an-nav orow" });
 	nav.append(
 		btn("an-start", "⏮", "Back to the start (Home)", act(() => goTo(scratch, 0)), scratch.at === 0),
+		btn("an-prevbranch", "⤺", "Back to where this line meets another ([)", act(() => stepBranch(scratch, -1)), !branchPoints(scratch).some((p) => p < scratch.at)),
 		btn("an-back", "◀", "Back one move (←)", act(() => back(scratch)), scratch.at === 0),
 		btn("an-fwd", "▶", "Forward one move (→)", act(() => forward(scratch)), scratch.at === len),
+		btn("an-nextbranch", "⤻", "On to where this line meets another (])", act(() => stepBranch(scratch, 1)), !branchPoints(scratch).some((p) => p > scratch.at)),
 		btn("an-end", "⏭", "To the end of the line (End)", act(() => goTo(scratch, len)), scratch.at === len),
 		// Flip changes nothing about the scratch's moves, so it is kept apart
 		// from the controls that do.
@@ -162,7 +185,7 @@ export function analysisPanel(
 			"an-cut",
 			"✂ Delete from here",
 			"Delete the moves after this one in this line",
-			risky(() => truncate(scratch)),
+			risky("delete from here", () => truncate(scratch)),
 			scratch.at === len,
 		),
 	);
@@ -170,7 +193,9 @@ export function analysisPanel(
 	left.appendChild(
 		el("div", {
 			className: "an-keys",
-			textContent: "Keys: ← → step · Home/End · ↑ ↓ switch line · F flip" + (engine ? " · E engine · Space best move" : ""),
+			textContent:
+				"Keys: ← → step · Home/End · ↑ ↓ switch line · [ ] branch points · F flip · Ctrl+Z undo" +
+				(engine ? " · E engine · Space best move" : ""),
 		}),
 	);
 
@@ -226,6 +251,43 @@ export function analysisPanel(
 		const r = commitLine(line, opts);
 		return r.ok ? null : r.reason;
 	};
+	// Naming a line happens in place, in a box where its name goes. Enter or
+	// leaving the box keeps the name (an empty one clears it), Escape keeps
+	// the old one -- and does not close the window, as Escape would elsewhere.
+	function nameInput(i) {
+		const line = scratch.lines[i];
+		const input = el("input", {
+			type: "text",
+			className: "an-line-name-input",
+			value: line.name || "",
+			placeholder: "Line name",
+		});
+		input.setAttribute("aria-label", "Line name");
+		let done = false;
+		const finish = (keep) => {
+			if (done) return;
+			done = true;
+			scratch.renaming = null;
+			const name = input.value.trim();
+			if (keep && name !== (line.name || "")) {
+				checkpoint(scratch, "rename");
+				rename(scratch, i, name);
+			}
+			onChange();
+		};
+		input.onclick = (e) => e.stopPropagation();
+		input.onkeydown = (e) => {
+			if (e.key === "Enter") finish(true);
+			else if (e.key === "Escape") {
+				e.stopPropagation();
+				finish(false);
+			}
+		};
+		input.onblur = () => finish(true);
+		// after the app has focused the panel
+		setTimeout(() => input.isConnected && input.focus());
+		return input;
+	}
 	const list = el("div", { className: "an-lines" });
 	on.forEach((i, k) => {
 		const line = scratch.lines[i];
@@ -241,6 +303,20 @@ export function analysisPanel(
 		// you get back to a position you want to branch from again.
 		row.onclick = act(() => select(scratch, i));
 		const movesBox = el("div", { className: "an-line-moves" });
+		if (scratch.renaming === i) row.appendChild(nameInput(i));
+		else if (line.name)
+			row.appendChild(
+				el("span", {
+					className: "an-line-name",
+					textContent: line.name,
+					title: "Double-click to rename",
+					ondblclick: (e) => {
+						e.stopPropagation();
+						scratch.renaming = i;
+						onChange();
+					},
+				}),
+			);
 		if (!line.moves.length) {
 			movesBox.appendChild(el("span", { className: "an-empty", textContent: "(no moves yet — play one on the board)" }));
 		}
@@ -300,6 +376,7 @@ export function analysisPanel(
 			});
 		if (on.length > 1) {
 			tools.append(
+				small("an-top", "⤒", "Make this the first line (the trunk of the copied PGN)", risky("move to top", () => moveToTop(scratch, i)), i === 0),
 				small("an-up", "↑", "Move this line up", act(() => moveLine(scratch, i, -1)), k === 0),
 				small("an-down", "↓", "Move this line down", act(() => moveLine(scratch, i, 1)), k === on.length - 1),
 			);
@@ -315,7 +392,12 @@ export function analysisPanel(
 		);
 		pinBtn.setAttribute("aria-pressed", String(!!line.pinned));
 		tools.appendChild(pinBtn);
-		tools.appendChild(small("an-del", "✕", "Delete this line", risky(() => removeLine(scratch, i))));
+		tools.appendChild(
+			small("an-rename", "✎", line.name ? "Rename this line" : "Name this line (the name goes into the notebook with it)", act(() => {
+				scratch.renaming = i;
+			})),
+		);
+		tools.appendChild(small("an-del", "✕", "Delete this line", risky("delete line", () => removeLine(scratch, i))));
 		row.appendChild(tools);
 		list.appendChild(row);
 	});
@@ -357,9 +439,12 @@ export function analysisPanel(
 	extra.append(
 		btn("an-copy-fen", "Copy FEN", "Copy this position as FEN", copy(pos.fen, "FEN")),
 		btn("an-copy-pgn", "Copy PGN", "Copy every line here as one PGN, the first line as the main line", copy(scratchPgn(scratch), "PGN")),
-		btn("an-clear", "Clear lines", "Delete the lines on view and start again from this position", risky(() => clearShown(scratch))),
+		btn("an-clear", "Clear lines", "Delete the lines on view and start again from this position", risky("clear lines", () => clearShown(scratch))),
 	);
-	if (scratch.undo) extra.appendChild(btn("an-undo", "↶ Undo", "Undo the last delete", act(() => undo(scratch))));
+	const u = undoLabel(scratch);
+	const r = redoLabel(scratch);
+	if (u) extra.appendChild(btn("an-undo", "↶ Undo " + u, "Undo: " + u + " (Ctrl+Z)", act(() => undo(scratch))));
+	if (r) extra.appendChild(btn("an-redo", "↷ Redo " + r, "Redo: " + r + " (Ctrl+Shift+Z)", act(() => redo(scratch))));
 	right.appendChild(extra);
 
 	panel.append(left, right);
