@@ -306,6 +306,46 @@ test("a tap then a tap is a click-click; a cancelled touch plays nothing", () =>
 	done();
 });
 
+test("a sideways swipe from an empty square steps through the moves", () => {
+	const done = installDom();
+	const steps = [];
+	const board = interactiveBoard(START, () => {}, { onSwipe: (d) => steps.push(d) });
+	const svg = board.querySelector("svg");
+	const e4 = board.querySelector('rect[data-sq="e4"]');
+	touch(e4, "touchstart", 200, 100);
+	touch(svg, "touchend", 120, 110, "changed");
+	touch(e4, "touchstart", 100, 100);
+	touch(svg, "touchend", 180, 95, "changed");
+	assert.deepStrictEqual(steps, [1, -1], "left is forward, right is back");
+	// too short, or more down than across: a tap with a wobble, not a swipe
+	touch(e4, "touchstart", 100, 100);
+	touch(svg, "touchend", 120, 100, "changed");
+	touch(e4, "touchstart", 100, 100);
+	touch(svg, "touchend", 150, 180, "changed");
+	assert.deepStrictEqual(steps, [1, -1]);
+	done();
+});
+
+test("a swipe is never read from a touch that picks up or places a piece", () => {
+	const done = installDom();
+	const steps = [];
+	const seen = [];
+	const board = interactiveBoard(START, (san) => seen.push(san), { onSwipe: (d) => steps.push(d) });
+	const svg = board.querySelector("svg");
+	const e2 = board.querySelector('rect[data-sq="e2"]');
+	document.elementFromPoint = () => e2;
+	// picks the pawn up: a drag, which snaps back where it started
+	touch(e2, "touchstart", 100, 100);
+	touch(svg, "touchend", 20, 100, "changed");
+	// the pawn is still picked up, so a touch on an empty square is aimed at
+	// the move, and one that is not a target just drops the selection
+	touch(board.querySelector('rect[data-sq="a5"]'), "touchstart", 100, 100);
+	touch(svg, "touchend", 20, 100, "changed");
+	assert.deepStrictEqual(steps, []);
+	assert.deepStrictEqual(seen, []);
+	done();
+});
+
 test("arrows are drawn over the board and replaced in place", () => {
 	const done = installDom();
 	const board = interactiveBoard(START, () => {}, { size: 320 });
