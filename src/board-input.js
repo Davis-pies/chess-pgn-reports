@@ -24,6 +24,7 @@ const PROMO_PIECES = [
 ];
 
 const SVG_NS = "http://www.w3.org/2000/svg";
+const SWIPE_PX = 40;
 const FILES = "abcdefgh";
 
 // The centre of a square in board units, for whichever way up it is drawn.
@@ -39,10 +40,14 @@ function centre(sq, size, flipped) {
 // `lastMove` ({from, to}) and `check` (a square) are marked on the squares
 // under the pieces; they are what a player looks for first on a board they
 // did not just move on.
+//
+// `onSwipe(dir)` is called for a sideways finger swipe that starts on a
+// square without picking a piece up: -1 for a swipe to the right (back, like
+// turning a page back), 1 for one to the left (forward).
 export function interactiveBoard(
 	fen,
 	onMove,
-	{ size = 320, flipped = false, lastMove = null, check = null } = {},
+	{ size = 320, flipped = false, lastMove = null, check = null, onSwipe = null } = {},
 ) {
 	const wrap = document.createElement("div");
 	wrap.className = "an-board";
@@ -205,8 +210,14 @@ export function interactiveBoard(
 			if (!sq) return;
 			e.preventDefault();
 			const t = e.touches[0];
+			// A touch while a piece is picked up is aimed at finishing or
+			// changing that move, never a swipe.
+			const selecting = !!from;
 			const drag = down(sq, t.clientX, t.clientY);
-			if (!drag) return;
+			if (!drag) {
+				if (onSwipe && !selecting && !from && !pending) swipe(t.clientX, t.clientY);
+				return;
+			}
 			const move = (ev) => {
 				ev.preventDefault();
 				drag.move(ev.touches[0].clientX, ev.touches[0].clientY);
@@ -228,6 +239,21 @@ export function interactiveBoard(
 		},
 		{ passive: false },
 	);
+
+	// Mostly sideways and far enough that a tap with a wobble is not one.
+	function swipe(x0, y0) {
+		const end = (ev) => {
+			svg.removeEventListener("touchend", end);
+			svg.removeEventListener("touchcancel", end);
+			const p = ev.changedTouches && ev.changedTouches[0];
+			if (ev.type !== "touchend" || !p) return;
+			const dx = p.clientX - x0;
+			const dy = p.clientY - y0;
+			if (Math.abs(dx) >= SWIPE_PX && Math.abs(dx) > 2 * Math.abs(dy)) onSwipe(dx < 0 ? 1 : -1);
+		};
+		svg.addEventListener("touchend", end);
+		svg.addEventListener("touchcancel", end);
+	}
 
 	// The picked piece rides under the pointer until it is let go. It stops
 	// catching pointer events meanwhile, so the release lands on the square
