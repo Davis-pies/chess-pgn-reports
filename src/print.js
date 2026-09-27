@@ -132,8 +132,18 @@ function offshoot(mainV, lines, index) {
     }
     return out;
   };
+  // Note markers are gathered from every line on the table, not just the one
+  // the moves were read off: a note on a stem move belongs to whichever line
+  // owns that node, and the stem is the only place the move is printed.
+  const noteByPly = {};
+  for (const m of moves) {
+    const refs = new Set();
+    for (const v of m.ply < mainShared ? [mainV] : lines)
+      ((v.noteByPly && v.noteByPly[m.ply]) || []).forEach((n) => refs.add(n));
+    if (refs.size) noteByPly[m.ply] = [...refs].sort((a, b) => a - b);
+  }
   return {
-    stem: { tag: "mainline", moves, marks: pick("marks"), noteByPly: pick("noteByPly") },
+    stem: { tag: "mainline", moves, marks: pick("marks"), noteByPly },
     cols,
   };
 }
@@ -203,10 +213,6 @@ export function appendPrintTables(box, g) {
   const packs = packForPrint(mainV, others, size);
   (packs.length ? packs : [[]]).forEach((lines, i) => {
     const { off, pv, stem, maxPly } = tableShape(mainV, lines, i);
-    // the lines no table of their own was worth: say so, so the table reads
-    // as a section of its own rather than as a page that lost its thread
-    if (lines.odds)
-      wrap.appendChild(el("div", { className: "print-odds", textContent: "Other lines" }));
     if (stem) {
       const s = el("div", { className: "print-stem" });
       // the stem's moves, marks and note markers: every column states these
@@ -332,7 +338,11 @@ function tableShape(mainV, lines, index) {
 function tableRows(mainV, lines, index) {
   const maxPly = index === 0 ? subMaxPly([mainV, ...lines]) : subMaxPly(lines);
   const off = offshoot(mainV, lines, index);
-  const stem = off ? off.stem.moves.length : stemLength([mainV, ...lines]);
+  // The table carrying the mainline states it whole, from move one: it is the
+  // reference the rest of the report is read against, and a stem above it
+  // would take the mainline's opening moves out of its own column.
+  const carriesMain = index === 0 && !mainV.synthetic;
+  const stem = off ? off.stem.moves.length : carriesMain ? 0 : stemLength([mainV, ...lines]);
   return { off, stem, maxPly, rows: Math.max(maxPly - stem + 1, 0) };
 }
 
@@ -375,20 +385,13 @@ function packForPrint(mainV, lines, size) {
   ].join("|");
   if (lastCut.key === key) return rebuild(order, lastCut.cut);
   const tables = combineSmall(mainV, packFresh(mainV, order, size), size);
-  lastCut = {
-    key,
-    cut: tables.map((t) => ({ at: t.map((l) => order.indexOf(l)), odds: !!t.odds })),
-  };
+  lastCut = { key, cut: tables.map((t) => t.map((l) => order.indexOf(l))) };
   return tables;
 }
 
 // A kept cut, as tables of this render's lines.
 function rebuild(order, cut) {
-  return cut.map(({ at, odds }) => {
-    const t = at.map((k) => order[k]);
-    if (odds) t.odds = true;
-    return t;
-  });
+  return cut.map((at) => at.map((k) => order[k]));
 }
 
 // The cut above is by paper alone, and paper alone is happy to leave a line
@@ -398,7 +401,6 @@ function rebuild(order, cut) {
 // "odds and ends" table (or as many as they need) at the end of the report.
 // The first table stays where it is, small or not, when it carries the
 // mainline.
-// A table of these is flagged `odds`, for its caption.
 function combineSmall(mainV, tables, size) {
   const width = (lines, i) => tableShape(mainV, lines, i).width;
   const keep = [];
@@ -417,7 +419,6 @@ function combineSmall(mainV, tables, size) {
   const per = Math.ceil(odds.length / Math.ceil(odds.length / size));
   let cur = [];
   const close = () => {
-    cur.odds = true;
     keep.push(cur);
     cur = [];
   };
