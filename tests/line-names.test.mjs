@@ -15,6 +15,7 @@ test("printed headers carry the same line names as the editor, on every render",
   await app.loadPgn("1. e4 c5 2. Nf3 d6 (2... Nc6 3. d4) (2... e6 3. d4) (2... g6) 3. d4 *");
   const names = () => {
     const editor = new Set([...app.view().querySelectorAll("input.ln")].map((i) => i.value));
+    app.print();
     const printed = [...app.view().querySelectorAll(".pv-htable table.tbl tr:first-child th")]
       .map((th) => th.textContent)
       .filter((t) => /^Line \d+$/.test(t));

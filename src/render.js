@@ -53,7 +53,35 @@ function fenGrid(fen) {
 // on the a-file and 1st rank.
 // `flipped` draws it from Black's side. The squares keep their real names, so
 // a click resolves the same either way; only where each one is drawn changes.
+//
+// A report draws the same few positions over and over (every card of a line
+// family ends near the others, and each re-render draws them all again), so
+// a built board is kept and later requests get a deep clone of it: one
+// cloneNode instead of ~100 createElementNS/setAttribute calls.
+const boardCache = new Map(); // key -> built <svg>, oldest first
+const BOARD_CACHE_MAX = 400;
 export function boardSvg(fen, size = 220, { flipped = false } = {}) {
+	// only the fields the drawing reads: placement, and the side to move for
+	// the accessible name
+	const f = (fen || START_FEN).split(" ");
+	const key = f[0] + " " + f[1] + " " + size + (flipped ? " f" : "");
+	let built = boardCache.get(key);
+	// a board built in another document (the tests swap jsdom windows) cannot
+	// be cloned into this one
+	if (built && built.ownerDocument !== document) {
+		boardCache.clear();
+		built = null;
+	}
+	if (!built) {
+		built = buildBoard(fen, size, flipped);
+		if (boardCache.size >= BOARD_CACHE_MAX)
+			boardCache.delete(boardCache.keys().next().value);
+		boardCache.set(key, built);
+	}
+	return built.cloneNode(true);
+}
+
+function buildBoard(fen, size, flipped) {
 	const grid = fenGrid(fen);
 	const sq = size / 8;
 	const pad = Math.max(2, sq * 0.1);

@@ -71,6 +71,7 @@ export function closeBoard(s) {
 	s.lines.forEach((l) => delete l.pinned);
 	s.showAll = false;
 	s.wbAll = false;
+	s.renaming = null;
 	return s;
 }
 
@@ -140,6 +141,32 @@ export function play(s, san) {
 	const next = line.moves[s.at];
 	// walking forward through a line already held
 	if (next && next.san === san) {
+		s.at++;
+		return s;
+	}
+	// a move another line already plays from here: go along that line rather
+	// than forking a copy of it, so a continuation is only ever held once
+	const pos = line.moves.slice(0, s.at);
+	const twin = s.lines.findIndex(
+		(l) => l !== line && l.moves.length > s.at && l.moves[s.at].san === san && through(pos, l),
+	);
+	if (twin !== -1) {
+		const other = s.lines[twin];
+		// At the end of the line being played, that line is now a mere prefix
+		// of the other and says nothing it does not: it goes, its notes moving
+		// across to the other where that has none of its own on the move (and
+		// its name and pin, where the other has none).
+		if (s.at === line.moves.length) {
+			other.comments = [
+				...(other.comments || []),
+				...(line.comments || []).filter((c) => !(other.comments || []).some((o) => o.ply === c.ply)),
+			];
+			if (!other.comments.length) delete other.comments;
+			if (line.name && !other.name) other.name = line.name;
+			if (line.pinned) other.pinned = true;
+			s.lines.splice(s.active, 1);
+		}
+		s.active = s.lines.indexOf(other);
 		s.at++;
 		return s;
 	}
@@ -244,6 +271,26 @@ export function moveLine(s, idx, dir) {
 	return s;
 }
 
+// Make a line the first: the trunk of the copied PGN, and first in the list.
+export function moveToTop(s, idx) {
+	if (idx <= 0 || !s.lines[idx]) return s;
+	const activeLineObj = activeLine(s);
+	s.lines.unshift(...s.lines.splice(idx, 1));
+	s.active = s.lines.indexOf(activeLineObj);
+	return s;
+}
+
+// Name a line, or clear its name with an empty one. The name goes into the
+// notebook with the line.
+export function rename(s, idx, name) {
+	const l = s.lines[idx];
+	if (!l) return s;
+	const n = String(name || "").trim();
+	if (n) l.name = n;
+	else delete l.name;
+	return s;
+}
+
 // The lines on view as PGN, the first as the trunk and every other a
 // variation off it -- written by the same code that writes the notebook's.
 export function scratchPgn(s) {
@@ -320,22 +367,47 @@ export function toLine(scratchLine, idx) {
 		fen: replay(moves).fen(),
 		ply: last ? last.ply : 0,
 		tag: "sideline",
-		name: defaultLineName(false, idx),
+		name: scratchLine.name || defaultLineName(false, idx),
 	};
 }
 
-// One level of undo for the moves that throw work away: deleting a line,
-// cutting one short, starting over. A deep copy, so nothing done after it
-// can reach back into it.
-export function checkpoint(s) {
-	s.undo = JSON.stringify({ lines: s.lines, active: s.active, at: s.at });
+// Undo for the moves that change the lines rather than the cursor: deleting
+// a line, cutting one short, starting over, renaming, reordering. Each
+// checkpoint is a deep copy, so nothing done after it can reach back into it,
+// and carries a label saying what it is the undo of. A new change drops what
+// could have been redone, as editors do. The history is capped, not endless.
+const HISTORY = 50;
+
+const snap = (s, label) => JSON.stringify({ lines: s.lines, active: s.active, at: s.at, label });
+
+function restore(s, json) {
+	const { lines, active, at } = JSON.parse(json);
+	Object.assign(s, { lines, active, at });
+}
+
+export function checkpoint(s, label = "change") {
+	s.undo = [...(s.undo || []), snap(s, label)].slice(-HISTORY);
+	s.redo = [];
 	return s;
 }
 
+// What undo and redo would do next, for their buttons: the label, or null.
+export const undoLabel = (s) => (s.undo && s.undo.length ? JSON.parse(s.undo[s.undo.length - 1]).label : null);
+export const redoLabel = (s) => (s.redo && s.redo.length ? JSON.parse(s.redo[s.redo.length - 1]).label : null);
+
 export function undo(s) {
-	if (!s.undo) return s;
-	const { lines, active, at } = JSON.parse(s.undo);
-	Object.assign(s, { lines, active, at, undo: null });
+	if (!s.undo || !s.undo.length) return s;
+	const prev = s.undo.pop();
+	s.redo = [...(s.redo || []), snap(s, JSON.parse(prev).label)];
+	restore(s, prev);
+	return s;
+}
+
+export function redo(s) {
+	if (!s.redo || !s.redo.length) return s;
+	const next = s.redo.pop();
+	s.undo = [...(s.undo || []), snap(s, JSON.parse(next).label)];
+	restore(s, next);
 	return s;
 }
 
@@ -346,6 +418,31 @@ export function stepLine(s, dir) {
 	if (idx === -1) return s;
 	s.active = idx;
 	s.at = Math.min(s.at, s.lines[idx].moves.length);
+	return s;
+}
+
+// The moves at which the line being played meets another line: where some
+// other line leaves it, or it leaves another. As cursor positions, in order.
+export function branchPoints(s) {
+	const a = activeLine(s).moves;
+	const out = new Set();
+	s.lines.forEach((l, i) => {
+		if (i === s.active) return;
+		let k = 0;
+		while (k < a.length && k < l.moves.length && a[k].san === l.moves[k].san) k++;
+		// a line that holds all of this one, or all of which this one holds,
+		// does not branch off it
+		if (k < a.length && k < l.moves.length) out.add(k);
+	});
+	return [...out].sort((x, y) => x - y);
+}
+
+// Jump the cursor to the previous (dir -1) or next (dir 1) branch point on
+// the line being played. Stays put when there is none that way.
+export function stepBranch(s, dir) {
+	const pts = branchPoints(s);
+	const to = dir < 0 ? pts.filter((p) => p < s.at).pop() : pts.find((p) => p > s.at);
+	if (to !== undefined) s.at = to;
 	return s;
 }
 
@@ -390,6 +487,7 @@ export function packScratch(s) {
 	return {
 		lines: s.lines.map((l) => ({
 			moves: l.moves.map((m) => m.san),
+			...(l.name ? { name: l.name } : {}),
 			...(l.comments && l.comments.length
 				? { comments: l.comments.map((c) => ({ ply: c.ply, text: c.text })) }
 				: {}),
@@ -421,7 +519,9 @@ export function unpackScratch(d) {
 		const comments = (Array.isArray(raw && raw.comments) ? raw.comments : [])
 			.filter((c) => c && Number.isInteger(c.ply) && c.ply >= 0 && c.ply < moves.length && typeof c.text === "string")
 			.map((c) => ({ ply: c.ply, text: c.text }));
-		lines.push(comments.length ? { moves, comments } : { moves });
+		const line = comments.length ? { moves, comments } : { moves };
+		if (raw && typeof raw.name === "string" && raw.name.trim()) line.name = raw.name.trim();
+		lines.push(line);
 	}
 	if (!lines.some((l) => l.moves.length)) return null;
 	const s = newScratch();

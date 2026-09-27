@@ -207,6 +207,7 @@ test("print table: wide notebooks pack into multiple tables, oversized forks chu
 
 	// >15 lines: the wide branch is cut at its sub-forks into multiple tables,
 	// each at most 16 columns (mainline + 15)
+	app.print();
 	const tables = doc("view").querySelectorAll(".pv-htable table.tbl");
 	assert.ok(tables.length >= 2, "wide notebook splits into multiple tables");
 	[...tables].forEach((t) =>
@@ -554,6 +555,7 @@ test("print notes: a note shared by several lines is listed once", async () => {
 		.find((b) => b.textContent.includes("Load"))
 		.click();
 	await tick();
+	app.print();
 
 	const boxes = [...global.document.querySelectorAll(".print-notes")];
 	const tables = [...global.document.querySelectorAll(".pv-htable table.tbl")];

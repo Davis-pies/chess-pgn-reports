@@ -134,3 +134,31 @@ test("unescapes quotes and backslashes in a tag value", () => {
 	const { tags } = parsePgn('[Event "the \\"sharp\\" \\\\ line"]\n\n1. e4 *');
 	assert.strictEqual(tags.Event, 'the "sharp" \\ line');
 });
+
+// The parser plays moves through chess.js internals and rebuilds the canonical
+// SAN itself (see fastStrict in pgn.js). These pin it to what chess.js's public
+// move() says, for every decoration it can get wrong.
+test("the parser's SAN and FEN match chess.js's own move() for every move", async () => {
+	const { Chess } = await import("chess.js");
+	const pgns = [
+		// promotion written with and without '=', with a check
+		"1. e4 d5 2. exd5 c6 3. dxc6 e5 4. cxb7 Ke7 5. bxa8Q Nf6 6. Qxb8 *",
+		"1. e4 d5 2. exd5 c6 3. dxc6 e5 4. cxb7 Ke7 5. bxa8=N *",
+		"1. e4 f5 2. exf5 g5 3. fxg6 Nf6 4. gxh7 Ng8 5. hxg8=Q *",
+		// mate without its '#', a check without its '+', stray glyphs
+		"1. f3 e5 2. g4 Qh4 *",
+		"1. e4 e5 2. Bc4 Nc6 3. Qh5 Nf6 4. Qxf7# *",
+		"1. e4 e5 2. Nf3!? Nc6?! 3. Bb5!! a6?? 4. Ba4 Nf6 5. O-O Be7 *",
+		// disambiguation by file
+		"1. Nf3 Nf6 2. Nc3 Nc6 3. Nd4 Nd5 4. Ncb5 Ncb4 *",
+		"1. d4 e5 2. dxe5 d6 3. exd6 Bxd6 4. Nf3 Nf6 5. Nc3 O-O 6. Bg5 Re8 *",
+	];
+	for (const pgn of pgns) {
+		const chess = new Chess();
+		for (const node of parsePgn(pgn).nodes) {
+			const m = chess.move(node.san, { strict: true });
+			assert.strictEqual(node.san, m.san, pgn);
+			assert.strictEqual(node.fen, m.after, pgn);
+		}
+	}
+});
