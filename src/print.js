@@ -134,11 +134,16 @@ function offshoot(mainV, lines, index) {
   };
   // Note markers are gathered from every line on the table, not just the one
   // the moves were read off: a note on a stem move belongs to whichever line
-  // owns that node, and the stem is the only place the move is printed.
+  // owns that node, and the stem is the only place the move is printed on
+  // this table. Except the moves the table shares with the mainline: those are
+  // the mainline's, annotated once, in the mainline's table -- a note on one
+  // is copied onto every line through it, and marking it again on every later
+  // table that happens to pass through that move is noise.
   const noteByPly = {};
   for (const m of moves) {
+    if (m.ply < mainShared) continue;
     const refs = new Set();
-    for (const v of m.ply < mainShared ? [mainV] : lines)
+    for (const v of lines)
       ((v.noteByPly && v.noteByPly[m.ply]) || []).forEach((n) => refs.add(n));
     if (refs.size) noteByPly[m.ply] = [...refs].sort((a, b) => a - b);
   }
@@ -217,7 +222,7 @@ export function appendPrintTables(box, g) {
       const s = el("div", { className: "print-stem" });
       // the stem's moves, marks and note markers: every column states these
       // moves, and the rows that carried the markers are gone
-      buildCardMoves(s, off ? off.stem : { ...mainV, moves: mainV.moves.slice(0, stem) });
+      buildCardMoves(s, off ? off.stem : { ...referenceFor(mainV, i), moves: mainV.moves.slice(0, stem) });
       wrap.appendChild(s);
     }
     renderTable(wrap, {
@@ -231,7 +236,7 @@ export function appendPrintTables(box, g) {
       fromPly: stem,
       byMove: getCurrent().printByMove === true,
     });
-    renderTableNotes(wrap, off ? lines : [mainV, ...lines], i === 0 && !off);
+    renderTableNotes(wrap, lines, { mainV, showMain: i === 0 && !off });
   });
   box.appendChild(wrap);
 }
@@ -263,24 +268,27 @@ function notesForVar(v) {
 // A table's notes rendered beneath it in the print report. `showMain` includes
 // the mainline's notes (first table only — the mainline column repeats in
 // every packed table).
-function renderTableNotes(wrap, vars, showMain) {
+function renderTableNotes(wrap, lines, { mainV, showMain }) {
   const rows = [];
   // Notes are shared: the editor writes one note onto every line in an
   // equal-position group, and identical PGN comment text at the same ply
-  // collapses to a single note in allNotes(). So dedupe ACROSS lines here —
-  // notesForVar only dedupes within one line.
-  const seen = new Set();
-  // Skipping the mainline var is not enough to keep its notes off later
+  // collapses to a single note in allNotes(). So dedupe ACROSS lines here --
+  // notesForVar only dedupes within one line. Every table lists the notes it
+  // marks, so it stands on its own, like the rest of the printed report.
+  //
+  // The mainline's notes are listed under the mainline's table and nowhere
+  // else. Skipping the mainline var is not enough to keep them off later
   // tables: a note written on the mainline is copied onto every line in its
   // equal-position group, so a sideline in a later table carries it too and
-  // would reprint it. Suppress the mainline's notes by number instead.
+  // would reprint it. Suppress the mainline's notes by number instead -- on
+  // every later table, including one headed by its own stem, which has no
+  // mainline column at all.
   const mainOnly = new Set();
-  if (!showMain) {
-    const mainV = vars.find((v) => v.tag === "mainline");
-    if (mainV) notesForVar(mainV).forEach((n) => mainOnly.add(n.n));
-  }
+  const main = mainV && !mainV.synthetic ? mainV : null;
+  if (main && !showMain) notesForVar(main).forEach((n) => mainOnly.add(n.n));
+  const vars = showMain && main ? [main, ...lines] : lines;
+  const seen = new Set();
   vars.forEach((v) => {
-    if (v.tag === "mainline" && !showMain) return;
     notesForVar(v).forEach((n) => {
       if (seen.has(n.n) || mainOnly.has(n.n)) return;
       seen.add(n.n);
@@ -327,10 +335,22 @@ function renderTableNotes(wrap, vars, showMain) {
 // leave it.
 function tableShape(mainV, lines, index) {
   const { off, stem, maxPly, rows } = tableRows(mainV, lines, index);
-  const pv = off ? printVars(stemRef(off.stem.moves), off.cols) : printVars(mainV, lines);
+  const pv = off ? printVars(stemRef(off.stem.moves), off.cols) : printVars(referenceFor(mainV, index), lines);
   // columns beside the mainline reference, where there is one
   const width = pv.length - (off || mainV.synthetic ? 0 : 1);
   return { off, pv, stem, maxPly, width, rows };
+}
+
+// The mainline as a later table's reference column: its moves and symbols,
+// but not its note markers. Its notes are listed under the mainline's own
+// table, and a note on a mainline move is copied onto every line through that
+// move -- so marking it again in every later table that repeats the mainline
+// is a marker pointing at a note that table does not list.
+const quiet = new WeakMap();
+function referenceFor(mainV, index) {
+  if (index === 0 || mainV.synthetic) return mainV;
+  if (!quiet.has(mainV)) quiet.set(mainV, { ...mainV, noteByPly: {} });
+  return quiet.get(mainV);
 }
 
 // The part of a table's shape that does not need its columns built: cheap

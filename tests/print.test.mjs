@@ -1151,3 +1151,64 @@ test("a note on a stem move owned by any line on the table is marked in the stem
   assert.ok(stem.querySelector("sup"), "the stem carries the second line's marker");
   off();
 });
+
+// A note on a mainline move is written onto every line through that move, so
+// a later table that repeats the move -- in its mainline column, in a stem
+// taken off the mainline, or in the stem of a branch that follows the
+// mainline for a while -- used to mark it again and list it again. It is the
+// mainline's note: marked and listed under the mainline's table only.
+function mainlineNoteReport(pgn, ply) {
+  const st = loadState(pgn);
+  const main = st.lines.find((l) => l.isMain);
+  const key = main.moves.slice(0, ply + 1).map((m) => m.san).join(" ");
+  st.lines.forEach((l) => {
+    if (l.moves.slice(0, ply + 1).map((m) => m.san).join(" ") === key)
+      l.comments = [...(l.comments || []), { ply, text: "Test Note" }];
+  });
+  const box = document.createElement("div");
+  appendPrintTables(box, grid(st.lines));
+  return [...box.querySelectorAll("table.tbl")].map((t) => {
+    const stem = t.previousElementSibling?.classList.contains("print-stem") ? t.previousElementSibling : null;
+    return {
+      listed: /Test Note/.test(t.nextElementSibling.textContent),
+      marked: !!(stem && stem.querySelector("sup")) || !!t.querySelector("td sup"),
+    };
+  });
+}
+
+test("a mainline note is not marked or listed in the mainline column of later tables", () => {
+  const off = installDom();
+  // replies that run a move further, so later tables reach 2.Nf3 in their
+  // mainline column
+  const alts = "c5 e6 c6 d5 d6 Nf6 g6 b6 a6 Nc6 f5 h6 a5 b5".split(" ").map((m) => `(1... ${m} 2. Nc3)`).join(" ");
+  const ts = mainlineNoteReport(`1. e4 e5 ${alts} ${MAIN}`, 2); // on 2.Nf3
+  assert.ok(ts.length > 1);
+  assert.deepStrictEqual(ts[0], { listed: true, marked: true }, "the mainline's table has it");
+  ts.slice(1).forEach((t, i) => assert.deepStrictEqual(t, { listed: false, marked: false }, `table ${i + 1}`));
+  off();
+});
+
+test("a mainline note is not marked or listed in a later table's stem", () => {
+  const off = installDom();
+  // on 1.d4, which the King's Indian table's stem repeats
+  const ts = mainlineNoteReport(kid(16), 0);
+  assert.ok(ts.length > 1);
+  assert.strictEqual(ts[0].listed, true);
+  ts.slice(1).forEach((t, i) => assert.deepStrictEqual(t, { listed: false, marked: false }, `table ${i + 1}`));
+  off();
+});
+
+test("with no mainline, every table that shows a noted move lists the note", () => {
+  const off = installDom();
+  const box = noMainTables(kid(16), (s) =>
+    s.lines.forEach((l) => (l.comments = [{ ply: 0, text: "Test Note" }])),
+  );
+  const tables = [...box.querySelectorAll("table.tbl")];
+  assert.ok(tables.length > 1);
+  tables.forEach((t, i) => {
+    const marked = !!t.previousElementSibling?.querySelector?.("sup") || !!t.querySelector("td sup");
+    const listed = /Test Note/.test(t.nextElementSibling.textContent);
+    assert.strictEqual(listed, marked, `table ${i}: listed where marked, so it stands on its own`);
+  });
+  off();
+});
