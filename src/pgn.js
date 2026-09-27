@@ -31,18 +31,16 @@ export function parsePgn(mt) {
 	return { nodes, result: ctx.result, comments: ctx.comments, tags };
 }
 
-function stepFrom(state, san) {
-	const chess = new Chess();
-	chess.load(state.fen);
+function stepFrom(w, state, san) {
 	let m;
 	try {
-		m = chess.move(san, { strict: true });
+		m = w.play(san, true);
 	} catch {
 		throw new Error("Illegal or ambiguous move in PGN: " + san);
 	}
 	return {
 		san: m.san,
-		fen: chess.fen(),
+		fen: m.fen,
 		ply: state.ply,
 		variations: [],
 		comments: [],
@@ -60,29 +58,116 @@ function attachPending(pending) {
 	return pending ? [pending] : [];
 }
 
+// Every position reached by a move, keyed by the position before it and the
+// move as written: "fen\nsan" -> { san (canonical), fen (after) }. Playing a
+// move through chess.js is the expensive part of loading (move generation,
+// SAN, FEN), and the same moves are played over and over: each line replays
+// the opening it shares with its siblings, and every render replays every line
+// (see fenMap). A cached step is a string key and a Map lookup instead.
+//
+// Only a move chess.js accepts in strict mode is kept, so a lookup never lets
+// the parser accept a loose SAN ("Ng1f3") it would otherwise have refused.
+// Bounded: it starts over once full rather than growing without limit.
+const steps = new Map();
+const STEPS_MAX = 200000;
+
+function remember(key, step) {
+	if (steps.size >= STEPS_MAX) steps.clear();
+	steps.set(key, step);
+}
+
+function slowStep(chess, san, strict) {
+	const m = chess.move(san, strict ? { strict: true } : undefined);
+	return { san: m.san, fen: m.after };
+}
+
+// chess.move() builds a full Move object for its return value: every legal
+// move again, the SAN, and the FEN before and after, by making and unmaking
+// the move. Parsing needs none of that beyond the SAN and the FEN after, so
+// this plays the move through chess.js's own internals instead, at about a
+// third of the cost. Those internals are not public API, which is why the
+// version is pinned (tests/deps.test.mjs) and why any surprise -- a method
+// gone, a SAN it will not match -- returns null for the public path to
+// handle, errors and all.
+const STRIP = (san) => san.replace(/=/, "").replace(/[+#]?[?!]*$/, "");
+function fastStrict(chess, san) {
+	if (typeof chess._moveFromSan !== "function" || typeof chess._makeMove !== "function") return null;
+	let mv;
+	try {
+		mv = chess._moveFromSan(san, true);
+	} catch {
+		return null;
+	}
+	if (!mv) return null;
+	// strict matching means the SAN as written, less the decorations chess.js
+	// strips, IS the canonical one; put back what the strip took
+	let base = STRIP(san);
+	if (mv.promotion) base = base.slice(0, -1) + "=" + base.slice(-1).toUpperCase();
+	chess._makeMove(mv);
+	const suffix = chess.inCheck() ? (chess.isCheckmate() ? "#" : "+") : "";
+	return { san: base + suffix, fen: chess.fen() };
+}
+
+// A walker over one line: `play` advances it a move, reading the cache when it
+// can and replaying on a chess.js board only when it cannot. The board is
+// created on the first miss and re-seated only when a hit moved on without it.
+function walker(fen = START_FEN) {
+	let chess = null;
+	let boardAt = null; // the FEN the board is at, when it is in step
+	const seat = () => {
+		if (!chess) chess = new Chess();
+		if (boardAt !== fen) chess.load(fen);
+	};
+	return {
+		get fen() {
+			return fen;
+		},
+		// `strict`: SAN exactly as the standard writes it, as the parser needs.
+		// Throws what chess.js throws on an illegal move.
+		play(san, strict = false) {
+			if (san === "--") {
+				// null move: the other side to move, board unchanged. The board
+				// is re-seated from it only if a real move follows.
+				fen = flipToMove(fen);
+				return { san, fen };
+			}
+			const key = fen + "\n" + san;
+			const hit = steps.get(key);
+			if (hit) {
+				fen = hit.fen;
+				return hit;
+			}
+			seat();
+			// Strict parsing accepts less than loose parsing and means the same
+			// move by what it accepts, so the fast strict path serves both.
+			const fast = fastStrict(chess, san);
+			const step = fast || slowStep(chess, san, strict);
+			// a loose SAN that only non-strict parsing took is not cached
+			if (fast || strict || step.san === san) remember(key, step);
+			fen = boardAt = step.fen;
+			return step;
+		},
+	};
+}
+
 // Replay a line's moves up to and including the given ply and return the FEN
 // of the resulting position (handles -- null moves). Used to show a static
 // board for the move currently selected in the editor.
 export function fenAt(moves, ply) {
-	const chess = new Chess();
+	const w = walker();
 	for (const m of moves) {
 		if (m.ply > ply) break;
-		if (m.san === "--") chess.load(flipToMove(chess.fen()));
-		else chess.move(m.san);
+		w.play(m.san);
 	}
-	return chess.fen();
+	return w.fen;
 }
 
 // One-pass variant of fenAt: replay a line's moves once and record the FEN
 // after each ply. Turns per-(line,ply) replays (O(n²) Chess steps) into O(n).
 export function fenMap(moves) {
-	const chess = new Chess();
+	const w = walker();
 	const map = new Map();
-	for (const m of moves) {
-		if (m.san === "--") chess.load(flipToMove(chess.fen()));
-		else chess.move(m.san);
-		map.set(m.ply, chess.fen());
-	}
+	for (const m of moves) map.set(m.ply, w.play(m.san).fen);
 	return map;
 }
 
@@ -105,6 +190,8 @@ function parseSeq(tokens, ctx, state, inVariation = false, intro = null) {
 	let last = null;
 	let stateBeforeLast = state; // position before the most recent move
 	let cur = state;
+	// this run's own walker: a variation gets its own, from where it branches
+	const w = walker(state.fen);
 	let pendingComment = null; // trunk comment seen before any move yet
 	let variationIntro = null; // trunk lead-in carried into the next variation
 	let narrative = intro
@@ -234,11 +321,12 @@ function parseSeq(tokens, ctx, state, inVariation = false, intro = null) {
 			nodes.push(node);
 			stateBeforeLast = cur;
 			cur = { fen: node.fen, ply: node.ply + 1 };
+			w.play("--");
 			last = node;
 			ctx.i++;
 			continue;
 		}
-		const node = stepFrom(cur, t);
+		const node = stepFrom(w, cur, t);
 		node.comments = attachPending(pendingComment);
 		pendingComment = null;
 		if (narrative) {

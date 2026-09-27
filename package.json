@@ -11,7 +11,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "coverage": "node --test --experimental-test-coverage --test-coverage-exclude='tests/**' 'tests/**/*.test.mjs'",
-    "knip": "knip"
+    "knip": "knip",
+    "bench": "node tools/bench.mjs"
   },
   "keywords": [
     "chess",

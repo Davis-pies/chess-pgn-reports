@@ -160,9 +160,14 @@ export async function bootApp({ onAlert } = {}) {
 		if (b) b.click();
 	};
 
+	// The print tables, and the cards when the table is the preview, are built
+	// when the page is printed (see preparePrint in app.js).
+	const print = () => dom.window.dispatchEvent(new dom.window.Event("beforeprint"));
+
 	return {
 		dom,
 		alerts,
+		print,
 		reset,
 		view,
 		button,
