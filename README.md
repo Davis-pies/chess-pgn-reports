@@ -256,6 +256,7 @@ Tests:
 ```bash
 npm test          # unit tests, under jsdom
 npm run test:e2e  # browser tests (e2e/), Playwright + Chromium
+npm run check     # what CI's static and unit jobs run: lint, knip, coverage floors
 ```
 
 The browser tests start the dev server themselves and drive the real page:
