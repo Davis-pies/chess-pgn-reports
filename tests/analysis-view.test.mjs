@@ -722,3 +722,18 @@ test("an unselected row starts where it leaves the lines above it", () => {
 	assert.deepStrictEqual(rows, ["… 1...c5 2.Nf3 d6 3.d4 cxd4 4.Nxd4", "… 3.d4 Nf6 4.Nc3"]);
 	done();
 });
+
+test("a move in a capitalised heading keeps its case (Nbd7, not NBD7)", () => {
+	const done = installDom();
+	loadState("1. e4 d5 2. exd5 c6 3. dxc6 Nf6 4. cxb7 Nbd7 *");
+	const s = newScratch();
+	for (const san of ["e4", "d5", "exd5", "c6", "dxc6", "Nf6", "cxb7", "Nbd7"]) play(s, san);
+	const panel = analysisPanel(s, () => {});
+	const heads = [...panel.querySelectorAll(".an-sec")];
+	// the heading is text-transform: uppercase; the move sits in its own span
+	// that the stylesheet exempts
+	const sans = heads.flatMap((h) => [...h.querySelectorAll(".an-san")].map((x) => x.textContent));
+	assert.ok(sans.some((t) => t.includes("Nbd7")), "Note on … names the move in a span");
+	assert.ok(heads.some((h) => /^Note on/.test(h.textContent)));
+	done();
+});

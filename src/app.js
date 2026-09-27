@@ -58,6 +58,17 @@ import {
 import { assignLineNames, lineEditor } from "./line-editor.js";
 import { exportBar, download, slug } from "./export.js";
 import { notesPanel } from "./notes-view.js";
+import {
+  loadPrefs,
+  savePrefs,
+  clearPrefs,
+  loadTheme,
+  saveTheme,
+  cleanWidth,
+  rememberWorkbook,
+  workbookToRestore,
+} from "./prefs.js";
+import { settingsMenu } from "./settings-view.js";
 
 // Canonical reset for `current`. Every "start over" path (New/Import, Load &
 // Tag, opening a saved notebook, a failed open) rebuilt this object from an
@@ -82,7 +93,8 @@ function freshState(overrides = {}) {
     showFinalBoard: true,
     showFirstDivBoard: false,
     showFootNames: false, // footnote entries lead with their line's name
-    sideWidth: 420, // px; the drag-resized table panel width
+    // px; the drag-resized table panel width, as the viewer last left it
+    sideWidth: loadPrefs().sideWidth || 420,
     sel: null, // { lines: shared group, ply, at: line the panel opens on }
     ...overrides,
   };
@@ -228,7 +240,6 @@ async function withLoading(fn) {
   }
 }
 
-const THEME_KEY = "ott-theme";
 function currentTheme() {
   return (document.documentElement.dataset.theme || "light") === "dark"
     ? "dark"
@@ -236,9 +247,70 @@ function currentTheme() {
 }
 function applyTheme(t) {
   document.documentElement.dataset.theme = t;
+  saveTheme(t);
+}
+
+// The Settings drop-down (see settings-view.js), with the parts of a change
+// only app.js can apply to the live page.
+function settings() {
+  return settingsMenu({
+    theme: currentTheme(),
+    setTheme: (t) => {
+      applyTheme(t);
+      renderApp();
+    },
+    resetWidth: () => {
+      getCurrent().sideWidth = 420;
+      renderApp();
+    },
+    forget: () => {
+      clearPrefs();
+      delete document.documentElement.dataset.theme;
+      getCurrent().sideWidth = 420;
+      renderApp();
+    },
+  });
+}
+
+// Record the workbook on screen, the board over it and which way up it is, so
+// the next visit opens where this one left off (see prefs.js). Only a saved
+// workbook has an id to come back to.
+function rememberPlace() {
+  rememberWorkbook(getCurrent().id, {
+    mode: getMode(),
+    board: packScratch(getScratch()),
+  });
+  // the way up the board was left is the way up the next new one starts,
+  // whether or not anything was played on it
+  const s = getScratch();
+  if (s) savePrefs({ orientation: s.flipped ? "black" : "white" });
+}
+
+// The other half: reopen what rememberPlace recorded. The board recorded at
+// the last visit wins over the one saved in the workbook, which is only as
+// recent as the last Save. Anything unreadable leaves the import screen.
+function restorePlace() {
+  const last = workbookToRestore((id) => !!loadNotebook(id));
+  if (!last) return;
   try {
-    localStorage.setItem(THEME_KEY, t);
-  } catch {}
+    installNotebook(loadNotebook(last.id), last.id);
+  } catch {
+    setCurrent(freshState());
+    return;
+  }
+  const board = last.board ? unpackScratch(last.board) : null;
+  if (board) setScratch(board);
+  if (last.mode === "analysis") {
+    if (!getScratch()) setScratch(newBoard());
+    setMode("analysis");
+  }
+}
+
+// An empty board, the way up the viewer prefers new boards to start.
+function newBoard() {
+  const s = newScratch();
+  s.flipped = loadPrefs().orientation === "black";
+  return s;
 }
 // card text size as a percentage; falls back to 100 for workbooks saved before
 // the setting existed.
@@ -295,7 +367,7 @@ function themeBtn() {
 // analysis, read from the workbook as it stands, not copied onto the board.
 export function openAnalysis(moves = []) {
 	if (getMode() !== "analysis") opener = focusKey($("view"), document.activeElement);
-	if (!getScratch()) setScratch(newScratch());
+	if (!getScratch()) setScratch(newBoard());
 	if (moves.length) openAt(getScratch(), moves);
 	setMode("analysis");
 	renderApp();
@@ -404,6 +476,7 @@ function viewRoot() {
     }),
   );
   top.appendChild(themeBtn());
+  top.appendChild(settings());
   const layout = el("div", { className: "app-layout" });
   const side = el("aside", { className: "side-panel" });
   const main = el("div", { className: "main-panel" });
@@ -481,7 +554,7 @@ let opener = null; // what opened the board, to have the focus back when it shut
 // own, so the table it was opened from stays in view behind it. It closes on
 // the ✕, Escape, or a click on the backdrop; the scratch is kept either way.
 function analysisOverlay() {
-  if (!getScratch()) setScratch(newScratch());
+  if (!getScratch()) setScratch(newBoard());
   const engine = sharedEngine();
   // Closing stops the engine's search but keeps its switch, so it is back on
   // where it was the next time the board opens.
@@ -658,7 +731,7 @@ function openNotebook(id) {
 function loadPgnText(text) {
   withLoading(() => {
     try {
-      const { nodes } = parsePgn(text);
+      const { nodes, moreGames } = parsePgn(text);
       if (!nodes.length) {
         alert("No moves found in PGN");
         return;
@@ -675,6 +748,10 @@ function loadPgnText(text) {
         }),
       );
       renderApp();
+      if (moreGames)
+        alert(
+          "Only the first game was loaded: this PGN holds more than one game (or text after the result).",
+        );
     } catch (e) {
       alert("Could not read PGN: " + e.message);
     }
@@ -912,6 +989,7 @@ function importPanel() {
     el("h2", { textContent: "Chess Opening Theory Table Builder" }),
   );
   box.appendChild(themeBtn());
+  box.appendChild(settings());
   box.appendChild(notebookList());
   const ta = el("textarea", {
     className: "pgnin",
@@ -921,7 +999,10 @@ function importPanel() {
   const go = el("button", {
     className: "chip primary",
     textContent: "Load & Tag",
-    onclick: () => loadPgnText(ta.value),
+    onclick: () =>
+      ta.value.trim()
+        ? loadPgnText(ta.value)
+        : alert("Paste a PGN first, or load one with Load PGN file."),
   });
   // No PGN to start from: play the lines in on the board instead. The first
   // one added becomes the mainline, and the notebook opens around it.
@@ -948,7 +1029,13 @@ function importPanel() {
   // says Load, and a file the user picked by name needs no second confirmation.
   pickPgn.onchange = () => {
     const f = pickPgn.files[0];
-    if (f) f.text().then(loadPgnText);
+    // cleared so picking the same file again (after fixing it on disk, say)
+    // still fires a change
+    pickPgn.value = "";
+    if (f)
+      f.text().then((t) =>
+        t.trim() ? loadPgnText(t) : alert(`${f.name} is empty.`),
+      );
   };
   const pickWb = el("input", {
     type: "file",
@@ -958,6 +1045,7 @@ function importPanel() {
   });
   pickWb.onchange = () => {
     const f = pickWb.files[0];
+    pickWb.value = "";
     if (f) f.text().then(openWorkbookFile);
   };
   const fileBtn = (cls, label, input) =>
@@ -1034,7 +1122,7 @@ function openUpdateDialog() {
     pending = null;
     apply.disabled = true;
     try {
-      const { nodes } = parsePgn(ta.value);
+      const { nodes, moreGames } = parsePgn(ta.value);
       if (!nodes.length) {
         report.replaceChildren(
           el("p", { className: "bad", textContent: "No moves found in PGN." }),
@@ -1047,7 +1135,18 @@ function openUpdateDialog() {
       });
       pending = { pgn: ta.value, lines, keepDropped: keep.checked };
       apply.disabled = false;
-      report.replaceChildren(...reportNodes(r));
+      report.replaceChildren(
+        ...(moreGames
+          ? [
+              el("p", {
+                className: "bad",
+                textContent:
+                  "Only the first game is used: this PGN holds more than one game (or text after the result).",
+              }),
+            ]
+          : []),
+        ...reportNodes(r),
+      );
     } catch (e) {
       report.replaceChildren(
         el("p", {
@@ -1211,12 +1310,16 @@ function reportNodes(r) {
 
 document.addEventListener("DOMContentLoaded", () => {
   if (!document.getElementById("view")) return;
-  let saved = null;
-  try {
-    saved = localStorage.getItem(THEME_KEY);
-  } catch {}
+  const saved = loadTheme();
   if (saved) document.documentElement.dataset.theme = saved;
+  restorePlace();
   renderApp();
+  // leaving the page (or hiding it: mobile browsers often never fire pagehide)
+  // records where the viewer was
+  window.addEventListener("pagehide", rememberPlace);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") rememberPlace();
+  });
   // drag-resize for the table panel (updates main margin to match)
   document.addEventListener("pointermove", (e) => {
     if (!sideDragging) return;
@@ -1225,6 +1328,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.documentElement.style.setProperty("--side-w", w + "px");
   });
   const stopSideDrag = () => {
+    if (sideDragging) savePrefs({ sideWidth: cleanWidth(getCurrent().sideWidth) });
     sideDragging = false;
   };
   document.addEventListener("pointerup", stopSideDrag);

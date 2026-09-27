@@ -1,6 +1,7 @@
 // tests/engine-store.test.mjs
 import { test, beforeEach } from "node:test";
 import assert from "node:assert";
+import { createHash } from "node:crypto";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 import {
@@ -13,6 +14,7 @@ import {
 } from "../src/engine-store.js";
 
 const WASM = new Uint8Array([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0, 9, 9]);
+const SHA = createHash("sha256").update(WASM).digest("hex");
 
 beforeEach(() => {
 	globalThis.indexedDB = new IDBFactory(); // a clean store per test
@@ -61,7 +63,7 @@ test("with no IndexedDB at all, nothing is stored rather than an error", async (
 test("the download reports progress, is stored, and is there next time", async () => {
 	const fetch = fakeFetch({ [FULL.urls[0]]: WASM });
 	const seen = [];
-	const blob = await downloadFull((l, t) => seen.push([l, t]), fetch);
+	const blob = await downloadFull((l, t) => seen.push([l, t]), fetch, SHA);
 	assert.deepStrictEqual(seen, [[5, 10], [10, 10]]);
 	assert.deepStrictEqual(await bytes(blob), [...WASM]);
 	assert.deepStrictEqual(await bytes(await storedFull()), [...WASM]);
@@ -71,10 +73,10 @@ test("the download reports progress, is stored, and is there next time", async (
 
 test("a mirror that fails or answers with an error falls through to the next", async () => {
 	const fetch = fakeFetch({ [FULL.urls[0]]: 503, [FULL.urls[1]]: WASM });
-	await downloadFull(undefined, fetch);
+	await downloadFull(undefined, fetch, SHA);
 	assert.deepStrictEqual(fetch.calls, FULL.urls);
 	const down = fakeFetch({ [FULL.urls[1]]: WASM }); // the first throws
-	await downloadFull(undefined, down);
+	await downloadFull(undefined, down, SHA);
 	assert.ok(await storedFull());
 });
 
@@ -92,8 +94,15 @@ test("a length the server does not give is taken from the known size", async () 
 		body: { getReader: () => { let sent = false; return { read: async () => (sent ? { done: true } : ((sent = true), { done: false, value: WASM })) }; } },
 	});
 	const seen = [];
-	await downloadFull((l, t) => seen.push(t), fetch);
+	await downloadFull((l, t) => seen.push(t), fetch, SHA);
 	assert.deepStrictEqual(seen, [FULL.size]);
+});
+
+test("a download whose checksum does not match is refused and not stored", async () => {
+	const other = new Uint8Array([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0, 6, 6]);
+	const fetch = fakeFetch({ [FULL.urls[0]]: other, [FULL.urls[1]]: other });
+	await assert.rejects(downloadFull(undefined, fetch, SHA), /does not match the expected checksum/);
+	assert.strictEqual(await storedFull(), null);
 });
 
 test("a file from disk is checked before it is stored", async () => {

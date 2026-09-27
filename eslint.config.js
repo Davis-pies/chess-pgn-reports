@@ -7,6 +7,36 @@ export default [
   js.configs.recommended,
 
   {
+    // A stale `eslint-disable` comment hides nothing and misleads readers.
+    linterOptions: { reportUnusedDisableDirectives: 'error' },
+  },
+
+  {
+    // Correctness rules beyond `recommended`, applied everywhere.
+    rules: {
+      'array-callback-return': 'error',
+      'default-case-last': 'error',
+      eqeqeq: ['error', 'smart'],
+      'no-eval': 'error',
+      'no-implied-eval': 'error',
+      'no-new-wrappers': 'error',
+      'no-return-assign': 'error',
+      'no-self-compare': 'error',
+      'no-sequences': 'error',
+      'no-throw-literal': 'error',
+      'no-unmodified-loop-condition': 'error',
+      'no-unreachable-loop': 'error',
+      'no-useless-concat': 'error',
+      'no-useless-rename': 'error',
+      'no-useless-return': 'error',
+      'no-var': 'error',
+      'prefer-const': 'error',
+      radix: 'error',
+      'require-atomic-updates': 'error',
+    },
+  },
+
+  {
     // Browser-side application code.
     files: ['src/**/*.js'],
     languageOptions: {

@@ -12,8 +12,8 @@ test("a saved workbook survives a reload and reopens with its edits", async ({ p
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByRole("button", { name: "Saved ✓" })).toBeVisible();
 
+  // the reload reopens the workbook it left (see prefs.js)
   await page.reload();
-  await page.getByRole("button", { name: "Open: Ruy Lopez" }).click();
   await expect(page.locator(".toolbar input.name")).toHaveValue("Ruy Lopez");
   await expect(page.locator(".pv-table th.var-head")).toHaveText([/^Mainline/, /^Line 1/, /^Italian/]);
 });
