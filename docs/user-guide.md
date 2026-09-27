@@ -69,7 +69,18 @@ For a shorter overview see the [README](../README.md).
      **Analysis** reopens the board as you left it.
    - **Keys** — ← → step, Home/End jump, ↑ ↓ switch line at the same move,
      [ ] jump between branch points, Ctrl+Z / Ctrl+Shift+Z (or Ctrl+Y) undo
-     and redo, F flips, E toggles the engine, Space plays the engine's best move.
+     and redo, F flips, E toggles the engine, Space plays the engine's best
+     move, P pins the line. **?** (or **? all keys** under the board) lists
+     them all. **M** jumps to the move box under the board, where a move can be
+     typed instead of played — SAN (`Nf3`, `exd5`, `O-O`, `e8=Q`) or from-to
+     (`g1f3`) — and Enter plays it; **N** jumps to the note box.
+   - **Accessibility** — the board is a labelled dialog that keeps Tab inside
+     it and gives the focus back to what opened it when it closes; after a
+     redraw the focus stays on the control you pressed, so Enter on ▶ steps
+     again. Every move is read out as it is played ("12... knight f6. White to
+     move"), the board describes its pieces to a screen reader, and the glyph
+     buttons (◀ ▶ ↑ ↓ 📌 ✕) have names. Focus rings show for the keyboard
+     only, and motion is turned off for anyone who asks for less.
    - **Notes** — the box under the lines holds a note on the move just
      played, which goes into the notebook with the line. For a move the
      notebook already has, **Save note to notebook** puts it straight in (on

@@ -484,12 +484,16 @@ export function commentEditor(ply, lines) {
 			value: isNew ? "" : texts[i],
 			placeholder: isNew ? (i ? "add another note…" : "note at this move…") : "",
 		});
+		// the placeholder goes once there is text, so the box needs a name of its own
+		inp.setAttribute("aria-label", isNew && i ? "Another note on this move" : "Note on this move");
 		const del = el("button", {
 			type: "button",
 			className: "chip mini danger",
 			textContent: "✕",
+			title: "Delete this note",
 			hidden: isNew,
 		});
+		del.setAttribute("aria-label", "Delete this note");
 		inp.oninput = () => {
 			if (row.classList.contains("new")) {
 				row.classList.remove("new");

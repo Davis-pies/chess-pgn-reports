@@ -11,6 +11,7 @@
 // are repainted in place by a listener the panel installs on the engine.
 
 import { el } from "./dom.js";
+import { announce } from "./a11y.js";
 import { drawArrows, interactiveBoard } from "./board-input.js";
 import {
 	activeLine,
@@ -38,6 +39,7 @@ import {
 	stepLine,
 	through,
 	truncate,
+	typedMove,
 	undo,
 	undoLabel,
 } from "./analysis.js";
@@ -65,6 +67,47 @@ export function numberedMoves(moves) {
 		.join(" ");
 }
 
+// A move as a screen reader should say it: "Nxf7+" is read letter by letter,
+// "knight takes f7, check" is a move.
+const PIECE = { K: "king", Q: "queen", R: "rook", B: "bishop", N: "knight" };
+export function spokenSan(san) {
+	if (/^O-O-O/.test(san)) return "castles queenside" + (/#$/.test(san) ? ", mate" : /\+$/.test(san) ? ", check" : "");
+	if (/^O-O/.test(san)) return "castles kingside" + (/#$/.test(san) ? ", mate" : /\+$/.test(san) ? ", check" : "");
+	const m = /^([KQRBN])?([a-h]?[1-8]?)(x)?([a-h][1-8])(?:=([QRBN]))?([+#])?/.exec(san);
+	if (!m) return san;
+	const [, piece, from, takes, to, promo, mark] = m;
+	return [
+		piece ? PIECE[piece] + (from ? " " + from : "") : from || "",
+		takes ? "takes" : "",
+		to,
+		promo ? "promotes to " + PIECE[promo] : "",
+	]
+		.filter(Boolean)
+		.join(" ") + (mark === "#" ? ", mate" : mark === "+" ? ", check" : "");
+}
+
+// "12... knight f6": a move with its number, for reading out.
+const spokenMove = (j, san) => `${Math.floor(j / 2) + 1}${j % 2 ? "..." : "."} ${spokenSan(san)}`;
+
+// Every key the board answers to, for the help it opens with ?. The handlers
+// are in the panel; this is what they are called.
+export const BOARD_KEYS = [
+	["← / →", "Back / forward one move"],
+	["Home / End", "To the start / end of the line"],
+	["↑ / ↓", "Previous / next line, at the same move"],
+	["[ / ]", "Back / forward to where the line meets another"],
+	["F", "Flip the board"],
+	["M", "Type a move (SAN like Nf3, or g1f3)"],
+	["N", "Write a note on the move just played"],
+	["P", "Pin or unpin the line being played"],
+	["Ctrl+Z", "Undo"],
+	["Ctrl+Shift+Z", "Redo"],
+	["E", "Engine on / off"],
+	["Space", "Play the engine's best move"],
+	["?", "This list"],
+	["Esc", "Close this list, then the board"],
+];
+
 const noteOn = (line, ply) =>
 	(line.comments || []).find((c) => c.ply === ply)?.text || "";
 
@@ -82,6 +125,7 @@ export function analysisPanel(
 	// somewhere to land, but it is not a tab stop of its own -- tabbing should
 	// still walk the actual controls. app.js focuses it after appending.
 	const panel = el("div", { className: "analysis", tabIndex: -1 });
+	panel.setAttribute("aria-label", "Analysis board. Press ? for keyboard shortcuts.");
 	const pos = positionOf(scratch);
 
 	// Mutate, then redraw: every control below is one of these.
@@ -110,6 +154,14 @@ export function analysisPanel(
 		"[": () => stepBranch(scratch, -1),
 		"]": () => stepBranch(scratch, 1),
 		f: () => (scratch.flipped = !scratch.flipped),
+		p: () => pin(scratch, scratch.active),
+		"?": () => (scratch.help = !scratch.help),
+	};
+	// Keys that move focus rather than change the scratch: nothing to redraw.
+	const focusKeys = {
+		m: () => panel.querySelector(".an-type")?.focus(),
+		"/": () => panel.querySelector(".an-type")?.focus(),
+		n: () => panel.querySelector(".cedit input")?.focus(),
 	};
 	if (engine) {
 		keys.e = () => engine.enable(!engine.state.enabled);
@@ -120,6 +172,14 @@ export function analysisPanel(
 		};
 	}
 	panel.onkeydown = (e) => {
+		// The help is the innermost thing open, so Escape closes it and not the
+		// board around it.
+		if (e.key === "Escape" && scratch.help) {
+			e.stopPropagation();
+			scratch.help = false;
+			onChange();
+			return;
+		}
 		if (e.target.closest("input, textarea, select")) return; // the caret's, while typing a note
 		// Ctrl/Cmd+Z undoes, Ctrl/Cmd+Shift+Z or Ctrl+Y redoes; any other
 		// modified key is the browser's.
@@ -134,7 +194,14 @@ export function analysisPanel(
 		}
 		if (e.ctrlKey || e.metaKey || e.altKey) return;
 		if (e.key === " " && e.target.closest("button")) return; // Space presses a focused button
-		const fn = keys[e.key];
+		// a letter with Caps Lock on is the same key
+		const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+		if (focusKeys[k]) {
+			e.preventDefault();
+			focusKeys[k]();
+			return;
+		}
+		const fn = keys[k];
 		if (!fn) return;
 		e.preventDefault();
 		fn();
@@ -154,6 +221,9 @@ export function analysisPanel(
 			size: BOARD_SIZE,
 			lastMove: pos.lastMove,
 			check: pos.check,
+			label: scratch.at
+				? `Board after ${spokenMove(scratch.at - 1, activeLine(scratch).moves[scratch.at - 1].san)}, ${pos.turn === "w" ? "White" : "Black"} to move`
+				: `Board at the start, White to move`,
 			onSwipe: (dir) => {
 				if (dir > 0) forward(scratch);
 				else back(scratch);
@@ -164,6 +234,7 @@ export function analysisPanel(
 	const bar = el("div", { className: "an-evalbar" + (scratch.flipped ? " flipped" : "") }, [
 		el("div", { className: "an-evalfill" }),
 	]);
+	bar.setAttribute("role", "img");
 	left.appendChild(el("div", { className: "an-boardrow" }, [bar, board]));
 
 	const status = el("div", { className: "an-status" });
@@ -175,22 +246,28 @@ export function analysisPanel(
 	}
 	left.appendChild(status);
 
-	const btn = (cls, text, title, onclick, disabled = false) =>
-		el("button", { className: "chip mini " + cls, textContent: text, title, onclick, disabled });
+	// `name` is what a screen reader calls the button, where its text is a glyph
+	// or says less than the tooltip; `keys` is its shortcut, announced with it.
+	const btn = (cls, text, title, onclick, disabled = false, name = null, keys = null) => {
+		const b = el("button", { className: "chip mini " + cls, textContent: text, title, onclick, disabled });
+		if (name) b.setAttribute("aria-label", name);
+		if (keys) b.setAttribute("aria-keyshortcuts", keys);
+		return b;
+	};
 	const len = activeLine(scratch).moves.length;
 	const nav = el("div", { className: "an-nav orow" });
 	nav.append(
-		btn("an-start", "⏮", "Back to the start (Home)", act(() => goTo(scratch, 0)), scratch.at === 0),
-		btn("an-prevbranch", "⤺", "Back to where this line meets another ([)", act(() => stepBranch(scratch, -1)), !branchPoints(scratch).some((p) => p < scratch.at)),
-		btn("an-back", "◀", "Back one move (←)", act(() => back(scratch)), scratch.at === 0),
-		btn("an-fwd", "▶", "Forward one move (→)", act(() => forward(scratch)), scratch.at === len),
-		btn("an-nextbranch", "⤻", "On to where this line meets another (])", act(() => stepBranch(scratch, 1)), !branchPoints(scratch).some((p) => p > scratch.at)),
-		btn("an-end", "⏭", "To the end of the line (End)", act(() => goTo(scratch, len)), scratch.at === len),
+		btn("an-start", "⏮", "Back to the start (Home)", act(() => goTo(scratch, 0)), scratch.at === 0, "Back to the start", "Home"),
+		btn("an-prevbranch", "⤺", "Back to where this line meets another ([)", act(() => stepBranch(scratch, -1)), !branchPoints(scratch).some((p) => p < scratch.at), "Back to where this line meets another", "["),
+		btn("an-back", "◀", "Back one move (←)", act(() => back(scratch)), scratch.at === 0, "Back one move", "ArrowLeft"),
+		btn("an-fwd", "▶", "Forward one move (→)", act(() => forward(scratch)), scratch.at === len, "Forward one move", "ArrowRight"),
+		btn("an-nextbranch", "⤻", "On to where this line meets another (])", act(() => stepBranch(scratch, 1)), !branchPoints(scratch).some((p) => p > scratch.at), "On to where this line meets another", "]"),
+		btn("an-end", "⏭", "To the end of the line (End)", act(() => goTo(scratch, len)), scratch.at === len, "To the end of the line", "End"),
 		// Flip changes nothing about the scratch's moves, so it is kept apart
 		// from the controls that do.
 		btn("an-flip", "⇅ Flip", "Show the board from the other side (F)", act(() => {
 			scratch.flipped = !scratch.flipped;
-		})),
+		}), false, "Flip the board", "F"),
 		btn(
 			"an-cut",
 			"✂ Delete from here",
@@ -199,14 +276,25 @@ export function analysisPanel(
 			scratch.at === len,
 		),
 	);
+	nav.setAttribute("role", "toolbar");
+	nav.setAttribute("aria-label", "Move navigation");
 	left.appendChild(nav);
+	left.appendChild(moveBox(scratch, onChange));
+	const helpBtn = el("button", {
+		className: "an-help-open",
+		textContent: "? all keys",
+		title: "Keyboard shortcuts (?)",
+		onclick: act(() => (scratch.help = true)),
+	});
+	helpBtn.setAttribute("aria-keyshortcuts", "Shift+?");
+	helpBtn.setAttribute("aria-haspopup", "dialog");
 	left.appendChild(
-		el("div", {
-			className: "an-keys",
-			textContent:
-				"Keys: ← → step · Home/End · ↑ ↓ switch line · [ ] branch points · F flip · Ctrl+Z undo" +
-				(engine ? " · E engine · Space best move" : ""),
-		}),
+		el("div", { className: "an-keys" }, [
+			"Keys: ← → step · Home/End · ↑ ↓ switch line · [ ] branch points · F flip · Ctrl+Z undo" +
+				(engine ? " · E engine · Space best move" : "") +
+				" · ",
+			helpBtn,
+		]),
 	);
 	// shown in place of the keys on a touch screen (see style.css)
 	left.appendChild(
@@ -305,7 +393,8 @@ export function analysisPanel(
 		setTimeout(() => input.isConnected && input.focus());
 		return input;
 	}
-	const list = el("div", { className: "an-lines" });
+	const list = el("div", { className: "an-lines", role: "list" });
+	list.setAttribute("aria-label", "Analysis lines");
 	on.forEach((i, k) => {
 		const line = scratch.lines[i];
 		const row = el("div", {
@@ -362,6 +451,8 @@ export function analysisPanel(
 				textContent: j % 2 === 0 ? `${j / 2 + 1}.${m.san}` : j === skip ? `${(j + 1) / 2}...${m.san}` : m.san,
 				title: noteOn(line, j),
 			});
+			mv.setAttribute("aria-label", spokenMove(j, m.san) + (noteOn(line, j) ? ", has a note" : ""));
+			if (i === scratch.active && j === scratch.at - 1) mv.setAttribute("aria-current", "step");
 			mv.onclick = (e) => {
 				e.stopPropagation();
 				select(scratch, i);
@@ -370,6 +461,8 @@ export function analysisPanel(
 			};
 			movesBox.appendChild(mv);
 		});
+		row.setAttribute("role", "listitem");
+		row.setAttribute("aria-label", `Line ${k + 1}${i === scratch.active ? ", being played" : ""}${line.pinned ? ", pinned" : ""}`);
 		row.appendChild(movesBox);
 		const tools = el("div", { className: "an-line-tools" });
 		if (inNotebook(line.moves)) {
@@ -380,8 +473,11 @@ export function analysisPanel(
 				addBtn("an-add-foot", "+ Footnote", "Add this line to the notebook as a footnote", addOne(line, { tag: "foot" })),
 			);
 		}
-		const small = (cls, text, title, fn, disabled) =>
-			el("button", {
+		// Each of these is a glyph, so each is named for a screen reader, and
+		// named with the line it acts on: a list of "Delete" buttons says nothing.
+		const which = `line ${k + 1}`;
+		const small = (cls, text, title, fn, disabled) => {
+			const b = el("button", {
 				className: "chip mini " + cls,
 				textContent: text,
 				title,
@@ -391,6 +487,9 @@ export function analysisPanel(
 					fn();
 				},
 			});
+			b.setAttribute("aria-label", `${title.split(":")[0]} (${which})`);
+			return b;
+		};
 		if (on.length > 1) {
 			tools.append(
 				small("an-top", "⤒", "Make this the first line (the trunk of the copied PGN)", risky("move to top", () => moveToTop(scratch, i)), i === 0),
@@ -460,7 +559,85 @@ export function analysisPanel(
 	right.appendChild(extra);
 
 	panel.append(left, right);
+	if (scratch.help) panel.appendChild(helpDialog(act(() => (scratch.help = false)), !!engine));
+	speak(scratch, pos);
 	return panel;
+}
+
+// Read out where the board is after anything that moved it: the move just
+// played and whose turn it is. Only on a change, so a redraw for a note or a
+// pin says nothing.
+let lastSpoken = "";
+function speak(scratch, pos) {
+	const line = activeLine(scratch);
+	const where = scratch.at ? "After " + spokenMove(scratch.at - 1, line.moves[scratch.at - 1].san) : "Start position";
+	const text = `${where}. ${pos.over || (pos.turn === "w" ? "White" : "Black") + " to move"}.`;
+	if (text === lastSpoken) return;
+	lastSpoken = text;
+	announce(text);
+}
+
+// The keys, in a dialog over the panel. Opened with ? or its button; Esc,
+// ? again or Close shuts it (the panel's keydown handles the keys).
+function helpDialog(close, withEngine) {
+	const rows = BOARD_KEYS.filter(([k]) => withEngine || (k !== "E" && k !== "Space"));
+	const table = el("table", { className: "an-help-keys" }, [
+		el("caption", { className: "sr-only", textContent: "Keyboard shortcuts" }),
+		el("tbody", {}, rows.map(([k, what]) =>
+			el("tr", {}, [el("th", { scope: "row" }, [el("kbd", { textContent: k })]), el("td", { textContent: what })]),
+		)),
+	]);
+	const box = el("div", { className: "an-help modal" }, [
+		el("h3", { id: "an-help-title", textContent: "Keyboard shortcuts" }),
+		table,
+		el("p", { className: "an-help-note", textContent: "Keys work anywhere in the window except while typing in a box. Tab walks the controls; Enter or Space presses one." }),
+		el("div", { className: "modal-actions" }, [el("button", { className: "chip an-help-close", textContent: "Close", onclick: close })]),
+	]);
+	box.setAttribute("role", "dialog");
+	box.setAttribute("aria-modal", "true");
+	box.setAttribute("aria-labelledby", "an-help-title");
+	return el("div", { className: "an-help-wrap", onclick: (e) => e.target === e.currentTarget && close() }, [box]);
+}
+
+// A move typed in, for playing without a mouse (or a finger). Enter plays it;
+// a move that is not legal here is said so, and stays in the box to fix.
+function moveBox(scratch, onChange) {
+	const hint = el("span", { className: "an-type-msg", id: "an-type-msg", role: "status" });
+	const input = el("input", {
+		className: "an-type",
+		type: "text",
+		placeholder: "Type a move: Nf3, exd5, O-O, g1f3…",
+		autocomplete: "off",
+		spellcheck: false,
+	});
+	input.setAttribute("aria-label", "Type a move");
+	input.setAttribute("aria-describedby", "an-type-msg");
+	input.setAttribute("aria-keyshortcuts", "M");
+	input.onkeydown = (e) => {
+		if (e.key === "Escape" && input.value) {
+			// clear the box first; a second Escape closes the board as usual
+			e.stopPropagation();
+			input.value = "";
+			input.removeAttribute("aria-invalid");
+			hint.textContent = "";
+			return;
+		}
+		if (e.key !== "Enter") return;
+		e.preventDefault();
+		const san = typedMove(scratch, input.value);
+		if (!san) {
+			input.setAttribute("aria-invalid", "true");
+			hint.textContent = input.value.trim() ? `${input.value.trim()} is not a legal move here.` : "";
+			return;
+		}
+		play(scratch, san);
+		onChange();
+	};
+	input.oninput = () => {
+		input.removeAttribute("aria-invalid");
+		hint.textContent = "";
+	};
+	return el("div", { className: "an-type-row" }, [input, hint]);
 }
 
 // "12...Nf6", the move the cursor sits after.
@@ -491,6 +668,7 @@ function engineBox(engine, scratch, pos, onChange, { board, bar, flavors }) {
 	if (on) {
 		const pick = (cls, label, values, current, set) => {
 			const s = el("select", { className: cls, title: label });
+			s.setAttribute("aria-label", label);
 			values.forEach(([v, text]) => {
 				const o = el("option", { value: String(v), textContent: text });
 				if (v === current) o.selected = true;
@@ -506,6 +684,7 @@ function engineBox(engine, scratch, pos, onChange, { board, bar, flavors }) {
 	}
 	if (on && flavors) {
 		const f = el("select", { className: "an-engine-flavor", title: "Which Stockfish 19 to run" });
+		f.setAttribute("aria-label", "Which Stockfish 19 to run");
 		[["lite", "Lite · 1.8 MB"], ["full", "Full · 99 MB"]].forEach(([v, text]) => {
 			f.appendChild(el("option", { value: v, textContent: text, selected: v === flavors.state.flavor }));
 		});
@@ -548,6 +727,7 @@ function engineBox(engine, scratch, pos, onChange, { board, bar, flavors }) {
 		if (best) lastShare = whiteShare(best.score);
 		bar.firstChild.style.height = `${(lastShare * 100).toFixed(1)}%`;
 		bar.title = best ? `${formatScore(best.score)} from White's side` : "";
+		bar.setAttribute("aria-label", best ? `Evaluation ${formatScore(best.score)} from White's side` : "Evaluation");
 		// One row per line asked for, whether or not the search has filled it
 		// yet, so the box keeps its height from one move to the next instead
 		// of collapsing while the new search starts and growing back.
