@@ -31,6 +31,11 @@ Run a single test file with `node --test tests/pgn.test.mjs`. The browser tests
 need Chromium once (`npx playwright install chromium`); they start the dev
 server themselves and serve chess.js from `node_modules`, so they run offline.
 
+`npm run bench` times load, re-render, print and analysis-board navigation in
+Chromium on synthetic workbooks of 50, 200 and 800 variations
+(`BENCH_SIZES=50,200` to choose); run it before and after a change that could
+make a big workbook slower.
+
 `npm run dev` serves the app at http://127.0.0.1:8000 with live reload. esm.sh
 must be reachable for the page to load `chess.js`; in a sandbox without it,
 intercept `https://esm.sh/**` and serve `node_modules/chess.js/dist/esm/chess.js`.

@@ -52,6 +52,20 @@ analysis scratch) and asks for a re-render. The analysis board follows the
 same contract with its own scratch object (`analysis.js`), which has exactly
 the shape of `current.lines` so committing a line is an array push.
 
+What a change redraws is kept as small as the change (big workbooks run to
+tens of thousands of elements; `npm run bench` measures them):
+
+- The analysis window redraws on its own when only the scratch changes
+  (stepping, switching lines, flipping). Saving a note or adding a line
+  writes to the notebook, so that goes through the full `renderApp`.
+- The print tables, and the cards unless they are the preview, are built on
+  `beforeprint` from the notebook as it is then, not on every render.
+- Inside one render pass (`renderPass` in `notes.js`) note numbering is
+  computed once and shared by every caller.
+- `pgn.js` caches every move it plays by position and SAN, so replaying lines
+  (`fenMap`, `fenAt`) is mostly map lookups, and `render.js` clones board
+  diagrams it has drawn before.
+
 ## Persistence
 
 A **workbook** (`store.js`) is the raw PGN plus per-line annotations keyed by
