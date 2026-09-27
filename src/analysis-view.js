@@ -69,7 +69,7 @@ let lastShare = 0.5; // viewBox units; CSS scales it to the column
 export function analysisPanel(
 	scratch,
 	onChange,
-	{ onAdded = onChange, engine = null, flavors = null } = {},
+	{ onAdded = onChange, onNotebook = onChange, engine = null, flavors = null } = {},
 ) {
 	// tabIndex -1 rather than 0: the panel is focusable so the arrow keys have
 	// somewhere to land, but it is not a tab stop of its own -- tabbing should
@@ -351,7 +351,7 @@ export function analysisPanel(
 			? commentEditor(scratch.at - 1, [activeLine(scratch)])
 			: el("div", { className: "an-note-hint", textContent: "Play a move to note it." }),
 	);
-	right.appendChild(noteTools(scratch, onChange));
+	right.appendChild(noteTools(scratch, onNotebook));
 
 	// Every line on view can go into the notebook on its own, from its row,
 	// and the lines on view can go in together from here.
@@ -607,6 +607,8 @@ function fullBox(flavors) {
 // that is not what the board says -- so a save never overwrites a note the
 // user could not see. A save redraws the report behind the window, and with it
 // the panel, so its outcome rides on the scratch to the next draw.
+// `onChange` here is the caller's onNotebook: saving a note writes to the
+// notebook, so the report behind the window has to be redrawn as well.
 function noteTools(scratch, onChange) {
 	const box = el("div", { className: "an-note-tools" });
 	const line = activeLine(scratch);

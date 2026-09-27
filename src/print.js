@@ -191,6 +191,13 @@ const stemRef = (moves) => ({
 });
 
 export function appendPrintTables(box, g) {
+  fillPrintTables(printTablesBox(box), g);
+}
+
+// The section on its own, empty, for a caller that fills it later: the app
+// builds the tables only when the page is printed (see app.js), as nothing
+// on screen shows them.
+export function printTablesBox(box) {
   // the whole horizontal-table section can be left out of the printed report
   const wrap = el("div", {
     className:
@@ -200,13 +207,15 @@ export function appendPrintTables(box, g) {
       (getCurrent().printZebra === true ? " zebra" : ""),
   });
   wrap.style.setProperty("--row-pad", (getCurrent().printRowPad || 0) + "px");
+  box.appendChild(wrap);
+  return wrap;
+}
+
+export function fillPrintTables(wrap, g) {
   const mainV = g.vars[0]; // mainline sorts first
   const others = g.vars.slice(1);
   const size = 13; // mainline + 13 = 14 data columns per table (fits a page)
-  if (!mainV) {
-    box.appendChild(wrap);
-    return;
-  }
+  if (!mainV) return;
   // pack branches into tables of up to `size` COLUMNS: tiny branches share
   // a table, and an oversized fork spills into the next one — every table
   // spans only the deepest line it actually covers (the mainline reference
@@ -238,7 +247,6 @@ export function appendPrintTables(box, g) {
     });
     renderTableNotes(wrap, lines, { mainV, showMain: i === 0 && !off });
   });
-  box.appendChild(wrap);
 }
 
 // The numbered notes belonging to a table's var (matched back to its source

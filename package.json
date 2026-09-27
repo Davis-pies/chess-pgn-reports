@@ -14,7 +14,8 @@
     "coverage:check": "node --test --experimental-test-coverage --test-coverage-exclude='tests/**' --test-coverage-lines=97 --test-coverage-branches=87 --test-coverage-functions=97 'tests/**/*.test.mjs'",
     "check": "npm run lint && npm run knip && npm run coverage:check",
     "knip": "knip",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "bench": "node tools/bench.mjs"
   },
   "keywords": [
     "chess",
