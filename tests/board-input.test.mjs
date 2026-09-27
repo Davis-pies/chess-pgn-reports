@@ -328,3 +328,87 @@ test("arrows follow a flipped board", () => {
 	assert.match(tip, /^140,140 /);
 	done();
 });
+
+// Black pawn on g2, White king away from the queening square.
+const BLACK_PROMO_FEN = "4k3/8/8/8/8/8/6p1/K7 b - - 0 1";
+
+test("Black's promotion picker offers Black's pieces", () => {
+	const done = installDom();
+	const seen = [];
+	const board = interactiveBoard(BLACK_PROMO_FEN, (san) => seen.push(san));
+	on(board, "g2", "mousedown");
+	on(board, "g1", "mouseup");
+	const white = interactiveBoard(PROMO_FEN, () => {});
+	on(white, "b7", "mousedown");
+	on(white, "b8", "mouseup");
+	const glyph = (b) => b.querySelector('.an-promo-pick[data-piece="q"]').textContent;
+	assert.notStrictEqual(glyph(board), glyph(white), "a black queen, not a white one");
+	board.querySelector('.an-promo button[data-piece="r"]').click();
+	assert.deepStrictEqual(seen, ["g1=R+"]);
+	done();
+});
+
+test("a release while the picker is open does not dismiss it", () => {
+	const done = installDom();
+	const board = interactiveBoard(PROMO_FEN, () => {});
+	on(board, "b7", "mousedown");
+	on(board, "b8", "mouseup");
+	on(board, "e1", "mouseup");
+	assert.ok(board.querySelector(".an-promo"), "the picker is still open");
+	assert.deepStrictEqual(marked(board, "sel"), ["b7"]);
+	done();
+});
+
+test("a press off the squares selects nothing", () => {
+	const done = installDom();
+	const board = interactiveBoard(START, () => {});
+	const svg = board.querySelector("svg");
+	svg.dispatchEvent(new window.MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+	assert.deepStrictEqual(marked(board, "sel"), []);
+	const t = touch(svg, "touchstart", 1, 1);
+	assert.ok(!t.defaultPrevented, "a touch off the squares still scrolls the page");
+	done();
+});
+
+test("a two-finger touch is left to the browser", () => {
+	const done = installDom();
+	const board = interactiveBoard(START, () => {});
+	const e2 = board.querySelector('rect[data-sq="e2"]');
+	const e = new window.Event("touchstart", { bubbles: true, cancelable: true });
+	e.touches = [{ clientX: 0, clientY: 0 }, { clientX: 5, clientY: 5 }];
+	e2.dispatchEvent(e);
+	assert.ok(!e.defaultPrevented, "pinch-zoom is not swallowed");
+	assert.deepStrictEqual(marked(board, "sel"), []);
+	done();
+});
+
+test("a finger lifted where no square can be found plays nothing", () => {
+	const done = installDom();
+	const seen = [];
+	const board = interactiveBoard(START, (san) => seen.push(san));
+	const svg = board.querySelector("svg");
+	document.elementFromPoint = () => null;
+	touch(board.querySelector('rect[data-sq="e2"]'), "touchstart", 5, 5);
+	touch(svg, "touchend", 9, 9, "changed");
+	assert.deepStrictEqual(seen, []);
+	assert.deepStrictEqual(marked(board, "sel"), ["e2"], "the pick survives");
+	done();
+});
+
+test("a drag on a board drawn at half size moves the piece in board units", () => {
+	const done = installDom();
+	const board = interactiveBoard(START, () => {});
+	const svg = board.querySelector("svg");
+	const size = Number(svg.getAttribute("viewBox").split(" ")[2]);
+	svg.getBoundingClientRect = () => ({ width: size / 2, height: size / 2 });
+	const e2 = board.querySelector('rect[data-sq="e2"]');
+	e2.dispatchEvent(
+		new window.MouseEvent("mousedown", { bubbles: true, cancelable: true, clientX: 0, clientY: 0 }),
+	);
+	window.dispatchEvent(new window.MouseEvent("mousemove", { clientX: 10, clientY: 5 }));
+	const piece = svg.querySelector("use.dragging");
+	assert.ok(piece, "the piece is being dragged");
+	assert.strictEqual(piece.getAttribute("transform"), "translate(20 10)");
+	window.dispatchEvent(new window.MouseEvent("mouseup", {}));
+	done();
+});
