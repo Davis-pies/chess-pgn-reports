@@ -374,6 +374,26 @@ function pushFlat(node, vars, spans, cut) {
 		if (k.leaf) vars.push(elide(k.leaf, c));
 		else pushFlat(k.node, vars, spans, c);
 	});
+	// The run is written out in the group's first column, but a note on one of
+	// its moves may belong to any of the group's lines -- a comment sits on the
+	// line that owns the node, which is often a sibling that starts lower down.
+	// Its marker goes on the column that shows the move, or it is numbered in
+	// the notes and referenced from nowhere in the table. (The screen's group
+	// column does the same with sharedNotes.)
+	const carrier = vars[start];
+	const refs = {};
+	leavesOf(node).forEach((l) =>
+		Object.entries(l.noteByPly || {}).forEach(([k, ns]) => {
+			const p = Number(k);
+			if (p > cut && p <= inner) ns.forEach((n) => (refs[p] = refs[p] || new Set()).add(n));
+		}),
+	);
+	if (Object.keys(refs).length) {
+		const noteByPly = { ...(carrier.noteByPly || {}) };
+		for (const [p, set] of Object.entries(refs))
+			noteByPly[p] = [...new Set([...(noteByPly[p] || []), ...set])].sort((a, b) => a - b);
+		vars[start] = { ...carrier, noteByPly };
+	}
 	// `start` holds the shared run's last move, so the run begins after it and
 	// stops at the LAST CHILD's first column -- not at the last column of the
 	// group, which belongs to that child's own descendants. `tree` gives a
