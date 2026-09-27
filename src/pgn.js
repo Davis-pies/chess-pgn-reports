@@ -22,15 +22,32 @@ function tokenize(mt) {
 	return mt.match(re) || [];
 }
 
-export function parsePgn(mt) {
-	// Tag pairs are read off, then stripped. Anchored per line and matched
-	// against the real tag-pair shape on purpose: a looser pattern removes ANY
-	// bracketed text anywhere, which also eats "[%...]" markers inside comments
-	// (an imported file's [%eval] or [%clk] annotations, say).
-	const TAG_LINE = /^[ \t]*\[([A-Za-z0-9_]+)\s+"((?:[^"\\]|\\.)*)"\][ \t]*$/gm;
+// Tag pairs are read off, then stripped. Anchored per line and matched
+// against the real tag-pair shape on purpose: a looser pattern removes ANY
+// bracketed text anywhere, which also eats "[%...]" markers inside comments
+// (an imported file's [%eval] or [%clk] annotations, say).
+const TAG_LINE = /^[ \t]*\[([A-Za-z0-9_]+)\s+"((?:[^"\\]|\\.)*)"\][ \t]*$/gm;
+
+// A PGN's tag pairs alone, without parsing its moves: the report reads them on
+// every redraw, and a full parse replays every move through chess.js.
+export function pgnTags(mt) {
 	const tags = {};
-	for (const m of mt.matchAll(TAG_LINE))
-		tags[m[1]] = m[2].replace(/\\(["\\])/g, "$1");
+	// first game's tags only: a multi-game file reads its first game, and a
+	// later game's header must not overwrite that one's
+	for (const m of String(mt || "").matchAll(TAG_LINE))
+		if (!(m[1] in tags)) tags[m[1]] = m[2].replace(/\\(["\\])/g, "$1");
+	return tags;
+}
+
+// The header a workbook reports and exports: its PGN's tags, overridden by
+// what was typed in the Game info dialog (state.header). An edit to "" is a
+// deliberate blank, not "no edit", so it overrides too.
+export function headerTags(state) {
+	return { ...pgnTags(state.pgn), ...(state.header || {}) };
+}
+
+export function parsePgn(mt) {
+	const tags = pgnTags(mt);
 	// A set-up position would be replayed from the standard start by every
 	// consumer (fenAt, fenMap, the board), so its first move reads as illegal:
 	// say what is actually unsupported instead.

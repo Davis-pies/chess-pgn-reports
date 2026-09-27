@@ -10,6 +10,7 @@ import { el } from "./dom.js";
 import { getCurrent, getRenderHooks } from "./state.js";
 import { allNotes } from "./notes.js";
 import { buildPgn } from "./pgn-out.js";
+import { reportSummary, summaryMarkdown } from "./report-summary.js";
 
 // Explicit move reference for a note, e.g. "7.Nbd2" / "7...Nbd7" (number + SAN).
 // A variation-owned note (inVar) is looked up among non-main lines, since a
@@ -151,6 +152,8 @@ export function exportBar() {
     ]),
   );
   pOpts.append(
+    // the report's head: its title, the PGN's opening and game, and the tally
+    group("Report", [["summary at the top", "printSummary", true]]),
     cards,
     table,
     // Applies everywhere a line's name would prefix a note — the notes panel,
@@ -206,8 +209,8 @@ export function download(filename, text, mime) {
 // Editable, portable Markdown of the finished table — paste into Docs/Word.
 export function buildMarkdown() {
   const g = grid(getCurrent().lines);
-  const L = [];
-  if (getCurrent().name) L.push("# " + getCurrent().name, "");
+  const notes = allNotes();
+  const L = summaryMarkdown(reportSummary(getCurrent(), g, notes));
   L.push("## Lines", "");
   for (const v of g.vars) {
     if (v.synthetic) continue; // the empty reference, not a line
@@ -218,7 +221,6 @@ export function buildMarkdown() {
       `${lead}${v.name ? " (" + v.name + ")" : ""}${v.eval ? " " + v.eval : ""}: ${moves}`,
     );
   }
-  const notes = allNotes();
   if (notes.length) {
     L.push("", "## Notes", "");
     notes.forEach((note) => {

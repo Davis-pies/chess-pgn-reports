@@ -99,6 +99,8 @@ way in (see `migrate()`).
 | `src/trace.js` | which cells make up one line in the grouped table |
 | `src/table-menu.js` | the table's right-click menu, reusing the line editor's components |
 | `src/line-editor.js` | the tagging panel: names, tags, symbols, notes, hide, focus, make mainline |
+| `src/report-summary.js` | the report's head: title, PGN header facts, counts and the verdict tally, for print and Markdown |
+| `src/game-info.js` | the Game info dialog: edits to the header tags, kept in `state.header` over the PGN's own |
 | `src/render.js` | DOM tables, print cards, and SVG board diagrams from FEN |
 | `src/print.js` | the printed report: tables headed by shared moves, sliced to fit, chosen to save paper |
 | `src/notes.js` | one-pass numbering of note markers and the Notes list |

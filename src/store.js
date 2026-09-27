@@ -23,7 +23,7 @@ function keyFor(moves) {
 }
 
 // The workbook object: what gets JSON-stringified into localStorage or a file.
-export function toNotebook({ name, pgn, lines, view, analysis }) {
+export function toNotebook({ name, pgn, lines, view, analysis, header }) {
   const mainLine = lines.find((l) => l.isMain) || lines[0];
   return {
     format: FORMAT,
@@ -39,6 +39,8 @@ export function toNotebook({ name, pgn, lines, view, analysis }) {
     // the analysis board as it was left (analysis.js's packScratch), or
     // absent; older builds read only the fields above and ignore it
     ...(analysis ? { analysis } : {}),
+    // the Game info dialog's edits over the PGN's own tags, or absent
+    ...(header && Object.keys(header).length ? { header } : {}),
     tags: lines.map((l) => ({
       key: keyFor(l.moves),
       tag: l.tag || "sideline",

@@ -234,6 +234,45 @@ test("emits a full seven tag roster", () => {
 	]);
 });
 
+test("carries the source PGN's players, event and extra tags", () => {
+	const pgn = [
+		'[Event "Wijk aan Zee"]',
+		'[White "Kasparov, Garry"]',
+		'[Black "Topalov, Veselin"]',
+		'[Date "1999.01.20"]',
+		'[Result "1-0"]',
+		'[ECO "B07"]',
+		'[Opening "Pirc"]',
+		'[PlyCount "87"]',
+		'[SetUp "0"]',
+		"",
+		"1. e4 d6 *",
+	].join("\n");
+	const out = buildPgn({ name: "", pgn, lines: linesOf("1. e4 d6 *") });
+	const tags = out.split("\n\n")[0].split("\n");
+	assert.deepEqual(tags, [
+		'[Event "Wijk aan Zee"]',
+		'[Site "?"]',
+		'[Date "1999.01.20"]',
+		'[Round "?"]',
+		'[White "Kasparov, Garry"]',
+		'[Black "Topalov, Veselin"]',
+		// the export's own result, not the source game's
+		'[Result "*"]',
+		'[ECO "B07"]',
+		'[Opening "Pirc"]',
+	]);
+});
+
+test("the workbook's name wins over the source's Event", () => {
+	const out = buildPgn({
+		name: "My Pirc",
+		pgn: '[Event "Wijk aan Zee"]\n\n1. e4 d6 *',
+		lines: linesOf("1. e4 d6 *"),
+	});
+	assert.ok(out.startsWith('[Event "My Pirc"]'), out);
+});
+
 test("falls back to ? for an unnamed notebook", () => {
 	const out = buildPgn({ lines: linesOf("1. e4 *") });
 	assert.ok(out.startsWith('[Event "?"]'));

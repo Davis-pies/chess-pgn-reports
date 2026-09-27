@@ -28,8 +28,9 @@ test("buildMarkdown emits a title, the mainline, and tagged variations", () => {
 test("buildMarkdown omits the title heading when the workbook is unnamed", () => {
   const off = installDom();
   loadState("1. e4 e5 2. Nf3", { name: "" });
-  assert.ok(!buildMarkdown().startsWith("#  "), "no empty title heading");
-  assert.match(buildMarkdown(), /^## Lines/);
+  assert.ok(!buildMarkdown().startsWith("#"), "no empty title heading");
+  // the summary's counts lead instead, straight into the lines
+  assert.match(buildMarkdown(), /^1 line · to move 2\n\n## Lines/);
   off();
 });
 
@@ -191,18 +192,18 @@ test("exportBar's print options toggle state and trigger a re-render", () => {
   const boxes = [...bar.querySelectorAll('.printopts input[type="checkbox"]')];
   assert.strictEqual(
     boxes.length,
-    9,
-    "three card options, five table options, one notes option",
+    10,
+    "one report option, three card options, five table options, one notes option",
   );
-  // defaults: cards printed, final-position on, latest-divergence off;
-  // table printed with borders, one row per ply, no stripes, branch lines;
-  // footnote line names off
+  // defaults: summary printed; cards printed, final-position on,
+  // latest-divergence off; table printed with borders, one row per ply, no
+  // stripes, branch lines; footnote line names off
   assert.deepStrictEqual(
     boxes.map((b) => b.checked),
-    [true, true, false, true, true, false, false, true, false],
+    [true, true, true, false, true, true, false, false, true, false],
   );
-  boxes[2].checked = true;
-  boxes[2].onchange({ target: boxes[2] });
+  boxes[3].checked = true;
+  boxes[3].onchange({ target: boxes[3] });
   assert.strictEqual(s.showFirstDivBoard, true);
   assert.strictEqual(renders, 1);
   off();

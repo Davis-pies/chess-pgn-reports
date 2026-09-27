@@ -26,6 +26,9 @@ a `.json` file you keep.
 - **Print** a paper-saving report (**Print → Save as PDF**): tables headed by
   the moves their lines share, sliced to fit the page, with footnotes and
   lettered sub-notes.
+- **Summarise** the report at its head: the title, the opening and ECO, the
+  source game when the PGN names its players, how many lines and notes
+  follow, and a tally of how the lines end. **Game info…** edits that header.
 - **Export** to PGN or Markdown, or save the whole workbook to a `.json` file.
 - **Update the PGN** under your annotations: notes, symbols and tags follow
   the moves to the new file, with a preview of anything that would be lost.

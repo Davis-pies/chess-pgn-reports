@@ -53,6 +53,10 @@ test("full app flow: import PGN, tag a line, render table preview", async () => 
 	view = doc("view");
 	// Now in labeling view: line editors + a live table preview
 	assert.ok(view.querySelector(".markup"), "tagging panel present");
+	// headed by the report's summary, on screen and in print
+	const head = view.querySelector(".side-panel > .report-head");
+	assert.ok(head, "report summary heads the preview");
+	assert.strictEqual(head.querySelector(".rh-counts").textContent, "2 lines · to move 2");
 	assert.ok(view.querySelector("table.tbl"), "table preview rendered");
 	// main + 1 variation -> 2 line editors
 	const editors = view.querySelectorAll(".ledge");
@@ -1291,4 +1295,26 @@ test("clicking a lit group Focus chip clears the focus", async () => {
 		getCurrent().lines.every((l) => !l.hidden),
 		"every line is back",
 	);
+});
+
+test("Game info edits head the report and survive a save and reopen", async () => {
+	app.reset();
+	await app.loadPgn("1. e4 d6 2. d4");
+	app.clickText("Game info…");
+	const ov = dom.window.document.getElementById("gameinfo");
+	assert.ok(ov, "dialog open");
+	ov.querySelector("input.gi-White").value = "Kasparov";
+	ov.querySelector("input.gi-Black").value = "Topalov";
+	ov.querySelector("input.gi-Opening").value = "Pirc";
+	[...ov.querySelectorAll("button")].find((b) => b.textContent === "Save").click();
+	const facts = () =>
+		[...doc("view").querySelectorAll(".report-head .rh-fact")].map((f) => f.textContent);
+	assert.deepStrictEqual(facts(), ["Pirc", "Kasparov – Topalov"]);
+	saveNotebook("gi", { ...getCurrent(), name: "GI" });
+	app.clickText("New / Import");
+	[...doc("view").querySelectorAll("button")]
+		.find((b) => b.textContent.includes("Open: GI"))
+		.click();
+	await tick();
+	assert.deepStrictEqual(facts(), ["Pirc", "Kasparov – Topalov"], "reopened");
 });

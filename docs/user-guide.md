@@ -203,10 +203,25 @@ For a shorter overview see the [README](../README.md).
    possible, rather than filling each table to its column limit: a stray line
    that would cut a table's heading back to move two, and leave it thirty rows
    of mostly empty column, gets a small table of its own instead.
+   **The report opens with a summary**: its title (the notebook's name, or
+   the PGN's Opening and Variation when it has none), the PGN's ECO code and
+   opening, the source game's players, event and year (only when both
+   players are named), how many lines, footnote lines and notes follow and
+   how deep they go, and a tally of the lines' verdicts — White better,
+   equal, unclear, Black better — read from each line's end evaluation, or
+   an assessment on its last move. It heads the preview, the printed report
+   (untick **Report → summary at the top** to leave it off paper) and the
+   Markdown export. **Game info…** in the toolbar edits that header —
+   opening, variation, ECO, players, event, site, date, round — and the
+   edits are saved with the workbook, laid over the PGN's own tags so they
+   survive **Update PGN**. A blank field is left out of the report.
 5. **Export** — **Export PGN** (editable chess notation for any chess app),
    **Export Markdown** (paste into Google Docs/Word), or **Print → Save as
    PDF** (always the linear card view). Saved workbooks (`localStorage`) are
    listed under **My saved workbooks** on the import screen to reopen/delete.
+   Export PGN keeps the header: the players, event, date and tags like ECO
+   and Opening go back out with the lines (Event is the notebook's name when
+   it has one, unless Game info sets one).
 6. **Save and reload as a file** — **Save to file** asks for a name (prefilled
    with the workbook's current one) and writes the whole workbook, PGN and all
    annotations together, to one `.json` you can back up, share or keep in

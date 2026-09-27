@@ -56,6 +56,8 @@ import {
 } from "./trie-view.js";
 import { assignLineNames, lineEditor } from "./line-editor.js";
 import { exportBar, download, slug } from "./export.js";
+import { appendReportSummary, reportSummary } from "./report-summary.js";
+import { openGameInfo } from "./game-info.js";
 import { notesPanel } from "./notes-view.js";
 import {
   loadPrefs,
@@ -342,11 +344,13 @@ function workbookState() {
     name: c.name,
     pgn: c.pgn,
     lines: c.lines,
+    header: c.header,
     // analysis in progress travels with the workbook
     analysis: packScratch(getScratch()),
     view: {
       boardSize: c.boardSize,
       cardFont: c.cardFont,
+      printSummary: c.printSummary,
       printCards: c.printCards,
       printTables: c.printTables,
       printBorders: c.printBorders,
@@ -508,6 +512,13 @@ function viewRoot() {
   top.appendChild(
     el("button", {
       className: "chip",
+      textContent: "Game info…",
+      onclick: () => openGameInfo(getCurrent(), renderApp),
+    }),
+  );
+  top.appendChild(
+    el("button", {
+      className: "chip",
       textContent: "Update PGN…",
       onclick: () => openUpdateDialog(),
     }),
@@ -520,6 +531,9 @@ function viewRoot() {
   const g = grid(getCurrent().lines);
 
   // side: the preview (table, or print lines) with its own scroll, resizable
+  appendReportSummary(side, reportSummary(getCurrent(), g, allNotes()), {
+    print: getCurrent().printSummary !== false,
+  });
   const t = el("div", { className: "pv-table" });
   tableBox = t;
   t.appendChild(el("h3", { textContent: "Table" }));
@@ -706,6 +720,7 @@ function installNotebook(nb, id) {
       id,
       name: nb.name || "",
       pgn: nb.pgn,
+      header: nb.header || undefined,
       lines,
       // a saved notebook carries its own board settings; fall back to the
       // session's for notebooks saved before `view` existed
@@ -716,6 +731,7 @@ function installNotebook(nb, id) {
       noMain: !!view.noMain,
       boardSize: view.boardSize || getCurrent().boardSize,
       cardFont: view.cardFont || getCurrent().cardFont,
+      printSummary: view.printSummary ?? getCurrent().printSummary,
       printCards: view.printCards ?? getCurrent().printCards,
       printTables: view.printTables ?? getCurrent().printTables,
       printBorders: view.printBorders ?? getCurrent().printBorders,

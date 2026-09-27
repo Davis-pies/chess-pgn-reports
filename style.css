@@ -852,6 +852,20 @@ select:focus {
 .hidden {
   display: none !important;
 }
+/* the report's head: title, the PGN's opening and game, counts, verdicts */
+.report-head {
+  margin: 0 0 12px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.report-head h1 {
+  font-size: 1.2rem;
+  margin: 0 0 4px;
+  color: var(--text);
+}
+.report-head .rh-verdicts {
+  color: var(--text);
+}
 /* the horizontal table is rendered for print only; hidden on screen */
 .pv-htable {
   display: none;
@@ -1277,6 +1291,23 @@ sup {
 .modal .pgnin {
   width: 100%;
 }
+/* the Game info dialog: label over field, two to a row where there is room */
+.gi-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px 14px;
+}
+.gi-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.gi-field input {
+  font: inherit;
+  color: var(--text);
+}
 .modal-actions {
   display: flex;
   justify-content: flex-end;
@@ -1476,7 +1507,8 @@ sup {
      !important that reveals each section for print, hence the compound
      selectors and !important. */
   .pv-cards.noprint,
-  .pv-htable.noprint {
+  .pv-htable.noprint,
+  .report-head.noprint {
     display: none !important;
   }
   /* the screen-only label for this section. Printed it was both unwanted and
