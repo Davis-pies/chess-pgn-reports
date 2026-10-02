@@ -6,7 +6,9 @@ For a shorter overview see the [README](../README.md).
 1. **Import** — paste PGN and press **Load & Tag**, or use **Load PGN file**
    / **Load Workbook file** to open one from disk. Parenthesized variations
    `(...)` are parsed into separate taggable lines; PGN `{...}` comments are
-   captured as numbered **Notes**.
+   captured as numbered **Notes**. Notes are numbered in reading order: down
+   the first column of the table, then down the next, so the notes on a line
+   come in sequence as you read it through.
 2. **Tag** — the mainline is the reference row. For each other line choose
    **Sideline** or **Footnote** (optionally add a name, evaluation symbol, and a
    note), or use **★ Make mainline** to promote a sideline to the mainline.

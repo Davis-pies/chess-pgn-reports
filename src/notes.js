@@ -2,6 +2,7 @@ import { getCurrent } from "./state.js";
 import { divergence, mainOf, isMainLine } from "./tree.js";
 import { footGroups } from "./foot-groups.js";
 import { visibleLines } from "./visibility.js";
+import { orderedLeaves } from "./group-cols.js";
 // The tree INSIDE a group footnote — decoration, symbol merging and lettering —
 // lives in foot-nodes.js, which assigns no global numbers; this module keeps the
 // one-pass numbering. labelFor lives there too, with the rest of the labelling.
@@ -253,14 +254,17 @@ function computeNotes(lines, opts) {
 	footEntries.forEach(([e, l]) => (e.foot.noteByPly = byLine.get(l)));
 	roots.forEach(labelNodes);
 	// Reading order. Numbers are handed out above in lines order — a whole line
-	// at a time — which is not the order a reader meets the markers in: a
-	// footnote anchored on an early mainline move is created only when its own
-	// line comes around, so it used to outnumber a comment on a later move and
-	// the table's markers read out of sequence. Renumber by anchor ply, keeping
-	// first-seen order within one ply, then rewrite the markers to match.
+	// at a time — which is not the order a reader meets the markers in. A reader
+	// takes the table one line at a time: down the first column to its end, then
+	// down the next. Sorting by ply alone numbered across the rows instead, so a
+	// note low in the first column was outnumbered by every note higher up in
+	// the columns beside it, and a reader following a line met its notes out of
+	// sequence. So each note is placed by the column that shows its marker, then
+	// by ply down that column, then first-seen order, and the markers rewritten.
+	const rank = readingRank(lines, main, byLine);
 	const ordered = entries
-		.map((e, i) => [e, i])
-		.sort((a, b) => a[0].ply - b[0].ply || a[1] - b[1])
+		.map((e, i) => [e, i, rank.get(e.n) || [Infinity, e.ply]])
+		.sort((a, b) => a[2][0] - b[2][0] || a[2][1] - b[2][1] || a[1] - b[1])
 		.map(([e]) => e);
 	const remap = new Map();
 	ordered.forEach((e, i) => {
@@ -288,6 +292,43 @@ function computeNotes(lines, opts) {
 		),
 	);
 	return { entries: ordered, byLine };
+}
+
+// Where a reader meets each note number: [column, ply] of its first marker.
+//
+// Columns are the lines in the order the printed table lays them out (the
+// mainline first, then orderedLeaves) — footnote lines have no column, their
+// markers sit on their parent's. A move several lines share is spelled out
+// once, in the first of those columns, so a marker on it counts from there
+// whichever line carries it: a line's column at ply p is the first column
+// whose line plays the same moves through p.
+//
+// Only numbers reach a column's map: a footnote's lettered notes live on the
+// footnote line, which has no column. A number no column shows (a footnote
+// line's note when the footnote has nothing to hang off) is left out, and the
+// caller files it last, by ply.
+function readingRank(lines, main, byLine) {
+	const isFoot = (l) => !isMainLine(l) && l.tag === "foot";
+	const cols = [
+		...(main.synthetic ? [] : [main]),
+		...orderedLeaves(main, lines.filter((l) => !isFoot(l))),
+	];
+	const rank = new Map();
+	const better = (a, b) => a[0] - b[0] || a[1] - b[1];
+	cols.forEach((l) => {
+		Object.entries(byLine.get(l)).forEach(([key, marks]) => {
+			const ply = Number(key);
+			const i = l.moves.findIndex((m) => m.ply === ply);
+			// l itself shares every move it plays, so this always finds a column
+			const col = cols.findIndex((c) => c === l || (i >= 0 && divergence(c, l) > i));
+			marks.forEach((n) => {
+				const at = [col, ply];
+				const was = rank.get(n);
+				if (!was || better(at, was) < 0) rank.set(n, at);
+			});
+		});
+	});
+	return rank;
 }
 
 // The numbered Notes list for the open notebook. Hidden lines are filtered out
