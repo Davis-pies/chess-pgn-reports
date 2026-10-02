@@ -727,8 +727,8 @@ test("a hidden line's note consumes no number", () => {
 	assert.deepStrictEqual(
 		allNotes().map((e) => [e.n, e.text]),
 		[
-			[1, "open"],
-			[2, "develops"],
+			[1, "develops"],
+			[2, "open"],
 		],
 		"sanity: both notes are numbered while everything is visible",
 	);
@@ -786,4 +786,48 @@ test("noMain: a notebook of nothing but one footnote files no anchor", () => {
 	const { entries } = numberNotes(s.lines);
 	for (const e of entries)
 		assert.ok(!e.owner || e.owner.moves.length > 0, "anchored on an empty line");
+});
+
+// A reader takes the table one line at a time, down a column to its end and
+// then down the next, so that is the order the notes are numbered in. This is
+// the report that showed the bug: numbered across the rows, 13...c6 at the
+// foot of the first column came seventh, after notes on move 12 in the columns
+// beside it.
+const KID = `1. d4 Nf6 2. c4 g6 3. g3 Bg7 4. Bg2 O-O 5. Nf3 d6 6. O-O Nbd7 7. Nc3 e5
+8. e4 exd4 9. Nxd4 Nc5 {a} 10. h3 (10. Re1 $6 Nfd7 11. Be3 Ne5 12. b3 Ng4
+13. Bf4 Qf6 14. Nde2 g5 15. Be3 Qh6 {i}) (10. Nb3 $5 {b}) 10... Re8 11. Re1 h6
+12. Rb1 (12. b4 {c}) (12. Nb3 Ne6 {d}) (12. Qc2 Nfxe4 {e}) (12. Bf4 Bd7 {f})
+12... a5 13. b3 (13. Ndb5 Bf8 {g}) 13... c6 {h} 14. Bf4 (14. Kh2 {j}) 14... Nh7 *`;
+
+for (const noMain of [false, true])
+	test(`notes are numbered down each column in turn${noMain ? " (no mainline)" : ""}`, () => {
+		const s = loadState(KID);
+		s.noMain = noMain;
+		const { entries, byLine } = numberNotes(s.lines);
+		assert.deepStrictEqual(
+			entries.map((e) => e.n + e.text).join(" "),
+			"1a 2h 3j 4g 5c 6d 7e 8f 9i 10b",
+		);
+		// the markers in the first column read 1 then 2, down the column
+		const first = byLine.get(s.lines[0]);
+		const marked = Object.keys(first).map(Number).sort((a, b) => a - b);
+		assert.deepStrictEqual(marked.map((p) => first[p]), [[1], [2]]);
+	});
+
+test("a note on a shared move is numbered in the column that shows the move", () => {
+	// 2...d6 is spelled out in the mainline's column; the note on it belongs to
+	// the side line alone, but the reader meets it there, before the side
+	// line's column starts
+	const s = loadState("1. e4 c5 2. Nf3 d6 3. d4 (3. Bb5+ {check}) 3... cxd4 {late} *");
+	const bb5 = s.lines.find((l) => l.moves.some((m) => m.san === "Bb5+"));
+	bb5.comments.push({ ply: 3, text: "shared" });
+	const { entries } = numberNotes(s.lines);
+	assert.deepStrictEqual(
+		entries.map((e) => [e.n, e.text]),
+		[
+			[1, "shared"],
+			[2, "late"],
+			[3, "check"],
+		],
+	);
 });
