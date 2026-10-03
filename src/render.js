@@ -548,6 +548,10 @@ function moveNum(ply, first) {
 	return ply % 2 === 0 || first ? fullmoveLabel(ply) : "";
 }
 
+// The moves a card spells out, each with its note markers: a sideline's own
+// tail, the mainline whole. The context move before a tail carries none.
+const cardRange = (v) => (v.tag === "mainline" ? v.moves : v.moves.slice(v.d));
+
 export function cardMovesText(v) {
 	const parts = [];
 	const ctx = v.tag !== "mainline" && v.d > 0 ? v.moves[v.d - 1] : null;
@@ -555,7 +559,7 @@ export function cardMovesText(v) {
 		const num = moveNum(ctx.ply, true);
 		parts.push("\u22ef " + (num ? num + " " : "") + ctx.san);
 	}
-	const range = v.tag === "mainline" ? v.moves : v.moves.slice(v.d);
+	const range = cardRange(v);
 	range.forEach((m, i) => {
 		// the context move is the ply right before the range, so the range's
 		// first move reads as its natural pair and needs no forced number
@@ -586,7 +590,7 @@ export function buildCardMoves(container, v) {
 		const num = moveNum(ctx.ply, true);
 		seg("\u22ef " + (num ? num + " " : "") + ctx.san);
 	}
-	const range = v.tag === "mainline" ? v.moves : v.moves.slice(v.d);
+	const range = cardRange(v);
 	range.forEach((m, i) => {
 		const n = moveNum(m.ply, i === 0 && !ctx);
 		const num = n ? n + " " : "";
@@ -673,7 +677,15 @@ export function renderCards(container, grid, opts = {}) {
 		const notesBox = document.createElement("div");
 		notesBox.className = "card-notes";
 		const owned = [];
+		// Only the notes this card's own moves mark. The editor shares a note by
+		// writing it onto every line through that position, so a sideline also
+		// carries the mainline's notes on the moves it shares, and listed here
+		// they reprinted the mainline's notes under every sideline's card with
+		// no marker in its moves pointing at them. The printed tables suppress
+		// them the same way (see renderTableNotes in print.js).
+		const shown = new Set(cardRange(v).map((m) => m.ply));
 		for (const ply in v.noteByPly || {}) {
+			if (!shown.has(Number(ply))) continue;
 			v.noteByPly[ply].forEach((n) => {
 				const note = notes[n - 1];
 				if (!note) return;
