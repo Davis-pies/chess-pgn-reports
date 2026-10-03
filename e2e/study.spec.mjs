@@ -102,9 +102,11 @@ test("on a phone the engine's lines stay right under the board", async ({ page }
   await page.setViewportSize({ width: 390, height: 844 });
   await loadPgn(page, readFileSync(FIXTURE, "utf8"));
   await openStudy(page);
+  const off = await page.locator(".study .an-boardrow").boundingBox();
   await page.locator(".an-engine-toggle").click();
   await expect(page.locator(".an-engine-toggle")).toHaveText("Engine on");
   const board = await page.locator(".study .an-boardrow").boundingBox();
+  expect(board.width).toBeCloseTo(off.width, 0);
   const box = page.locator(".study .an-engine");
   const before = await box.boundingBox();
   expect(before.y - (board.y + board.height)).toBeLessThan(16);

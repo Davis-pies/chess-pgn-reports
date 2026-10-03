@@ -113,8 +113,9 @@ For a shorter overview see the [README](../README.md).
      shows an eval bar beside the board, the top lines (1–5) with scores from
      White's side right under the board, and arrows for their first moves. On
      a phone the lines are pinned with the board, so they stay on screen while
-     the rest scrolls; held sideways, the board shrinks to make room for them
-     (the engine's settings are then in the upright view). Click any move in a line
+     the rest (the steppers included) scrolls; the board keeps its full width
+     held upright, and held sideways it shrinks to make room for them (the
+     engine's settings are then in the upright view). Click any move in a line
      to play the line up to it. Search depth is a number box (0 = no limit);
      **Go deeper** keeps searching a finished position, and **Note eval**
      writes the verdict into the current move's note.
@@ -135,8 +136,9 @@ For a shorter overview see the [README](../README.md).
    move in the table and choose **Study from here** to open it at that
    position. Step with ← →, Home/End and the ⏮ ◀ ▶ ⏭ buttons as on the
    analysis board, and `[` `]` jump to where the line meets another. On a
-   phone the board, the engine's lines and the buttons stay pinned at the top
-   while the notes scroll underneath.
+   phone the board and its buttons stay pinned at the top while the notes
+   scroll underneath; with the engine on, the board and the engine's lines
+   are pinned and the buttons scroll with the notes (swipe the board to step).
    - **The line and its notes** — the line being read is written out with its
      symbols and the same `[n]` note numbers as the table and the Notes list.
      The note on the move just played is shown large above the moves, and

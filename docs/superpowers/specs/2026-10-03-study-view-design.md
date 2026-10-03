@@ -57,8 +57,10 @@ The board, eval bar, engine box and steppers are pinned under the header and
 the notes scroll beneath them. The typed-move box and keyboard hints are
 dropped. (The engine box first went below the notes; Davis asked for the
 engine's lines right under the board, everywhere, on 2026-10-03, and then
-pinned there.) With the engine on, the board shrinks so the pinned block
-leaves room to read. In landscape the branch-point buttons are dropped so the
+pinned there.) With the engine on, the board and the engine box are pinned
+at the board's full width and the steppers scroll with the notes: board,
+lines and steppers together left no room to read. Davis asked for the full
+width over a smaller board (2026-10-03). In landscape the branch-point buttons are dropped so the
 steppers fit one row, and with the engine on the board column is pinned and
 scrolls on its own, the board sized so the engine's lines fit under it.
 
