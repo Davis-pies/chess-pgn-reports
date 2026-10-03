@@ -10,18 +10,18 @@
 // control mutates the study and calls onChange, which redraws the panel.
 
 import { el, renderInline } from "./dom.js";
-import { activeLine, back, forward, goTo, positionOf, select, shown, stepBranch, stepLine } from "./analysis.js";
+import { activeLine, back, forward, goTo, positionOf, stepBranch } from "./analysis.js";
 import { boardRow, chipBtn, helpDialog, moveBox, navRow, speak, statusLine } from "./analysis-view.js";
 import { engineBox } from "./engine-view.js";
 import { appendFootnote } from "./render.js";
 import { markSym } from "./nags.js";
-import { divergence } from "./tree.js";
-import { backToBook, studyMark, studyNotes, studyPlay, studyPlayAll } from "./study.js";
+import { defaultLineName } from "./tree.js";
+import { backToBook, ownFrom, readLine, stepStudyLine, studyMark, studyNotes, studyPlay, studyPlayAll } from "./study.js";
 
 export const STUDY_KEYS = [
 	["← →", "Back / forward one move"],
 	["Home / End", "To the start / end of the line"],
-	["↑ ↓", "The line above / below among the lines through here"],
+	["↑ ↓", "The previous / next line of the workbook"],
 	["[ ]", "Back / on to where this line meets another"],
 	["F", "Flip the board"],
 	["M", "Type a move (SAN like Nf3, or g1f3)"],
@@ -32,15 +32,17 @@ export const STUDY_KEYS = [
 	["Esc", "Close this list, then the study"],
 ];
 
-// How many other lines through the position are listed before "show all".
-const OTHERS_SHOWN = 30;
-
 // "12.Nf3" or "12...Nf6"; `first` writes a Black move with its number.
 const moveText = (ply, san, first = true) =>
 	ply % 2 === 0 ? `${ply / 2 + 1}.${san}` : first ? `${(ply + 1) / 2}...${san}` : san;
 
-const lineName = (line) =>
-	line.off ? "Your moves" : line.src.name || (line.src.isMain ? "Mainline" : "Line");
+// A line's name; an unnamed one (the app names every line, so only a bare
+// workbook has these) by its place in the study, as the editor would name it.
+const lineName = (study, i) => {
+	const line = study.lines[i];
+	if (line.off) return "Your moves";
+	return line.src.name || defaultLineName(!!line.src.isMain, i + 1);
+};
 
 export function studyPanel(study, onChange, { engine = null, flavors = null } = {}) {
 	const panel = el("div", { className: "analysis study", tabIndex: -1 });
@@ -58,8 +60,8 @@ export function studyPanel(study, onChange, { engine = null, flavors = null } = 
 		ArrowRight: () => forward(study),
 		Home: () => goTo(study, 0),
 		End: () => goTo(study, line.moves.length),
-		ArrowUp: () => stepLine(study, -1),
-		ArrowDown: () => stepLine(study, 1),
+		ArrowUp: () => stepStudyLine(study, -1),
+		ArrowDown: () => stepStudyLine(study, 1),
 		"[": () => stepBranch(study, -1),
 		"]": () => stepBranch(study, 1),
 		f: () => (study.flipped = !study.flipped),
@@ -143,7 +145,6 @@ export function studyPanel(study, onChange, { engine = null, flavors = null } = 
 		keepInView(sheet, sheet.querySelector(".an-move.at"));
 		keepInView(list, list.querySelector(".st-note.here") || list.querySelector(".st-note.ahead"));
 	});
-	right.appendChild(otherLines(study, onChange));
 
 	panel.append(left, right);
 	if (study.help)
@@ -171,7 +172,7 @@ function keepInView(box, item) {
 // the reader's own, where they left the book.
 function lineHead(study, line, foot, onChange) {
 	const head = el("div", { className: "st-head" });
-	head.appendChild(el("span", { className: "st-name", textContent: lineName(line) }));
+	head.appendChild(linePicker(study, onChange));
 	if (foot) head.appendChild(el("span", { className: "st-tag", textContent: `footnote [${foot.n}]` }));
 	if (line.off) {
 		const left = line.offAt
@@ -307,60 +308,39 @@ function footLine(study, foot) {
 	return i === -1 ? null : i;
 }
 
-// The other lines through the position, each from where it goes its own way.
-// A click on one reads that line instead, from here.
-function otherLines(study, onChange) {
-	const box = el("div", { className: "st-others an-wb" });
-	const others = shown(study).filter((i) => i !== study.active);
-	box.appendChild(
-		el("div", {
-			className: "an-sec",
-			textContent: `Other lines through here (${others.length})`,
-		}),
-	);
-	if (!others.length) {
-		box.appendChild(el("div", { className: "an-note-hint", textContent: "None: no other line passes through this position." }));
-		return box;
-	}
-	const all = study.othersAll || others.length <= OTHERS_SHOWN;
-	const list = el("div", { className: "an-wb-lines" });
-	(all ? others : others.slice(0, OTHERS_SHOWN)).forEach((i) => {
+// Which line is being read, and the way to any other: ◀ ▶ step through the
+// workbook's lines in order (↑ ↓ do the same), and the drop-down goes
+// straight to one. Each line is listed by name with the move it leaves the
+// others on, so lines named only "Line 7" can still be told apart.
+function linePicker(study, onChange) {
+	const book = study.lines.map((l, i) => i).filter((i) => !study.lines[i].off);
+	const line = activeLine(study);
+	const go = (dir) => () => {
+		stepStudyLine(study, dir);
+		onChange();
+	};
+	const box = el("div", { className: "st-picker" });
+	const one = book.length < 2;
+	box.appendChild(chipBtn("st-prev", "◀", "Previous line (↑)", go(-1), one, "Previous line", "ArrowUp"));
+	box.appendChild(el("span", { className: "st-name", textContent: lineName(study, study.active) }));
+	box.appendChild(chipBtn("st-next", "▶", "Next line (↓)", go(1), one, "Next line", "ArrowDown"));
+	const sel = el("select", { className: "st-pick", title: "Go to a line" });
+	sel.setAttribute("aria-label", "Go to a line");
+	if (line.off) sel.appendChild(el("option", { value: String(study.active), textContent: "Your moves", selected: true }));
+	book.forEach((i, k) => {
 		const l = study.lines[i];
-		const row = el("button", {
-			className: "an-wb-line st-other",
-			title: "Read this line from here",
-			onclick: () => {
-				select(study, i);
-				onChange();
-			},
-		});
-		row.appendChild(el("span", { className: "an-wb-name", textContent: lineName(l) }));
-		// from the move before it leaves the line being read, so each row
-		// shows where it differs rather than the moves they all share
-		const from = Math.max(study.at - 1, divergence(l, activeLine(study)) - 1, 0);
-		const text = l.moves
-			.slice(from, from + 8)
-			.map((m, k) => moveText(m.ply, m.san, k === 0) + (markSym(studyMark(l, m.ply)) || ""))
-			.join(" ");
-		row.appendChild(
-			el("span", {
-				className: "an-line-moves",
-				textContent: (from ? "… " : "") + text + (l.moves.length > from + 8 ? " …" : ""),
-			}),
-		);
-		list.appendChild(row);
+		const d = ownFrom(study, i);
+		const label = `${k + 1}. ${lineName(study, i)}` + (k && l.moves[d] ? ` · ${moveText(d, l.moves[d].san)}` : "");
+		sel.appendChild(el("option", { value: String(i), textContent: label, selected: i === study.active }));
 	});
-	box.appendChild(list);
-	if (!all)
-		box.appendChild(
-			el("button", {
-				className: "an-showall",
-				textContent: `show all ${others.length}`,
-				onclick: () => {
-					study.othersAll = true;
-					onChange();
-				},
-			}),
-		);
+	sel.onchange = () => {
+		readLine(study, Number(sel.value));
+		onChange();
+	};
+	box.appendChild(sel);
+	const k = book.indexOf(study.active);
+	box.appendChild(
+		el("span", { className: "st-count", textContent: k === -1 ? `${book.length} lines` : `${k + 1} of ${book.length}` }),
+	);
 	return box;
 }

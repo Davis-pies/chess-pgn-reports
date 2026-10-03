@@ -84,6 +84,44 @@ export function studyPlayAll(s, sans) {
 	return s;
 }
 
+// Where a workbook line goes its own way: the most moves it shares with any
+// other book line. Its move there is the one that names it ("22...g6").
+export function ownFrom(s, idx) {
+	const line = s.lines[idx];
+	let d = 0;
+	s.lines.forEach((l, i) => {
+		if (i !== idx && !l.off) d = Math.max(d, divergence(line, l));
+	});
+	return Math.min(d, Math.max(line.moves.length - 1, 0));
+}
+
+// Read another of the workbook's lines. The board stays where it is if that
+// line passes through the position. Otherwise it goes to the line's own first
+// move, where it leaves the others -- or, for the mainline, to where the line
+// being read left it -- so a switch lands on what makes the line different.
+export function readLine(s, idx) {
+	const to = s.lines[idx];
+	if (!to || idx === s.active) return s;
+	const from = activeLine(s);
+	const d = divergence(to, from);
+	s.active = idx;
+	if (d >= s.at) return s;
+	s.at = Math.min((idx === 0 ? d : ownFrom(s, idx)) + 1, to.moves.length);
+	return s;
+}
+
+// The previous (dir -1) or next (dir 1) workbook line, in the study's order,
+// wrapping round at either end. From moves of the reader's own it counts
+// from the book line they left.
+export function stepStudyLine(s, dir) {
+	const book = s.lines.map((l, i) => i).filter((i) => !s.lines[i].off);
+	if (!book.length) return s;
+	const line = activeLine(s);
+	const here = line.off ? s.lines.findIndex((l) => !l.off && l.src === line.src) : s.active;
+	const k = book.indexOf(here);
+	return readLine(s, book[(k + dir + book.length) % book.length]);
+}
+
 // Drop the reader's own lines and go back to where the line being read left
 // the book: on the book line it came from, at the move it left it.
 export function backToBook(s) {

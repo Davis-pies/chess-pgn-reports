@@ -138,17 +138,17 @@ test("a move's symbol comes from its workbook line while the moves agree", () =>
 
 // ---- the panel
 
-test("the panel draws the board, the line, its notes and the other lines", () => {
+test("the panel draws the board, the line and its notes", () => {
 	const done = installDom();
 	const s = loadState(NOTED);
 	const st = newStudy(s.lines);
 	let panel = studyPanel(st, () => {});
 	assert.ok(panel.querySelector(".an-board svg"));
 	assert.strictEqual(panel.querySelector(".st-name").textContent, "Mainline");
+	assert.strictEqual(panel.querySelector(".st-count").textContent, "1 of 2");
 	assert.strictEqual(panel.querySelector(".st-here").textContent, "The start position.");
 	assert.strictEqual(panel.querySelectorAll(".st-note").length, 1);
 	assert.ok(panel.querySelector(".st-note").classList.contains("ahead"));
-	assert.match(panel.querySelector(".st-others .an-sec").textContent, /\(1\)/);
 	// nothing that edits the workbook
 	for (const sel of [".an-add", ".an-del", ".an-rename", ".cedit", ".an-cut", ".an-undo", ".an-note-eval"])
 		assert.strictEqual(panel.querySelector(sel), null, sel);
@@ -164,36 +164,88 @@ test("the panel draws the board, the line, its notes and the other lines", () =>
 	done();
 });
 
-test("clicks go to a move, a note's move, and another line", () => {
+test("clicks go to a move and to a note's move", () => {
 	const done = installDom();
 	const s = loadState(NOTED);
 	const st = newStudy(s.lines);
 	let changed = 0;
-	let panel = studyPanel(st, () => changed++);
+	const panel = studyPanel(st, () => changed++);
 	panel.querySelectorAll(".st-moves .an-move")[1].click();
 	assert.strictEqual(st.at, 2);
 	click(panel, ".st-note-go");
 	assert.strictEqual(st.at, 3);
-	panel = studyPanel(st, () => changed++);
-	click(panel, ".st-other");
-	assert.strictEqual(activeLine(st).src, s.lines[1]);
-	assert.strictEqual(st.at, 3, "the cursor stays at the position");
-	assert.strictEqual(changed, 3);
+	assert.strictEqual(changed, 2);
 	done();
 });
 
-test("the other lines are cut at thirty until asked for all", () => {
+const OPENINGS = "1. e4 e5 (1... c5 2. Nf3 d6) (1... c5 2. Nc3) (1... e6) 2. Nf3 Nc6 3. Bb5 (3. Bc4 Bc5) a6 *";
+const named = () => {
+	const s = loadState(OPENINGS);
+	s.lines.forEach((l, i) => i && (l.name = ["", "Open", "Closed", "French", "Italian"][i]));
+	return s;
+};
+
+test("◀ ▶ step through every line in order, and the picker goes to any", () => {
 	const done = installDom();
-	const firsts = ["a3", "a4", "b3", "b4", "c3", "c4", "d3", "d4", "f3", "f4", "g3", "g4", "h3", "h4", "Na3", "Nc3", "Ne2", "Nh3"];
-	const vars = firsts.flatMap((m) => [`(2. ${m} a6)`, `(2. ${m} h6)`]);
-	const s = loadState("1. e4 e5 2. Nf3 " + vars.join(" ") + " Nc6");
+	const s = named();
 	const st = newStudy(s.lines);
+	goTo(st, 4); // 3.Bb5 on the mainline
+	let changed = 0;
+	let panel = studyPanel(st, () => changed++);
+	const options = [...panel.querySelectorAll(".st-pick option")].map((o) => o.textContent);
+	assert.deepStrictEqual(options, ["1. Mainline", "2. Open · 2.Nf3", "3. Closed · 2.Nc3", "4. French · 1...e6", "5. Italian · 3.Bc4"]);
+	assert.strictEqual(panel.querySelector(".st-pick").value, "0");
+
+	click(panel, ".st-next");
+	assert.strictEqual(activeLine(st).src.name, "Open");
+	assert.strictEqual(st.at, 3, "on the line's own first move, 2.Nf3");
+	click(studyPanel(st, () => changed++), ".st-next");
+	assert.strictEqual(activeLine(st).src.name, "Closed");
+	assert.strictEqual(st.at, 3, "2.Nc3, where it leaves the Open");
+	click(studyPanel(st, () => changed++), ".st-prev");
+	assert.strictEqual(activeLine(st).src.name, "Open");
+	// a line through the position keeps the board where it is
 	goTo(st, 2);
-	let panel = studyPanel(st, () => {});
-	assert.strictEqual(panel.querySelectorAll(".st-other").length, 30);
-	click(panel, ".st-others .an-showall");
-	panel = studyPanel(st, () => {});
-	assert.strictEqual(panel.querySelectorAll(".st-other").length, s.lines.length - 1);
+	click(studyPanel(st, () => changed++), ".st-next");
+	assert.strictEqual(st.at, 2);
+	// to the mainline: where the line being read left it
+	panel = studyPanel(st, () => changed++);
+	const pick = panel.querySelector(".st-pick");
+	goTo(st, 3);
+	pick.value = "0";
+	pick.dispatchEvent(new window.Event("change"));
+	assert.strictEqual(activeLine(st).src.isMain, true);
+	assert.strictEqual(st.at, 2, "1...e5, where the Closed left it");
+	// round the end
+	click(studyPanel(st, () => changed++), ".st-prev");
+	assert.strictEqual(activeLine(st).src.name, "Italian");
+	click(studyPanel(st, () => changed++), ".st-next");
+	assert.ok(activeLine(st).src.isMain);
+	assert.strictEqual(changed, 7);
+	done();
+});
+
+test("from your own moves the switcher counts from the line you left", () => {
+	const done = installDom();
+	const s = named();
+	const st = newStudy(s.lines);
+	studyPlayAll(st, ["e4", "e5", "Nf3", "Nc6", "d4"]);
+	const panel = studyPanel(st, () => {});
+	assert.strictEqual(panel.querySelector(".st-pick option").textContent, "Your moves");
+	assert.strictEqual(panel.querySelector(".st-count").textContent, "5 lines");
+	click(panel, ".st-next");
+	assert.strictEqual(activeLine(st).src.name, "Open");
+	assert.strictEqual(st.lines.length, 6, "your moves are kept until you go back to the book");
+	done();
+});
+
+test("a lone line has nothing to switch to", () => {
+	const done = installDom();
+	const s = loadState("1. e4 e5 *");
+	const panel = studyPanel(newStudy(s.lines), () => {});
+	assert.ok(panel.querySelector(".st-prev").disabled);
+	assert.ok(panel.querySelector(".st-next").disabled);
+	assert.strictEqual(panel.querySelector(".st-name").textContent, "Mainline");
 	done();
 });
 

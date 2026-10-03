@@ -41,6 +41,23 @@ along each line).
 The note on the move just played is shown large above the move list; every note
 along the line is listed below, the current one marked and later ones greyed.
 
+## Switching lines
+
+Not "the lines through this position" (that read as the next book moves, and
+hid every line that does not pass through the board). The line's name sits
+between ◀ and ▶, which step through all the workbook's lines in order and
+wrap; a drop-down lists every line by name with the move where it goes its own
+way (`ownFrom`: the most moves it shares with any other line). A switch keeps
+the board where it is when the new line passes through it, and otherwise goes
+to that line's own first move (to the mainline, to where the old line left it).
+
+## Phones
+
+The board, eval bar and steppers are pinned under the header and the notes
+scroll beneath them. The typed-move box and keyboard hints are dropped, and the
+engine box goes below the notes. In landscape the branch-point buttons are
+dropped so the steppers fit one row.
+
 ## Moves off the book
 
 A move no workbook line plays from the position starts a line of the reader's

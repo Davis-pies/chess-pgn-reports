@@ -26,7 +26,9 @@ test("the study steps through the workbook's lines with their notes", async ({ p
   await expect(page.locator(".st-note.here")).toContainText("Develops with tempo.");
 
   // the Petroff is another line through here; reading it shows its own note
-  await page.locator(".st-other", { hasText: "Nf6" }).click();
+  // the next line is the Petroff, read from where it is on the board
+  await page.locator(".st-next").click();
+  await expect(page.locator(".st-count")).toHaveText("2 of 2");
   await expect(page.locator(".st-note")).toHaveCount(2);
   await page.keyboard.press("ArrowRight");
   await page.keyboard.press("ArrowRight");
@@ -75,4 +77,23 @@ test("a real game reads in the study", async ({ page }) => {
     for (let i = 0; i < 9; i++) await page.keyboard.press("ArrowRight");
     await page.screenshot({ path: process.env.STUDY_SHOT, fullPage: true });
   }
+});
+
+test("on a phone the board stays put while the notes scroll", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await loadPgn(page, readFileSync(FIXTURE, "utf8"));
+  await openStudy(page);
+  for (let i = 0; i < 9; i++) await page.locator(".an-fwd").click();
+  await expect(here(page)).toContainText("very solid development");
+  const board = page.locator(".study .an-board");
+  const before = await board.boundingBox();
+  await page.locator(".st-window").evaluate((w) => (w.scrollTop = 600));
+  const after = await board.boundingBox();
+  expect(Math.abs(after.y - before.y)).toBeLessThan(2);
+  // the line switcher fits the width and still works
+  const picker = await page.locator(".st-picker").boundingBox();
+  expect(picker.x + picker.width).toBeLessThanOrEqual(390);
+  await page.locator(".st-window").evaluate((w) => (w.scrollTop = 0));
+  await page.locator(".st-next").click();
+  await expect(page.locator(".st-name")).not.toHaveText("Mainline");
 });

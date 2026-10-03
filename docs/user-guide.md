@@ -130,9 +130,10 @@ For a shorter overview see the [README](../README.md).
 4. **Study** — **Study** in the toolbar opens the workbook on a board to
    read, not to edit: nothing in it can change the workbook. Right-click a
    move in the table and choose **Study from here** to open it at that
-   position. Step with the arrow keys, Home/End and the ⏮ ◀ ▶ ⏭ buttons as on
-   the analysis board; ↑ ↓ switch between the lines through the position and
-   `[` `]` jump to where the line meets another.
+   position. Step with ← →, Home/End and the ⏮ ◀ ▶ ⏭ buttons as on the
+   analysis board, and `[` `]` jump to where the line meets another. On a
+   phone the board and its buttons stay pinned at the top while the notes
+   scroll underneath.
    - **The line and its notes** — the line being read is written out with its
      symbols and the same `[n]` note numbers as the table and the Notes list.
      The note on the move just played is shown large above the moves, and
@@ -140,9 +141,14 @@ For a shorter overview see the [README](../README.md).
      and the ones still ahead greyed. Click a move or a note to go there. A
      footnote's entry offers **Read this footnote**, which follows the
      footnote's own line on the board, with its lettered notes.
-   - **Other lines through here** lists the lines that pass through the
-     position, each from where it leaves the line being read; click one to
-     read it from here.
+   - **Switching lines** — the line's name sits above its note, between **◀**
+     and **▶**, which step to the previous and next line of the workbook
+     (↑ ↓ do the same, and they wrap round at the ends). The drop-down beside
+     them goes straight to any line; each is listed with the move where it
+     goes its own way. If the new line passes through the position on the
+     board, the board stays put; otherwise it goes to that line's own first
+     move (to the mainline, to where you left it), so a switch lands on what
+     makes the line different.
    - **Moves of your own** — play a move on the board (or type it) that the
      workbook does not have and you are off the book, on a line called **Your
      moves**. Nothing is saved; **↩ Back to the book** (or **B**) returns to
