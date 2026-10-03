@@ -309,3 +309,37 @@ test("the box shows progress, and a failure with the way round it", async () => 
 	assert.strictEqual(f.state.flavor, "full");
 	done();
 });
+
+// ---- the thread count
+
+test("the thread picker shows for a multi-threaded engine on an isolated page, and is remembered", () => {
+	const done = withDom();
+	const engineWith = (threads) => {
+		const e = createEngine(() => fakeWorker("w", []), { throttle: 0, threads });
+		e.enable();
+		return e;
+	};
+	const panel = (engine) => analysisPanel(newScratch(), () => {}, { engine });
+	assert.strictEqual(panel(engineWith(2)).querySelector(".an-engine-threads"), null, "not isolated: no picker");
+	globalThis.crossOriginIsolated = true;
+	const cores = Object.getOwnPropertyDescriptor(globalThis.navigator, "hardwareConcurrency");
+	Object.defineProperty(globalThis.navigator, "hardwareConcurrency", { value: 4, configurable: true });
+	try {
+		assert.strictEqual(panel(engineWith(0)).querySelector(".an-engine-threads"), null, "single-threaded build: no picker");
+		const engine = engineWith(2);
+		const pick = panel(engine).querySelector(".an-engine-threads");
+		assert.deepStrictEqual([...pick.options].map((o) => o.textContent), ["1 thread", "2 threads", "3 threads", "4 threads"]);
+		assert.strictEqual(pick.value, "2");
+		pick.value = "3";
+		pick.onchange();
+		assert.strictEqual(engine.threads, 3);
+		assert.strictEqual(JSON.parse(localStorage.getItem("ott-prefs")).engineThreads, 3);
+		Object.defineProperty(globalThis.navigator, "hardwareConcurrency", { value: 1, configurable: true });
+		assert.strictEqual(panel(engineWith(1)).querySelector(".an-engine-threads"), null, "one core: nothing to pick");
+	} finally {
+		delete globalThis.crossOriginIsolated;
+		if (cores) Object.defineProperty(globalThis.navigator, "hardwareConcurrency", cores);
+		else delete globalThis.navigator.hardwareConcurrency;
+		done();
+	}
+});

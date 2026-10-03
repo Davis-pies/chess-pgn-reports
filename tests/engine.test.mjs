@@ -4,7 +4,10 @@ import assert from "node:assert";
 import {
 	createEngine,
 	formatScore,
+	maxThreads,
 	numberedFrom,
+	startThreads,
+	threadsAvailable,
 	parseInfo,
 	uciToSan,
 	whiteScore,
@@ -268,6 +271,65 @@ test("a depth or line-count change re-searches the position", () => {
 	assert.strictEqual(eng.multiPv, 3);
 	assert.ok(w().sent.includes("setoption name MultiPV value 3"));
 	assert.strictEqual(w().gos().length, 3, "the cache was cleared, so it searches");
+});
+
+test("a multi-threaded build is told its thread count; a single-threaded one never is", () => {
+	const single = setup();
+	single.eng.enable();
+	single.eng.analyse(START);
+	assert.ok(!single.w().sent.some((c) => c.includes("Threads")));
+	single.eng.setThreads(4);
+	assert.strictEqual(single.eng.threads, 0, "a single-threaded build has no count to change");
+	assert.ok(!single.w().sent.some((c) => c.includes("Threads")));
+
+	const { eng, w } = setup({ threads: 2, depth: 10 });
+	eng.enable();
+	eng.analyse(START);
+	assert.deepStrictEqual(w().sent.slice(0, 4), [
+		"uci",
+		"setoption name Hash value 64",
+		"setoption name Threads value 2",
+		"setoption name MultiPV value 3",
+	]);
+	eng.setThreads(2); // unchanged: nothing
+	assert.strictEqual(w().sent.filter((c) => c.includes("Threads")).length, 1);
+	eng.setThreads(4);
+	assert.strictEqual(eng.threads, 4);
+	// the running search is stopped, the count sent, and the search restarted
+	const tail = w().sent.slice(-2);
+	assert.deepStrictEqual(tail, ["stop", "setoption name Threads value 4"]);
+	w().reply("bestmove e2e4");
+	assert.deepStrictEqual(w().gos(), ["go depth 10", "go depth 10"]);
+});
+
+test("a count chosen before the engine starts is sent when it does", () => {
+	const { eng, w } = setup({ threads: 2 });
+	eng.setThreads(3);
+	eng.enable();
+	eng.analyse(START);
+	assert.ok(w().sent.includes("setoption name Threads value 3"));
+	assert.ok(!w().sent.includes("setoption name Threads value 2"));
+});
+
+test("threads are on offer only on an isolated page, one per core", () => {
+	const page = (o) => ({ SharedArrayBuffer, navigator: { hardwareConcurrency: 8 }, ...o });
+	assert.strictEqual(threadsAvailable(page({ crossOriginIsolated: true })), true);
+	assert.strictEqual(threadsAvailable(page({ crossOriginIsolated: false })), false);
+	assert.strictEqual(threadsAvailable(page({ crossOriginIsolated: true, SharedArrayBuffer: undefined })), false);
+	assert.strictEqual(maxThreads(page({ crossOriginIsolated: true })), 8);
+	assert.strictEqual(maxThreads(page({ crossOriginIsolated: false })), 1);
+	assert.strictEqual(maxThreads(page({ crossOriginIsolated: true, navigator: {} })), 1);
+	assert.strictEqual(maxThreads({ crossOriginIsolated: true, SharedArrayBuffer }), 1);
+});
+
+test("the starting count is the saved one if it fits, else most of the cores up to four", () => {
+	assert.strictEqual(startThreads(null, 8), 4);
+	assert.strictEqual(startThreads(null, 4), 3);
+	assert.strictEqual(startThreads(null, 2), 1);
+	assert.strictEqual(startThreads(null, 1), 1);
+	assert.strictEqual(startThreads(6, 8), 6);
+	assert.strictEqual(startThreads(16, 8), 8, "capped to this machine");
+	assert.strictEqual(startThreads(0, 8), 4);
 });
 
 test("deeper searches the position with no depth limit", () => {

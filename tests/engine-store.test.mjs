@@ -9,6 +9,7 @@ import {
 	downloadFull,
 	fileToFull,
 	forgetFull,
+	fullFor,
 	isWasm,
 	storedFull,
 } from "../src/engine-store.js";
@@ -110,4 +111,48 @@ test("a file from disk is checked before it is stored", async () => {
 	assert.strictEqual(await storedFull(), null);
 	await fileToFull(new Blob([WASM]));
 	assert.ok(await storedFull());
+});
+
+test("each build has its own file; the page's is the single-threaded one when not isolated", () => {
+	assert.strictEqual(FULL, fullFor(false));
+	assert.strictEqual(fullFor(false).file, "stockfish-19-single.wasm");
+	assert.strictEqual(fullFor(true).file, "stockfish-19.wasm");
+	for (const t of [true, false]) {
+		const b = fullFor(t);
+		assert.ok(b.urls.every((u) => u.endsWith("/" + b.file)), "every mirror sends that build");
+		assert.match(b.sha256, /^[0-9a-f]{64}$/);
+	}
+	assert.notStrictEqual(fullFor(true).sha256, fullFor(false).sha256);
+});
+
+test("storing one build removes the other's file", async () => {
+	const put = (key, value) =>
+		new Promise((resolve, reject) => {
+			const req = indexedDB.open("chess-pgn-engines", 1);
+			req.onupgradeneeded = () => req.result.createObjectStore("files");
+			req.onsuccess = () => {
+				const t = req.result.transaction("files", "readwrite");
+				t.objectStore("files").put(value, key);
+				t.oncomplete = () => {
+					req.result.close();
+					resolve();
+				};
+				t.onerror = () => reject(t.error);
+			};
+		});
+	const has = (key) =>
+		new Promise((resolve) => {
+			const req = indexedDB.open("chess-pgn-engines", 1);
+			req.onsuccess = () => {
+				const g = req.result.transaction("files").objectStore("files").get(key);
+				g.onsuccess = () => {
+					req.result.close();
+					resolve(g.result !== undefined);
+				};
+			};
+		});
+	await put(fullFor(true).file, new Blob([WASM]));
+	await fileToFull(new Blob([WASM]));
+	assert.strictEqual(await has(fullFor(true).file), false);
+	assert.strictEqual(await has(FULL.file), true);
 });
