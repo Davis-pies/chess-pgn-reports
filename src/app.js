@@ -39,6 +39,8 @@ import {
   setScratch,
 } from "./state.js";
 import { analysisPanel } from "./analysis-view.js";
+import { studyPanel } from "./study-view.js";
+import { newStudy } from "./study.js";
 import { closeBoard, newScratch, openAt, packScratch, unpackScratch } from "./analysis.js";
 import { sharedEngine } from "./engine.js";
 import { sharedFlavors } from "./engine-flavor.js";
@@ -122,6 +124,7 @@ closedNotePaths.clear();
 setRenderHooks({
   renderApp,
   openAnalysis,
+  openStudy,
   rerenderTable,
   rerenderMarkup,
   rerenderNotes,
@@ -396,6 +399,31 @@ export function openAnalysis(moves = []) {
 	else renderApp();
 }
 
+// Open the study view: the workbook's lines on a board, read-only. From a
+// move it opens after that move, on a line through it; from the toolbar, at the
+// start of the mainline. It is built afresh each time from the workbook as it
+// stands, so it never shows a line or a note the workbook no longer has.
+let study = null;
+export function openStudy(moves = []) {
+	if (getMode() !== "study") opener = focusKey($("view"), document.activeElement);
+	study = newStudy(visibleLines(getCurrent().lines), moves, { footNames: getCurrent().showFootNames });
+	study.flipped = loadPrefs().orientation === "black";
+	setMode("study");
+	const wrap = $("view").firstElementChild;
+	if (wrap && !studyBox?.isConnected) wrap.appendChild(studyOverlay());
+	else renderApp();
+}
+
+// The study window alone, as rerenderAnalysis does for the board: stepping
+// through the workbook touches nothing behind the window.
+let studyBox = null;
+function rerenderStudy() {
+  if (getMode() !== "study" || !studyBox?.isConnected) return renderApp();
+  const win = studyBox.querySelector(".an-window");
+  keepFocus = win ? focusKey(win, document.activeElement) : null;
+  studyBox.replaceWith(studyOverlay());
+}
+
 // The analysis window alone. Stepping through a line, switching lines and
 // flipping the board touch only the scratch, and the report behind the window
 // (table, print cards, editor) can run to tens of thousands of elements on a
@@ -467,6 +495,14 @@ function viewRoot() {
       className: "chip an-toggle",
       textContent: "Analysis",
       onclick: () => openAnalysis(),
+    }),
+  );
+  top.appendChild(
+    el("button", {
+      className: "chip st-toggle",
+      textContent: "Study",
+      title: "Read the workbook's lines and notes on a board, with the engine",
+      onclick: () => openStudy(),
     }),
   );
   const name = el("input", {
@@ -618,6 +654,7 @@ function viewRoot() {
     cardFont() / 100 + "rem",
   );
   if (getMode() === "analysis") wrap.appendChild(analysisOverlay());
+  if (getMode() === "study" && study) wrap.appendChild(studyOverlay());
   return wrap;
 }
 
@@ -691,6 +728,54 @@ function analysisOverlay() {
     const help = win.querySelector(".an-help-close");
     if (help) help.focus({ preventScroll: true });
     else if (!restoreFocus(win, keep)) an.focus({ preventScroll: true });
+  });
+  return ov;
+}
+
+// The study view as a window over the report, like the analysis board: it
+// closes on the ✕, Escape, or a click on the backdrop. Nothing in it changes
+// the workbook, so closing never redraws the report.
+function studyOverlay() {
+  const engine = sharedEngine();
+  const close = () => {
+    engine.pause();
+    setMode("report");
+    savePrefs({ orientation: study.flipped ? "black" : "white" });
+    const back = opener;
+    opener = null;
+    if (!ov.isConnected) renderApp();
+    else ov.remove();
+    restoreFocus($("view"), back);
+  };
+  const ov = el("div", { className: "modal-overlay an-overlay st-overlay" });
+  studyBox = ov;
+  ov.onclick = (e) => e.target === ov && close();
+  ov.onkeydown = (e) => {
+    if (e.key === "Escape") close();
+    else trapTab(ov, e);
+  };
+  const panel = studyPanel(study, rerenderStudy, { engine, flavors: sharedFlavors() });
+  const head = el("div", { className: "an-head" }, [
+    el("h3", { id: "st-title", textContent: "Study" }),
+    el("button", {
+      className: "chip mini an-close",
+      textContent: "✕",
+      title: "Close (Esc)",
+      onclick: () => close(),
+    }),
+  ]);
+  head.lastChild.setAttribute("aria-label", "Close the study");
+  const win = el("div", { className: "modal an-window st-window" }, [head, panel]);
+  win.setAttribute("role", "dialog");
+  win.setAttribute("aria-modal", "true");
+  win.setAttribute("aria-labelledby", "st-title");
+  ov.appendChild(win);
+  const keep = keepFocus;
+  keepFocus = null;
+  queueMicrotask(() => {
+    const help = win.querySelector(".an-help-close");
+    if (help) help.focus({ preventScroll: true });
+    else if (!restoreFocus(win, keep)) panel.focus({ preventScroll: true });
   });
   return ov;
 }

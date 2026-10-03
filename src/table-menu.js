@@ -202,6 +202,12 @@ function buildInto(box, target) {
 					getRenderHooks().openAnalysis(movesUpTo(target.lines[0], target.ply)),
 				),
 			);
+		if (target.ply != null)
+			box.appendChild(
+				item("Study from here", () =>
+					getRenderHooks().openStudy(movesUpTo(target.lines[0], target.ply)),
+				),
+			);
 		box.appendChild(section(target.lines.length + " lines"));
 		// Still no Make mainline: a group is not one line.
 		lineActions(box, target.lines);
@@ -212,6 +218,12 @@ function buildInto(box, target) {
 			box.appendChild(
 				item("Analyse from here", () =>
 					getRenderHooks().openAnalysis(movesUpTo(line, ply)),
+				),
+			);
+		if (ply != null)
+			box.appendChild(
+				item("Study from here", () =>
+					getRenderHooks().openStudy(movesUpTo(line, ply)),
 				),
 			);
 		box.appendChild(section(line.name || "this line"));

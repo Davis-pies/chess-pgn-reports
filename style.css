@@ -1809,6 +1809,35 @@ sup {
 .an-wb-name { flex: none; font-size: .72rem; font-weight: 600; color: var(--muted); min-width: 4.2rem; padding-top: .2rem; }
 .an-wb .an-showall { align-self: flex-start; }
 
+/* ---- the study view: the analysis board's layout, read-only ---- */
+.st-head { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem; }
+.st-name { font-weight: 700; }
+.st-tag, .st-eval { font-size: .78rem; padding: .05rem .4rem; border-radius: .25rem; background: color-mix(in srgb, var(--main) 14%, transparent); }
+.st-off { font-size: .85rem; color: var(--warn); }
+.st-linenote { flex-basis: 100%; color: var(--muted); font-size: .9rem; }
+.st-moves { row-gap: .15rem; max-height: 9.5rem; overflow: auto; position: relative; padding-right: .3rem; }
+.st-moves .an-move sup { font-size: .68em; color: var(--main); margin-left: .05rem; }
+.an-move.st-own { font-style: italic; color: var(--warn); }
+.st-here { font-size: 1.05rem; line-height: 1.45; padding: .6rem .8rem; border-radius: var(--radius-sm); border: 1px solid color-mix(in srgb, var(--main) 30%, transparent); background: color-mix(in srgb, var(--main) 7%, transparent); }
+.st-here.empty { font-size: .9rem; color: var(--muted); background: none; border-style: dashed; border-color: var(--line); }
+.st-here-note + .st-here-note { margin-top: .4rem; }
+.st-here sup, .st-note sup { color: var(--main); }
+.st-notes { display: flex; flex-direction: column; gap: .25rem; max-height: 20rem; overflow: auto; position: relative; }
+/* the board stays in view while the notes beside it are scrolled */
+@media (min-width: 761px) {
+  .study .an-left { position: sticky; top: 0; }
+}
+.st-note { display: flex; flex-wrap: wrap; align-items: baseline; gap: .35rem; padding: .25rem .5rem; border-radius: var(--radius-sm); border: 1px solid transparent; }
+.st-note.here { border-color: color-mix(in srgb, var(--main) 30%, transparent); background: color-mix(in srgb, var(--main) 9%, transparent); box-shadow: inset 3px 0 0 var(--main); }
+.st-note.ahead { opacity: .6; }
+.st-note-go { all: unset; cursor: pointer; font-weight: 600; font-size: .85rem; white-space: nowrap; }
+.st-note-go:focus-visible { outline: 2px solid var(--main); outline-offset: 2px; border-radius: .2rem; }
+.st-note-body { flex: 1; min-width: 12rem; }
+.st-picker { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; flex-basis: 100%; }
+.st-picker .st-name { font-size: 1.05rem; }
+.st-pick { font: inherit; font-size: .85rem; max-width: 16rem; padding: .15rem .3rem; border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--bg); color: inherit; }
+.st-count { font-size: .78rem; color: var(--muted); }
+
 /* ---- keyboard and screen-reader support ---- */
 /* read out, never seen: the live region and the board's piece list */
 .sr-only {
@@ -2047,3 +2076,39 @@ kbd {
 .an-wb-toggle::before { content: "▾"; display: inline-block; width: 1em; }
 .an-wb-toggle.collapsed::before { content: "▸"; }
 .an-wb-toggle:focus-visible { outline: 2px solid var(--main); outline-offset: 2px; border-radius: .2rem; }
+
+/* The study on a phone: the board and its steppers stay pinned under the
+   header while the note, the line switcher and the notes scroll beneath, so
+   reading a note never scrolls the position away. What a thumb does not need
+   there -- the typed-move box, the swipe hint -- gives way to the notes, and
+   the engine's box drops below them (its eval bar stays beside the board). */
+@media (max-width: 760px) {
+	.study .an-left {
+		position: sticky;
+		/* the header's height (its 2.5rem close button, padding, border) and the gap
+		   under it, so the board does not jump as it sticks */
+		top: calc(2.9rem + 13px + env(safe-area-inset-top));
+		z-index: 2;
+		background: var(--panel);
+		padding-bottom: .4rem;
+		border-bottom: 1px solid var(--line);
+		gap: .3rem;
+	}
+	.study .an-left .an-type-row,
+	.study .an-left .an-touch-hint,
+	.study .an-left .an-keys { display: none; }
+	.study .an-status { font-size: .85rem; }
+	.study .an-engine { order: 10; }
+	.study .st-notes { max-height: none; overflow: visible; }
+	.st-picker { flex-wrap: nowrap; }
+	.st-picker .st-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 1 auto; }
+	.st-pick { flex: 1 1 0; min-width: 0; max-width: none; }
+	.st-count { display: none; }
+}
+/* Landscape phone: the study's nav keeps to one row under the board. The
+   branch-point jumps give way (their keys still work); with them the row
+   ran Flip off into the next column. */
+@media (max-height: 500px) and (orientation: landscape) and (max-width: 1000px) {
+	.study .an-nav .an-prevbranch,
+	.study .an-nav .an-nextbranch { display: none; }
+}

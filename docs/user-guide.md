@@ -127,7 +127,36 @@ For a shorter overview see the [README](../README.md).
    says why.
    To correct a wrong move, analyse from the move before it, play the right one,
    add it, and hide the old line.
-4. **Render** — a table (plies down, lines across), or a linear
+4. **Study** — **Study** in the toolbar opens the workbook on a board to
+   read, not to edit: nothing in it can change the workbook. Right-click a
+   move in the table and choose **Study from here** to open it at that
+   position. Step with ← →, Home/End and the ⏮ ◀ ▶ ⏭ buttons as on the
+   analysis board, and `[` `]` jump to where the line meets another. On a
+   phone the board and its buttons stay pinned at the top while the notes
+   scroll underneath.
+   - **The line and its notes** — the line being read is written out with its
+     symbols and the same `[n]` note numbers as the table and the Notes list.
+     The note on the move just played is shown large above the moves, and
+     every note along the line is listed below them, the current one marked
+     and the ones still ahead greyed. Click a move or a note to go there. A
+     footnote's entry offers **Read this footnote**, which follows the
+     footnote's own line on the board, with its lettered notes.
+   - **Switching lines** — the line's name sits above its note, between **◀**
+     and **▶**, which step to the previous and next line of the workbook
+     (↑ ↓ do the same, and they wrap round at the ends). The drop-down beside
+     them goes straight to any line; each is listed with the move where it
+     goes its own way. If the new line passes through the position on the
+     board, the board stays put; otherwise it goes to that line's own first
+     move (to the mainline, to where you left it), so a switch lands on what
+     makes the line different.
+   - **Moves of your own** — play a move on the board (or type it) that the
+     workbook does not have and you are off the book, on a line called **Your
+     moves**. Nothing is saved; **↩ Back to the book** (or **B**) returns to
+     where you left it.
+   - **The engine** works as on the analysis board: **E** switches it on,
+     Space plays its best move, and clicking a move in one of its lines plays
+     the line up to there (off the book, unless the workbook has it).
+5. **Render** — a table (plies down, lines across), or a linear
    **card** view (each table row with a board diagram of its end position) for
    print — footnotes don't get their own card, since they're not a table row.
    Boards use the open-source **cburnett** piece set (white + black) with
@@ -233,21 +262,21 @@ For a shorter overview see the [README](../README.md).
    opening, variation, ECO, players, event, site, date, round — and the
    edits are saved with the workbook, laid over the PGN's own tags so they
    survive **Update PGN**. A blank field is left out of the report.
-5. **Export** — **Export PGN** (editable chess notation for any chess app),
+6. **Export** — **Export PGN** (editable chess notation for any chess app),
    **Export Markdown** (paste into Google Docs/Word), or **Print → Save as
    PDF** (always the linear card view). Saved workbooks (`localStorage`) are
    listed under **My saved workbooks** on the import screen to reopen/delete.
    Export PGN keeps the header: the players, event, date and tags like ECO
    and Opening go back out with the lines (Event is the notebook's name when
    it has one, unless Game info sets one).
-6. **Save and reload as a file** — **Save to file** asks for a name (prefilled
+7. **Save and reload as a file** — **Save to file** asks for a name (prefilled
    with the workbook's current one) and writes the whole workbook, PGN and all
    annotations together, to one `.json` you can back up, share or keep in
    version control; the import screen reopens one. It's the same format
    `localStorage` holds, so nothing is lost either way. A file opens with no
    `localStorage` id of its own — pressing **Save** files it as a new entry
    rather than overwriting one.
-7. **Update the PGN under your annotations** — **Update PGN…** replaces the
+8. **Update the PGN under your annotations** — **Update PGN…** replaces the
    moves without throwing the markup away. Notes and symbols are re-attached by
    **move path**, so a note on a move several lines share reaches all of them,
    however the new PGN re-cuts the lines around it; a line's own name, tag,
@@ -263,7 +292,7 @@ For a shorter overview see the [README](../README.md).
    nothing can be lost. The pasted text then no longer describes the line set,
    so the workbook's stored PGN is rebuilt from its lines (the same way Export
    PGN builds one) rather than being the file that was pasted.
-8. **Settings** — the **Settings** menu beside the theme button, and what the
+9. **Settings** — the **Settings** menu beside the theme button, and what the
    app remembers in this browser between visits: the theme, which way up new
    analysis boards start (the way the last one was left, or White/Black picked
    here), the table panel's dragged width, whether the analysis board's
@@ -272,7 +301,7 @@ For a shorter overview see the [README](../README.md).
    last workbook on start** turns that off; **Forget settings** clears it all
    (saved workbooks are kept). A workbook never carries these: a file you send
    someone does not bring your panel width with it.
-9. **Phones and tablets** — on a narrow screen the report stacks with the
+10. **Phones and tablets** — on a narrow screen the report stacks with the
    toolbar first, and the table scrolls sideways in its own box rather than
    widening the page. The analysis window becomes a full-screen sheet; in
    landscape the board is sized to the height so it and its step buttons fit.
