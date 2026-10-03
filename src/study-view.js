@@ -11,7 +11,7 @@
 
 import { el, renderInline } from "./dom.js";
 import { activeLine, back, forward, goTo, positionOf, stepBranch } from "./analysis.js";
-import { boardRow, chipBtn, helpDialog, moveBox, navRow, speak, statusLine } from "./analysis-view.js";
+import { boardAndEngine, boardRow, chipBtn, helpDialog, moveBox, navRow, speak, statusLine } from "./analysis-view.js";
 import { engineBox } from "./engine-view.js";
 import { appendFootnote } from "./render.js";
 import { markSym } from "./nags.js";
@@ -101,12 +101,15 @@ export function studyPanel(study, onChange, { engine = null, flavors = null } = 
 	// ---- left column: the board and its controls
 	const left = el("div", { className: "an-left" });
 	const { row, board, bar } = boardRow(study, pos, play, onChange);
-	left.appendChild(row);
 	// the engine's lines right under the board, as on the analysis board
-	if (engine)
-		left.appendChild(
-			engineBox(engine, pos, onChange, { board, bar, flavors, playLine: (sans) => studyPlayAll(study, sans) }),
-		);
+	left.appendChild(
+		boardAndEngine(
+			panel,
+			row,
+			engine && engineBox(engine, pos, onChange, { board, bar, flavors, playLine: (sans) => studyPlayAll(study, sans) }),
+			engine,
+		),
+	);
 	left.appendChild(statusLine(pos));
 	left.appendChild(navRow(study, act));
 	left.appendChild(moveBox(study, play, onChange));

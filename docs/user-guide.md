@@ -111,7 +111,10 @@ For a shorter overview see the [README](../README.md).
      [Stockfish.js releases](https://github.com/nmrugg/stockfish.js/releases/tag/v19.0.0)
      and load the file. **Remove download** frees the space again. The engine
      shows an eval bar beside the board, the top lines (1–5) with scores from
-     White's side right under the board, and arrows for their first moves. Click any move in a line
+     White's side right under the board, and arrows for their first moves. On
+     a phone the lines are pinned with the board, so they stay on screen while
+     the rest scrolls; held sideways, the board shrinks to make room for them
+     (the engine's settings are then in the upright view). Click any move in a line
      to play the line up to it. Search depth is a number box (0 = no limit);
      **Go deeper** keeps searching a finished position, and **Note eval**
      writes the verdict into the current move's note.

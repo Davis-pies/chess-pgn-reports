@@ -112,3 +112,22 @@ test("on a phone the engine's lines stay right under the board", async ({ page }
   await page.locator(".st-window").evaluate((w) => (w.scrollTop = 600));
   expect(Math.abs((await box.boundingBox()).y - before.y)).toBeLessThan(2);
 });
+
+// Sideways the board shrinks so the engine's lines fit under it, and they stay
+// on screen however far the notes beside them are scrolled.
+test("on a phone held sideways the engine's lines stay on screen under the board", async ({ page }) => {
+  await page.setViewportSize({ width: 667, height: 375 });
+  await loadPgn(page, readFileSync(FIXTURE, "utf8"));
+  await openStudy(page);
+  await page.locator(".an-engine-toggle").click();
+  await expect(page.locator(".an-engine-toggle")).toHaveText("Engine on");
+  for (const top of [0, 2000]) {
+    await page.locator(".st-window").evaluate((w, t) => (w.scrollTop = t), top);
+    const head = await page.locator(".st-window .an-head").boundingBox();
+    const board = await page.locator(".study .an-boardrow").boundingBox();
+    const lines = await page.locator(".study .an-pvs").boundingBox();
+    expect(board.y).toBeGreaterThanOrEqual(head.y + head.height - 1);
+    expect(lines.y - (board.y + board.height)).toBeLessThan(60);
+    expect(lines.y + lines.height).toBeLessThanOrEqual(375);
+  }
+});

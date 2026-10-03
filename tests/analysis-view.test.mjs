@@ -406,11 +406,18 @@ test("the engine box is off until switched on, and E switches it", () => {
 	panel = analysisPanel(s, () => {}, { engine });
 	assert.strictEqual(panel.querySelector(".an-engine-toggle").textContent, "Engine on");
 	assert.match(panel.querySelector(".an-engine-info").textContent, /Thinking/);
+	// pinned with the board as one block, and the panel says how many lines
+	// it holds, for the CSS that sizes the board to leave them room
+	assert.strictEqual(panel.querySelector(".an-stage .an-boardrow").nextElementSibling, panel.querySelector(".an-engine"));
+	assert.ok(panel.classList.contains("engine-on"));
+	assert.strictEqual(panel.style.getPropertyValue("--pv-rows"), String(engine.multiPv));
 	// its lines sit right under the board, whatever grows in the column beside
 	assert.strictEqual(panel.querySelector(".an-left .an-boardrow").nextElementSibling, panel.querySelector(".an-engine"));
 	assert.ok(panel.querySelector(".an-engine-head .an-deeper"), "the actions share the head row");
 	click(panel, ".an-engine-toggle");
 	assert.strictEqual(engine.state.enabled, false);
+	assert.ok(!analysisPanel(s, () => {}, { engine }).classList.contains("engine-on"));
+	assert.ok(analysisPanel(s, () => {}).querySelector(".an-stage .an-boardrow"), "a stage without an engine too");
 	done();
 });
 
