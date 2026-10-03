@@ -53,9 +53,10 @@ to that line's own first move (to the mainline, to where the old line left it).
 
 ## Phones
 
-The board, eval bar and steppers are pinned under the header and the notes
-scroll beneath them. The typed-move box and keyboard hints are dropped, and the
-engine box goes below the notes. In landscape the branch-point buttons are
+The board, eval bar, engine box and steppers are pinned under the header and
+the notes scroll beneath them. The typed-move box and keyboard hints are
+dropped. (The engine box first went below the notes; Davis asked for the
+engine's lines right under the board, everywhere, on 2026-10-03.) In landscape the branch-point buttons are
 dropped so the steppers fit one row.
 
 ## Moves off the book

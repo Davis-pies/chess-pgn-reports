@@ -406,6 +406,9 @@ test("the engine box is off until switched on, and E switches it", () => {
 	panel = analysisPanel(s, () => {}, { engine });
 	assert.strictEqual(panel.querySelector(".an-engine-toggle").textContent, "Engine on");
 	assert.match(panel.querySelector(".an-engine-info").textContent, /Thinking/);
+	// its lines sit right under the board, whatever grows in the column beside
+	assert.strictEqual(panel.querySelector(".an-left .an-boardrow").nextElementSibling, panel.querySelector(".an-engine"));
+	assert.ok(panel.querySelector(".an-engine-head .an-deeper"), "the actions share the head row");
 	click(panel, ".an-engine-toggle");
 	assert.strictEqual(engine.state.enabled, false);
 	done();

@@ -205,10 +205,29 @@ export function analysisPanel(
 		onChange();
 	};
 
-	// ---- left column: board, status, navigation
+	// ---- left column: board, engine, status, navigation
 	const left = el("div", { className: "an-left" });
 	const { row, board, bar } = boardRow(scratch, pos, (san) => play(scratch, san), onChange);
-	left.append(row, statusLine(pos));
+	left.appendChild(row);
+	// The engine's lines go right under the board, where the eye already is
+	// and where they stay put however long the panel beside them grows.
+	if (engine)
+		left.appendChild(
+			engineBox(engine, pos, onChange, {
+				board,
+				bar,
+				flavors,
+				playLine: (sans) => playAll(scratch, sans),
+				noteEval: scratch.at
+					? (text) => {
+							const line = activeLine(scratch);
+							line.comments = line.comments || [];
+							line.comments.push({ ply: scratch.at - 1, text });
+						}
+					: null,
+			}),
+		);
+	left.appendChild(statusLine(pos));
 	const len = activeLine(scratch).moves.length;
 	left.appendChild(
 		navRow(scratch, act, [
@@ -246,24 +265,8 @@ export function analysisPanel(
 		}),
 	);
 
-	// ---- right column: engine, lines, note, commit
+	// ---- right column: lines, note, commit
 	const right = el("div", { className: "an-right" });
-	if (engine)
-		right.appendChild(
-			engineBox(engine, pos, onChange, {
-				board,
-				bar,
-				flavors,
-				playLine: (sans) => playAll(scratch, sans),
-				noteEval: scratch.at
-					? (text) => {
-							const line = activeLine(scratch);
-							line.comments = line.comments || [];
-							line.comments.push({ ply: scratch.at - 1, text });
-						}
-					: null,
-			}),
-		);
 
 	// The lines through the position on the board: the list follows the
 	// cursor, so a line that does not lead here is out of view until the

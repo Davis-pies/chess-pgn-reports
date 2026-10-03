@@ -111,7 +111,7 @@ For a shorter overview see the [README](../README.md).
      [Stockfish.js releases](https://github.com/nmrugg/stockfish.js/releases/tag/v19.0.0)
      and load the file. **Remove download** frees the space again. The engine
      shows an eval bar beside the board, the top lines (1–5) with scores from
-     White's side, and arrows for their first moves. Click any move in a line
+     White's side right under the board, and arrows for their first moves. Click any move in a line
      to play the line up to it. Search depth is a number box (0 = no limit);
      **Go deeper** keeps searching a finished position, and **Note eval**
      writes the verdict into the current move's note.
@@ -132,8 +132,8 @@ For a shorter overview see the [README](../README.md).
    move in the table and choose **Study from here** to open it at that
    position. Step with ← →, Home/End and the ⏮ ◀ ▶ ⏭ buttons as on the
    analysis board, and `[` `]` jump to where the line meets another. On a
-   phone the board and its buttons stay pinned at the top while the notes
-   scroll underneath.
+   phone the board, the engine's lines and the buttons stay pinned at the top
+   while the notes scroll underneath.
    - **The line and its notes** — the line being read is written out with its
      symbols and the same `[n]` note numbers as the table and the Notes list.
      The note on the move just played is shown large above the moves, and

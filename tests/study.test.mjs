@@ -375,6 +375,7 @@ test("the engine runs in the study, its lines play off the book, and no eval is 
 	w.reply("info depth 12 multipv 1 score cp -30 pv c7c5 g1f3");
 	w.reply("bestmove c7c5");
 	assert.strictEqual(panel.querySelector(".an-note-eval"), null, "the study writes no notes");
+	assert.strictEqual(panel.querySelector(".an-left .an-boardrow").nextElementSibling, panel.querySelector(".an-engine"), "lines under the board");
 	panel.querySelectorAll(".an-pvmove")[1].click();
 	assert.deepStrictEqual(sans(activeLine(st)), ["e4", "c5", "Nf3"]);
 	assert.ok(activeLine(st).off);

@@ -58,10 +58,15 @@ export function engineBox(engine, pos, onChange, { board, bar, flavors, playLine
 		f.onchange = () => flavors.choose(f.value);
 		opts.prepend(f);
 	}
-	box.appendChild(el("div", { className: "an-engine-head" }, [toggle, info, opts]));
+	// The box sits under the board, so it is kept short: the actions share the
+	// head row with the toggle, and the settings go in a slim row after the
+	// lines rather than a row of their own above them.
+	const acts = el("span", { className: "orow an-engine-acts" });
+	box.appendChild(el("div", { className: "an-engine-head" }, [toggle, info, acts]));
 	if (flavors) box.appendChild(fullBox(flavors));
 	const lines = el("div", { className: "an-pvs" });
 	box.appendChild(lines);
+	if (on) box.appendChild(opts);
 	const deeper = el("button", {
 		className: "chip mini an-deeper",
 		textContent: "Go deeper",
@@ -75,6 +80,7 @@ export function engineBox(engine, pos, onChange, { board, bar, flavors, playLine
 		if (!st.enabled) {
 			info.textContent = "Stockfish 19, on this device";
 			lines.replaceChildren();
+			acts.replaceChildren();
 			drawArrows(board, []);
 			return;
 		}
@@ -133,8 +139,8 @@ export function engineBox(engine, pos, onChange, { board, bar, flavors, playLine
 		);
 		// The actions keep their place too: disabled, or held invisible, while
 		// there is nothing for them to act on.
+		acts.replaceChildren();
 		if (!pos.over) {
-			const acts = el("div", { className: "orow an-engine-acts" });
 			// The verdict into the note on the move just played, where the
 			// notebook and its PGN will carry it. Only a caller that keeps
 			// notes passes `noteEval`; the study view reads and writes nothing.
@@ -156,7 +162,6 @@ export function engineBox(engine, pos, onChange, { board, bar, flavors, playLine
 			}
 			deeper.style.visibility = best && st.status !== "searching" ? "" : "hidden";
 			acts.appendChild(deeper);
-			lines.appendChild(acts);
 		}
 		drawArrows(
 			board,
