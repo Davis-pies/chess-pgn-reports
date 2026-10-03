@@ -139,8 +139,10 @@ with `fake-indexeddb`. `tests/fixtures/` holds real PGNs.
 
 `e2e/*.spec.mjs` are Playwright tests against the real page in Chromium
 (`npm run test:e2e`, configured in `playwright.config.js`): importing, the
-report's editor, the analysis board, the engine, and saving and reopening
-workbooks. They start the dev server themselves and answer the esm.sh request
+report's editor, the analysis board, the engine, saving and reopening
+workbooks, and the printed report: `print.spec.mjs` prints the page to PDF
+and reads it back with pdf.js (`e2e/pdf.mjs`) to see where the page breaks
+fell and whether anything ran past the page. They start the dev server themselves and answer the esm.sh request
 for chess.js from `node_modules`.
 
 Coverage is enforced in CI with floors just below the current numbers, so new
