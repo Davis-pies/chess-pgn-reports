@@ -44,3 +44,31 @@ test("on a phone the engine's lines stay pinned under the board", async ({ page 
   expect(await page.locator(".an-window").evaluate((w) => w.scrollTop)).toBeGreaterThan(0);
   expect(Math.abs((await lines.boundingBox()).y - before.y)).toBeLessThan(2);
 });
+
+// sw.js makes the page cross-origin isolated, so the multi-threaded build runs
+// and its thread count can be picked, and the pick outlives a reload.
+test("the engine runs multi-threaded, with a thread count that is remembered", async ({ page }) => {
+  const builds = [];
+  page.on("request", (r) => {
+    const m = r.url().match(/stockfish-19[^/#]*\.(js|wasm)/);
+    if (m) builds.push(m[0]);
+  });
+  await loadPgn(page);
+  expect(await page.evaluate(() => globalThis.crossOriginIsolated)).toBe(true);
+  await page.getByRole("button", { name: "Analysis", exact: true }).click();
+  await page.locator(".an-engine-toggle").click();
+  await expect(page.locator(".an-engine-info")).toHaveText(/^depth \d+/, { timeout: 30_000 });
+  expect(builds).toContain("stockfish-19-lite.js");
+  expect(builds).not.toContain("stockfish-19-lite-single.js");
+
+  const threads = page.locator(".an-engine-threads");
+  const cores = await page.evaluate(() => navigator.hardwareConcurrency);
+  test.skip(cores < 2, "one core: there is no count to pick");
+  await expect(threads.locator("option")).toHaveCount(cores);
+  await threads.selectOption("2");
+  // the search restarts on two threads and still reaches a depth
+  await expect(page.locator(".an-engine-info")).toHaveText(/^depth \d+/, { timeout: 30_000 });
+  await page.reload();
+  await page.locator("#wK").waitFor({ state: "attached" });
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("ott-prefs")).engineThreads)).toBe(2);
+});

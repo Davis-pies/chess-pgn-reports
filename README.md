@@ -22,7 +22,7 @@ a `.json` file you keep.
 - **Analyse** on an interactive board: play moves, build several lines at
   once, write notes, and add what you found to the workbook. Save the board
   as a PNG or SVG, or its lines as PGN. Stockfish 19 runs locally in your
-  browser; nothing is sent anywhere.
+  browser, on as many threads as you give it; nothing is sent anywhere.
 - **Study** the workbook on a board, read-only: step through each line with
   its notes shown large beside the moves, flip between lines with ◀ ▶ or
   jump to any of them, try your own moves, and run the engine.

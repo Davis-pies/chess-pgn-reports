@@ -9,8 +9,9 @@
 
 import { el } from "./dom.js";
 import { drawArrows } from "./board-input.js";
-import { formatScore, numberedFrom, whiteShare } from "./engine.js";
+import { formatScore, maxThreads, numberedFrom, whiteShare } from "./engine.js";
 import { FULL } from "./engine-store.js";
+import { savePrefs } from "./prefs.js";
 
 // Where the eval bar stood, carried across redraws so a new position starts
 // the bar from the last reading rather than from even.
@@ -48,11 +49,26 @@ export function engineBox(engine, pos, onChange, { board, bar, flavors, playLine
 			pick("an-engine-pv", "Lines shown", [[1, "1 line"], [2, "2 lines"], [3, "3 lines"], [5, "5 lines"]], engine.multiPv, (n) => engine.setMultiPv(n)),
 			depthBox(engine),
 		);
+		// Only a multi-threaded build has a count to pick, and only on a
+		// machine with more than one core to give it.
+		const max = maxThreads();
+		if (engine.threads && max > 1) {
+			const counts = Array.from({ length: max }, (_, i) => [i + 1, i ? `${i + 1} threads` : "1 thread"]);
+			opts.append(
+				pick("an-engine-threads", "Threads to search with", counts, engine.threads, (n) => {
+					engine.setThreads(n);
+					savePrefs({ engineThreads: n });
+				}),
+			);
+		}
 	}
 	if (on && flavors) {
-		const f = el("select", { className: "an-engine-flavor", title: "Which Stockfish 19 to run" });
+		const f = el("select", { className: "an-engine-flavor", title: "Which Stockfish 19 to run: Lite (1.8 MB) or Full (99 MB, stronger)" });
 		f.setAttribute("aria-label", "Which Stockfish 19 to run");
-		[["lite", "Lite · 1.8 MB"], ["full", "Full · 99 MB"]].forEach(([v, text]) => {
+		// Plain names, so the settings row fits a phone held upright with the
+		// thread count in it; the download box gives the full engine's size
+		// before anything is fetched.
+		[["lite", "Lite"], ["full", "Full"]].forEach(([v, text]) => {
 			f.appendChild(el("option", { value: v, textContent: text, selected: v === flavors.state.flavor }));
 		});
 		f.onchange = () => flavors.choose(f.value);
@@ -207,7 +223,7 @@ function fullBox(flavors) {
 			kids.push(
 				el("div", { className: "an-full-err" }, [
 					`Could not get the full engine: ${st.error}. You can download `,
-					el("code", { textContent: "stockfish-19-single.wasm" }),
+					el("code", { textContent: FULL.file }),
 					" from the ",
 					link,
 					" page yourself and load it here.",

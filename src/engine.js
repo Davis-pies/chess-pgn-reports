@@ -11,6 +11,7 @@
 // takes its worker from a factory so the tests can hand it a fake.
 
 import { Chess } from "chess.js";
+import { loadPrefs } from "./prefs.js";
 
 // One UCI "info" line, or null for one that carries no scored line (the
 // engine also reports currmove, hashfull, strings and so on).
@@ -100,8 +101,9 @@ export function numberedFrom(fen, sans) {
 }
 
 // depth 0 means "until stopped". Hash is in MB; 64 is roomy for analysis
-// and small beside the engine itself.
-const DEFAULTS = { multiPv: 3, depth: 22, throttle: 120, hash: 64, cacheSize: 2000 };
+// and small beside the engine itself. threads 0 means the build is
+// single-threaded and is never sent a Threads option at all.
+const DEFAULTS = { multiPv: 3, depth: 22, throttle: 120, hash: 64, cacheSize: 2000, threads: 0 };
 
 // The controller the view talks to. `makeWorker` returns something with
 // postMessage / onmessage / onerror / terminate -- a real Worker in the app.
@@ -177,6 +179,7 @@ export function createEngine(makeWorker, opts = {}) {
 	function receive(line) {
 		if (line === "uciok") {
 			send(`setoption name Hash value ${o.hash}`);
+			if (o.threads) send(`setoption name Threads value ${o.threads}`);
 			send(`setoption name MultiPV value ${o.multiPv}`);
 			send("isready");
 		} else if (line === "readyok") {
@@ -323,6 +326,20 @@ export function createEngine(makeWorker, opts = {}) {
 		get depth() {
 			return o.depth;
 		},
+		// More threads search the same tree faster, so what is cached stands;
+		// the search under way restarts to pick the new count up. Stockfish
+		// waits for that search to stop before it resizes its thread pool.
+		setThreads(n) {
+			if (!o.threads || n === o.threads) return;
+			o.threads = n;
+			const fen = wanted;
+			this.pause();
+			if (worker) send(`setoption name Threads value ${n}`);
+			if (fen) this.analyse(fen);
+		},
+		get threads() {
+			return o.threads;
+		},
 		// Keep searching this position past the depth setting, until it moves.
 		deeper() {
 			if (!state.fen || !state.enabled || !worker) return;
@@ -359,18 +376,45 @@ export function createEngine(makeWorker, opts = {}) {
 	};
 }
 
+// The multi-threaded builds share memory between their threads, which the
+// browser allows only on a cross-origin isolated page (sw.js makes it one).
+// Isolation is fixed for the life of a page, so this never changes under a
+// running engine. Elsewhere the single-threaded builds run, as they always did.
+export function threadsAvailable(g = globalThis) {
+	return g.crossOriginIsolated === true && typeof g.SharedArrayBuffer === "function";
+}
+
+// How many threads the viewer can pick from: one per logical core.
+export function maxThreads(g = globalThis) {
+	if (!threadsAvailable(g)) return 1;
+	return Math.max(1, Math.floor(g.navigator?.hardwareConcurrency) || 1);
+}
+
+// The count to start with: the viewer's own choice if it still fits this
+// machine, otherwise most of the cores -- one is left for the page itself,
+// and past four the gain is small beside the heat and the battery.
+export function startThreads(saved, max) {
+	if (Number.isInteger(saved) && saved >= 1) return Math.min(saved, max);
+	return Math.max(1, Math.min(4, max - 1));
+}
+
 // The app's engine: one per page, created on first use, running the lite
 // build until the full one is chosen. Worker paths are resolved against this
 // module, so they hold wherever the site is hosted.
 const script = (name) => new URL(`../vendor/stockfish/${name}`, import.meta.url);
-export const liteWorker = () => new Worker(script("stockfish-19-lite-single.js"));
+const suffix = () => (threadsAvailable() ? "" : "-single");
+export const liteWorker = () => new Worker(script(`stockfish-19-lite${suffix()}.js`));
 // The full build's .wasm comes from browser storage, handed over by URL in
-// the loader's hash (the loader reads it from there).
+// the loader's hash (the loader reads it from there, and passes it on to the
+// threads it starts).
 export const fullWorker = (wasmUrl) => () =>
-	new Worker(script("stockfish-19-single.js") + "#" + encodeURIComponent(wasmUrl));
+	new Worker(script(`stockfish-19${suffix()}.js`) + "#" + encodeURIComponent(wasmUrl));
 
 let shared = null;
 export function sharedEngine() {
-	if (!shared) shared = createEngine(liteWorker);
+	if (!shared) {
+		const threads = threadsAvailable() ? startThreads(loadPrefs().engineThreads, maxThreads()) : 0;
+		shared = createEngine(liteWorker, { threads });
+	}
 	return shared;
 }

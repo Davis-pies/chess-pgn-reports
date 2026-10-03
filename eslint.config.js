@@ -72,6 +72,12 @@ export default [
   },
 
   {
+    // The service worker that isolates the page (a classic worker script).
+    files: ['sw.js'],
+    languageOptions: { sourceType: 'script', globals: globals.serviceworker },
+  },
+
+  {
     // Config files are Node modules.
     files: ['*.config.js'],
     languageOptions: { globals: globals.node },

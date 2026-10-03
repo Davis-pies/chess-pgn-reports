@@ -1,8 +1,9 @@
 // src/prefs.js
 // What the app remembers about the viewer between visits, apart from the
 // workbooks themselves: the theme, which way up new analysis boards start,
-// the table panel's width, whether the board's workbook lines are folded, and
-// the workbook and board position they were on when they left. Browser-local and never part of a workbook: a file you send
+// the table panel's width, whether the board's workbook lines are folded, the
+// engine's thread count, and the workbook and board position they were on
+// when they left. Browser-local and never part of a workbook: a file you send
 // someone should not carry your panel width.
 //
 // Everything is read defensively. Storage can be blocked, full, or hold a
@@ -28,6 +29,9 @@ const DEFAULTS = Object.freeze({
 	last: null,
 	// the analysis board's list of workbook lines folded to its heading
 	wbCollapsed: false,
+	// how many threads the engine searches with; null means "pick for this
+	// machine" (engine.js startThreads), and a count is capped to its cores
+	engineThreads: null,
 });
 
 const store = () => {
@@ -76,6 +80,10 @@ export function loadPrefs() {
 		restore: typeof d.restore === "boolean" ? d.restore : DEFAULTS.restore,
 		last: cleanLast(d.last) ?? DEFAULTS.last,
 		wbCollapsed: typeof d.wbCollapsed === "boolean" ? d.wbCollapsed : DEFAULTS.wbCollapsed,
+		engineThreads:
+			Number.isInteger(d.engineThreads) && d.engineThreads >= 1 && d.engineThreads <= 256
+				? d.engineThreads
+				: DEFAULTS.engineThreads,
 	};
 }
 
