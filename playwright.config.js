@@ -16,7 +16,14 @@ export default defineConfig({
     baseURL: `http://127.0.0.1:${PORT}/`,
     trace: "retain-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  // The phone project is a real phone's profile -- its screen, its pixel
+  // density, touch instead of a mouse -- for the tests in *.phone.spec.mjs,
+  // which tap, drag and swipe with a finger and check the phone layout.
+  // Both run in Chromium, so CI still installs one browser.
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] }, testIgnore: /\.phone\.spec\.mjs$/ },
+    { name: "phone", use: { ...devices["Pixel 7"] }, testMatch: /\.phone\.spec\.mjs$/ },
+  ],
   webServer: {
     command: `node tools/dev-server.mjs ${PORT}`,
     url: `http://127.0.0.1:${PORT}/`,
