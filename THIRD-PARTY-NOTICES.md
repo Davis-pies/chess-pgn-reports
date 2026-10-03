@@ -50,9 +50,11 @@ POSSIBILITY OF SUCH DAMAGE.
 
 ## Chess engine — `vendor/stockfish/`
 
-`stockfish-19-lite-single.js`, `stockfish-19-lite-single.wasm` and
-`stockfish-19-single.js` (and `stockfish-19-single.wasm`, which is not stored
-here but downloaded by the app on request) are **Stockfish 19** as compiled to WebAssembly by the Stockfish.js project
+`stockfish-19-lite.js`, `stockfish-19-lite.wasm`,
+`stockfish-19-lite-single.js`, `stockfish-19-lite-single.wasm`,
+`stockfish-19.js` and `stockfish-19-single.js` (and `stockfish-19.wasm` and
+`stockfish-19-single.wasm`, which are not stored here but downloaded by the
+app on request) are **Stockfish 19** as compiled to WebAssembly by the Stockfish.js project
 (Nathan Rugg / Chess.com), taken unmodified from the `stockfish` npm package,
 version 19.0.0. They are licensed under the **GNU General Public License,
 version 3**; the full text is in `vendor/stockfish/COPYING.txt`.

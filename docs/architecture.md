@@ -120,11 +120,12 @@ way in (see `migrate()`).
 | `src/share-tools.js` | the analysis panel's copy/save row: FEN, PGN, board PNG and SVG |
 | `src/share.js` | standalone board SVG (pieces inlined), SVG to PNG, file names for saved positions |
 | `src/board-input.js` | click, drag and touch input over `render.js`'s board, promotion, highlights, arrows |
-| `src/engine.js` | Stockfish in a Web Worker over UCI: search sequencing, eval cache, SAN conversion |
+| `src/engine.js` | Stockfish in a Web Worker over UCI: search sequencing, eval cache, SAN conversion, threaded or single-threaded build |
 | `src/engine-store.js` | the full engine's one-time download, its SHA-256 check and its IndexedDB copy |
 | `src/engine-flavor.js` | which engine build runs (lite or full) and the download box's state |
-| `src/prefs.js` | what the viewer's browser remembers between visits: theme, board orientation, panel width, the last workbook and its board |
+| `src/prefs.js` | what the viewer's browser remembers between visits: theme, board orientation, panel width, the engine's thread count, the last workbook and its board |
 | `src/settings-view.js` | the Settings drop-down over `prefs.js` |
+| `sw.js` | service worker adding COOP/COEP headers so the page is cross-origin isolated and the threaded engine can run |
 | `vendor/stockfish/` | Stockfish 19 WebAssembly builds (GPL-3.0, unmodified; not linted) |
 | `tools/dev-server.mjs` | the dependency-free live-reload dev server |
 | `style.css` | all styles, including `@media print` rules for the report |

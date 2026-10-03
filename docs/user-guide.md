@@ -107,9 +107,21 @@ For a shorter overview see the [README](../README.md).
      Choosing Full offers a one-time download, checked against a known
      SHA-256 before it is used, which is kept in the browser
      (IndexedDB) so later visits start it from disk; if the download is
-     blocked, you can download `stockfish-19-single.wasm` yourself from the
+     blocked, you can download the file the message names (`stockfish-19.wasm`
+     in most browsers) yourself from the
      [Stockfish.js releases](https://github.com/nmrugg/stockfish.js/releases/tag/v19.0.0)
-     and load the file. **Remove download** frees the space again. The engine
+     and load the file. **Remove download** frees the space again.
+     The engine searches on several threads at once, one per CPU core you
+     give it: pick the count in the **threads** menu beside the depth box
+     (it starts at up to four, leaving a core for the page, and is
+     remembered). More threads reach a given depth sooner but use more power.
+     This needs the page to be *cross-origin isolated*, which the app sets up
+     with a small service worker: on your very first visit the page reloads
+     itself once to switch it on. In a browser that blocks service workers
+     (some private windows) the engine runs on one thread and the menu is
+     not shown. The multi-threaded Full engine is a different file from the
+     single-threaded one, so a Full engine downloaded before this needs
+     downloading once more. The engine
      shows an eval bar beside the board, the top lines (1–5) with scores from
      White's side right under the board, and arrows for their first moves. On
      a phone the lines are pinned with the board, so they stay on screen while

@@ -13,7 +13,12 @@
 // file is handed over as a blob: URL -- no network involved after the first
 // time.
 
-export const FULL = {
+import { threadsAvailable } from "./engine.js";
+
+// Two builds of the same engine: the multi-threaded one runs on a cross-origin
+// isolated page (see engine.js threadsAvailable), the single-threaded one
+// everywhere else. Each loads only its own .wasm, so they are stored apart.
+const SINGLE = {
 	file: "stockfish-19-single.wasm",
 	size: 99102793,
 	// SHA-256 of the file in the npm tarball (which the registry signs); a
@@ -27,6 +32,24 @@ export const FULL = {
 	// where to get it by hand if neither mirror answers
 	manual: "https://github.com/nmrugg/stockfish.js/releases/tag/v19.0.0",
 };
+const THREADED = {
+	file: "stockfish-19.wasm",
+	size: 99065439,
+	sha256: "e0ef90031a310479e5b0c3692a9839118ed785535c306252e68ed3300a45b02d",
+	urls: [
+		"https://unpkg.com/stockfish@19.0.0/bin/stockfish-19.wasm",
+		"https://cdn.jsdelivr.net/npm/stockfish@19.0.0/bin/stockfish-19.wasm",
+	],
+	manual: SINGLE.manual,
+};
+
+export const fullFor = (threaded) => (threaded ? THREADED : SINGLE);
+
+// The build this page runs. Isolation cannot change while the page is open.
+export const FULL = fullFor(threadsAvailable());
+// The other build: removed when this one is stored, so a browser that moved
+// from one to the other does not keep 99 MB it will never load again.
+const OTHER = fullFor(!threadsAvailable());
 
 const DB = "chess-pgn-engines";
 const STORE = "files";
@@ -64,7 +87,11 @@ export async function storedFull() {
 	}
 }
 
-const storeFull = (blob) => tx("readwrite", (s) => s.put(blob, FULL.file));
+const storeFull = (blob) =>
+	tx("readwrite", (s) => {
+		s.delete(OTHER.file);
+		return s.put(blob, FULL.file);
+	});
 
 export const forgetFull = () => tx("readwrite", (s) => s.delete(FULL.file));
 

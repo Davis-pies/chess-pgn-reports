@@ -2047,11 +2047,19 @@ kbd {
 }
 
 /* Landscape phone: board beside the rest, sized off the height so the whole
-   of it, and the steppers under it, fit on the screen at once. */
+   of it, and the steppers under it, fit on the screen at once. The height
+   left over holds the header, the engine's box (its toggle, while it is off),
+   whose move it is and the steppers; budgeted without the box, the steppers
+   sat under the bottom of a 360px-tall screen. */
 @media (max-height: 500px) and (orientation: landscape) and (max-width: 1000px) {
 	.analysis {
-		grid-template-columns: minmax(0, min(calc(100dvh - 9.5rem), 480px)) minmax(0, 1fr);
+		grid-template-columns: minmax(0, min(calc(100dvh - 12rem), 480px)) minmax(0, 1fr);
 	}
+	.analysis:not(.engine-on) .an-engine { padding: .3rem .45rem; }
+	.analysis:not(.engine-on) .an-engine-head { flex-wrap: nowrap; }
+	.an-engine-toggle { white-space: nowrap; }
+	/* the column can be narrower than the box's usual minimum */
+	.an-type { min-width: 0; }
 	/* a set height, which the pinned board column sits under */
 	.an-overlay .an-head {
 		box-sizing: border-box;
@@ -2064,7 +2072,8 @@ kbd {
 	/* the four steppers and Flip on one row under the board */
 	.an-nav { flex-wrap: wrap; gap: .25rem; }
 	.an-nav .chip { flex: 1 1 0; min-width: 0; padding-left: 4px; padding-right: 4px; white-space: nowrap; }
-	.an-nav .an-flip { flex-grow: 1.6; }
+	/* Flip keeps its word; the glyph-only steppers give it the room */
+	.an-nav .an-flip { flex-grow: 1.6; min-width: max-content; }
 	.an-nav .an-cut { flex-basis: 100%; }
 	.an-touch-hint { display: none !important; }
 }

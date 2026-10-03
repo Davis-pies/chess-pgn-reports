@@ -291,6 +291,27 @@ test("a finger drag plays the move it ends on", () => {
 	done();
 });
 
+// A touch's events go to the node it started on, and Chrome stops sending
+// them once that node leaves the page even for a moment: lifting the piece by
+// re-appending it made every finger drag drop nothing.
+test("a piece lifted by a finger stays in the page and is drawn over the rest", () => {
+	const done = installDom();
+	const board = interactiveBoard(START, () => {});
+	const svg = board.querySelector("svg");
+	const piece = board.querySelector('use[data-sq="g1"]');
+	const watch = new window.MutationObserver(() => {});
+	watch.observe(svg, { childList: true });
+	touch(piece, "touchstart", 5, 5);
+	const removed = watch.takeRecords().flatMap((r) => [...r.removedNodes]);
+	assert.ok(!removed.includes(piece), "the touched node never left");
+	assert.ok(piece.classList.contains("dragging"));
+	assert.strictEqual(svg.lastElementChild, piece, "drawn last, over the other pieces");
+	touch(svg, "touchcancel", 5, 5, "changed");
+	assert.ok(!piece.classList.contains("dragging"));
+	watch.disconnect();
+	done();
+});
+
 test("a tap then a tap is a click-click; a cancelled touch plays nothing", () => {
 	const done = installDom();
 	const seen = [];

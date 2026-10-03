@@ -1,4 +1,4 @@
-import { test, expect, loadPgn } from "./fixtures.mjs";
+import { test, expect, loadPgn, SMALL_PGN } from "./fixtures.mjs";
 
 // The real lite Stockfish from vendor/, in a real Worker: the one part of the
 // board jsdom cannot run at all.
@@ -43,4 +43,104 @@ test("on a phone the engine's lines stay pinned under the board", async ({ page 
   await page.locator(".an-window").evaluate((w) => (w.scrollTop = 2000));
   expect(await page.locator(".an-window").evaluate((w) => w.scrollTop)).toBeGreaterThan(0);
   expect(Math.abs((await lines.boundingBox()).y - before.y)).toBeLessThan(2);
+});
+
+// sw.js makes the page cross-origin isolated. A first visit is not: the page
+// registers the worker, reloads once when it takes over, and is isolated
+// after that reload.
+test("a first visit reloads once and comes back cross-origin isolated", async ({ page }) => {
+  // each document that starts in this tab notes whether it was isolated
+  await page.addInitScript(() => {
+    const seen = JSON.parse(sessionStorage.getItem("seen") || "[]");
+    seen.push(globalThis.crossOriginIsolated);
+    sessionStorage.setItem("seen", JSON.stringify(seen));
+  });
+  const seen = () => page.evaluate(() => JSON.parse(sessionStorage.getItem("seen")));
+  await page.goto("./");
+  await page.waitForFunction(() => globalThis.crossOriginIsolated);
+  await page.locator("#wK").waitFor({ state: "attached" });
+  expect(await seen()).toEqual([false, true]);
+  expect(await page.evaluate(() => sessionStorage.getItem("coi-reloaded"))).toBe("1");
+  expect(await page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+  // later loads are isolated from the start, with no second reload
+  await page.reload();
+  await page.locator("#wK").waitFor({ state: "attached" });
+  expect(await seen()).toEqual([false, true, true]);
+});
+
+// Records every UCI command the page sends its engine worker.
+const recordUci = (page) =>
+  page.addInitScript(() => {
+    globalThis.__uci = [];
+    const proto = globalThis.Worker.prototype;
+    const post = proto.postMessage;
+    proto.postMessage = function (m) {
+      if (typeof m === "string") globalThis.__uci.push(m);
+      return post.call(this, m);
+    };
+  });
+
+// On the isolated page the multi-threaded build runs, starts on the count
+// picked for this machine, and takes a new count from the menu at once.
+test("the engine runs multi-threaded, with a thread count that takes effect and is remembered", async ({ page }) => {
+  const builds = [];
+  page.on("request", (r) => {
+    const m = r.url().match(/stockfish-19[^/#]*\.(js|wasm)/);
+    if (m) builds.push(m[0]);
+  });
+  await recordUci(page);
+  await loadPgn(page);
+  expect(await page.evaluate(() => globalThis.crossOriginIsolated)).toBe(true);
+  await page.getByRole("button", { name: "Analysis", exact: true }).click();
+  await page.locator(".an-engine-toggle").click();
+  await expect(page.locator(".an-engine-info")).toHaveText(/^depth \d+/, { timeout: 30_000 });
+  expect(builds).toContain("stockfish-19-lite.js");
+  expect(builds).toContain("stockfish-19-lite.wasm");
+  expect(builds).not.toContain("stockfish-19-lite-single.js");
+
+  const cores = await page.evaluate(() => navigator.hardwareConcurrency);
+  const start = Math.max(1, Math.min(4, cores - 1));
+  const uci = () => page.evaluate(() => globalThis.__uci);
+  expect(await uci()).toContain(`setoption name Threads value ${start}`);
+
+  test.skip(cores < 2, "one core: there is no count to pick");
+  const threads = page.locator(".an-engine-threads");
+  await expect(threads.locator("option")).toHaveCount(cores);
+  await expect(threads).toHaveValue(String(start));
+  const pick = start === 2 ? "1" : "2";
+  await threads.selectOption(pick);
+  // the running search is stopped, the count sent, and the search restarted
+  await expect.poll(async () => (await uci()).slice(-4).join("|")).toMatch(
+    new RegExp(`stop\\|setoption name Threads value ${pick}\\|position fen .+\\|go depth \\d+`),
+  );
+  await expect(page.locator(".an-engine-info")).toHaveText(/^depth \d+/, { timeout: 30_000 });
+  await page.reload();
+  await page.locator("#wK").waitFor({ state: "attached" });
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("ott-prefs")).engineThreads)).toBe(Number(pick));
+});
+
+// Without a service worker (blocked, as in some private windows) the page is
+// never isolated: no reload, the single-threaded build, no thread menu.
+test.describe("without a service worker", () => {
+  test.use({ serviceWorkers: "block" });
+  test("the engine falls back to the single-threaded build", async ({ page }) => {
+    const builds = [];
+    page.on("request", (r) => {
+      const m = r.url().match(/stockfish-19[^/#]*\.(js|wasm)/);
+      if (m) builds.push(m[0]);
+    });
+    await recordUci(page);
+    await page.goto("./");
+    await page.locator("#wK").waitFor({ state: "attached" });
+    await page.locator("textarea.pgnin").fill(SMALL_PGN);
+    await page.getByRole("button", { name: "Load & Tag" }).click();
+    expect(await page.evaluate(() => globalThis.crossOriginIsolated)).toBe(false);
+    await page.getByRole("button", { name: "Analysis", exact: true }).click();
+    await page.locator(".an-engine-toggle").click();
+    await expect(page.locator(".an-engine-info")).toHaveText(/^depth \d+/, { timeout: 30_000 });
+    expect(builds).toContain("stockfish-19-lite-single.js");
+    expect(builds).not.toContain("stockfish-19-lite.js");
+    await expect(page.locator(".an-engine-threads")).toHaveCount(0);
+    expect((await page.evaluate(() => globalThis.__uci)).some((c) => c.includes("Threads"))).toBe(false);
+  });
 });

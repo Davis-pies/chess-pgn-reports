@@ -37,6 +37,7 @@ test("defaults when nothing is stored", () => {
 		restore: true,
 		last: null,
 		wbCollapsed: false,
+		engineThreads: null,
 	});
 });
 
@@ -50,12 +51,14 @@ test("saved fields round-trip and merge", () => {
 	assert.ok(savePrefs({ wbCollapsed: true }));
 	assert.strictEqual(loadPrefs().wbCollapsed, true);
 	assert.strictEqual(loadPrefs().orientation, "black", "the other fields stay");
+	assert.ok(savePrefs({ engineThreads: 3 }));
+	assert.strictEqual(loadPrefs().engineThreads, 3);
 });
 
 test("junk in storage falls back to defaults field by field", () => {
 	localStorage.setItem(
 		"ott-prefs",
-		JSON.stringify({ orientation: "sideways", sideWidth: "wide", restore: "no", last: { id: 7 }, wbCollapsed: "yes" }),
+		JSON.stringify({ orientation: "sideways", sideWidth: "wide", restore: "no", last: { id: 7 }, wbCollapsed: "yes", engineThreads: 2.5 }),
 	);
 	assert.deepStrictEqual(loadPrefs(), {
 		orientation: "white",
@@ -63,7 +66,12 @@ test("junk in storage falls back to defaults field by field", () => {
 		restore: true,
 		last: null,
 		wbCollapsed: false,
+		engineThreads: null,
 	});
+	for (const bad of [0, -1, 1000, "4"]) {
+		localStorage.setItem("ott-prefs", JSON.stringify({ engineThreads: bad }));
+		assert.strictEqual(loadPrefs().engineThreads, null, `${bad} is refused`);
+	}
 	localStorage.setItem("ott-prefs", "{not json");
 	assert.strictEqual(loadPrefs().orientation, "white");
 	localStorage.setItem("ott-prefs", "[1,2]");
