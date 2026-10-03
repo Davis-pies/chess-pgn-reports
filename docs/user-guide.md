@@ -236,8 +236,9 @@ For a shorter overview see the [README](../README.md).
    nested beneath, with **Expand all** / **Collapse all** beside the heading.
    Everything starts expanded, and the folding is not saved with the notebook.
    **Printed tables are headed by what their lines share, and cut to save
-   paper.** Each printed table writes the moves all of its columns share once,
-   above it, and starts its rows where they split (as MCO does). When a
+   paper.** Each printed table, the mainline's own included, writes the moves
+   all of its columns share once, above it, and starts its rows where they
+   split (as MCO does). When a
    table's lines all come off one branch — sharing moves with each other past
    where they leave the mainline — that branch is the heading instead, and the
    mainline column is left off that table, since below the heading it would
