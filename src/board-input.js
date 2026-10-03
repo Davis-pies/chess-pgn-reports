@@ -302,7 +302,13 @@ export function interactiveBoard(
 	function follow(x0, y0) {
 		const piece = svg.querySelector(`use[data-sq="${from}"]`);
 		if (!piece) return null;
-		svg.appendChild(piece); // drawn last, so it passes over the other pieces
+		// Drawn last, so it passes over the other pieces: what comes after it
+		// moves underneath, rather than the piece moving to the end. A touch's
+		// events all go to the node it started on, and Chrome stops sending
+		// them once that node is taken out of the page, even to be put
+		// straight back -- moving the piece itself made a finger drag drop
+		// nothing.
+		while (piece.nextSibling) svg.insertBefore(piece.nextSibling, piece);
 		piece.classList.add("dragging");
 		// the board can be drawn smaller than its viewBox; move in board units
 		const w = svg.getBoundingClientRect().width;
