@@ -59,7 +59,9 @@ intercept `https://esm.sh/**` and serve `node_modules/chess.js/dist/esm/chess.js
   `nags.js`. Add a second way to reach an action, not a second copy of it.
 - **Workbook format changes** go through `store.js`. Keep old files readable:
   migrate on the way in, and bump `VERSION` only when older builds could not
-  read the new data correctly.
+  read the new data correctly. When the saved shape changes, save a workbook
+  with the new build into `tests/fixtures/workbooks/` and add it to
+  `tests/old-workbooks.test.mjs`, so every past format keeps being opened.
 - **Viewer preferences live in `prefs.js`, not the workbook.** A workbook
   holds what travels with the analysis; theme, panel width and the like stay
   in this browser.
