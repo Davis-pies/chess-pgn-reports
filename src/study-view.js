@@ -101,7 +101,13 @@ export function studyPanel(study, onChange, { engine = null, flavors = null } = 
 	// ---- left column: the board and its controls
 	const left = el("div", { className: "an-left" });
 	const { row, board, bar } = boardRow(study, pos, play, onChange);
-	left.append(row, statusLine(pos));
+	left.appendChild(row);
+	// the engine's lines right under the board, as on the analysis board
+	if (engine)
+		left.appendChild(
+			engineBox(engine, pos, onChange, { board, bar, flavors, playLine: (sans) => studyPlayAll(study, sans) }),
+		);
+	left.appendChild(statusLine(pos));
 	left.appendChild(navRow(study, act));
 	left.appendChild(moveBox(study, play, onChange));
 	const helpBtn = el("button", {
@@ -124,12 +130,8 @@ export function studyPanel(study, onChange, { engine = null, flavors = null } = 
 		el("div", { className: "an-touch-hint", textContent: "Swipe the board left or right to step through the moves" }),
 	);
 
-	// ---- right column: engine, the line and its notes, the other lines
+	// ---- right column: the line and its notes
 	const right = el("div", { className: "an-right" });
-	if (engine)
-		right.appendChild(
-			engineBox(engine, pos, onChange, { board, bar, flavors, playLine: (sans) => studyPlayAll(study, sans) }),
-		);
 	const { notes, foot } = studyNotes(line.moves, line.src, study.numbering);
 	// The note on the move just played comes before the move list: on a
 	// phone the columns stack, and a long game's moves pushed it off the

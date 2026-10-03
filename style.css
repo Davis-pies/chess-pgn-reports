@@ -1714,9 +1714,10 @@ sup {
 .an-sec .an-san { text-transform: none; letter-spacing: normal; }
 
 .an-engine { border: 1px solid var(--line); border-radius: var(--radius); padding: .55rem .65rem; background: color-mix(in srgb, var(--head-bg) 55%, var(--panel)); display: flex; flex-direction: column; gap: .4rem; }
-.an-engine-head { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
-.an-engine-info { font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
-.an-engine-opts { margin-left: auto; display: flex; gap: .3rem; }
+.an-engine-head { display: flex; align-items: center; gap: .3rem .5rem; flex-wrap: wrap; }
+/* the info gives way first: the toggle and the actions keep their size */
+.an-engine-info { flex: 1 1 7rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.an-engine-opts { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; }
 .an-engine-opts select { font: inherit; font-size: .78rem; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 5px; padding: 2px 4px; }
 .an-pvs { display: flex; flex-direction: column; gap: .15rem; }
 .an-pv { display: flex; flex-wrap: nowrap; overflow: hidden; align-items: baseline; gap: .1rem; font-size: .88rem; white-space: nowrap; mask-image: linear-gradient(to right, #000 90%, transparent); -webkit-mask-image: linear-gradient(to right, #000 90%, transparent); }
@@ -1725,7 +1726,6 @@ sup {
 .an-score.b { background: #403d39; color: #f4f4f0; }
 .an-pvmove { background: none; border: 0; padding: 0 .15rem; font: inherit; color: inherit; cursor: pointer; border-radius: 3px; }
 .an-pvmove:hover, .an-move:hover { background: color-mix(in srgb, var(--main) 18%, transparent); }
-.an-deeper { align-self: flex-start; }
 
 .an-lines { display: flex; flex-direction: column; gap: .2rem; width: 100%; max-height: 16rem; overflow: auto; }
 .an-line { display: flex; align-items: flex-start; gap: .4rem; padding: .3rem .5rem; border-radius: var(--radius-sm); cursor: pointer; border: 1px solid transparent; transition: background .12s, border-color .12s; }
@@ -1751,7 +1751,7 @@ sup {
 .an-tools { flex-wrap: wrap; gap: .3rem; padding-top: .7rem; margin-top: .2rem; border-top: 1px solid var(--line); }
 .an-share { flex-wrap: wrap; gap: .3rem; padding-top: .7rem; margin-top: .2rem; border-top: 1px solid var(--line); }
 .an-share + .an-tools { border-top: none; margin-top: 0; padding-top: .3rem; }
-.an-engine-acts { gap: .3rem; }
+.an-engine-acts { gap: .3rem; flex: none; }
 .an-full { display: flex; flex-direction: column; gap: .35rem; font-size: .82rem; padding: .45rem .6rem; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--main) 7%, transparent); }
 .an-full[hidden] { display: none; }
 .an-full:has(.an-full-forget) { flex-direction: row; align-items: center; justify-content: space-between; background: none; padding: 0; }
@@ -1764,7 +1764,6 @@ sup {
 .an-pv.empty { color: var(--muted); }
 .an-pv.empty .an-score { background: none; }
 .an-pv { min-height: 1.45em; }
-.an-engine-acts { min-height: 1.6em; }
 .an-note-tools { display: flex; flex-direction: column; gap: .3rem; }
 .an-note-tools:empty { display: none; }
 .an-note-nb { font-size: .8rem; color: var(--muted); }
@@ -2080,8 +2079,8 @@ kbd {
 /* The study on a phone: the board and its steppers stay pinned under the
    header while the note, the line switcher and the notes scroll beneath, so
    reading a note never scrolls the position away. What a thumb does not need
-   there -- the typed-move box, the swipe hint -- gives way to the notes, and
-   the engine's box drops below them (its eval bar stays beside the board). */
+   there -- the typed-move box, the swipe hint -- gives way to the notes. The
+   engine's box is pinned with the board, its lines right under it. */
 @media (max-width: 760px) {
 	.study .an-left {
 		position: sticky;
@@ -2098,7 +2097,6 @@ kbd {
 	.study .an-left .an-touch-hint,
 	.study .an-left .an-keys { display: none; }
 	.study .an-status { font-size: .85rem; }
-	.study .an-engine { order: 10; }
 	.study .st-notes { max-height: none; overflow: visible; }
 	.st-picker { flex-wrap: nowrap; }
 	.st-picker .st-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 1 auto; }

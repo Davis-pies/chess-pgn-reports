@@ -97,3 +97,18 @@ test("on a phone the board stays put while the notes scroll", async ({ page }) =
   await page.locator(".st-next").click();
   await expect(page.locator(".st-name")).not.toHaveText("Mainline");
 });
+
+test("on a phone the engine's lines stay right under the board", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await loadPgn(page, readFileSync(FIXTURE, "utf8"));
+  await openStudy(page);
+  await page.locator(".an-engine-toggle").click();
+  await expect(page.locator(".an-engine-toggle")).toHaveText("Engine on");
+  const board = await page.locator(".study .an-boardrow").boundingBox();
+  const box = page.locator(".study .an-engine");
+  const before = await box.boundingBox();
+  expect(before.y - (board.y + board.height)).toBeLessThan(16);
+  // pinned with the board while the notes scroll
+  await page.locator(".st-window").evaluate((w) => (w.scrollTop = 600));
+  expect(Math.abs((await box.boundingBox()).y - before.y)).toBeLessThan(2);
+});
