@@ -25,7 +25,7 @@ export { expect };
 
 export const FIXTURE = fileURLToPath(new URL("../tests/fixtures/capablanca.pgn", import.meta.url));
 
-export const SMALL_PGN = "1. e4 e5 2. Nf3 Nc6 (2... Nf6 3. d4) 3. Bb5 (3. Bc4 Bc5) a6";
+const SMALL_PGN = "1. e4 e5 2. Nf3 Nc6 (2... Nf6 3. d4) 3. Bb5 (3. Bc4 Bc5) a6";
 
 // Open the app and wait for its start-up to settle. app.js fetches the piece
 // sprite after the first render and renders again once it lands, which

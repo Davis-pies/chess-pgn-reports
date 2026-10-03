@@ -256,6 +256,10 @@ For a shorter overview see the [README](../README.md).
    possible, rather than filling each table to its column limit: a stray line
    that would cut a table's heading back to move two, and leave it thirty rows
    of mostly empty column, gets a small table of its own instead.
+   The printed tables are set in smaller type than the screen's, with a
+   column's heading wrapping onto two lines where it needs to, so a full
+   table of fourteen lines fits the width of an A4 or Letter page and the
+   rest of the report prints at full size.
    **The preview opens with a summary**: its title (the notebook's name, or
    the PGN's Opening and Variation when it has none), the PGN's ECO code and
    opening, the source game's players, event and year (only when both

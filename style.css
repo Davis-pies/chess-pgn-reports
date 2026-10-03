@@ -1006,10 +1006,14 @@ sup {
      table's many rows; a reference grid wants them tight */
   line-height: 1.2;
 }
+.tbl {
+  /* a cell's side padding, which the group rules (.gm) reach back over */
+  --cell-pad-x: 8px;
+}
 .tbl th,
 .tbl td {
   border: 1px solid var(--line);
-  padding: 3px 8px;
+  padding: 3px var(--cell-pad-x);
   white-space: nowrap;
 }
 .tbl th {
@@ -1407,7 +1411,7 @@ sup {
   display: block;
   position: relative;
   height: 1em;
-  margin: 0 -8px;
+  margin: 0 calc(-1 * var(--cell-pad-x));
 }
 .tbl .gm::before {
   content: "";
@@ -1529,6 +1533,20 @@ sup {
   .tbl :is(td, .half).ellip {
     color: #444;
     opacity: 1; /* the 0.6 screen opacity prints as washed-out grey */
+  }
+  /* A full table is fourteen columns of moves, and at the screen's type and
+     padding it came to about 1000px: wider than any paper. Chrome's answer to
+     anything wider than the page is to shrink the WHOLE report to fit, so one
+     wide table took every card, note and diagram down to two-thirds size with
+     it. Set small and tight, as a printed reference table is, and with the
+     column heads free to wrap between words (a line's name is what made the
+     columns wide), a full table fits an A4 page inside the default margins. */
+  .pv-htable .tbl {
+    font-size: 0.75rem;
+    --cell-pad-x: 4px;
+  }
+  .pv-htable .tbl th.var-head {
+    white-space: normal;
   }
   .pv-htable table.tbl {
     break-inside: avoid;
