@@ -2119,20 +2119,30 @@ kbd {
 }
 
 /* The engine on a phone: its lines are pinned right under the board, so they
-   never scroll away from the position they are about. The board gives up
-   size to leave the rest of the panel room: `--pv-rows` (set by the panel
-   while the engine is on) says how many lines the box holds, and `--eng-h`
-   is the box's height from it -- the lines, its head row and its settings. */
+   never scroll away from the position they are about. `--pv-rows` (set by
+   the panel while the engine is on) says how many lines the box holds, and
+   `--eng-h` is the box's height from it, for sizing the board sideways. */
 .analysis.engine-on { --eng-h: calc(var(--pv-rows, 3) * 1.6rem + 6rem); }
 .an-stage { display: flex; flex-direction: column; gap: .55rem; }
+@media (max-width: 760px) {
+	/* The box keeps to what the search needs: the full engine's "loaded from
+	   this browser" row waits for the engine to be off, and the rows close
+	   up, so the board above keeps its size. */
+	.analysis.engine-on .an-full:has(.an-full-forget) { display: none; }
+	.analysis.engine-on .an-engine { padding: .4rem .55rem; gap: .3rem; }
+	.analysis.engine-on .an-pvs { gap: 2px; }
+	.analysis.engine-on .an-pvmove { padding-top: 0; padding-bottom: 0; }
+}
 @media (max-width: 760px) and (orientation: portrait) {
-	/* Upright. The study pins its whole board column already; the analysis
-	   board pins the board and the engine, and its column's other rows scroll
-	   with the lines beside them. The column steps aside (`contents`) so the
-	   pinned block sticks for the whole panel, not just its own column. */
-	.analysis.engine-on:not(.study) { row-gap: .55rem; grid-template-columns: minmax(0, 1fr); }
-	.analysis.engine-on:not(.study) .an-left { display: contents; }
-	.analysis.engine-on:not(.study) .an-stage {
+	/* Upright. The board keeps the full width and is pinned with the engine
+	   box; the steppers and the rest of the panel scroll beneath them (the
+	   study pins its steppers too while the engine is off, but board, lines
+	   and steppers together left no room to read). The column steps aside
+	   (`contents`) so the pinned block sticks for the whole panel, not just
+	   its own column. */
+	.analysis.engine-on { row-gap: .55rem; grid-template-columns: minmax(0, 1fr); }
+	.analysis.engine-on .an-left { display: contents; }
+	.analysis.engine-on .an-stage {
 		position: sticky;
 		top: calc(2.9rem + 13px + env(safe-area-inset-top));
 		z-index: 2;
@@ -2144,16 +2154,7 @@ kbd {
 	/* The gap between the header and a pinned block: filled, or what scrolls
 	   under the block shows through it */
 	.study .an-left,
-	.analysis.engine-on:not(.study) .an-stage { box-shadow: 0 -13px 0 var(--panel); }
-	.study.engine-on .an-stage { gap: .3rem; }
-	/* at most about half the screen's height for the board, the rest of the
-	   pinned block under it, and room left over to read */
-	.analysis.engine-on .an-stage .an-boardrow {
-		width: 100%;
-		max-width: max(11rem, calc(100dvh - var(--eng-h) - 17rem));
-		margin: 0 auto;
-	}
-	.study.engine-on .an-stage .an-boardrow { max-width: max(11rem, calc(100dvh - var(--eng-h) - 21rem)); }
+	.analysis.engine-on .an-stage { box-shadow: 0 -13px 0 var(--panel); }
 }
 @media (max-height: 500px) and (orientation: landscape) and (max-width: 1000px) {
 	/* Sideways. The board column is as wide as the board is tall, and the

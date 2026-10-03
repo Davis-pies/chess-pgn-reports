@@ -31,8 +31,11 @@ test("on a phone the engine's lines stay pinned under the board", async ({ page 
   await page.setViewportSize({ width: 390, height: 844 });
   await loadPgn(page);
   await page.getByRole("button", { name: "Analysis", exact: true }).click();
+  const off = await page.locator(".an-boardrow").boundingBox();
   await page.locator(".an-engine-toggle").click();
   await expect(page.locator(".an-engine-toggle")).toHaveText("Engine on");
+  // the board keeps its full width: the box under it is what stays small
+  expect((await page.locator(".an-boardrow").boundingBox()).width).toBeCloseTo(off.width, 0);
   const lines = page.locator(".an-pvs");
   const before = await lines.boundingBox();
   const board = await page.locator(".an-boardrow").boundingBox();
