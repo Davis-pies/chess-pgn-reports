@@ -1716,7 +1716,7 @@ sup {
 .an-engine { border: 1px solid var(--line); border-radius: var(--radius); padding: .55rem .65rem; background: color-mix(in srgb, var(--head-bg) 55%, var(--panel)); display: flex; flex-direction: column; gap: .4rem; }
 .an-engine-head { display: flex; align-items: center; gap: .3rem .5rem; flex-wrap: wrap; }
 /* the info gives way first: the toggle and the actions keep their size */
-.an-engine-info { flex: 1 1 7rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.an-engine-info { flex: 1 1 5rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .an-engine-opts { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; }
 .an-engine-opts select { font: inherit; font-size: .78rem; background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 5px; padding: 2px 4px; }
 .an-pvs { display: flex; flex-direction: column; gap: .15rem; }
@@ -1751,7 +1751,7 @@ sup {
 .an-tools { flex-wrap: wrap; gap: .3rem; padding-top: .7rem; margin-top: .2rem; border-top: 1px solid var(--line); }
 .an-share { flex-wrap: wrap; gap: .3rem; padding-top: .7rem; margin-top: .2rem; border-top: 1px solid var(--line); }
 .an-share + .an-tools { border-top: none; margin-top: 0; padding-top: .3rem; }
-.an-engine-acts { gap: .3rem; flex: none; }
+.an-engine-acts { gap: .3rem; flex: none; margin: 0; }
 .an-full { display: flex; flex-direction: column; gap: .35rem; font-size: .82rem; padding: .45rem .6rem; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--main) 7%, transparent); }
 .an-full[hidden] { display: none; }
 .an-full:has(.an-full-forget) { flex-direction: row; align-items: center; justify-content: space-between; background: none; padding: 0; }
@@ -2034,7 +2034,14 @@ kbd {
 	.analysis {
 		grid-template-columns: minmax(0, min(calc(100dvh - 9.5rem), 480px)) minmax(0, 1fr);
 	}
-	.an-overlay .an-head { padding-top: 2px; padding-bottom: 2px; }
+	/* a set height, which the pinned board column sits under */
+	.an-overlay .an-head {
+		box-sizing: border-box;
+		height: calc(2.45rem + env(safe-area-inset-top));
+		padding-top: env(safe-area-inset-top);
+		padding-bottom: 0;
+	}
+	.an-overlay .an-close { min-height: 2.1rem; }
 	.an-left { gap: .35rem; }
 	/* the four steppers and Flip on one row under the board */
 	.an-nav { flex-wrap: wrap; gap: .25rem; }
@@ -2109,4 +2116,75 @@ kbd {
 @media (max-height: 500px) and (orientation: landscape) and (max-width: 1000px) {
 	.study .an-nav .an-prevbranch,
 	.study .an-nav .an-nextbranch { display: none; }
+}
+
+/* The engine on a phone: its lines are pinned right under the board, so they
+   never scroll away from the position they are about. The board gives up
+   size to leave the rest of the panel room: `--pv-rows` (set by the panel
+   while the engine is on) says how many lines the box holds, and `--eng-h`
+   is the box's height from it -- the lines, its head row and its settings. */
+.analysis.engine-on { --eng-h: calc(var(--pv-rows, 3) * 1.6rem + 6rem); }
+.an-stage { display: flex; flex-direction: column; gap: .55rem; }
+@media (max-width: 760px) and (orientation: portrait) {
+	/* Upright. The study pins its whole board column already; the analysis
+	   board pins the board and the engine, and its column's other rows scroll
+	   with the lines beside them. The column steps aside (`contents`) so the
+	   pinned block sticks for the whole panel, not just its own column. */
+	.analysis.engine-on:not(.study) { row-gap: .55rem; grid-template-columns: minmax(0, 1fr); }
+	.analysis.engine-on:not(.study) .an-left { display: contents; }
+	.analysis.engine-on:not(.study) .an-stage {
+		position: sticky;
+		top: calc(2.9rem + 13px + env(safe-area-inset-top));
+		z-index: 2;
+		background: var(--panel);
+		padding-bottom: .4rem;
+		border-bottom: 1px solid var(--line);
+		gap: .3rem;
+	}
+	/* The gap between the header and a pinned block: filled, or what scrolls
+	   under the block shows through it */
+	.study .an-left,
+	.analysis.engine-on:not(.study) .an-stage { box-shadow: 0 -13px 0 var(--panel); }
+	.study.engine-on .an-stage { gap: .3rem; }
+	/* at most about half the screen's height for the board, the rest of the
+	   pinned block under it, and room left over to read */
+	.analysis.engine-on .an-stage .an-boardrow {
+		width: 100%;
+		max-width: max(11rem, calc(100dvh - var(--eng-h) - 17rem));
+		margin: 0 auto;
+	}
+	.study.engine-on .an-stage .an-boardrow { max-width: max(11rem, calc(100dvh - var(--eng-h) - 21rem)); }
+}
+@media (max-height: 500px) and (orientation: landscape) and (max-width: 1000px) {
+	/* Sideways. The board column is as wide as the board is tall, and the
+	   board shrinks to leave the engine's lines room under it; the column
+	   stays put and scrolls on its own to its steppers. */
+	.analysis.engine-on {
+		--eng-h: calc(var(--pv-rows, 3) * 1.6rem + 3.6rem);
+		grid-template-columns: minmax(0, min(calc(100dvh - 3.4rem - var(--eng-h)), 480px)) minmax(0, 1fr);
+	}
+	/* Note eval takes a second row in the box's head */
+	.analysis.engine-on:not(.study) { --eng-h: calc(var(--pv-rows, 3) * 1.6rem + 6.2rem); }
+	.analysis.engine-on .an-left {
+		position: sticky;
+		/* under the header, which is this tall sideways */
+		top: calc(2.45rem + env(safe-area-inset-top));
+		/* and above the sheet's bottom padding, or the panel's end pushes it up */
+		max-height: calc(100dvh - 2.45rem - 12px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+		overflow-y: auto;
+		overscroll-behavior: contain;
+	}
+	.analysis.engine-on .an-stage { position: sticky; top: 0; z-index: 2; background: var(--panel); gap: .3rem; }
+	/* the box keeps to its toggle, its actions and its lines; the settings
+	   and the depth read-out wait for the phone to be held upright */
+	.analysis.engine-on .an-engine-info,
+	.analysis.engine-on .an-engine-opts { display: none; }
+	.analysis.engine-on .an-engine { padding: .4rem .45rem; gap: .3rem; }
+	.analysis.engine-on .an-engine-head .chip.mini { padding-left: 6px; padding-right: 6px; font-size: .78rem; white-space: nowrap; }
+	/* one row in the study: Go deeper gives way at its end rather than
+	   taking a row of its own; the analysis board's two actions wrap, and
+	   its --eng-h counts the row */
+	.study.engine-on .an-engine-head { flex-wrap: nowrap; }
+	.study.engine-on .an-engine-acts { min-width: 0; flex: 0 1 auto; }
+	.study.engine-on .an-deeper { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 }

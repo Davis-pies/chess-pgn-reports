@@ -208,11 +208,13 @@ export function analysisPanel(
 	// ---- left column: board, engine, status, navigation
 	const left = el("div", { className: "an-left" });
 	const { row, board, bar } = boardRow(scratch, pos, (san) => play(scratch, san), onChange);
-	left.appendChild(row);
 	// The engine's lines go right under the board, where the eye already is
 	// and where they stay put however long the panel beside them grows.
-	if (engine)
-		left.appendChild(
+	left.appendChild(
+		boardAndEngine(
+			panel,
+			row,
+			engine &&
 			engineBox(engine, pos, onChange, {
 				board,
 				bar,
@@ -226,7 +228,9 @@ export function analysisPanel(
 						}
 					: null,
 			}),
-		);
+			engine,
+		),
+	);
 	left.appendChild(statusLine(pos));
 	const len = activeLine(scratch).moves.length;
 	left.appendChild(
@@ -528,6 +532,22 @@ export function analysisPanel(
 		);
 	speak(scratch, pos);
 	return panel;
+}
+
+// The board with the engine's box under it, as one block, so a phone can pin
+// the two together: the lines stay in view, right under the board, however
+// far the rest of the panel scrolls. While the engine is on, the panel says
+// so and how many lines it shows, for the CSS that sizes the board to leave
+// them room.
+export function boardAndEngine(panel, row, box, engine) {
+	const pin = el("div", { className: "an-stage" }, [row]);
+	if (!box) return pin;
+	pin.appendChild(box);
+	if (engine.state.enabled) {
+		panel.classList.add("engine-on");
+		panel.style.setProperty("--pv-rows", String(engine.multiPv));
+	}
+	return pin;
 }
 
 // The board and the eval bar beside it. A move made on the board goes to

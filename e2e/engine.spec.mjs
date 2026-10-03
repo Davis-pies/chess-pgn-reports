@@ -24,3 +24,20 @@ test("the engine analyses the position and its move can be played", async ({ pag
   await page.keyboard.press("e");
   await expect(toggle).toHaveText("Engine off");
 });
+
+// On a phone the engine's lines are pinned with the board: scrolling the rest
+// of the analysis board away leaves both where they were.
+test("on a phone the engine's lines stay pinned under the board", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await loadPgn(page);
+  await page.getByRole("button", { name: "Analysis", exact: true }).click();
+  await page.locator(".an-engine-toggle").click();
+  await expect(page.locator(".an-engine-toggle")).toHaveText("Engine on");
+  const lines = page.locator(".an-pvs");
+  const before = await lines.boundingBox();
+  const board = await page.locator(".an-boardrow").boundingBox();
+  expect(before.y - (board.y + board.height)).toBeLessThan(60);
+  await page.locator(".an-window").evaluate((w) => (w.scrollTop = 2000));
+  expect(await page.locator(".an-window").evaluate((w) => w.scrollTop)).toBeGreaterThan(0);
+  expect(Math.abs((await lines.boundingBox()).y - before.y)).toBeLessThan(2);
+});
