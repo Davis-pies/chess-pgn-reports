@@ -113,6 +113,9 @@ way in (see `migrate()`).
 | `src/merge.js` | re-homing annotations onto a new PGN, and the report of what cannot be carried |
 | `src/analysis.js` | the analysis board's scratch lines: play, fork, cut, reorder, undo, pack/unpack |
 | `src/analysis-view.js` | the analysis window: board, lines, notes, engine box, commit bar |
+| `src/engine-view.js` | the engine box, eval bar and arrows, shared by the analysis board and the study |
+| `src/study.js` | the study view's state: the workbook's lines to step through, moves off the book, the notes along a line |
+| `src/study-view.js` | the read-only study window: board, the line with its notes, other lines, engine |
 | `src/analysis-commit.js` | the only write from the board into the workbook (line plus regenerated PGN) |
 | `src/share-tools.js` | the analysis panel's copy/save row: FEN, PGN, board PNG and SVG |
 | `src/share.js` | standalone board SVG (pieces inlined), SVG to PNG, file names for saved positions |

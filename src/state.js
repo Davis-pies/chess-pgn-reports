@@ -94,7 +94,8 @@ export function setRenderHooks(h) {
 	return renderHooks;
 }
 
-// Analysis mode and its scratch. Session-only, exactly like openTablePaths and
+// Analysis mode and its scratch (or "study", the read-only study view, whose
+// state app.js keeps). Session-only, exactly like openTablePaths and
 // the trace: a half-explored variation is something you are doing right now,
 // not a property of the notebook, so store.js does not save either of these --
 // and toNotebook, which picks its fields explicitly, never will by accident.
@@ -103,7 +104,7 @@ export function getMode() {
 	return mode;
 }
 export function setMode(m) {
-	mode = m === "analysis" ? "analysis" : "report";
+	mode = m === "analysis" || m === "study" ? m : "report";
 	return mode;
 }
 let scratch = null;

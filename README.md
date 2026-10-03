@@ -23,6 +23,9 @@ a `.json` file you keep.
   once, write notes, and add what you found to the workbook. Save the board
   as a PNG or SVG, or its lines as PGN. Stockfish 19 runs locally in your
   browser; nothing is sent anywhere.
+- **Study** the workbook on a board, read-only: step through each line with
+  its notes shown large beside the moves, switch to the lines through the
+  position, try your own moves, and run the engine.
 - **Print** a paper-saving report (**Print → Save as PDF**): tables headed by
   the moves their lines share, sliced to fit the page, with footnotes and
   lettered sub-notes.
