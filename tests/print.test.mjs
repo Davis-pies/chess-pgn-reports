@@ -27,9 +27,12 @@ test("the first print table runs the mainline out to its full length", () => {
   const tables = [...box.querySelectorAll("table.tbl")];
   assert.ok(tables.length > 1, "the fixture packs into several tables");
   const rows = (t) => t.querySelectorAll("tr").length - 1; // minus the header
-  // the mainline is 16 plies; the first table shows all of it, from move
-  // one, even though its own branches are only a couple of moves deep
-  assert.strictEqual(rows(tables[0]), 16, "first table spans the mainline");
+  // the mainline is 16 plies; the first table runs it out to its last move,
+  // even though its own branches are only a couple of moves deep. Its first
+  // move, which every line shares, is the stem above the table.
+  assert.strictEqual(rows(tables[0]), 15, "first table spans the mainline");
+  const last = [...tables[0].querySelectorAll("tr")].at(-1);
+  assert.strictEqual(last.dataset.ply, "15", "down to its last move");
   // later tables still stop at the deepest line they actually cover
   assert.ok(
     rows(tables[1]) < 16,
@@ -164,11 +167,11 @@ test("the printed table opens every group whatever the preview has folded", () =
   const col = (i) => rows.slice(1).map((tr) => tr.children[i].textContent);
   // The group has no column of its own on paper: its FIRST line states the
   // moves they share and runs straight on into its own.
-  // (The mainline's table starts at move one, so 1.e4 heads every column.)
-  assert.deepStrictEqual(col(2), ["", "c5", "Nf3", "Nc6", "Bb5"]);
+  // (1.e4, which every line shares, is the stem above the table.)
+  assert.deepStrictEqual(col(2), ["c5", "Nf3", "Nc6", "Bb5"]);
   // The sibling still starts after the shared run. Its cell on the fork's own
   // row is the group rule, which carries no text -- the rule is the statement.
-  assert.deepStrictEqual(col(3), ["", "", "", "", "a4"]);
+  assert.deepStrictEqual(col(3), ["", "", "", "a4"]);
   openTablePaths.clear();
   off();
 });
@@ -193,7 +196,7 @@ test("a group draws a rule from its last shared move across its continuations", 
   const row = rules[0].parentElement;
   assert.strictEqual(
     rows.indexOf(row),
-    4,
+    3,
     "on Nc6's row, not floating above the header",
   );
   // it keeps its own cell -- no colspan swallowing the columns it covers
@@ -221,13 +224,15 @@ test("groups nested inside a group draw their own shorter rules", () => {
     byRow.set(k, (byRow.get(k) || 0) + 1);
   });
   const ends = box.querySelectorAll("td.grp-rule .gm-end").length;
-  // the mainline's own branch, leaving after 1.e4, the group, and its inner
-  assert.strictEqual(ends, 3, "the mainline's branch, the group and its inner");
+  // The group and its inner. The mainline's own branch leaves after 1.e4,
+  // which is the stem above the table, so it has no row to draw a rule on:
+  // the stem already says every column carries on from it.
+  assert.strictEqual(ends, 2, "the group and its inner");
   // Every mark is a junction on its own group's row -- a tee or a corner --
   // never a stroke running down the table. Two groups, two rows carrying them.
   const rows = [...box.querySelectorAll("table.tbl tr")];
   const marked = rows.filter((tr) => tr.querySelector("td.grp-rule"));
-  assert.strictEqual(marked.length, 3, "the mainline's branch and the two groups");
+  assert.strictEqual(marked.length, 2, "the two groups");
   assert.strictEqual(
     box.querySelectorAll("td.grp-edge").length,
     0,
@@ -475,8 +480,8 @@ test("a group's run stops at its last child, not at its last column", () => {
   const marked = rows.filter((tr) => tr.querySelector("td.grp-rule"));
   assert.strictEqual(
     marked.length,
-    3,
-    "the mainline's branch, the group off it, and the one nested in that",
+    2,
+    "the group off the stem, and the one nested in that",
   );
 
   // The group leaving Nf3: it has two children, one of which owns two columns,
@@ -744,14 +749,31 @@ test("a cell that states no move carries no symbol and no note marker", () => {
   off();
 });
 
-// The mainline's table states the mainline whole; the stem is for the tables
-// read against something else (see offshoot in print.js). With No mainline
-// there is no such table, so a single table of lines is stemmed.
-test("the mainline's table has no stem: it starts at move one", () => {
+// The mainline's table is stemmed like any other: the moves every line shares
+// are written once above it, as the mainline's, rather than run down its
+// column beside empty ones until the lines split.
+test("the mainline's table states its shared moves once, above it", () => {
   const off = installDom();
   const box = printTables("1. e4 c5 2. Nf3 d6 (2... Nc6 3. d4) (2... e6 3. d4) 3. d4 *");
-  assert.strictEqual(box.querySelector(".print-stem"), null);
-  assert.strictEqual(box.querySelectorAll("table.tbl tr")[1].dataset.ply, "0");
+  const stem = box.querySelector(".print-stem");
+  assert.ok(stem, "a stem is printed");
+  assert.match(stem.textContent, /^1\. e4\s+c5\s+2\. Nf3$/);
+  const rows = box.querySelectorAll("table.tbl tr");
+  assert.strictEqual(rows[1].dataset.ply, "3", "rows start where the lines split");
+  // the mainline column carries on from the stem, to its last move
+  assert.strictEqual(rows[1].children[1].textContent, "d6");
+  assert.strictEqual([...rows].at(-1).dataset.ply, "4");
+  off();
+});
+
+// A note on a move the stem took out of the table keeps its marker: on the
+// stem, where the move is now printed, with its note listed under the table.
+test("a note on a stem move is marked on the stem of the mainline's table", () => {
+  const off = installDom();
+  const box = printTables("1. e4 c5 2. Nf3 {develops} d6 (2... Nc6 3. d4) (2... e6 3. d4) 3. d4 *");
+  const stem = box.querySelector(".print-stem");
+  assert.strictEqual(stem.querySelector("sup")?.textContent, "1");
+  assert.match(box.querySelector(".print-notes").textContent, /\[1\].*develops/);
   off();
 });
 

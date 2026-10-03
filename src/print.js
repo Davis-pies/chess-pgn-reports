@@ -369,11 +369,13 @@ function referenceFor(mainV, index) {
 function tableRows(mainV, lines, index) {
   const maxPly = index === 0 ? subMaxPly([mainV, ...lines]) : subMaxPly(lines);
   const off = offshoot(mainV, lines, index);
-  // The table carrying the mainline states it whole, from move one: it is the
-  // reference the rest of the report is read against, and a stem above it
-  // would take the mainline's opening moves out of its own column.
-  const carriesMain = index === 0 && !mainV.synthetic;
-  const stem = off ? off.stem.moves.length : carriesMain ? 0 : stemLength([mainV, ...lines]);
+  // The table carrying the mainline gets a stem too. It once stated the
+  // mainline whole, from move one, but the moves every line shares then ran
+  // down the mainline's column beside empty ones, often for most of a page,
+  // before the table reached the move where anything happens. Written once
+  // above the table, they still read as the mainline (the stem is its moves,
+  // with its symbols and note markers), and its column picks up from there.
+  const stem = off ? off.stem.moves.length : stemLength([mainV, ...lines]);
   return { off, stem, maxPly, rows: Math.max(maxPly - stem + 1, 0) };
 }
 
