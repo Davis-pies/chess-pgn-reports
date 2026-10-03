@@ -937,3 +937,30 @@ test("a flipped board is drawn from Black's side, pieces on their own squares", 
 	assert.ok(labels.includes("h") && labels.indexOf("h") < labels.indexOf("a"));
 	done();
 });
+
+test("a sideline's card does not list the mainline's notes", () => {
+	const off = installDom();
+	const s = loadState("1. e4 e5 2. Nf3 (2. Bc4 Nf6) (2. d4 exd4) 2... Nc6");
+	// The editor shares a note by writing it onto every line through that
+	// position, so the mainline's note also lives on the sidelines. Raw PGN
+	// comments never end up on more than one line, so reproduce it by hand.
+	const note = { ply: 1, text: "mainline note" };
+	s.lines.forEach((l) => (l.comments = [note]));
+	const bc4 = s.lines.find((l) => l.moves.some((m) => m.san === "Bc4"));
+	bc4.comments.push({ ply: 3, text: "own note" });
+	const box = document.createElement("div");
+	renderCards(box, grid(s.lines), { notes: allNotes() });
+	const cards = [...box.querySelectorAll(".card")];
+	assert.strictEqual(cards.length, 3);
+	const notesOf = (c) => c.querySelector(".card-notes")?.textContent || "";
+	assert.match(notesOf(cards[0]), /mainline note/, "the mainline's card lists it");
+	cards.slice(1).forEach((c) =>
+		assert.doesNotMatch(notesOf(c), /mainline note/, "no sideline card repeats it"),
+	);
+	assert.match(
+		notesOf(cards.find((c) => /Bc4/.test(c.textContent))),
+		/own note/,
+		"a sideline still lists the notes on its own moves",
+	);
+	off();
+});

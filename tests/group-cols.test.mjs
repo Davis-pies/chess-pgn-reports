@@ -236,3 +236,26 @@ test("flatGroupedVars with the mainline off keeps only inner runs", () => {
 	);
 	getCurrent().noMain = false;
 });
+
+// The notes are numbered down the columns in the printed report's order, so the
+// editor's table has to lay its columns out in that order too, or its markers
+// jump about from left to right.
+test("the editor's table orders its columns as the printed report does", () => {
+	const { main, rest } = cols(
+		"1. e4 e5 2. Nf3 (2. Bc4 {early}) 2... Nc6 3. Bb5 (3. d4 {late}) 3... a6",
+	);
+	const screen = groupedVars(main, rest, { isOpen: () => true });
+	const lineOf = (v) => v.line;
+	assert.deepStrictEqual(
+		screen.slice(1).map(lineOf),
+		orderedLeaves(main, rest).map((v) => v.line),
+	);
+	// and the markers read in number order across it
+	const marks = screen.flatMap((v) =>
+		Object.keys(v.noteByPly || {})
+			.map(Number)
+			.sort((a, b) => a - b)
+			.flatMap((p) => v.noteByPly[p]),
+	);
+	assert.deepStrictEqual(marks, [1, 2]);
+});

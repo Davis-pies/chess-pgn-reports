@@ -43,7 +43,10 @@ export function groupedVars(mainV, lines, { isOpen, onToggle } = {}) {
 	// A synthetic mainV is the empty reference, not a column: with the mainline
 	// disabled there is nothing for it to show and nothing to read it against.
 	const vars = mainV.synthetic ? [] : [mainV];
-	trie.children.forEach((c) => pushNode(opts, c, vars));
+	// In the printed report's order, so the two tables read alike and the note
+	// numbers, which run down the columns in that order, ascend left to right
+	// on screen too.
+	byDeparture(trie.children).forEach((c) => pushNode(opts, c, vars));
 	return vars;
 }
 
@@ -290,8 +293,9 @@ function sharedMoves(node) {
 // produce their own, shorter rules, on their own rows.
 // The mainline's branches in the order the printed report lays them out:
 // latest-leaving first, ties keeping PGN order. One definition, used by the
-// layout and by the page packer -- the packer has to cut the report in this
-// order too, or the report reads one way down a page and another across them.
+// layout, by the page packer and by the editor's table -- the packer has to cut
+// the report in this order too, or the report reads one way down a page and
+// another across them, and notes.js numbers the notes down the columns in it.
 function byDeparture(children) {
 	return [...children.values()].sort((a, b) => b.move.ply - a.move.ply);
 }

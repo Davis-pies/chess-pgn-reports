@@ -8,7 +8,9 @@ For a shorter overview see the [README](../README.md).
    `(...)` are parsed into separate taggable lines; PGN `{...}` comments are
    captured as numbered **Notes**. Notes are numbered in reading order: down
    the first column of the table, then down the next, so the notes on a line
-   come in sequence as you read it through.
+   come in sequence as you read it through. The table on screen lays its
+   columns out as the printed report does, latest-leaving line first, so the
+   numbers run left to right in both.
 2. **Tag** — the mainline is the reference row. For each other line choose
    **Sideline** or **Footnote** (optionally add a name, evaluation symbol, and a
    note), or use **★ Make mainline** to promote a sideline to the mainline.

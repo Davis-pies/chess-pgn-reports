@@ -65,3 +65,27 @@ test("the dark theme sticks across a reload", async ({ page }) => {
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await expect(page.getByRole("button", { name: "Light theme" })).toBeVisible();
 });
+
+// Branches sit latest-leaving first, as in print. A group folds by its move
+// path, so clicking one opens that group in place and leaves the other shut.
+test("a group in the table opens and folds in place", async ({ page }) => {
+  await loadPgn(
+    page,
+    "1. e4 e5 (1... c5 2. Nf3 d6 3. d4 (3. Bb5+)) 2. Nf3 Nc6 (2... Nf6 3. Nxe5 (3. d4)) 3. Bb5",
+  );
+  const heads = page.locator(".pv-table th.var-head");
+  await expect(heads).toHaveText([/^Mainline/, /2 lines/, /2 lines/]);
+  // the later-leaving 2...Nf6 group comes first
+  const row = (ply) => page.locator(`.pv-table tr[data-ply="${ply}"] td`);
+  await expect(row(3).nth(1)).toHaveText("Nf6");
+  // open the second group, the one through 1...c5
+  await heads.nth(2).click();
+  await expect(heads).toHaveCount(5);
+  await expect(heads.nth(1)).toHaveText(/2 lines/);
+  await expect(row(3).nth(1)).toHaveText("Nf6");
+  await expect(row(4).nth(3)).toHaveText(/^(d4|Bb5\+)$/);
+  await expect(row(4).nth(4)).toHaveText(/^(d4|Bb5\+)$/);
+  // and fold it again
+  await heads.nth(2).click();
+  await expect(heads).toHaveCount(3);
+});

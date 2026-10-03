@@ -532,3 +532,48 @@ test("the mainline column is pinned by default", () => {
 	assert.strictEqual(st.noMain, undefined);
 	undo();
 });
+
+// The mainline's branches are laid out latest-leaving first, as print does.
+// Folding is keyed by each group's move path, not its position, so the order
+// must not change which group a click opens or what it reveals.
+test("groups fold and unfold in place with the branches in print order", () => {
+	const off = installDom();
+	const TWO =
+		"1. e4 e5 (1... c5 2. Nf3 d6 3. d4 (3. Bb5+)) 2. Nf3 Nc6 (2... Nf6 3. Nxe5 (3. d4)) 3. Bb5";
+	const s = loadState(TWO);
+	openTablePaths.clear();
+	setRenderHooks({ rerenderTable: () => {} });
+	const render = () => {
+		const box = document.createElement("div");
+		renderTrieTable(box, grid(s.lines));
+		return box;
+	};
+	// each column after the ply and mainline columns, by the moves it shows
+	const cols = (box) =>
+		columns(box)
+			.slice(2)
+			.map((c) => c.cells.map(moveOf).filter(Boolean).join(" "));
+	const shut = cols(render());
+	// both groups shut: the later-leaving 2...Nf6 group comes first
+	assert.deepStrictEqual(shut.length, 2);
+	assert.match(shut[0], /Nf6/);
+	assert.match(shut[1], /c5/);
+	// open the c5 group: its two lines appear right after its column, and the
+	// Nf6 group stays shut where it was
+	const groupHead = (box, i) => box.querySelectorAll("th.var-head")[i + 1];
+	groupHead(render(), 1).onclick({});
+	assert.ok(openTablePaths.has(GROUP_KEY), "the click opened the c5 group");
+	const open = cols(render());
+	assert.strictEqual(open.length, 4);
+	assert.strictEqual(open[0], shut[0], "the other group is untouched");
+	assert.match(open[1], /c5/);
+	assert.deepStrictEqual(
+		open.slice(2).map((c) => c.split(" ").pop()).sort(),
+		["Bb5+", "d4"],
+	);
+	// and folding it again gives back exactly the table it started as
+	groupHead(render(), 1).onclick({});
+	assert.ok(!openTablePaths.has(GROUP_KEY));
+	assert.deepStrictEqual(cols(render()), shut);
+	off();
+});
