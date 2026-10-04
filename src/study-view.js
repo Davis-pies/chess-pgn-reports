@@ -41,7 +41,7 @@ const moveText = (ply, san, first = true) =>
 const lineName = (study, i) => {
 	const line = study.lines[i];
 	if (line.off) return "Your moves";
-	return line.src.name || defaultLineName(!!line.src.isMain, i + 1);
+	return line.src.name || defaultLineName(line.num === 0, line.num);
 };
 
 export function studyPanel(study, onChange, { engine = null, flavors = null } = {}) {
@@ -335,7 +335,10 @@ function linePicker(study, onChange) {
 	book.forEach((i, k) => {
 		const l = study.lines[i];
 		const d = ownFrom(study, i);
-		const label = `${k + 1}. ${lineName(study, i)}` + (k && l.moves[d] ? ` · ${moveText(d, l.moves[d].san)}` : "");
+		const name = lineName(study, i);
+		// numbered as the names count, so a typed name keeps its place in the count
+		const num = l.num && name !== defaultLineName(false, l.num) ? `${l.num}. ` : "";
+		const label = num + name + (k && l.moves[d] ? ` · ${moveText(d, l.moves[d].san)}` : "");
 		sel.appendChild(el("option", { value: String(i), textContent: label, selected: i === study.active }));
 	});
 	sel.onchange = () => {
@@ -343,9 +346,9 @@ function linePicker(study, onChange) {
 		onChange();
 	};
 	box.appendChild(sel);
-	const k = book.indexOf(study.active);
-	box.appendChild(
-		el("span", { className: "st-count", textContent: k === -1 ? `${book.length} lines` : `${k + 1} of ${book.length}` }),
-	);
+	// "3 of 8" counts the lines after the mainline, as their names do
+	const num = line.off ? 0 : line.num;
+	const others = book.filter((i) => study.lines[i].num).length;
+	box.appendChild(el("span", { className: "st-count", textContent: num ? `${num} of ${others}` : `${book.length} lines` }));
 	return box;
 }

@@ -28,7 +28,7 @@ test("the study steps through the workbook's lines with their notes", async ({ p
   // the Petroff is another line through here; reading it shows its own note
   // the next line is the Petroff, read from where it is on the board
   await page.locator(".st-next").click();
-  await expect(page.locator(".st-count")).toHaveText("2 of 2");
+  await expect(page.locator(".st-count")).toHaveText("1 of 1");
   await expect(page.locator(".st-note")).toHaveCount(2);
   await page.keyboard.press("ArrowRight");
   await page.keyboard.press("ArrowRight");

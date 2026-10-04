@@ -2,7 +2,7 @@
 import { test, after } from "node:test";
 import assert from "node:assert";
 import { bootApp } from "./helpers.mjs";
-import { getMode, getRenderHooks } from "../src/state.js";
+import { getCurrent, getMode, getRenderHooks } from "../src/state.js";
 import { loadPrefs } from "../src/prefs.js";
 
 const app = await bootApp();
@@ -69,4 +69,32 @@ test("Study from here opens the study at the table's move", async () => {
 	key(win(), "Escape");
 	app.button("Study").click();
 	assert.strictEqual(win().querySelector(".st-moves .an-move.at"), null);
+});
+
+// The PGN lists 1...c5 2.Nc3 after 1...e6, but the editor draws it beside
+// 1...c5 2.Nf3 (its group) and names it Line 2, so the study reads it second.
+// The study once went in the PGN's order, Line 1, Line 3, Line 2, and counted
+// the mainline as 1, so Line 1 was listed as "2." and counted "2 of 4".
+test("the study reads the lines in the order their names count", async () => {
+	app.reset();
+	await app.loadPgn("1. e4 e5 (1... c5 2. Nf3) (1... e6) (1... c5 2. Nc3) 2. Nf3 *");
+	app.button("Study").click();
+	const options = [...win().querySelectorAll(".st-pick option")].map((o) => o.textContent);
+	assert.deepStrictEqual(options, ["Mainline", "Line 1 · 2.Nf3", "Line 2 · 2.Nc3", "Line 3 · 1...e6"]);
+	assert.strictEqual(win().querySelector(".st-count").textContent, "4 lines");
+	const seen = [];
+	for (let k = 0; k < 4; k++) {
+		key(win().querySelector(".study"), "ArrowDown");
+		seen.push(`${win().querySelector(".st-name").textContent} · ${win().querySelector(".st-count").textContent}`);
+	}
+	assert.deepStrictEqual(seen, ["Line 1 · 1 of 3", "Line 2 · 2 of 3", "Line 3 · 3 of 3", "Mainline · 4 lines"]);
+});
+
+test("a line with a typed name keeps its number in the picker", async () => {
+	app.reset();
+	await app.loadPgn("1. e4 e5 (1... c5 2. Nf3) (1... e6) (1... c5 2. Nc3) 2. Nf3 *");
+	getCurrent().lines.find((l) => l.name === "Line 3").name = "French";
+	app.button("Study").click();
+	const options = [...win().querySelectorAll(".st-pick option")].map((o) => o.textContent);
+	assert.deepStrictEqual(options, ["Mainline", "Line 1 · 2.Nf3", "Line 2 · 2.Nc3", "3. French · 1...e6"]);
 });

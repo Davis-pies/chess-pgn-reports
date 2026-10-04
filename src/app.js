@@ -57,7 +57,7 @@ import {
   collectKeys,
   renderTrieNode,
 } from "./trie-view.js";
-import { assignLineNames, lineEditor } from "./line-editor.js";
+import { assignLineNames, editorOrder, lineEditor } from "./line-editor.js";
 import { exportBar, download, slug } from "./export.js";
 import { appendReportSummary, reportSummary } from "./report-summary.js";
 import { openGameInfo } from "./game-info.js";
@@ -406,7 +406,8 @@ export function openAnalysis(moves = []) {
 let study = null;
 export function openStudy(moves = []) {
 	if (getMode() !== "study") opener = focusKey($("view"), document.activeElement);
-	study = newStudy(visibleLines(getCurrent().lines), moves, { footNames: getCurrent().showFootNames });
+	const lines = getCurrent().lines;
+	study = newStudy(visibleLines(lines), moves, { footNames: getCurrent().showFootNames }, editorOrder(lines));
 	study.flipped = loadPrefs().orientation === "black";
 	setMode("study");
 	const wrap = $("view").firstElementChild;

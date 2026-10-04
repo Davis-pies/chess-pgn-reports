@@ -20,37 +20,44 @@ import { focusLines, clearFocus } from "./trie-view.js";
 //
 // lineEditor writes a line's placeholder ("Line 7") back onto it as it draws,
 // numbered by where the editor draws it. Everything else -- the table
-// headers, the printed tables, the exports -- reads that name back. Left to
-// the editor alone, anything drawn before it in the same render read the
-// previous render's names: blank right after a load, and one out after
-// ticking No mainline renumbered every line. So the numbering is done here,
-// once, at the start of each render, walking the lines in exactly the order
-// the editor draws them: the mainline, then the visible lines (grouped by
-// their trie, or flat), then the hidden drawer's, which carries on the count.
-// A name the user typed is left alone.
+// headers, the printed tables, the exports, the study view -- reads that name
+// back. Left to the editor alone, anything drawn before it in the same render
+// read the previous render's names: blank right after a load, and one out
+// after ticking No mainline renumbered every line. So the numbering is done
+// here, once, at the start of each render, in editorOrder(). A name the user
+// typed is left alone.
 export function assignLineNames() {
 	const cur = getCurrent();
 	if (!cur || !cur.lines.length) return;
-	const main = mainOf(cur.lines);
 	let n = 1;
-	const name = (l, idx) => {
+	editorOrder(cur.lines).forEach((l) => {
+		const idx = isMainLine(l) ? 0 : n++;
 		if (!l.name || isDefaultLineName(l.name)) l.name = defaultLineName(isMainLine(l), idx);
-	};
+	});
+}
+
+// The workbook's lines in exactly the order the editor draws them, which is
+// the order their placeholder names count in: the mainline, then the visible
+// lines (grouped by their trie, or flat), then the hidden drawer's. It is not
+// the order of `lines` itself: the trie gathers lines that share moves, so a
+// line parsed later can be drawn earlier. A view that numbers or steps through
+// lines (the study view) takes them in this order, so "Line 3" is the third.
+export function editorOrder(lines) {
+	const main = mainOf(lines);
+	const out = [];
 	const walk = (node) =>
 		node.children.forEach((c) => {
-			if (c.leaf) name(c.leaf, n++);
+			if (c.leaf) out.push(c.leaf);
 			walk(c);
 		});
-	if (!noMain()) name(main, 0);
-	const shown = visibleLines(cur.lines);
-	if (cur.groupView === "flat") {
-		shown.forEach((l) => {
-			if (!isMainLine(l)) name(l, n++);
-		});
-	} else walk(buildTrie(shown, main));
-	const hid = buildTrie(hiddenLines(cur.lines), main);
-	if (hid.leaf) name(hid.leaf, n++);
+	if (!noMain()) out.push(main);
+	const shown = visibleLines(lines);
+	if (getCurrent().groupView === "flat") out.push(...shown.filter((l) => !isMainLine(l)));
+	else walk(buildTrie(shown, main));
+	const hid = buildTrie(hiddenLines(lines), main);
+	if (hid.leaf) out.push(hid.leaf);
 	walk(hid);
+	return out;
 }
 
 export function lineEditor(l, idx, showBoard = false) {

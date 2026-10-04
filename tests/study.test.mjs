@@ -145,7 +145,7 @@ test("the panel draws the board, the line and its notes", () => {
 	let panel = studyPanel(st, () => {});
 	assert.ok(panel.querySelector(".an-board svg"));
 	assert.strictEqual(panel.querySelector(".st-name").textContent, "Mainline");
-	assert.strictEqual(panel.querySelector(".st-count").textContent, "1 of 2");
+	assert.strictEqual(panel.querySelector(".st-count").textContent, "2 lines", "on the mainline, how many there are");
 	assert.strictEqual(panel.querySelector(".st-here").textContent, "The start position.");
 	assert.strictEqual(panel.querySelectorAll(".st-note").length, 1);
 	assert.ok(panel.querySelector(".st-note").classList.contains("ahead"));
@@ -193,7 +193,7 @@ test("◀ ▶ step through every line in order, and the picker goes to any", () 
 	let changed = 0;
 	let panel = studyPanel(st, () => changed++);
 	const options = [...panel.querySelectorAll(".st-pick option")].map((o) => o.textContent);
-	assert.deepStrictEqual(options, ["1. Mainline", "2. Open · 2.Nf3", "3. Closed · 2.Nc3", "4. French · 1...e6", "5. Italian · 3.Bc4"]);
+	assert.deepStrictEqual(options, ["Mainline", "1. Open · 2.Nf3", "2. Closed · 2.Nc3", "3. French · 1...e6", "4. Italian · 3.Bc4"]);
 	assert.strictEqual(panel.querySelector(".st-pick").value, "0");
 
 	click(panel, ".st-next");
