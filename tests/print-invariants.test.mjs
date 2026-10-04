@@ -286,3 +286,17 @@ test("the group marks are drawn with borders, so they survive printing", () => {
     );
   }
 });
+
+test("a table's notes may break across pages, but no single note does", () => {
+  // The notes block was once held together whole. A page of notes then
+  // could not start in the half page left under its table, so the browser
+  // moved all of it to the next page and printed the table alone above a
+  // blank half page. The block may break; a note, and the heading from the
+  // first note, may not.
+  assert.ok(
+    !/break-inside\s*:\s*avoid/.test(block(".print-notes")),
+    ".print-notes must be free to break across pages",
+  );
+  assert.match(block(".print-notes .nt"), /(^|[\s;{])break-inside:\s*avoid/);
+  assert.match(block(".print-notes-h"), /(^|[\s;{])break-after:\s*avoid/);
+});

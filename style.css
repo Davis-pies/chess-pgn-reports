@@ -1460,6 +1460,12 @@ sup {
        bottom margin, so a page break falling in the gap truncates it instead
        of indenting the top of the next page. */
     margin: 0 0 72px;
+  }
+  /* The notes may run on to the next page; each note may not. Holding the
+     whole block together pushed a page of notes past the half page left under
+     its table, so the table printed alone above a blank half page. */
+  .print-notes .nt {
+    break-inside: avoid;
     page-break-inside: avoid;
   }
   /* an empty block still has to hold the gap open, and margins on an empty
@@ -1473,6 +1479,9 @@ sup {
     letter-spacing: 0.05em;
     color: #222;
     margin-bottom: 4px;
+    /* never the last line of a page, cut off from the notes it heads */
+    break-after: avoid;
+    page-break-after: avoid;
   }
   .side-panel {
     position: static;
