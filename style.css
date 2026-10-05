@@ -908,6 +908,62 @@ select:focus {
   font-weight: 700;
 }
 
+/* A numbered note's way back to its move (notes-view.js): the [n] shows it in
+   the table, the pencil selects it in the line editor. Bare buttons, so the
+   row still reads as a footnote; the hover and focus ring say they act. */
+.note-jump,
+.note-edit {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0 2px;
+  margin: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  line-height: 1;
+}
+/* A finger needs more than a superscript to land on; the negative margin keeps
+   the bigger target from opening up the line. */
+@media (pointer: coarse) {
+  .note-jump,
+  .note-edit {
+    padding: 8px 6px;
+    margin: -8px 0;
+  }
+}
+.note-jump sup {
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+.note-edit {
+  color: var(--muted);
+  font-size: 0.85em;
+  margin-right: 4px;
+}
+.note-jump:hover sup,
+.note-edit:hover {
+  color: var(--main);
+}
+.note-jump:focus-visible,
+.note-edit:focus-visible {
+  outline: 2px solid var(--main);
+  outline-offset: 1px;
+}
+/* The cell a note jumped to. The ring stays until the table next redraws, so
+   it can still be found after the scroll settles; the flash is what draws the
+   eye there, and is the part reduced motion takes away. */
+.tbl tr td.note-hit {
+  outline: 2px solid var(--main);
+  outline-offset: -2px;
+  animation: note-hit 1.2s ease-out 2;
+}
+@keyframes note-hit {
+  0% {
+    background: color-mix(in srgb, var(--main) 35%, transparent);
+  }
+}
+
 /* A collapsible note group. The body draws the vertical guide that shows which
    rows belong to it, the same affordance .lgroup gives a trie branch in the
    editor. */

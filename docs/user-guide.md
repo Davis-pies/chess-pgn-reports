@@ -259,6 +259,10 @@ For a shorter overview see the [README](../README.md).
    footnote's own notes collapse to a one-line header saying how much is
    nested beneath, with **Expand all** / **Collapse all** beside the heading.
    Everything starts expanded, and the folding is not saved with the notebook.
+   Each note's **`[n]`** finds its move in the table: it opens any group
+   folded over the line, traces the line and scrolls to the marked cell. The
+   **✎** beside it selects that move in the line editor instead, ready for a
+   symbol or a note. Neither appears on paper.
    **Printed tables are headed by what their lines share, and cut to save
    paper.** Each printed table, the mainline's own included, writes the moves
    all of its columns share once, above it, and starts its rows where they
