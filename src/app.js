@@ -42,6 +42,7 @@ import {
 import { analysisPanel } from "./analysis-view.js";
 import { studyPanel } from "./study-view.js";
 import { newStudy } from "./study.js";
+import { auditChip, auditPanel } from "./audit-view.js";
 import { closeBoard, newScratch, openAt, packScratch, unpackScratch } from "./analysis.js";
 import { sharedEngine } from "./engine.js";
 import { sharedFlavors } from "./engine-flavor.js";
@@ -507,6 +508,7 @@ function viewRoot() {
       onclick: () => openStudy(),
     }),
   );
+  top.appendChild(auditChip());
   const name = el("input", {
     value: getCurrent().name,
     placeholder: "Notebook name",
@@ -634,6 +636,7 @@ function viewRoot() {
   main.appendChild(top);
   main.appendChild(viewControls());
   main.appendChild(notebookList());
+  main.appendChild(auditPanel());
   const mb = markupPanel();
   markupBox = mb; // module ref for in-place re-renders
   notesBox = notesPanel();

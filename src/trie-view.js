@@ -16,6 +16,23 @@ import { setHidden, solo, isFocused, hideAll, showAll } from "./visibility.js";
 import { grid } from "./table.js";
 import { tracedKey, tracePath } from "./trace.js";
 import { openTableMenu } from "./table-menu.js";
+import { evalsAlong, sharedAudit } from "./audit.js";
+import { formatScore } from "./engine.js";
+import { loadPrefs } from "./prefs.js";
+
+// What the audit has found after each move of a column, as text by ply, when
+// the reader has asked for it in the table (the audit panel's "Evals in the
+// table"); null otherwise.
+function auditEvals() {
+	if (!loadPrefs().auditInTable) return null;
+	const audit = sharedAudit();
+	return (v) => {
+		const out = new Map();
+		for (const [ply, ev] of evalsAlong(v.moves, audit.evals, audit.state.depth))
+			out.set(ply, ev.mated ? "#" : formatScore(ev.score));
+		return out;
+	};
+}
 
 // Shared empty default for renderTrieNode's `forks`, so the common call does
 // not allocate a Set per node.
@@ -107,6 +124,7 @@ export function renderTrieTable(container, g) {
 	// table down to the deepest hidden line
 	renderTable(container, { ...g, vars, maxPly: subMaxPly(vars) }, {
 		litByVar,
+		evalsOf: auditEvals(),
 		// Right-click acts on the move; left-click still traces. A group column
 		// gets the group's line actions and the move section both -- its moves
 		// are shared by every line under it, so annotating one there is the same

@@ -121,9 +121,12 @@ way in (see `migrate()`).
 | `src/share.js` | standalone board SVG (pieces inlined), SVG to PNG, file names for saved positions |
 | `src/board-input.js` | click, drag and touch input over `render.js`'s board, promotion, highlights, arrows |
 | `src/engine.js` | Stockfish in a Web Worker over UCI: search sequencing, eval cache, SAN conversion, threaded or single-threaded build |
+| `src/audit.js` | the repertoire audit: every unique position searched once by a pool of lite engines apart from the board's, and the report of moves that lose ground |
+| `src/audit-store.js` | the audit's evals kept in IndexedDB by position, so a re-run searches only what is new |
+| `src/audit-view.js` | the audit's panel in the report and its progress chip in the toolbar, refilled in place while it runs |
 | `src/engine-store.js` | the full engine's one-time download, its SHA-256 check and its IndexedDB copy |
 | `src/engine-flavor.js` | which engine build runs (lite or full) and the download box's state |
-| `src/prefs.js` | what the viewer's browser remembers between visits: theme, board orientation, panel width, the engine's thread count, the last workbook and its board |
+| `src/prefs.js` | what the viewer's browser remembers between visits: theme, board orientation, panel width, the engine's thread count, the audit's depth, the last workbook and its board |
 | `src/settings-view.js` | the Settings drop-down over `prefs.js` |
 | `sw.js` | service worker adding COOP/COEP headers so the page is cross-origin isolated and the threaded engine can run |
 | `vendor/stockfish/` | Stockfish 19 WebAssembly builds (GPL-3.0, unmodified; not linted) |

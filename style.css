@@ -1178,6 +1178,14 @@ sup {
 .mv-mark {
   margin-left: 0.18em;
 }
+/* the audit's eval after the move, under it ("Evals in the table") */
+.mv-eval {
+  display: block;
+  font-size: 0.72em;
+  line-height: 1.1;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
 .card-notes {
   margin-top: 10px;
   border-top: 1px solid var(--line);
@@ -2262,4 +2270,172 @@ kbd {
 	.study.engine-on .an-engine-head { flex-wrap: nowrap; }
 	.study.engine-on .an-engine-acts { min-width: 0; flex: 0 1 auto; }
 	.study.engine-on .an-deeper { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+}
+
+/* The repertoire audit (audit-view.js): a panel in the report, refilled in
+   place while the audit runs. */
+.audit {
+  margin-top: 12px;
+  max-width: 760px;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.audit-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.audit-head h3 {
+  margin: 0;
+  flex: 1 1 auto;
+}
+.audit-ctl {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.audit-ctl > * {
+  white-space: nowrap;
+}
+/* the ✕ ends the row on a wide screen; on a narrow one the controls wrap
+   under the title, and the ✕ stays up beside it */
+.audit-close {
+  order: 2;
+}
+@media (max-width: 640px) {
+  .audit-close {
+    order: 0;
+  }
+  .audit-ctl {
+    order: 1;
+  }
+}
+.audit-depth-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.audit-depth {
+  width: 4.2em;
+}
+.audit-status {
+  margin: 6px 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.audit-bar {
+  margin-bottom: 8px;
+}
+.audit-sum {
+  margin: 8px 0 4px;
+  font-size: 0.9rem;
+}
+.audit-tally.g-blunder,
+.audit-row.g-blunder .audit-sym {
+  color: var(--danger);
+}
+.audit-tally.g-mistake,
+.audit-row.g-mistake .audit-sym {
+  color: var(--warn);
+}
+.audit-row.g-inaccuracy .audit-sym {
+  color: var(--muted);
+}
+.audit-list {
+  list-style: none;
+  margin: 4px 0;
+  padding: 0;
+}
+/* a long list scrolls in the panel rather than pushing the editor a page down */
+.audit-body > .audit-list,
+.audit-ends > .audit-list {
+  max-height: 28rem;
+  overflow-y: auto;
+}
+/* one finding a row: symbol, move, evals, the engine's move, its lines and a
+   way to the position; on a narrow screen it wraps after the move */
+.audit-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  padding: 5px 0;
+  border-top: 1px solid var(--line);
+  font-size: 0.9rem;
+}
+.audit-sym {
+  width: 1.4em;
+  font-weight: 700;
+}
+.audit-move {
+  font-weight: 600;
+  min-width: 5.5em;
+}
+.audit-evals {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+.audit-best,
+.audit-lines {
+  color: var(--muted);
+}
+.audit-lines {
+  flex: 1 1 8em;
+}
+.audit-study {
+  margin-left: auto;
+}
+/* the suggested symbol, the note and the study: kept together at the end,
+   and wrapped as one when the row is too narrow for them */
+.audit-do {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.audit-do .audit-study {
+  margin-left: 0;
+}
+.audit-mark {
+  min-width: 2.6em;
+  white-space: nowrap;
+  justify-content: center;
+  text-align: center;
+}
+.audit-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0;
+}
+.audit-more {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0;
+}
+.audit-ends {
+  margin-top: 8px;
+}
+.audit-ends > summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.audit-ends .audit-lines {
+  flex: 0 0 auto;
+  min-width: 5em;
+  color: var(--text);
+}
+.chip.audit-toggle.busy:not(.on) {
+  border-color: var(--main);
+  color: var(--main);
+}
+@media print {
+  .audit {
+    display: none !important;
+  }
 }

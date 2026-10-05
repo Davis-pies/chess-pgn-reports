@@ -468,6 +468,8 @@ export function renderTable(container, grid, trace) {
 			for (let n = Math.floor(from / 2); 2 * n <= maxPly; n++)
 				rows.push([2 * n, 2 * n + 1]);
 		else for (let ply = from; ply <= maxPly; ply++) rows.push([ply]);
+		// per column, ply -> eval text, worked out once a render
+		const evals = vars.map((v) => (trace && trace.evalsOf && v.moves ? trace.evalsOf(v) : null));
 		const cellAt = (i, ply, tag) => {
 			const v = vars[i];
 			const shown = ply >= from && ply <= maxPly;
@@ -481,6 +483,16 @@ export function renderTable(container, grid, trace) {
 				v.noteByPly,
 				tag,
 			);
+			// The audit's eval of the position after the move, under it, where
+			// the cell states the move (see moveCell for why an elided one does
+			// not). Only the screen table passes `evalsOf`.
+			const ev = !rule && shown && evals[i]?.get(ply);
+			if (ev && v.cells[ply] && v.cells[ply].cls !== "ellip") {
+				const s = document.createElement("span");
+				s.className = "mv-eval";
+				s.textContent = ev;
+				c.appendChild(s);
+			}
 			if (rule) {
 				// The marks hang off a span INSIDE the cell, never off the cell
 				// itself. A positioned <td> breaks border-collapse rendering in

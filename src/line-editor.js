@@ -305,39 +305,18 @@ function isAnchor(l, ply) {
 //
 // Extracted out of movePanel so the table's context menu offers the SAME
 // control rather than a second one that could drift from it -- a symbol set
-// from either place runs this one `apply`, including the rule that a shared
+// from either place runs setMark, including the rule that a shared
 // move is marked on every line reaching that position. `ply` is null for a
 // line-end evaluation, which writes meta.eval instead of a per-move mark.
 //
 // `cur` is the symbol currently set, so the caller decides what "current"
 // means for its own scope, and this stays a pure builder.
 export function symbolRow(ply, lines, cur) {
-	const atEnd = ply == null;
 	// `cur` is a stored mark ("$23"); the buttons are glyphs. Compare what is
 	// displayed, so a coded mark and a legacy glyph both light the same button.
 	const curSym = markSym(cur);
-	const apply = (sym) => {
-		if (atEnd) {
-			lines.forEach((x) => {
-				x.meta = { ...(x.meta || {}), eval: curSym === sym ? "" : sym };
-			});
-		} else {
-			// Store the CODE. For the eight glyphs shared by a White/Black pair
-			// the side comes from the move this mark sits on (see nagFor) --
-			// a guess, but one confined to marks made here: an imported mark
-			// keeps the code its file carried.
-			const code = nagFor(sym, ply);
-			const mark = code === undefined ? sym : markOf(code);
-			lines.forEach((x) => {
-				x.marks = x.marks || {};
-				// an empty symbol is the clear button: always a delete, never an
-				// empty-string mark that would linger in the saved notebook
-				if (!sym || curSym === sym) delete x.marks[ply];
-				else x.marks[ply] = mark;
-				if (!Object.keys(x.marks).length) x.marks = undefined;
-			});
-		}
-	};
+	// the button already lit takes its symbol off again
+	const apply = (sym) => setMark(lines, ply, curSym === sym ? "" : sym);
 	const row = el("span", { className: "sympick" });
 	const symButton = (sym, title) => {
 		// Geometric Shapes are drawn smaller than letters at the same font-size
@@ -379,6 +358,42 @@ export function symbolRow(ply, lines, cur) {
 	};
 	row.appendChild(clear);
 	return row;
+}
+
+// A symbol onto the move at `ply` of every line in `lines`, or, with `ply`
+// null, onto their line-end evaluation; "" clears it. The palette and the
+// audit's suggested symbols both write through here.
+export function setMark(lines, ply, sym) {
+	if (ply == null) {
+		lines.forEach((x) => {
+			x.meta = { ...(x.meta || {}), eval: sym };
+		});
+		return;
+	}
+	// Store the CODE. For the eight glyphs shared by a White/Black pair
+	// the side comes from the move this mark sits on (see nagFor) --
+	// a guess, but one confined to marks made here: an imported mark
+	// keeps the code its file carried.
+	const code = nagFor(sym, ply);
+	const mark = code === undefined ? sym : markOf(code);
+	lines.forEach((x) => {
+		x.marks = x.marks || {};
+		// an empty symbol is the clear button: always a delete, never an
+		// empty-string mark that would linger in the saved notebook
+		if (!sym) delete x.marks[ply];
+		else x.marks[ply] = mark;
+		if (!Object.keys(x.marks).length) x.marks = undefined;
+	});
+}
+
+// A note on the move at `ply` of every line in `lines`, in place of any note
+// there that `replaces` matches -- so an engine verdict written again is
+// updated rather than stacked.
+export function putNote(lines, ply, text, replaces = () => false) {
+	lines.forEach((l) => {
+		l.comments = (l.comments || []).filter((c) => c.ply !== ply || !replaces(c.text));
+		l.comments.push({ ply, text });
+	});
 }
 
 // Symbol row. Applies to the selected move (a per-move mark) or, when no move

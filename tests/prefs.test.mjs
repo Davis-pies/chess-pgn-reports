@@ -38,6 +38,11 @@ test("defaults when nothing is stored", () => {
 		last: null,
 		wbCollapsed: false,
 		engineThreads: null,
+		auditDepth: 16,
+		auditEngines: null,
+		auditSide: "both",
+		auditFlavor: "lite",
+		auditInTable: false,
 	});
 });
 
@@ -53,12 +58,19 @@ test("saved fields round-trip and merge", () => {
 	assert.strictEqual(loadPrefs().orientation, "black", "the other fields stay");
 	assert.ok(savePrefs({ engineThreads: 3 }));
 	assert.strictEqual(loadPrefs().engineThreads, 3);
+	assert.ok(savePrefs({ auditDepth: 23, auditEngines: 11 }));
+	assert.strictEqual(loadPrefs().auditDepth, 23);
+	assert.strictEqual(loadPrefs().auditEngines, 11);
+	assert.ok(savePrefs({ auditSide: "black", auditFlavor: "full", auditInTable: true }));
+	assert.strictEqual(loadPrefs().auditInTable, true);
+	assert.strictEqual(loadPrefs().auditSide, "black");
+	assert.strictEqual(loadPrefs().auditFlavor, "full");
 });
 
 test("junk in storage falls back to defaults field by field", () => {
 	localStorage.setItem(
 		"ott-prefs",
-		JSON.stringify({ orientation: "sideways", sideWidth: "wide", restore: "no", last: { id: 7 }, wbCollapsed: "yes", engineThreads: 2.5 }),
+		JSON.stringify({ orientation: "sideways", sideWidth: "wide", restore: "no", last: { id: 7 }, wbCollapsed: "yes", engineThreads: 2.5, auditDepth: 41, auditEngines: 0, auditSide: "red", auditFlavor: "max", auditInTable: "yes" }),
 	);
 	assert.deepStrictEqual(loadPrefs(), {
 		orientation: "white",
@@ -67,6 +79,11 @@ test("junk in storage falls back to defaults field by field", () => {
 		last: null,
 		wbCollapsed: false,
 		engineThreads: null,
+		auditDepth: 16,
+		auditEngines: null,
+		auditSide: "both",
+		auditFlavor: "lite",
+		auditInTable: false,
 	});
 	for (const bad of [0, -1, 1000, "4"]) {
 		localStorage.setItem("ott-prefs", JSON.stringify({ engineThreads: bad }));
