@@ -1,4 +1,5 @@
-import { test, expect, loadPgn } from "./fixtures.mjs";
+import { readFileSync } from "node:fs";
+import { test, expect, loadPgn, FIXTURE } from "./fixtures.mjs";
 
 test("the preview switches between the table and the print lines", async ({ page }) => {
   await loadPgn(page);
@@ -89,4 +90,15 @@ test("a group in the table opens and folds in place", async ({ page }) => {
   // and fold it again
   await heads.nth(2).click();
   await expect(heads).toHaveCount(3);
+});
+
+test("a note's [n] scrolls the table to its move", async ({ page }) => {
+  await loadPgn(page, readFileSync(FIXTURE, "utf8"));
+  const note = page.locator(".notes .nt").filter({ hasText: "46.g6" });
+  await note.scrollIntoViewIfNeeded();
+  await note.locator(".note-jump").click();
+  const cell = page.locator(".pv-table td.note-hit");
+  await expect(cell).toHaveText(/^g6/);
+  await expect(cell).toBeInViewport();
+  await expect(cell).toBeFocused();
 });

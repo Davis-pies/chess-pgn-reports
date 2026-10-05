@@ -14,6 +14,7 @@ import {
 	subNoteRow,
 } from "./render.js";
 import { moveRef } from "./export.js";
+import { jumpToEditor, jumpToTable } from "./note-jump.js";
 
 // The numbered Notes list, folded. Everything starts expanded; closedNotePaths
 // carries what the reader shut, so a re-render (a re-tagged line, an edited
@@ -110,7 +111,7 @@ function appendHead(head, row) {
 		footStem(head, row.node);
 		return;
 	}
-	head.appendChild(el("sup", { textContent: "[" + row.entry.n + "]" }));
+	appendJumps(head, row.entry);
 	footStem(head, row.entry.foot);
 }
 
@@ -124,7 +125,7 @@ function appendLeaf(container, row) {
 		return;
 	}
 	const div = el("div", { className: "nt" });
-	div.appendChild(el("sup", { textContent: "[" + row.entry.n + "]" }));
+	appendJumps(div, row.entry);
 	if (row.kind === "foot") {
 		// A footnote owns the whole row: its stem goes in a span of its own, and
 		// its sub-notes and a group's branches are block rows beside that span.
@@ -138,6 +139,39 @@ function appendLeaf(container, row) {
 		div.appendChild(span);
 	}
 	container.appendChild(div);
+}
+
+// A numbered entry's [n] is the way back to its move: it shows the move in the
+// table, and the pencil beside it selects the move in the line editor. Both
+// are buttons, so they work from the keyboard; inside a <summary> they stop
+// the click, which would otherwise fold the row as well. Only the screen list
+// has them -- print and the exports keep a plain superscript.
+function appendJumps(container, entry) {
+	const go = (fn, e) => {
+		e.preventDefault();
+		e.stopPropagation();
+		fn(entry);
+	};
+	const ref = moveRef(entry.ply, entry.owner);
+	container.append(
+		el(
+			"button",
+			{
+				type: "button",
+				className: "note-jump",
+				title: "Show " + ref + " in the table",
+				onclick: (e) => go(jumpToTable, e),
+			},
+			el("sup", { textContent: "[" + entry.n + "]" }),
+		),
+		el("button", {
+			type: "button",
+			className: "note-edit",
+			textContent: "\u270e",
+			title: "Select " + ref + " in the line editor",
+			onclick: (e) => go(jumpToEditor, e),
+		}),
+	);
 }
 
 // The flat entry list from numberNotes(), grouped into a tree of collapsible
