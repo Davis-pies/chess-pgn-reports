@@ -180,7 +180,33 @@ For a shorter overview see the [README](../README.md).
    - **The engine** works as on the analysis board: **E** switches it on,
      Space plays its best move, and clicking a move in one of its lines plays
      the line up to there (off the book, unless the workbook has it).
-5. **Render** — a table (plies down, lines across), or a linear
+5. **Audit** — **Audit** in the toolbar opens the repertoire audit, which
+   runs the engine over every position in the workbook and reports the moves
+   that lose ground. Press **Run audit** and keep working: it runs in the
+   background, on engines of its own, so the analysis board and the study
+   stay usable, and the **Audit** button shows how far it has got ("Audit
+   42%"). Findings appear as they are found.
+   - **What is searched** — each position once, however many lines pass
+     through it (a transposition counts once too), to the same depth, with
+     the lite engine. **Depth 12** is the default and takes about a minute for
+     a 200-line workbook and four or five for 800 lines on a laptop; **Depth
+     14** and **16** are slower (about four times per step) and surer.
+   - **The findings** — every move whose eval drops is graded **??**
+     blunder, **?** mistake or **?!** inaccuracy, on the same scale lichess
+     uses, with the eval before and after, the engine's preferred move, and
+     the lines that play it (by name, in the table's column order). A move
+     that is the engine's own choice is never listed. The worst come first;
+     inaccuracies and anything past the first 50 are a click away. **Study**
+     on a finding opens the study at the position the move was played from.
+   - **Where each line ends** — folded under the findings: each line's final
+     eval, in column order, with a way to the study at its end.
+   - **What is kept** — what the audit finds is kept in this browser by
+     position, so a reload, another workbook with the same moves, or a run
+     after you add lines searches only what is new (**Continue** offers the
+     rest). Lines added while it runs join the run. **Stop** halts it;
+     **✕** hides the panel and leaves a run going. A changed depth starts the
+     report over at that depth.
+6. **Render** — a table (plies down, lines across), or a linear
    **card** view (each table row with a board diagram of its end position) for
    print — footnotes don't get their own card, since they're not a table row.
    Boards use the open-source **cburnett** piece set (white + black) with
@@ -286,21 +312,21 @@ For a shorter overview see the [README](../README.md).
    opening, variation, ECO, players, event, site, date, round — and the
    edits are saved with the workbook, laid over the PGN's own tags so they
    survive **Update PGN**. A blank field is left out of the report.
-6. **Export** — **Export PGN** (editable chess notation for any chess app),
+7. **Export** — **Export PGN** (editable chess notation for any chess app),
    **Export Markdown** (paste into Google Docs/Word), or **Print → Save as
    PDF** (always the linear card view). Saved workbooks (`localStorage`) are
    listed under **My saved workbooks** on the import screen to reopen/delete.
    Export PGN keeps the header: the players, event, date and tags like ECO
    and Opening go back out with the lines (Event is the notebook's name when
    it has one, unless Game info sets one).
-7. **Save and reload as a file** — **Save to file** asks for a name (prefilled
+8. **Save and reload as a file** — **Save to file** asks for a name (prefilled
    with the workbook's current one) and writes the whole workbook, PGN and all
    annotations together, to one `.json` you can back up, share or keep in
    version control; the import screen reopens one. It's the same format
    `localStorage` holds, so nothing is lost either way. A file opens with no
    `localStorage` id of its own — pressing **Save** files it as a new entry
    rather than overwriting one.
-8. **Update the PGN under your annotations** — **Update PGN…** replaces the
+9. **Update the PGN under your annotations** — **Update PGN…** replaces the
    moves without throwing the markup away. Notes and symbols are re-attached by
    **move path**, so a note on a move several lines share reaches all of them,
    however the new PGN re-cuts the lines around it; a line's own name, tag,
@@ -316,7 +342,7 @@ For a shorter overview see the [README](../README.md).
    nothing can be lost. The pasted text then no longer describes the line set,
    so the workbook's stored PGN is rebuilt from its lines (the same way Export
    PGN builds one) rather than being the file that was pasted.
-9. **Settings** — the **Settings** menu beside the theme button, and what the
+10. **Settings** — the **Settings** menu beside the theme button, and what the
    app remembers in this browser between visits: the theme, which way up new
    analysis boards start (the way the last one was left, or White/Black picked
    here), the table panel's dragged width, whether the analysis board's
@@ -325,7 +351,7 @@ For a shorter overview see the [README](../README.md).
    last workbook on start** turns that off; **Forget settings** clears it all
    (saved workbooks are kept). A workbook never carries these: a file you send
    someone does not bring your panel width with it.
-10. **Phones and tablets** — on a narrow screen the report stacks with the
+11. **Phones and tablets** — on a narrow screen the report stacks with the
    toolbar first, and the table scrolls sideways in its own box rather than
    widening the page. The analysis window becomes a full-screen sheet; in
    landscape the board is sized to the height so it and its step buttons fit.

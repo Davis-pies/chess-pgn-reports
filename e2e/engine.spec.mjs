@@ -144,3 +144,32 @@ test.describe("without a service worker", () => {
     expect((await page.evaluate(() => globalThis.__uci)).some((c) => c.includes("Threads"))).toBe(false);
   });
 });
+
+// The repertoire audit runs real engines of its own, in the background: the
+// study opens and is used while it searches, and its findings link back to
+// the board.
+test("the audit searches every position while the study stays usable", async ({ page }) => {
+  await loadPgn(page);
+  await page.locator(".audit-toggle").click();
+  await expect(page.locator(".audit-status")).toHaveText(/each of the workbook's 11 positions/);
+  await page.locator(".audit-run").click();
+  await page.getByRole("button", { name: "Study", exact: true }).click();
+  await page.locator(".study").focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator(".st-window")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".audit-status")).toHaveText("All 11 positions searched at depth 12.", { timeout: 60_000 });
+  await expect(page.locator(".audit-toggle")).toHaveText("Audit");
+  await expect(page.locator(".audit-sum")).toBeVisible();
+  await page.locator(".audit-ends summary").click();
+  await expect(page.locator(".audit-ends .audit-row")).toHaveCount(3);
+  await expect(page.locator(".audit-ends .audit-evals").first()).toHaveText(/^[+−]?\d+\.\d\d$|^#/);
+  await page.locator(".audit-ends .audit-study").first().click();
+  await expect(page.locator(".st-window")).toBeVisible();
+
+  // kept in the browser by position: on a fresh page nothing is left to search
+  await loadPgn(page);
+  await page.locator(".audit-toggle").click();
+  await expect(page.locator(".audit-status")).toHaveText("All 11 positions searched at depth 12.");
+  await expect(page.locator(".audit-run")).toHaveCount(0);
+});

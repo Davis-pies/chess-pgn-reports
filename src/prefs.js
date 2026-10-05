@@ -32,6 +32,8 @@ const DEFAULTS = Object.freeze({
 	// how many threads the engine searches with; null means "pick for this
 	// machine" (engine.js startThreads), and a count is capped to its cores
 	engineThreads: null,
+	// how deep the repertoire audit searches each position (audit.js DEPTHS)
+	auditDepth: 12,
 });
 
 const store = () => {
@@ -84,6 +86,7 @@ export function loadPrefs() {
 			Number.isInteger(d.engineThreads) && d.engineThreads >= 1 && d.engineThreads <= 256
 				? d.engineThreads
 				: DEFAULTS.engineThreads,
+		auditDepth: [12, 14, 16].includes(d.auditDepth) ? d.auditDepth : DEFAULTS.auditDepth,
 	};
 }
 
