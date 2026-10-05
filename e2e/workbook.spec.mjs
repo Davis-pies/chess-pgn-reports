@@ -8,14 +8,14 @@ test("a saved workbook survives a reload and reopens with its edits", async ({ p
   const group = page.locator(".markup details.lgroup").filter({ hasText: "3.Bc4" });
   await group.locator(".ledge input.ln").fill("Italian");
   await group.locator(".ledge input.ln").blur();
-  await expect(page.locator(".pv-table th.var-head")).toHaveText([/^Mainline/, /^Italian/, /^Line 1/]);
+  await expect(page.locator(".pv-table th.var-head")).toHaveText([/^Mainline/, /^Italian/, /^Line 2/]);
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByRole("button", { name: "Saved ✓" })).toBeVisible();
 
   // the reload reopens the workbook it left (see prefs.js)
   await page.reload();
   await expect(page.locator(".toolbar input.name")).toHaveValue("Ruy Lopez");
-  await expect(page.locator(".pv-table th.var-head")).toHaveText([/^Mainline/, /^Italian/, /^Line 1/]);
+  await expect(page.locator(".pv-table th.var-head")).toHaveText([/^Mainline/, /^Italian/, /^Line 2/]);
 });
 
 test("a saved workbook can be deleted from the list", async ({ page }) => {

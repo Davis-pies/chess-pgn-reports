@@ -7,7 +7,7 @@
 // columns and cannot import the view layer: trie-view.js already imports
 // subMaxPly from print.js, so the reverse import would close a cycle. Same
 // reasoning as buildTrie living in tree.js.
-import { buildTrie, leavesOf, countLeaves } from "./tree.js";
+import { buildTrie, byDeparture, leavesOf, countLeaves } from "./tree.js";
 import { markSym } from "./nags.js";
 
 // A trie node's contribution to the column list, one level at a time.
@@ -274,6 +274,15 @@ function sharedMoves(node) {
 	return out;
 }
 
+// Every line, in the order the report lays them out (byDeparture). What the
+// packer walks to decide what goes on which page.
+export function orderedLeaves(mainV, lines) {
+	const trie = buildTrie(lines, mainV);
+	const out = trie.leaf ? [trie.leaf] : [];
+	byDeparture(trie.children).forEach((c) => out.push(...leavesOf(c)));
+	return out;
+}
+
 // The PRINTED report's columns: the same grouping, without a column of its own
 // for each group.
 //
@@ -291,24 +300,6 @@ function sharedMoves(node) {
 // the row of the last shared move, reaching from just right of that move
 // across every column that continues from it. Groups nested inside a group
 // produce their own, shorter rules, on their own rows.
-// The mainline's branches in the order the printed report lays them out:
-// latest-leaving first, ties keeping PGN order. One definition, used by the
-// layout, by the page packer and by the editor's table -- the packer has to cut
-// the report in this order too, or the report reads one way down a page and
-// another across them, and notes.js numbers the notes down the columns in it.
-function byDeparture(children) {
-	return [...children.values()].sort((a, b) => b.move.ply - a.move.ply);
-}
-
-// Every line, in that order. What the packer walks to decide what goes on
-// which page.
-export function orderedLeaves(mainV, lines) {
-	const trie = buildTrie(lines, mainV);
-	const out = trie.leaf ? [trie.leaf] : [];
-	byDeparture(trie.children).forEach((c) => out.push(...leavesOf(c)));
-	return out;
-}
-
 export function flatGroupedVars(mainV, lines) {
 	const trie = buildTrie(lines, mainV);
 	// A synthetic mainV is the empty reference, not a column (see table.js), and

@@ -38,11 +38,12 @@ test("a line tagged as a footnote becomes a numbered note on the mainline", asyn
   await group.locator(".ledge button.tag.foot").click();
 
   // out of the table's columns, and marked on the move it replaces
-  await expect(page.locator(".pv-table th.var-head")).toHaveText([/^Mainline/, /^Line 1/]);
+  // (the footnote keeps its place in the count: it is still Line 1 in the editor)
+  await expect(page.locator(".pv-table th.var-head")).toHaveText([/^Mainline/, /^Line 2/]);
   await expect(page.locator('.pv-table tr[data-ply="4"] td.main')).toHaveText("Bb51");
 
   await page.getByRole("button", { name: "Lines (print)" }).click();
-  await expect(page.locator(".pv-cards .card-name")).toHaveText(["Mainline", "Line 1"]);
+  await expect(page.locator(".pv-cards .card-name")).toHaveText(["Mainline", "Line 2"]);
   await expect(page.locator(".pv-cards .card").first()).toContainText("[1] 3.Bc4 Bc5");
 });
 

@@ -14,6 +14,9 @@ For a shorter overview see the [README](../README.md).
 2. **Tag** — the mainline is the reference row. For each other line choose
    **Sideline** or **Footnote** (optionally add a name, evaluation symbol, and a
    note), or use **★ Make mainline** to promote a sideline to the mainline.
+   The editor lists the lines in the table's column order, and an unnamed
+   line is numbered by its place in it, so Line 3 is the table's third column
+   after the mainline.
    A Footnote line is pulled out of the table; it renders as a numbered entry
    in the **Notes** list instead, anchored by an `[n]` marker on the mainline
    move it replaces, with its own notes nested under it as lettered sub-notes.
@@ -161,11 +164,12 @@ For a shorter overview see the [README](../README.md).
    - **Switching lines** — the line's name sits above its note, between **◀**
      and **▶**, which step to the previous and next line of the workbook
      (↑ ↓ do the same, and they wrap round at the ends). The lines come in the
-     order the line editor lists them, so Line 3 is the third after the
-     mainline, and the count beside them ("3 of 8") numbers the lines after
-     the mainline the same way. The drop-down beside them goes straight to any
-     line; each is listed with the move where it goes its own way, and a line
-     you renamed keeps its number in front of its name. If the new line passes through the position on the
+     order the table's columns, the printed report and the line editor all
+     list them, so Line 3 is the third after the mainline, and the count
+     beside them ("3 of 8") numbers the lines after the mainline the same
+     way. The drop-down beside them goes straight to any line; each is listed
+     with the move where it goes its own way, and a line you renamed keeps its
+     number in front of its name. If the new line passes through the position on the
      board, the board stays put; otherwise it goes to that line's own first
      move (to the mainline, to where you left it), so a switch lands on what
      makes the line different.

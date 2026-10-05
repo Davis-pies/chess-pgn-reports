@@ -198,6 +198,17 @@ export function countLeaves(node) {
 
 // All descendant lines of a trie node, depth-first (the flat row/column set
 // a table branch contributes to the preview).
+// The mainline's branches in the order the printed report lays them out:
+// latest-leaving first, ties keeping PGN order. One definition, used by the
+// layout, by the page packer, by the editor's table and by the line editor --
+// the packer has to cut the report in this order too, or the report reads one
+// way down a page and another across them, and notes.js numbers the notes down
+// the columns in it. The line editor lists the lines in it, so a placeholder
+// "Line 3" is the third column of the table.
+export function byDeparture(children) {
+	return [...children.values()].sort((a, b) => b.move.ply - a.move.ply);
+}
+
 export function leavesOf(node) {
 	const out = [];
 	if (node.leaf) out.push(node.leaf);

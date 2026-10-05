@@ -4,6 +4,9 @@ import assert from "node:assert";
 import { bootApp } from "./helpers.mjs";
 import { getCurrent, getMode, getRenderHooks } from "../src/state.js";
 import { loadPrefs } from "../src/prefs.js";
+import { orderedLeaves } from "../src/group-cols.js";
+import { mainOf } from "../src/tree.js";
+import { grid } from "../src/table.js";
 
 const app = await bootApp();
 after(() => app.teardown());
@@ -97,4 +100,26 @@ test("a line with a typed name keeps its number in the picker", async () => {
 	app.button("Study").click();
 	const options = [...win().querySelectorAll(".st-pick option")].map((o) => o.textContent);
 	assert.deepStrictEqual(options, ["Mainline", "Line 1 · 2.Nf3", "Line 2 · 2.Nc3", "3. French · 1...e6"]);
+});
+
+// The table and the printed report lay the mainline's branches out latest-
+// leaving first; the editor once listed them, and counted their names, in PGN
+// order, so the table's columns read Line 4, Line 5, Line 1, ... and the study
+// (which reads in the names' order) disagreed with the table.
+test("the editor, the table, the print and the study count lines the same way", async () => {
+	app.reset();
+	await app.loadPgn("1. e4 c5 (1... e5 2. Nf3 (2. Bc4 Nf6) Nc6 (2... d6 3. d4)) 2. Nf3 d6 (2... Nc6 3. d4 (3. Bb5)) 3. d4 *");
+	const lines = getCurrent().lines;
+	const names = ["Mainline", "Line 1", "Line 2", "Line 3", "Line 4", "Line 5"];
+	const editor = () => [...app.view().querySelectorAll(".ledge input.ln")].map((i) => i.value);
+	assert.deepStrictEqual(editor(), names);
+	assert.deepStrictEqual(orderedLeaves(mainOf(lines), lines).map((l) => l.name), names.slice(1), "the table's columns");
+	assert.deepStrictEqual(grid(lines).vars.map((v) => v.name), names, "the print lines and the export");
+	assert.deepStrictEqual(lines.find((l) => l.name === "Line 1").moves.map((m) => m.san).join(" "), "e4 c5 Nf3 Nc6 Bb5");
+	getCurrent().groupView = "flat";
+	getRenderHooks().renderApp();
+	assert.deepStrictEqual(editor(), names, "the flat view lists them in the same order");
+	app.button("Study").click();
+	const picked = [...win().querySelectorAll(".st-pick option")].map((o) => o.textContent.split(" · ")[0]);
+	assert.deepStrictEqual(picked, names);
 });

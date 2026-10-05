@@ -3,6 +3,7 @@ import { parsePgn, fenMap } from "./pgn.js";
 import {
   collectLines,
   buildTrie,
+  byDeparture,
   forkKeys,
   mainOf,
   isMainLine,
@@ -1085,17 +1086,20 @@ function markupPanel() {
   // hidden lines leave BOTH editor views and live in the drawer below
   const shown = visibleLines(getCurrent().lines);
   const trie = buildTrie(shown, main);
-  // flat view renders every non-main line in order; grouped uses the trie
+  // flat view renders every non-main line in the table's column order, the
+  // order the names count in (editorOrder); grouped uses the trie, its
+  // branches in the same order
   if (getCurrent().groupView === "flat") {
-    shown.forEach((l) => {
-      if (!isMainLine(l))
+    const on = new Set(shown);
+    editorOrder(getCurrent().lines).forEach((l) => {
+      if (on.has(l) && !isMainLine(l))
         box.appendChild(lineEditor(l, counter.n++, getCurrent().showBoards));
     });
   } else {
     // forks come from every line, not just the visible ones: hiding a group's
     // siblings must not dissolve that group into the one child left standing
     const forks = forkKeys(getCurrent().lines, main);
-    trie.children.forEach((c) =>
+    byDeparture(trie.children).forEach((c) =>
       renderTrieNode(box, c, counter, "", true, openPaths, forks),
     );
   }
@@ -1143,7 +1147,7 @@ function hiddenDrawer(hid, main, counter) {
   // openHiddenPaths, not openPaths: the drawer's trie can produce the SAME
   // node.key as the editor's, and one shared Set would open both at once
   const forks = forkKeys(getCurrent().lines, main);
-  trie.children.forEach((c) =>
+  byDeparture(trie.children).forEach((c) =>
     renderTrieNode(body, c, counter, "", true, openHiddenPaths, forks),
   );
   det.appendChild(body);
