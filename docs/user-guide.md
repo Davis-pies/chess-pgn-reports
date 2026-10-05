@@ -228,7 +228,9 @@ For a shorter overview see the [README](../README.md).
    - **What is kept** — what the audit finds is kept in this browser by
      position, so a reload, another workbook with the same moves, or a run
      after you add lines searches only what is new (**Continue** offers the
-     rest). Lines added while it runs join the run. **Stop** halts it;
+     rest). It is also saved in the workbook (**Save** and **Save to file**),
+     so a workbook opened in another browser or on another device brings its
+     evals with it and does not need auditing again. Lines added while it runs join the run. **Stop** halts it;
      **✕** hides the panel and leaves a run going. A changed depth starts the report over at that depth.
 6. **Render** — a table (plies down, lines across), or a linear
    **card** view (each table row with a board diagram of its end position) for

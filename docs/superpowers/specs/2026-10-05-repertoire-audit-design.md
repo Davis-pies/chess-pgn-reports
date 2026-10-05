@@ -63,6 +63,11 @@ start) and the study opened and stepped mid-run.
 - **Kept by position.** Evals go to IndexedDB (`audit-store.js`) keyed by
   position; a deeper eval replaces a shallower one. A reload, another
   workbook, or a re-run after an edit searches only what is new.
+- **Carried by the workbook.** A saved workbook holds the evals of its own
+  positions, per build (`audit: { lite, full }`, each position's
+  `[depth, score, best]`, score in centipawns or `"#n"`; `packEvals` /
+  `unpackEvals`). Opening it merges them in (deeper wins) and keeps them in
+  IndexedDB too. Older builds ignore the field, so `VERSION` stays 1.
 - **The report is derived.** `auditReport(lines, evals, depth, order)` is a
   pure function of the workbook as it stands, so it never shows a line the
   workbook no longer has. Line walks and the engine's move as SAN are cached

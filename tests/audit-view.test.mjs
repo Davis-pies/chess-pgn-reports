@@ -7,7 +7,7 @@
 import { test, after } from "node:test";
 import assert from "node:assert";
 import { Chess } from "chess.js";
-import { bootApp } from "./helpers.mjs";
+import { bootApp, captureDownloads } from "./helpers.mjs";
 import { getCurrent, getMode, getRenderHooks } from "../src/state.js";
 import { sharedAudit } from "../src/audit.js";
 import { loadPrefs, savePrefs } from "../src/prefs.js";
@@ -377,4 +377,33 @@ test("Evals in the table shows the eval after each move under it, and is remembe
 	panel().querySelector(".audit-intable").click();
 	assert.deepStrictEqual(evals(), []);
 	assert.strictEqual(loadPrefs().auditInTable, false);
+});
+
+test("a saved workbook carries what the audit found, and brings it to a page that never ran it", async () => {
+	app.reset();
+	await app.loadPgn("1. h3 h6 2. g3 *");
+	getCurrent().name = "audited";
+	const show = () => (!panel() || panel().hidden) && chip().click();
+	show();
+	panel().querySelector(".audit-run").click();
+	await until(() => audit.state.status === "done" && audit.state.source === getCurrent());
+	const cap = captureDownloads(app.dom.window.document);
+	app.clickText("Save to file");
+	cap.restore();
+	const text = await cap.blobs[0].text();
+	const nb = JSON.parse(text);
+	assert.strictEqual(Object.keys(nb.audit.lite).length, 4, "the start and the three moves");
+	assert.strictEqual(nb.version, 1, "older builds read it, ignoring the evals");
+
+	// another device: nothing searched, nothing kept
+	audit.all.lite.clear();
+	app.reset();
+	const input = app.view().querySelector("input.wbin");
+	Object.defineProperty(input, "files", { value: [new app.dom.window.File([text], "audited.json")], configurable: true });
+	input.onchange();
+	await app.settle();
+	assert.strictEqual(audit.evals.size, 4);
+	show();
+	assert.match(panel().querySelector(".audit-status").textContent, /All 4 positions searched/);
+	assert.strictEqual(panel().querySelector(".audit-sum").textContent, "3 blunders", "the findings, without a run");
 });

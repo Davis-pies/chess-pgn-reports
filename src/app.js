@@ -43,6 +43,7 @@ import { analysisPanel } from "./analysis-view.js";
 import { studyPanel } from "./study-view.js";
 import { newStudy } from "./study.js";
 import { auditChip, auditPanel } from "./audit-view.js";
+import { auditPositions, packEvals, sharedAudit, unpackEvals } from "./audit.js";
 import { closeBoard, newScratch, openAt, packScratch, unpackScratch } from "./analysis.js";
 import { sharedEngine } from "./engine.js";
 import { sharedFlavors } from "./engine-flavor.js";
@@ -341,6 +342,15 @@ function cardFont() {
   return getCurrent().cardFont || 100;
 }
 
+// The audit's evals of these lines' positions. Walking the lines for their
+// positions is the cost on a big workbook, so a page that has audited
+// nothing skips it.
+function auditCarried(lines) {
+  const all = sharedAudit().all;
+  if (!Object.values(all).some((m) => m.size)) return null;
+  return packEvals(all, auditPositions(lines));
+}
+
 // What both stores persist: the PGN, the annotated lines, and the layout
 // settings that change what a print looks like. Shared so a workbook written
 // to a file and one written to localStorage can never carry different fields.
@@ -353,6 +363,8 @@ function workbookState() {
     header: c.header,
     // analysis in progress travels with the workbook
     analysis: packScratch(getScratch()),
+    // and so does what the audit found for it
+    audit: auditCarried(c.lines),
     view: {
       boardSize: c.boardSize,
       cardFont: c.cardFont,
@@ -870,6 +882,8 @@ function installNotebook(nb, id) {
       sideWidth: getCurrent().sideWidth,
     }),
   );
+  // what an audit found, wherever it was run
+  if (nb.audit) sharedAudit().absorb(unpackEvals(nb.audit));
 }
 
 function openNotebook(id) {

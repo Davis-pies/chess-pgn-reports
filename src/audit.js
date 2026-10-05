@@ -194,6 +194,51 @@ export function assessOf(score, mated = null) {
 	return w ? "+−" : "−+";
 }
 
+// What the audit found, as a workbook carries it (store.js): the evals of
+// the workbook's own positions, per build, so they go wherever the workbook
+// goes -- a file, another browser, another device -- rather than staying in
+// this browser's store. Each is [depth, score, best]: the score a number of
+// centipawns or "#n" for a mate, White's view. A finished game is left out;
+// it is judged again without the engine (overEval), and its depth of
+// Infinity is not JSON. Null when there is nothing to carry.
+export function packEvals(maps, positions) {
+	const out = {};
+	for (const [flavor, map] of Object.entries(maps)) {
+		const got = {};
+		let any = false;
+		for (const k of positions.keys()) {
+			const ev = map.get(k);
+			if (!ev || !Number.isFinite(ev.depth)) continue;
+			got[k] = [ev.depth, ev.score.mate != null ? "#" + ev.score.mate : ev.score.cp, ev.best ?? null];
+			any = true;
+		}
+		if (any) out[flavor] = got;
+	}
+	return Object.keys(out).length ? out : null;
+}
+
+// The other way: { lite: Map, full: Map } of evals. A workbook can be edited
+// by hand, so an entry that is not one is dropped rather than shown.
+export function unpackEvals(packed) {
+	const out = { lite: new Map(), full: new Map() };
+	if (!packed || typeof packed !== "object") return out;
+	for (const flavor of Object.keys(out)) {
+		const got = packed[flavor];
+		if (!got || typeof got !== "object") continue;
+		for (const [k, e] of Object.entries(got)) {
+			if (!Array.isArray(e)) continue;
+			const [depth, s, best] = e;
+			if (!Number.isInteger(depth) || depth < 1) continue;
+			let score;
+			if (typeof s === "number" && Number.isFinite(s)) score = { cp: s };
+			else if (typeof s === "string" && /^#-?\d+$/.test(s)) score = { mate: +s.slice(1) };
+			else continue;
+			out[flavor].set(k, { depth, score, best: typeof best === "string" ? best : null });
+		}
+	}
+	return out;
+}
+
 // How many engines the audit can run: one per logical core, which is the
 // most that run at once.
 export const maxAuditWorkers = (g = globalThis) => Math.max(1, Math.floor(g.navigator?.hardwareConcurrency) || 2);
@@ -235,7 +280,8 @@ export function createAudit({
 	};
 	const ev = () => evalsBy[state.flavor];
 	// the store's key: lite evals by the bare position, as they were first kept
-	const storeKey = (k) => (state.flavor === "lite" ? k : `${state.flavor}|${k}`);
+	const keyIn = (flavor, k) => (flavor === "lite" ? k : `${flavor}|${k}`);
+	const storeKey = (k) => keyIn(state.flavor, k);
 	let queue = []; // [key, fen], next first
 	let pool = [];
 	let run = 0; // which run a worker's answer belongs to
@@ -378,6 +424,28 @@ export function createAudit({
 		},
 		set onUpdate(fn) {
 			listener = fn || (() => {});
+		},
+		// Every build's evals, as packEvals takes them.
+		get all() {
+			return evalsBy;
+		},
+		// Evals a workbook brought with it (unpackEvals): a deeper one than
+		// is known replaces it, and they are kept in this browser's store
+		// too, for the next workbook that reaches the same positions.
+		absorb(maps) {
+			for (const [flavor, map] of Object.entries(maps)) {
+				const into = evalsBy[flavor];
+				if (!into) continue;
+				const fresh = [];
+				map.forEach((e, k) => {
+					const had = into.get(k);
+					if (had && had.depth >= e.depth) return;
+					into.set(k, e);
+					fresh.push([keyIn(flavor, k), e]);
+				});
+				if (store && fresh.length) store.save(fresh);
+			}
+			emit(true);
 		},
 		// Pick up what an earlier visit found. Evals already here stand.
 		async restore(positions) {

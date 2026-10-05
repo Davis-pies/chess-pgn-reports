@@ -14,7 +14,9 @@ import {
 	createAudit,
 	gradeOf,
 	overEval,
+	packEvals,
 	posKey,
+	unpackEvals,
 	shareOf,
 } from "../src/audit.js";
 import { evalStore } from "../src/audit-store.js";
@@ -435,4 +437,53 @@ test("an eval suggests an assessment, from White's side", () => {
 	assert.strictEqual(assessOf({ mate: -2 }), "−+");
 	assert.strictEqual(assessOf({ mate: 0 }, "w"), "−+", "White is mated");
 	assert.strictEqual(assessOf({ mate: 0 }, "b"), "+−");
+});
+
+test("a workbook carries the evals of its own positions, per build, and reads them back", () => {
+	const pos = auditPositions(linesOf("1. e4 e5 *"));
+	const [start, e4, e5] = [...pos.keys()];
+	const lite = new Map([
+		[start, { depth: 18, score: { cp: 20 }, best: "e2e4" }],
+		[e4, { depth: 18, score: { mate: -3 }, best: "e7e5" }],
+		[e5, { depth: Infinity, score: { mate: 0 }, best: null, mated: "w" }],
+		["elsewhere", { depth: 18, score: { cp: 1 }, best: "a2a3" }],
+	]);
+	const packed = packEvals({ lite, full: new Map() }, pos);
+	assert.deepStrictEqual(packed, { lite: { [start]: [18, 20, "e2e4"], [e4]: [18, "#-3", "e7e5"] } }, "only its own positions, no finished game, no empty build");
+	const back = unpackEvals(JSON.parse(JSON.stringify(packed)));
+	assert.deepStrictEqual(back.lite.get(start), { depth: 18, score: { cp: 20 }, best: "e2e4" });
+	assert.deepStrictEqual(back.lite.get(e4), { depth: 18, score: { mate: -3 }, best: "e7e5" });
+	assert.strictEqual(back.full.size, 0);
+	assert.strictEqual(packEvals({ lite: new Map(), full: new Map() }, pos), null, "nothing to carry");
+});
+
+test("evals a hand-edited workbook got wrong are dropped", () => {
+	for (const bad of [null, 3, "x", { lite: 3 }]) assert.strictEqual(unpackEvals(bad).lite.size, 0);
+	const back = unpackEvals({
+		lite: { a: [12, 5, null], b: "no", c: [0, 5, "e2e4"], d: [12, "lots", "e2e4"], e: [1.5, 5, null], f: [12, NaN, null] },
+		full: { g: [20, "#2", 7] },
+	});
+	assert.deepStrictEqual([...back.lite.keys()], ["a"]);
+	assert.deepStrictEqual(back.full.get("g"), { depth: 20, score: { mate: 2 }, best: null });
+});
+
+test("evals a workbook brings join what is known, deeper wins, and are kept in this browser", async () => {
+	const audit = createAudit({ throttle: 0, store: evalStore });
+	let painted = 0;
+	audit.onUpdate = () => painted++;
+	audit.absorb({
+		lite: new Map([["a", { depth: 12, score: { cp: 5 }, best: null }]]),
+		full: new Map([["a", { depth: 20, score: { cp: 9 }, best: null }]]),
+		other: new Map([["a", { depth: 20, score: { cp: 1 }, best: null }]]),
+	});
+	assert.strictEqual(painted, 1);
+	audit.absorb({ lite: new Map([["a", { depth: 10, score: { cp: 99 }, best: null }]]) });
+	assert.deepStrictEqual(audit.all.lite.get("a").score, { cp: 5 }, "a shallower one does not replace it");
+	audit.absorb({ lite: new Map([["a", { depth: 16, score: { cp: 7 }, best: null }]]) });
+	assert.deepStrictEqual(audit.all.lite.get("a").score, { cp: 7 });
+	assert.deepStrictEqual(audit.all.full.get("a").score, { cp: 9 });
+	await new Promise((r) => setTimeout(r, 20));
+	const kept = await evalStore.load(["a", "full|a"]);
+	assert.deepStrictEqual(kept.get("a").score, { cp: 7 });
+	assert.deepStrictEqual(kept.get("full|a").score, { cp: 9 });
 });
