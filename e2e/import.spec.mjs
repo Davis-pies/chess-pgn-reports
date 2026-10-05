@@ -4,7 +4,7 @@ test("pasted PGN opens as a table with one column per line", async ({ page }) =>
   await loadPgn(page);
   const heads = page.locator(".pv-table th.var-head");
   // latest-leaving first, as the printed report lays them out
-  await expect(heads).toHaveText([/^Mainline/, /^Line 2/, /^Line 1/]);
+  await expect(heads).toHaveText([/^Mainline/, /^Line 1/, /^Line 2/]);
   // the mainline column reads down the plies
   await expect(page.locator(".pv-table td.main")).toHaveText(["e4", "e5", "Nf3", "Nc6", "Bb5", "a6"]);
   // where each sideline leaves it

@@ -10,6 +10,7 @@ import { divergence, mainOf, isMainLine, noMain, EMPTY_MAIN } from "./tree.js";
 import { numberNotes } from "./notes.js";
 import { markSym } from "./nags.js";
 import { visibleLines } from "./visibility.js";
+import { orderedLeaves } from "./group-cols.js";
 
 const TAG_META = {
 	mainline: { label: "Mainline" },
@@ -102,10 +103,13 @@ export function grid(all) {
 			noteByPly: {},
 			synthetic: true,
 		});
-	// mainline is the top reference row
-	vars.sort(
-		(a, b) => (a.tag === "mainline" ? -1 : 1) - (b.tag === "mainline" ? -1 : 1),
-	);
+	// mainline is the top reference row, and the rest come in the table's
+	// column order (orderedLeaves), so the print lines and the Markdown export
+	// list them as the table and the line editor do: Line 1, Line 2, ...
+	const rank = new Map(orderedLeaves(main, lines).map((l, i) => [l, i]));
+	// a line the trie cannot hold apart (a duplicate) goes last, not nowhere
+	const at = (v) => (v.tag === "mainline" ? -1 : (rank.get(v.line) ?? rank.size));
+	vars.sort((a, b) => at(a) - at(b));
 
 
 	const maxPly = vars.reduce(

@@ -21,15 +21,25 @@ const copyMoves = (moves) => moves.map((m) => ({ san: m.san, ply: m.ply }));
 // `moves` it opens on the first line through that position, after its last
 // move; otherwise at the start of the mainline.
 //
+// The lines are read in `order` (the editor's, editorOrder()), the order their
+// "Line 7" names count in, so ◀ ▶ and the picker go Line 1, Line 2, ... and not
+// in the order the PGN happened to list them. Each book line's `num` is that
+// count: 0 for the mainline, from 1 for the rest.
+//
 // The notes are numbered once, here, as the table numbers them (`notesOpts`
-// are numberNotes' options). The workbook cannot change while the study is
-// open, and numbering walks every line against every other, which is too slow
-// to repeat on every step through a big workbook.
-export function newStudy(lines, moves = [], notesOpts = {}) {
+// are numberNotes' options), from `lines` as given: the table numbers them in
+// the workbook's order, and that is also the call numberNotes remembers. The
+// workbook cannot change while the study is open, and numbering walks every
+// line against every other, which is too slow to repeat on every step through
+// a big workbook.
+export function newStudy(lines, moves = [], notesOpts = {}, order = lines) {
 	const main = mainOf(lines);
-	const ordered = [...lines.filter((l) => l === main), ...lines.filter((l) => l !== main)];
+	const set = new Set(lines);
+	const read = order.filter((l) => set.has(l));
+	const ordered = [...read.filter((l) => l === main), ...read.filter((l) => l !== main)];
+	let n = 0;
 	const s = {
-		lines: ordered.map((l) => ({ moves: copyMoves(l.moves), src: l })),
+		lines: ordered.map((l) => ({ moves: copyMoves(l.moves), src: l, num: l === main ? 0 : ++n })),
 		active: 0,
 		at: 0,
 		flipped: false,
