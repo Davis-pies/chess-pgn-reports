@@ -34,13 +34,18 @@ start) and the study opened and stepped mid-run.
 - **Its own engines.** A pool of single-threaded lite workers, apart from the
   board's engine: N independent positions on N engines beat one engine on N
   threads by 3.5x, they need no cross-origin isolation, and the board's
-  engine stays free. One per core but one, at most four (`auditWorkers`). Each
-  gets a 16 MB hash. The pool is started for a run and shut when it ends.
+  engine stays free. The viewer picks how many, up to one per logical core
+  (`maxAuditWorkers`); it starts at one per core but one, at most four
+  (`auditWorkers`), since each is its own copy of Stockfish in memory. Kept
+  in `prefs.js` as `auditEngines`. Each gets a 16 MB hash. The pool is
+  started for a run and shut when it ends.
 - **Lite only.** Four copies of the 99 MB full engine would cost hundreds of
   MB, and depth-12 lite is plenty to tell a mistake from a good move.
-- **Fixed depth.** Every position to the same depth (12 by default; 14 and 16
-  offered, kept in `prefs.js` as `auditDepth`), so one move's eval can be set
-  against the next and a result can be reused.
+- **Fixed depth.** Every position to the same depth, any from 1 to 40 typed
+  by the viewer (16 to start; Davis found 12-14 too shallow), kept in
+  `prefs.js` as `auditDepth`, so one move's eval can be set against the next
+  and a result can be reused. One engine took 644 ms a position at depth 16
+  on the machine above.
 - **Judging a move.** From the evals of the positions before and after it,
   as the mover's share of the win chances (`whiteShare`, the lichess curve).
   A drop of 0.05 / 0.10 / 0.15 is an inaccuracy / mistake / blunder (lichess's
@@ -63,7 +68,7 @@ start) and the study opened and stepped mid-run.
   shows and hides the panel.
 - **Panel** at the top of the report's right-hand column: the status line
   (positions done of total, depth, a time to go from the pace so far), a
-  progress bar, Depth, Run audit / Stop / Continue (n left), and ✕ (hides the
+  progress bar, a Depth box, an engines menu, Run audit / Stop / Continue (n left), and ✕ (hides the
   panel; a run goes on).
 - **Findings**, worst first then by line and ply: symbol, move, eval before
   → after, the engine's move, the lines, and **Study** at the position the

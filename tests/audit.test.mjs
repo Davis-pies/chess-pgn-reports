@@ -8,6 +8,7 @@ import {
 	auditPositions,
 	auditReport,
 	auditWorkers,
+	maxAuditWorkers,
 	createAudit,
 	gradeOf,
 	overEval,
@@ -174,11 +175,15 @@ test("null moves are not judged, and a mated line end reads as mate", () => {
 	assert.strictEqual(auditReport(nul, ev2, 12).findings.length, 0);
 });
 
-test("the audit runs one engine per core but one, up to four", () => {
-	assert.strictEqual(auditWorkers({ navigator: { hardwareConcurrency: 8 } }), 4);
-	assert.strictEqual(auditWorkers({ navigator: { hardwareConcurrency: 4 } }), 3);
-	assert.strictEqual(auditWorkers({ navigator: { hardwareConcurrency: 1 } }), 1);
-	assert.strictEqual(auditWorkers({}), 1);
+test("the audit runs one engine per core but one, up to four, unless the viewer picks", () => {
+	const cores = (n) => ({ navigator: { hardwareConcurrency: n } });
+	assert.strictEqual(auditWorkers(null, cores(8)), 4);
+	assert.strictEqual(auditWorkers(null, cores(4)), 3);
+	assert.strictEqual(auditWorkers(null, cores(1)), 1);
+	assert.strictEqual(auditWorkers(null, {}), 1);
+	assert.strictEqual(auditWorkers(11, cores(12)), 11, "any count up to the cores");
+	assert.strictEqual(auditWorkers(16, cores(12)), 12, "but no more than there are");
+	assert.strictEqual(maxAuditWorkers(cores(12)), 12);
 });
 
 // A UCI engine that scores positions from a table (cp from White's side,
@@ -256,9 +261,12 @@ test("a run searches each position once over several engines, and ends by shutti
 	await audit.start(pos, { depth: 12 });
 	assert.strictEqual(audit.state.status, "done");
 	assert.strictEqual(made.length, 3);
-	// deeper is a new run
-	await audit.start(pos, { depth: 14 });
+	// deeper is a new run, on as many engines as asked for
+	await audit.start(pos, { depth: 22, engines: 2 });
 	assert.strictEqual(audit.state.status, "running");
+	assert.strictEqual(audit.workers, 2);
+	assert.strictEqual(made.length, 5);
+	assert.ok(made.at(-1).sent.includes("uci"));
 	audit.stop();
 	assert.strictEqual(audit.state.status, "stopped");
 	audit.stop(); // a second stop is nothing
@@ -288,7 +296,7 @@ test("what one run finds is kept for the next visit, and a deeper eval is not ov
 
 	await evalStore.save([[posKey(START), { depth: 8, score: { cp: 1 }, best: "a2a3" }]]);
 	await new Promise((r) => setTimeout(r, 10));
-	assert.strictEqual((await evalStore.load([posKey(START)])).get(posKey(START)).depth, 12, "the deeper one stays");
+	assert.strictEqual((await evalStore.load([posKey(START)])).get(posKey(START)).depth, 16, "the deeper one stays");
 
 	const { make, made } = fakeEngines();
 	const second = createAudit({ makeWorker: make, workers: 2, throttle: 0, store: evalStore });

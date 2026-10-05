@@ -12,7 +12,7 @@ import { el } from "./dom.js";
 import { getCurrent, getRenderHooks } from "./state.js";
 import { editorOrder } from "./line-editor.js";
 import { formatScore } from "./engine.js";
-import { DEPTHS, GRADES, auditPositions, auditReport, sharedAudit } from "./audit.js";
+import { GRADES, MAX_DEPTH, MIN_DEPTH, auditPositions, auditReport, auditWorkers, maxAuditWorkers, sharedAudit } from "./audit.js";
 import { loadPrefs, savePrefs } from "./prefs.js";
 
 // Session-only, like the table's open groups: whether the panel is shown,
@@ -43,7 +43,12 @@ function forThisWorkbook(audit) {
 }
 
 function start(audit) {
-	audit.start(auditPositions(getCurrent().lines), { depth: loadPrefs().auditDepth, source: getCurrent() });
+	const p = loadPrefs();
+	audit.start(auditPositions(getCurrent().lines), {
+		depth: p.auditDepth,
+		engines: auditWorkers(p.auditEngines),
+		source: getCurrent(),
+	});
 }
 
 // The toolbar's way in, which shows how far a run has got.
@@ -91,6 +96,8 @@ export function auditPanel(audit = sharedAudit()) {
 
 function listen(audit) {
 	audit.onUpdate = () => paint(audit);
+	// the report is at the depth the next run will search, until one runs
+	if (audit.state.status !== "running") audit.state.depth = loadPrefs().auditDepth;
 }
 
 // One report a paint, shared by the chip and the panel: on a big workbook it
@@ -113,7 +120,7 @@ function paintPanel(audit, r = null) {
 
 	let status;
 	if (running) {
-		status = `Searching: ${n(r.done)} of ${n(r.total)} positions, depth ${st.depth}`;
+		status = `Searching: ${n(r.done)} of ${n(r.total)} positions, depth ${st.depth}, ${audit.workers} ${audit.workers === 1 ? "engine" : "engines"}`;
 		const eta = minutes(audit.remaining());
 		if (eta) status += `, ${eta}`;
 	} else if (st.status === "error") status = `The engine stopped: ${st.error}`;
@@ -122,17 +129,41 @@ function paintPanel(audit, r = null) {
 	else if (!left) status = `All ${n(r.total)} positions searched at depth ${st.depth}.`;
 	else status = `${n(r.done)} of ${n(r.total)} positions searched at depth ${st.depth}.`;
 
-	const depth = el("select", { className: "audit-depth", title: "How deep each position is searched" });
+	// Any depth, typed: what is enough depends on the openings and on how
+	// long the reader will wait (about four times as long per two plies).
+	const depth = el("input", {
+		className: "audit-depth",
+		type: "number",
+		min: String(MIN_DEPTH),
+		max: String(MAX_DEPTH),
+		step: "1",
+		value: String(loadPrefs().auditDepth),
+		title: `How deep each position is searched (${MIN_DEPTH}-${MAX_DEPTH})`,
+	});
 	depth.setAttribute("aria-label", "Search depth");
-	for (const d of DEPTHS) {
-		depth.appendChild(el("option", { value: String(d), textContent: `Depth ${d}`, selected: d === loadPrefs().auditDepth }));
-	}
 	depth.onchange = () => {
-		savePrefs({ auditDepth: +depth.value });
+		const d = Math.round(+depth.value);
+		if (!(d >= MIN_DEPTH && d <= MAX_DEPTH)) {
+			depth.value = String(loadPrefs().auditDepth);
+			return;
+		}
+		savePrefs({ auditDepth: d });
 		// what is found is by depth: the report starts over at the new one
-		audit.state.depth = +depth.value;
+		audit.state.depth = d;
 		if (running) start(audit);
 		else paint(audit);
+	};
+	// How many engines search at once; each takes one core. A change takes
+	// effect on the next start, or at once by restarting a run.
+	const engines = el("select", { className: "audit-engines", title: "How many engines search at once (one core each)" });
+	engines.setAttribute("aria-label", "Engines");
+	const using = auditWorkers(loadPrefs().auditEngines);
+	for (let i = 1; i <= maxAuditWorkers(); i++) {
+		engines.appendChild(el("option", { value: String(i), textContent: `${i} ${i === 1 ? "engine" : "engines"}`, selected: i === using }));
+	}
+	engines.onchange = () => {
+		savePrefs({ auditEngines: +engines.value });
+		if (running) start(audit);
 	};
 	// nothing left to search at this depth: no button, the depth picker is
 	// the way to look again
@@ -159,11 +190,12 @@ function paintPanel(audit, r = null) {
 	let head = panel.querySelector(".audit-head");
 	const fresh = el("div", { className: "audit-head" }, [
 		el("h3", { textContent: "Repertoire audit" }),
-		el("span", { className: "audit-ctl" }, [depth, go, close]),
+		close,
+		el("span", { className: "audit-ctl" }, [el("label", { className: "audit-depth-label" }, ["Depth ", depth]), engines, go]),
 	]);
 	// the controls are rebuilt only when what they offer changes, so one in
 	// use is not pulled from under the pointer as the bar moves
-	const sig = `${st.status}|${r.done > 0}|${left > 0}|${st.depth}`;
+	const sig = `${st.status}|${r.done > 0}|${left > 0}|${st.depth}|${using}`;
 	if (!head || head.dataset.sig !== sig) {
 		fresh.dataset.sig = sig;
 		if (head) head.replaceWith(fresh);

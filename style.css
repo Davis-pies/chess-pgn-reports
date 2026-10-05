@@ -2230,8 +2230,35 @@ kbd {
 }
 .audit-ctl {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
+}
+.audit-ctl > * {
+  white-space: nowrap;
+}
+/* the ✕ ends the row on a wide screen; on a narrow one the controls wrap
+   under the title, and the ✕ stays up beside it */
+.audit-close {
+  order: 2;
+}
+@media (max-width: 640px) {
+  .audit-close {
+    order: 0;
+  }
+  .audit-ctl {
+    order: 1;
+  }
+}
+.audit-depth-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.audit-depth {
+  width: 4.2em;
 }
 .audit-status {
   margin: 6px 0;

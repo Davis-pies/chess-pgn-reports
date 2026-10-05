@@ -158,7 +158,7 @@ test("the audit searches every position while the study stays usable", async ({ 
   await page.keyboard.press("ArrowRight");
   await expect(page.locator(".st-window")).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(page.locator(".audit-status")).toHaveText("All 11 positions searched at depth 12.", { timeout: 60_000 });
+  await expect(page.locator(".audit-status")).toHaveText("All 11 positions searched at depth 16.", { timeout: 60_000 });
   await expect(page.locator(".audit-toggle")).toHaveText("Audit");
   await expect(page.locator(".audit-sum")).toBeVisible();
   await page.locator(".audit-ends summary").click();
@@ -170,6 +170,6 @@ test("the audit searches every position while the study stays usable", async ({ 
   // kept in the browser by position: on a fresh page nothing is left to search
   await loadPgn(page);
   await page.locator(".audit-toggle").click();
-  await expect(page.locator(".audit-status")).toHaveText("All 11 positions searched at depth 12.");
+  await expect(page.locator(".audit-status")).toHaveText("All 11 positions searched at depth 16.");
   await expect(page.locator(".audit-run")).toHaveCount(0);
 });

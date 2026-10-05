@@ -188,9 +188,12 @@ For a shorter overview see the [README](../README.md).
    42%"). Findings appear as they are found.
    - **What is searched** — each position once, however many lines pass
      through it (a transposition counts once too), to the same depth, with
-     the lite engine. **Depth 12** is the default and takes about a minute for
-     a 200-line workbook and four or five for 800 lines on a laptop; **Depth
-     14** and **16** are slower (about four times per step) and surer.
+     the lite engine. Type any **Depth** from 1 to 40 (16 to start); each two
+     plies deeper takes roughly four times as long. The engines menu picks
+     how many search at once, up to one per logical core (11 on a 12-thread
+     machine); it starts at one per core but one, at most four, because each
+     engine is its own copy of Stockfish in memory. A changed depth or engine
+     count restarts a run under way, and both are remembered.
    - **The findings** — every move whose eval drops is graded **??**
      blunder, **?** mistake or **?!** inaccuracy, on the same scale lichess
      uses, with the eval before and after, the engine's preferred move, and
@@ -204,8 +207,7 @@ For a shorter overview see the [README](../README.md).
      position, so a reload, another workbook with the same moves, or a run
      after you add lines searches only what is new (**Continue** offers the
      rest). Lines added while it runs join the run. **Stop** halts it;
-     **✕** hides the panel and leaves a run going. A changed depth starts the
-     report over at that depth.
+     **✕** hides the panel and leaves a run going. A changed depth starts the report over at that depth.
 6. **Render** — a table (plies down, lines across), or a linear
    **card** view (each table row with a board diagram of its end position) for
    print — footnotes don't get their own card, since they're not a table row.

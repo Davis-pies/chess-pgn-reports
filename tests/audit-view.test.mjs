@@ -86,7 +86,7 @@ test("the toolbar's Audit shows and hides the panel; Run searches the workbook i
 	await paint();
 	assert.strictEqual(audit.state.status, "done");
 	assert.strictEqual(chip().textContent, "Audit");
-	assert.match(panel().querySelector(".audit-status").textContent, /All 8 positions searched at depth 12/);
+	assert.match(panel().querySelector(".audit-status").textContent, /All 8 positions searched at depth 16/);
 	assert.strictEqual(panel().querySelector(".audit-run"), null, "nothing left to run at this depth");
 	assert.match(panel().querySelector(".audit-sum").textContent, /blunder/);
 	const rows = [...panel().querySelectorAll(".audit-body > .audit-list .audit-row")];
@@ -138,11 +138,18 @@ test("the line ends fold out, in column order, each with a way to the study", as
 	assert.ok(!panel().querySelector(".audit-ends").open);
 });
 
-test("a deeper depth starts the report over, and is remembered", async () => {
-	const depth = panel().querySelector(".audit-depth");
-	depth.value = "14";
-	depth.dispatchEvent(new app.dom.window.Event("change"));
-	assert.strictEqual(loadPrefs().auditDepth, 14);
+test("any depth can be typed: it starts the report over, and is remembered", async () => {
+	const typed = (v) => {
+		const d = panel().querySelector(".audit-depth");
+		d.value = v;
+		d.dispatchEvent(new app.dom.window.Event("change"));
+	};
+	typed("0");
+	assert.strictEqual(panel().querySelector(".audit-depth").value, "16", "out of range is put back");
+	typed("99");
+	assert.strictEqual(loadPrefs().auditDepth, 16);
+	typed("20");
+	assert.strictEqual(loadPrefs().auditDepth, 20);
 	assert.strictEqual(panel().querySelector(".audit-run").textContent, "Run audit");
 	assert.strictEqual(panel().querySelector(".audit-sum"), null);
 	// stopped part way, it offers to carry on
@@ -153,9 +160,16 @@ test("a deeper depth starts the report over, and is remembered", async () => {
 	await until(() => audit.state.searched >= 1);
 	// changing the depth mid-run starts again at the new one
 	const d2 = panel().querySelector(".audit-depth");
-	d2.value = "16";
+	d2.value = "23";
 	d2.dispatchEvent(new app.dom.window.Event("change"));
-	await until(() => audit.state.depth === 16 && audit.state.status === "running");
+	await until(() => audit.state.depth === 23 && audit.state.status === "running");
+	// and so does a new engine count, which is remembered
+	const engines = panel().querySelector(".audit-engines");
+	assert.ok(engines.options.length >= 1);
+	engines.value = "1";
+	engines.dispatchEvent(new app.dom.window.Event("change"));
+	assert.strictEqual(loadPrefs().auditEngines, 1);
+	await until(() => audit.state.status === "running" && audit.workers === 1);
 	// one answer from this run's engines (the first run's were shut)
 	await until(() => held.some((f) => !f.worker.dead));
 	held.find((f) => !f.worker.dead)();
@@ -166,12 +180,12 @@ test("a deeper depth starts the report over, and is remembered", async () => {
 	await paint();
 	assert.strictEqual(audit.state.status, "stopped");
 	assert.match(panel().querySelector(".audit-run").textContent, /^Continue \(\d+ left\)$/);
-	assert.match(panel().querySelector(".audit-status").textContent, /of 8 positions searched at depth 16/);
+	assert.match(panel().querySelector(".audit-status").textContent, /of 8 positions searched at depth 23/);
 	panel().querySelector(".audit-run").click();
 	await until(() => audit.state.status === "running");
 	await finished();
 	const d3 = panel().querySelector(".audit-depth");
-	d3.value = "12";
+	d3.value = "16";
 	d3.dispatchEvent(new app.dom.window.Event("change"));
 });
 
@@ -186,7 +200,7 @@ test("a long list shows its worst first and the rest on asking; a run for a clos
 	await until(() => audit.state.searched);
 	await paint();
 	assert.match(chip().textContent, /^Audit \d+%$/, "the chip shows how far it has got");
-	assert.match(panel().querySelector(".audit-status").textContent, /^Searching: \d+ of \d+ positions, depth 12/);
+	assert.match(panel().querySelector(".audit-status").textContent, /^Searching: \d+ of \d+ positions, depth 16, \d engines?/);
 	hold = false;
 	held.splice(0).forEach((f) => f());
 	await finished();

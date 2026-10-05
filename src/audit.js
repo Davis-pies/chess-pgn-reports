@@ -24,8 +24,11 @@ import { fenMap } from "./pgn.js";
 import { evalStore } from "./audit-store.js";
 import { liteWorker, parseInfo, uciToSan, whiteScore, whiteShare } from "./engine.js";
 
-export const DEPTHS = [12, 14, 16];
-const DEFAULT_DEPTH = 12;
+// Any depth the viewer types, within these. Past 40 a lite search of a single
+// position runs to minutes, which over a workbook is days.
+export const MIN_DEPTH = 1;
+export const MAX_DEPTH = 40;
+const DEFAULT_DEPTH = 16;
 
 const START = new Chess().fen();
 
@@ -156,11 +159,17 @@ export function auditReport(lines, evals, depth, order = lines) {
 	return { total: positions.size, done, findings, ends };
 }
 
-// How many engines the audit runs: one per core but one, which is left for
-// the page, and no more than four.
-export function auditWorkers(g = globalThis) {
-	const cores = Math.floor(g.navigator?.hardwareConcurrency) || 2;
-	return Math.max(1, Math.min(4, cores - 1));
+// How many engines the audit can run: one per logical core, which is the
+// most that run at once.
+export const maxAuditWorkers = (g = globalThis) => Math.max(1, Math.floor(g.navigator?.hardwareConcurrency) || 2);
+
+// How many it runs: the viewer's own choice if it still fits this machine,
+// otherwise one per core but one (left for the page), and no more than four
+// -- each engine is its own copy of Stockfish in memory, which a phone feels.
+export function auditWorkers(saved = null, g = globalThis) {
+	const max = maxAuditWorkers(g);
+	if (Number.isInteger(saved) && saved >= 1) return Math.min(saved, max);
+	return Math.max(1, Math.min(4, max - 1));
 }
 
 // The audit's controller. `makeWorker` returns something with postMessage /
@@ -296,7 +305,8 @@ export function createAudit({
 	}
 
 	let asked = 0; // starts asked for, so only the last one asked for begins
-	function begin(positions, depth, source) {
+	function begin(positions, depth, source, engines) {
+		workers = engines;
 		Object.assign(state, { depth, source, searched: 0, startedAt: now(), error: null });
 		enqueue(positions);
 		if (!queue.length) {
@@ -330,12 +340,15 @@ export function createAudit({
 		// Search every position of `positions` (auditPositions) not yet known at
 		// `depth`. `source` is what the run is for (the workbook), so the view
 		// can tell a run for a workbook since closed.
-		async start(positions, { depth = state.depth, source = null } = {}) {
+		async start(positions, { depth = state.depth, source = null, engines = workers } = {}) {
 			if (state.status === "running") finish("stopped");
 			const ticket = ++asked;
 			await this.restore(positions);
 			// a second start while this one read the store is the one that runs
-			if (ticket === asked) begin(positions, depth, source);
+			if (ticket === asked) begin(positions, depth, source, engines);
+		},
+		get workers() {
+			return workers;
 		},
 		// Lines added while it runs: their new positions join the queue.
 		add(positions) {
