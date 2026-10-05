@@ -186,9 +186,17 @@ For a shorter overview see the [README](../README.md).
    background, on engines of its own, so the analysis board and the study
    stay usable, and the **Audit** button shows how far it has got ("Audit
    42%"). Findings appear as they are found.
+   - **Your side** — **Both sides**, **I play White** or **I play Black**: pick the side
+     you play and only your moves are judged; the opponent's slips are not
+     listed. Every position is still searched, since the opponent's moves
+     lead to yours.
+   - **Lite or Full** — Lite (the default) is quick. Full is stronger and
+     slower, and runs from the full engine you downloaded on the analysis
+     board (the panel says so if it is not on this device yet). Each
+     engine is its own copy, so Full takes about 100 MB of memory per
+     engine. The two keep separate results.
    - **What is searched** — each position once, however many lines pass
-     through it (a transposition counts once too), to the same depth, with
-     the lite engine. Type any **Depth** from 1 to 40 (16 to start); each two
+     through it (a transposition counts once too), to the same depth. Type any **Depth** from 1 to 40 (16 to start); each two
      plies deeper takes roughly four times as long. The engines menu picks
      how many search at once, up to one per logical core (11 on a 12-thread
      machine); it starts at one per core but one, at most four, because each

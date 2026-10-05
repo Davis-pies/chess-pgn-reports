@@ -104,7 +104,9 @@ export const gradeOf = (loss) => GRADES.find((g) => loss >= g.min) || null;
 // which is how lines are numbered everywhere). A move several lines share is
 // one finding that names all of them. Evals searched shallower than `depth`
 // count as not yet searched: a run at a new depth starts the report over.
-export function auditReport(lines, evals, depth, order = lines) {
+// `side` ("white", "black" or "both") is whose moves are judged: the
+// opponent's slips are theirs to make, not a flaw in the repertoire.
+export function auditReport(lines, evals, depth, order = lines, side = "both") {
 	const rank = new Map(order.map((l, i) => [l, i]));
 	const ordered = [...lines].sort((a, b) => (rank.get(a) ?? Infinity) - (rank.get(b) ?? Infinity));
 	const at = (k) => {
@@ -124,6 +126,7 @@ export function auditReport(lines, evals, depth, order = lines) {
 			const b = at(steps[i + 1][0]);
 			if (!a || !b || m.san === "--") return;
 			const white = fenBefore.split(" ")[1] === "w";
+			if (side !== "both" && white !== (side === "white")) return;
 			const loss = white ? shareOf(a) - shareOf(b) : shareOf(b) - shareOf(a);
 			const grade = gradeOf(loss);
 			if (!grade) return;
@@ -185,8 +188,22 @@ export function createAudit({
 	throttle = 1000,
 	now = () => Date.now(),
 } = {}) {
-	const evals = new Map(); // key -> { depth, score, best, mated? }
-	const state = { status: "idle", depth: DEFAULT_DEPTH, queued: 0, searched: 0, error: null, startedAt: 0, source: null };
+	// key -> { depth, score, best, mated? }, one map per build: the full
+	// engine's evals are not the lite one's, and neither stands in for the other
+	const evalsBy = { lite: new Map(), full: new Map() };
+	const state = {
+		status: "idle",
+		depth: DEFAULT_DEPTH,
+		flavor: "lite",
+		queued: 0,
+		searched: 0,
+		error: null,
+		startedAt: 0,
+		source: null,
+	};
+	const ev = () => evalsBy[state.flavor];
+	// the store's key: lite evals by the bare position, as they were first kept
+	const storeKey = (k) => (state.flavor === "lite" ? k : `${state.flavor}|${k}`);
 	let queue = []; // [key, fen], next first
 	let pool = [];
 	let run = 0; // which run a worker's answer belongs to
@@ -208,8 +225,8 @@ export function createAudit({
 		if (store && unsaved.length) store.save(unsaved.splice(0));
 	};
 	const known = (k) => {
-		const ev = evals.get(k);
-		return ev && ev.depth >= state.depth;
+		const e = ev().get(k);
+		return e && e.depth >= state.depth;
 	};
 
 	function finish(status, error = null) {
@@ -248,7 +265,7 @@ export function createAudit({
 			while ((next = queue.shift())) {
 				const over = overEval(next[1]);
 				if (!over) break;
-				evals.set(next[0], over);
+				ev().set(next[0], over);
 			}
 			state.queued = queue.length;
 			if (!next) {
@@ -281,9 +298,9 @@ export function createAudit({
 				const best = line.split(/\s+/)[1];
 				w.busy = false;
 				if (score) {
-					const ev = { depth: state.depth, score: whiteScore(score, fen.split(" ")[1]), best };
-					evals.set(key, ev);
-					unsaved.push([key, ev]);
+					const found = { depth: state.depth, score: whiteScore(score, fen.split(" ")[1]), best };
+					ev().set(key, found);
+					unsaved.push([storeKey(key), found]);
 					if (unsaved.length >= 50) flush();
 					state.searched++;
 					emit(false);
@@ -323,25 +340,36 @@ export function createAudit({
 
 	return {
 		state,
-		evals,
+		// what is known for the build chosen
+		get evals() {
+			return ev();
+		},
 		set onUpdate(fn) {
 			listener = fn || (() => {});
 		},
 		// Pick up what an earlier visit found. Evals already here stand.
 		async restore(positions) {
 			if (!store) return;
-			const got = await store.load([...positions.keys()]);
-			for (const [k, ev] of got) {
-				const had = evals.get(k);
-				if (!had || had.depth < ev.depth) evals.set(k, ev);
-			}
+			const map = ev();
+			const keys = [...positions.keys()];
+			const got = await store.load(keys.map(storeKey));
+			keys.forEach((k) => {
+				const e = got.get(storeKey(k));
+				const had = map.get(k);
+				if (e && (!had || had.depth < e.depth)) map.set(k, e);
+			});
 			emit(true);
 		},
 		// Search every position of `positions` (auditPositions) not yet known at
 		// `depth`. `source` is what the run is for (the workbook), so the view
 		// can tell a run for a workbook since closed.
-		async start(positions, { depth = state.depth, source = null, engines = workers } = {}) {
+		async start(
+			positions,
+			{ depth = state.depth, source = null, engines = workers, flavor = state.flavor, factory = makeWorker } = {},
+		) {
 			if (state.status === "running") finish("stopped");
+			state.flavor = flavor;
+			makeWorker = factory;
 			const ticket = ++asked;
 			await this.restore(positions);
 			// a second start while this one read the store is the one that runs
@@ -349,6 +377,12 @@ export function createAudit({
 		},
 		get workers() {
 			return workers;
+		},
+		// Show another build's evals; a run of the old one is stopped.
+		setFlavor(f) {
+			if (f === state.flavor) return;
+			if (state.status === "running") finish("stopped");
+			state.flavor = f;
 		},
 		// Lines added while it runs: their new positions join the queue.
 		add(positions) {

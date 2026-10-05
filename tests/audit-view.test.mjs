@@ -12,13 +12,17 @@ import { getCurrent, getMode, getRenderHooks } from "../src/state.js";
 import { sharedAudit } from "../src/audit.js";
 import { loadPrefs } from "../src/prefs.js";
 import { genPgn } from "../tools/gen-pgn.mjs";
+import "fake-indexeddb/auto";
+import { fileToFull } from "../src/engine-store.js";
 
 let made = 0;
 let hold = false; // answer "go" only when released, so a run can be watched mid-way
 const held = [];
+const urls = []; // the scripts workers were started from
 globalThis.Worker = class {
-	constructor() {
+	constructor(url) {
 		made++;
+		urls.push(String(url));
 		this.fen = null;
 	}
 	postMessage(cmd) {
@@ -150,6 +154,9 @@ test("any depth can be typed: it starts the report over, and is remembered", asy
 	assert.strictEqual(loadPrefs().auditDepth, 16);
 	typed("20");
 	assert.strictEqual(loadPrefs().auditDepth, 20);
+	const head = panel().querySelector(".audit-head");
+	typed("20"); // the same again, as a blur sends it: nothing is redrawn
+	assert.strictEqual(panel().querySelector(".audit-head"), head);
 	assert.strictEqual(panel().querySelector(".audit-run").textContent, "Run audit");
 	assert.strictEqual(panel().querySelector(".audit-sum"), null);
 	// stopped part way, it offers to carry on
@@ -240,4 +247,57 @@ test("a workbook with no losing moves says so, and the panel picks up an earlier
 	assert.match(panel().querySelector(".audit-sum").textContent, /No move loses ground/);
 	chip().click();
 	assert.ok(panel().hidden);
+});
+
+test("only the chosen side's moves are listed, and the choice is remembered", async () => {
+	app.reset();
+	await app.loadPgn("1. c4 e5 2. Nc3 Nf6 3. g3 *");
+	if (panel().hidden) chip().click();
+	panel().querySelector(".audit-run").click();
+	await finished();
+	await paint();
+	const movers = () =>
+		[...panel().querySelectorAll(".audit-body > .audit-list .audit-move")].map((m) =>
+			m.textContent.includes("...") ? "b" : "w",
+		);
+	const both = movers();
+	assert.ok(both.includes("w") && both.includes("b"), "both sides err against the fake engine");
+	const side = (v) => {
+		const sel = panel().querySelector(".audit-side");
+		sel.value = v;
+		sel.dispatchEvent(new app.dom.window.Event("change"));
+	};
+	side("white");
+	assert.strictEqual(loadPrefs().auditSide, "white");
+	assert.ok(movers().length && movers().every((m) => m === "w"));
+	side("black");
+	assert.ok(movers().length && movers().every((m) => m === "b"));
+	side("both");
+	assert.deepStrictEqual(movers(), both);
+});
+
+test("the full engine runs from the stored copy, and says so when there is none", async () => {
+	const flavor = (v) => {
+		const sel = panel().querySelector(".audit-flavor");
+		sel.value = v;
+		sel.dispatchEvent(new app.dom.window.Event("change"));
+	};
+	flavor("full");
+	assert.strictEqual(loadPrefs().auditFlavor, "full");
+	assert.strictEqual(panel().querySelector(".audit-run").textContent, "Run audit", "full evals are its own");
+	panel().querySelector(".audit-run").click();
+	await until(() => /not on this device/.test(panel().querySelector(".audit-status").textContent));
+	assert.notStrictEqual(audit.state.status, "running");
+
+	await fileToFull(new Blob([new Uint8Array([0, 0x61, 0x73, 0x6d, 1, 0, 0, 0])]));
+	const before = urls.length;
+	panel().querySelector(".audit-run").click();
+	await until(() => audit.state.status === "running" || audit.state.status === "done");
+	await finished();
+	await paint();
+	assert.ok(urls.slice(before).every((u) => /stockfish-19(-single)?\.js#blob/.test(u)), "the full build, handed the stored file");
+	assert.ok(urls.length > before);
+	assert.match(panel().querySelector(".audit-status").textContent, /with the full engine\.$/);
+	flavor("lite");
+	assert.doesNotMatch(panel().querySelector(".audit-status").textContent, /full/);
 });

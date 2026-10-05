@@ -347,3 +347,50 @@ test("lines added during a run join it; a new start replaces the run; the pace g
 	assert.ok(!audit.evals.has(keyAfter(["h3"])), "the start replaced before it began searched nothing");
 	assert.ok(!audit.evals.has(keyAfter(["a3"])));
 });
+
+test("only the chosen side's moves are judged", () => {
+	// 1.e4 f6? 2.Qh5+?? (both sides err)
+	const lines = linesOf("1. e4 f6 2. Qh5+ *");
+	const evals = evalsOf([
+		[[], 30, "e2e4"],
+		[["e4"], 30, "e7e5"],
+		[["e4", "f6"], 150, "d2d4"],
+		[["e4", "f6", "Qh5+"], -100, "g7g6"],
+	]);
+	const sans = (side) => auditReport(lines, evals, 12, lines, side).findings.map((f) => f.san);
+	assert.deepStrictEqual(sans("both").sort(), ["Qh5+", "f6"]);
+	assert.deepStrictEqual(sans("white"), ["Qh5+"]);
+	assert.deepStrictEqual(sans("black"), ["f6"]);
+	assert.strictEqual(auditReport(lines, evals, 12, lines, "white").ends.length, 1, "line ends stay");
+});
+
+test("the full engine's evals are kept apart from the lite one's", async () => {
+	const pos = auditPositions(linesOf("1. e4 e5 *"));
+	const lite = fakeEngines(new Map([[keyAfter(["e4"]), 5]]));
+	const full = fakeEngines(new Map([[keyAfter(["e4"]), 77]]));
+	const audit = createAudit({ makeWorker: lite.make, workers: 1, throttle: 0, store: evalStore });
+	await audit.start(pos);
+	await settled(audit);
+	assert.strictEqual(audit.state.flavor, "lite");
+	assert.deepStrictEqual(audit.evals.get(keyAfter(["e4"])).score, { cp: 5 });
+
+	// a run with the full engine searches again, with its own engines
+	await audit.start(pos, { flavor: "full", factory: full.make });
+	assert.strictEqual(audit.state.status, "running", "lite evals do not stand in for full ones");
+	await settled(audit);
+	assert.strictEqual(full.made.length, 1);
+	assert.deepStrictEqual(audit.evals.get(keyAfter(["e4"])).score, { cp: 77 });
+	await new Promise((r) => setTimeout(r, 20));
+	const kept = await evalStore.load([`full|${keyAfter(["e4"])}`, keyAfter(["e4"])]);
+	assert.deepStrictEqual(kept.get(`full|${keyAfter(["e4"])}`).score, { cp: 77 });
+	assert.deepStrictEqual(kept.get(keyAfter(["e4"])).score, { cp: 5 }, "the lite eval is kept as it was");
+
+	// switching back shows the lite evals; switching during a run stops it
+	audit.setFlavor("lite");
+	assert.deepStrictEqual(audit.evals.get(keyAfter(["e4"])).score, { cp: 5 });
+	audit.setFlavor("lite"); // the same: nothing
+	await audit.start(pos, { depth: 30 });
+	assert.strictEqual(audit.state.status, "running");
+	audit.setFlavor("full");
+	assert.strictEqual(audit.state.status, "stopped");
+});

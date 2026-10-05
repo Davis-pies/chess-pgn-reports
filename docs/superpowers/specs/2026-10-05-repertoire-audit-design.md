@@ -39,8 +39,14 @@ start) and the study opened and stepped mid-run.
   (`auditWorkers`), since each is its own copy of Stockfish in memory. Kept
   in `prefs.js` as `auditEngines`. Each gets a 16 MB hash. The pool is
   started for a run and shut when it ends.
-- **Lite only.** Four copies of the 99 MB full engine would cost hundreds of
-  MB, and depth-12 lite is plenty to tell a mistake from a good move.
+- **Lite or full.** Lite by default. Full is offered (`auditFlavor`) and runs
+  from the copy `engine-store.js` keeps; each full engine is its own ~100 MB,
+  so the panel's status says which build runs. Their evals are kept apart
+  (store keys `full|<position>`; lite keeps the bare position).
+- **Your side.** `auditSide` is white, black or both. Only that side's moves
+  are graded; the opponent's slips are theirs, not a flaw in the
+  repertoire. Every position is still searched, since the opponent's moves
+  lead to the reader's.
 - **Fixed depth.** Every position to the same depth, any from 1 to 40 typed
   by the viewer (16 to start; Davis found 12-14 too shallow), kept in
   `prefs.js` as `auditDepth`, so one move's eval can be set against the next
@@ -83,5 +89,4 @@ start) and the study opened and stepped mid-run.
 
 ## Not in scope
 
-Writing evals or symbols into the workbook, auditing with the full engine,
-and per-side filtering (the app does not know which side the reader plays).
+Writing evals or symbols into the workbook.

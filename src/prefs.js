@@ -37,6 +37,10 @@ const DEFAULTS = Object.freeze({
 	// this machine" (audit.js auditWorkers)
 	auditDepth: 16,
 	auditEngines: null,
+	// whose moves the audit judges ("white", "black" or "both"), and with
+	// which build ("lite" or "full")
+	auditSide: "both",
+	auditFlavor: "lite",
 });
 
 const store = () => {
@@ -94,6 +98,8 @@ export function loadPrefs() {
 			Number.isInteger(d.auditEngines) && d.auditEngines >= 1 && d.auditEngines <= 256
 				? d.auditEngines
 				: DEFAULTS.auditEngines,
+		auditSide: ["white", "black", "both"].includes(d.auditSide) ? d.auditSide : DEFAULTS.auditSide,
+		auditFlavor: d.auditFlavor === "full" ? "full" : DEFAULTS.auditFlavor,
 	};
 }
 

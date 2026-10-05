@@ -11,7 +11,8 @@
 import { el } from "./dom.js";
 import { getCurrent, getRenderHooks } from "./state.js";
 import { editorOrder } from "./line-editor.js";
-import { formatScore } from "./engine.js";
+import { formatScore, fullWorker, liteWorker } from "./engine.js";
+import { storedFull } from "./engine-store.js";
 import { GRADES, MAX_DEPTH, MIN_DEPTH, auditPositions, auditReport, auditWorkers, maxAuditWorkers, sharedAudit } from "./audit.js";
 import { loadPrefs, savePrefs } from "./prefs.js";
 
@@ -22,6 +23,8 @@ const LIMIT = 50; // findings shown before "Show all"
 
 let panel = null; // the panel on the page, refilled in place
 let chip = null; // the toolbar's chip, likewise
+let notice = null; // why a run could not start, until the next start
+let fullUrl = null; // the stored full engine's blob: URL, made once per page
 
 // "12.Nf3" or "12...Nf6"
 const moveText = (ply, san) => (ply % 2 === 0 ? `${ply / 2 + 1}.${san}` : `${(ply + 1) / 2}...${san}`);
@@ -35,18 +38,40 @@ function minutes(ms) {
 }
 
 const report = (audit) =>
-	auditReport(getCurrent().lines, audit.evals, audit.state.depth, editorOrder(getCurrent().lines));
+	auditReport(
+		getCurrent().lines,
+		audit.evals,
+		audit.state.depth,
+		editorOrder(getCurrent().lines),
+		loadPrefs().auditSide,
+	);
 
 // A run for a workbook since closed is of no use to the one open now.
 function forThisWorkbook(audit) {
 	if (audit.state.status === "running" && audit.state.source !== getCurrent()) audit.stop();
 }
 
-function start(audit) {
+// The full engine runs from the copy the engine box downloaded (engine-store.js);
+// with none on this device, the run does not start and the panel says where
+// to get it.
+async function start(audit) {
 	const p = loadPrefs();
+	let factory = liteWorker;
+	notice = null;
+	if (p.auditFlavor === "full") {
+		const blob = fullUrl ? true : await storedFull();
+		if (!blob) {
+			notice = "The full engine is not on this device yet. Download it from the engine box (Full) on the analysis board, or pick Lite.";
+			return paint(audit);
+		}
+		fullUrl ??= URL.createObjectURL(blob);
+		factory = fullWorker(fullUrl);
+	}
 	audit.start(auditPositions(getCurrent().lines), {
 		depth: p.auditDepth,
 		engines: auditWorkers(p.auditEngines),
+		flavor: p.auditFlavor,
+		factory,
 		source: getCurrent(),
 	});
 }
@@ -97,7 +122,10 @@ export function auditPanel(audit = sharedAudit()) {
 function listen(audit) {
 	audit.onUpdate = () => paint(audit);
 	// the report is at the depth the next run will search, until one runs
-	if (audit.state.status !== "running") audit.state.depth = loadPrefs().auditDepth;
+	if (audit.state.status !== "running") {
+		audit.state.depth = loadPrefs().auditDepth;
+		audit.setFlavor(loadPrefs().auditFlavor);
+	}
 }
 
 // One report a paint, shared by the chip and the panel: on a big workbook it
@@ -118,16 +146,19 @@ function paintPanel(audit, r = null) {
 	const running = st.status === "running";
 	const left = r.total - r.done;
 
+	const full = st.flavor === "full" ? " with the full engine" : "";
 	let status;
 	if (running) {
-		status = `Searching: ${n(r.done)} of ${n(r.total)} positions, depth ${st.depth}, ${audit.workers} ${audit.workers === 1 ? "engine" : "engines"}`;
+		const kind = st.flavor === "full" ? "full " : "";
+		status = `Searching: ${n(r.done)} of ${n(r.total)} positions, depth ${st.depth}, ${audit.workers} ${kind}${audit.workers === 1 ? "engine" : "engines"}`;
 		const eta = minutes(audit.remaining());
 		if (eta) status += `, ${eta}`;
-	} else if (st.status === "error") status = `The engine stopped: ${st.error}`;
+	} else if (notice) status = notice;
+	else if (st.status === "error") status = `The engine stopped: ${st.error}`;
 	else if (!r.done)
 		status = `Searches each of the workbook's ${n(r.total)} positions once, in the background. Keep working while it runs.`;
-	else if (!left) status = `All ${n(r.total)} positions searched at depth ${st.depth}.`;
-	else status = `${n(r.done)} of ${n(r.total)} positions searched at depth ${st.depth}.`;
+	else if (!left) status = `All ${n(r.total)} positions searched at depth ${st.depth}${full}.`;
+	else status = `${n(r.done)} of ${n(r.total)} positions searched at depth ${st.depth}${full}.`;
 
 	// Any depth, typed: what is enough depends on the openings and on how
 	// long the reader will wait (about four times as long per two plies).
@@ -147,6 +178,10 @@ function paintPanel(audit, r = null) {
 			depth.value = String(loadPrefs().auditDepth);
 			return;
 		}
+		// The same depth again is nothing. Redrawing the controls takes the
+		// box out of the page, which blurs it, which fires "change" a second
+		// time from inside that redraw.
+		if (d === loadPrefs().auditDepth) return;
 		savePrefs({ auditDepth: d });
 		// what is found is by depth: the report starts over at the new one
 		audit.state.depth = d;
@@ -165,6 +200,23 @@ function paintPanel(audit, r = null) {
 		savePrefs({ auditEngines: +engines.value });
 		if (running) start(audit);
 	};
+	// Whose moves are judged. The opponent's slips are theirs: only the
+	// reader's side is graded, and every position is still searched, since
+	// the opponent's moves lead to the reader's.
+	const side = pick("audit-side", "Whose moves are judged", [["both", "Both sides"], ["white", "I play White"], ["black", "I play Black"]], loadPrefs().auditSide, (v) => {
+		savePrefs({ auditSide: v });
+		paint(audit);
+	});
+	// Which build searches. Lite is quick; full is stronger and slower, and
+	// each engine is its own ~100 MB copy in memory.
+	const flavor = pick("audit-flavor", "Which engine searches", [["lite", "Lite"], ["full", "Full"]], loadPrefs().auditFlavor, (v) => {
+		savePrefs({ auditFlavor: v });
+		notice = null;
+		const was = running;
+		audit.setFlavor(v);
+		if (was) start(audit);
+		else paint(audit);
+	});
 	// nothing left to search at this depth: no button, the depth picker is
 	// the way to look again
 	const go = running
@@ -191,11 +243,18 @@ function paintPanel(audit, r = null) {
 	const fresh = el("div", { className: "audit-head" }, [
 		el("h3", { textContent: "Repertoire audit" }),
 		close,
-		el("span", { className: "audit-ctl" }, [el("label", { className: "audit-depth-label" }, ["Depth ", depth]), engines, go]),
+		el("span", { className: "audit-ctl" }, [
+			side,
+			flavor,
+			el("label", { className: "audit-depth-label" }, ["Depth ", depth]),
+			engines,
+			go,
+		]),
 	]);
 	// the controls are rebuilt only when what they offer changes, so one in
 	// use is not pulled from under the pointer as the bar moves
-	const sig = `${st.status}|${r.done > 0}|${left > 0}|${st.depth}|${using}`;
+	const p = loadPrefs();
+	const sig = `${st.status}|${r.done > 0}|${left > 0}|${st.depth}|${using}|${p.auditSide}|${st.flavor}`;
 	if (!head || head.dataset.sig !== sig) {
 		fresh.dataset.sig = sig;
 		if (head) head.replaceWith(fresh);
@@ -224,6 +283,7 @@ function paintPanel(audit, r = null) {
 		ui.all,
 		ui.ends && r.ends.filter((e) => e.score).length,
 		st.depth,
+		st.flavor,
 		r.done > 0,
 		r.findings.map((f) => f.key + f.lines.length).join(","),
 	].join("|");
@@ -270,6 +330,15 @@ function findingsBody(audit, r) {
 	if (more.childNodes.length) body.appendChild(more);
 	body.appendChild(endsList(audit, r));
 	return body;
+}
+
+// A labelled drop-down of [value, text] pairs.
+function pick(cls, label, options, current, set) {
+	const sel = el("select", { className: cls, title: label });
+	sel.setAttribute("aria-label", label);
+	for (const [v, t] of options) sel.appendChild(el("option", { value: v, textContent: t, selected: v === current }));
+	sel.onchange = () => set(sel.value);
+	return sel;
 }
 
 const toggle = (text, act, audit) =>
