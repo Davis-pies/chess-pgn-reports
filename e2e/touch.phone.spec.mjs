@@ -142,10 +142,10 @@ test.describe("upright", () => {
     await scrollTo(page, ".an-window", 2000);
     expect(Math.abs((await lines.boundingBox()).y - before.y)).toBeLessThan(2);
     await fitsWidth(page, ".an-window");
-    // its moves still play with a finger
-    const move = page.locator(".an-pv:not(.empty) .an-pvmove").first();
-    const p = await move.boundingBox();
-    await page.touchscreen.tap(p.x + p.width / 2, p.y + p.height / 2);
+    // its moves still play with a finger. locator.tap, not a tap at a measured
+    // point: the engine redraws its lines as it deepens, and a move measured
+    // just before a redraw is detached and measures null.
+    await page.locator(".an-pv:not(.empty) .an-pvmove").first().tap();
     await expect(activeMoves(page)).toHaveText([/^1\.[A-Za-h]/]);
   });
 
