@@ -122,7 +122,6 @@ way in (see `migrate()`).
 | `src/board-input.js` | click, drag and touch input over `render.js`'s board, promotion, highlights, arrows |
 | `src/engine.js` | Stockfish in a Web Worker over UCI: search sequencing, eval cache, SAN conversion, threaded or single-threaded build |
 | `src/audit.js` | the repertoire audit: every unique position searched once by a pool of lite engines apart from the board's, and the report of moves that lose ground |
-| `src/audit-store.js` | the audit's evals kept in IndexedDB by position, so a re-run searches only what is new |
 | `src/audit-view.js` | the audit's panel in the report and its progress chip in the toolbar, refilled in place while it runs |
 | `src/engine-store.js` | the full engine's one-time download, its SHA-256 check and its IndexedDB copy |
 | `src/engine-flavor.js` | which engine build runs (lite or full) and the download box's state |

@@ -492,6 +492,7 @@ function viewRoot() {
         // notebook you just discarded is not a place to land.
         setMode("report");
         setScratch(null);
+        sharedAudit().reset();
         setCurrent(
           freshState({
             boardSize: getCurrent().boardSize,
@@ -882,7 +883,9 @@ function installNotebook(nb, id) {
       sideWidth: getCurrent().sideWidth,
     }),
   );
-  // what an audit found, wherever it was run
+  // what an audit found for this workbook, wherever it was run, and nothing
+  // found for the one open before
+  sharedAudit().reset();
   if (nb.audit) sharedAudit().absorb(unpackEvals(nb.audit));
 }
 
@@ -922,6 +925,8 @@ function loadPgnText(text) {
         return;
       }
       clearViewState();
+      // a new PGN has no audit yet, whatever positions it shares
+      sharedAudit().reset();
       setCurrent(
         freshState({
           id: getCurrent().id,

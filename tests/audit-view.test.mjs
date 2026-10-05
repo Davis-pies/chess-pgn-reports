@@ -237,7 +237,7 @@ test("a long list shows its worst first and the rest on asking; a run for a clos
 	assert.ok(getCurrent().lines.length);
 });
 
-test("a workbook with no losing moves says so, and the panel picks up an earlier visit's results", async () => {
+test("a workbook with no losing moves says so", async () => {
 	app.reset();
 	await app.loadPgn("1. a3 *");
 	panel().querySelector(".audit-run").click();
@@ -307,8 +307,7 @@ test("a finding's symbol and note go onto its move, one at a time or all at once
 	app.reset();
 	await app.loadPgn("1. e4 e5 2. Nf3 Nc6 (2... d6 3. d4) 3. Bb5 *");
 	if (panel().hidden) chip().click();
-	// the first test searched this workbook already; what it found is kept
-	panel().querySelector(".audit-run")?.click();
+	panel().querySelector(".audit-run").click();
 	await until(() => /All 8 positions/.test(panel().querySelector(".audit-status").textContent));
 	await finished();
 	const rows = () => [...panel().querySelectorAll(".audit-body > .audit-list .audit-row")];
@@ -395,9 +394,9 @@ test("a saved workbook carries what the audit found, and brings it to a page tha
 	assert.strictEqual(Object.keys(nb.audit.lite).length, 4, "the start and the three moves");
 	assert.strictEqual(nb.version, 1, "older builds read it, ignoring the evals");
 
-	// another device: nothing searched, nothing kept
-	audit.all.lite.clear();
+	// opened afresh, as on another device: the evals come from the file
 	app.reset();
+	assert.strictEqual(audit.evals.size, 0);
 	const input = app.view().querySelector("input.wbin");
 	Object.defineProperty(input, "files", { value: [new app.dom.window.File([text], "audited.json")], configurable: true });
 	input.onchange();
@@ -406,4 +405,27 @@ test("a saved workbook carries what the audit found, and brings it to a page tha
 	show();
 	assert.match(panel().querySelector(".audit-status").textContent, /All 4 positions searched/);
 	assert.strictEqual(panel().querySelector(".audit-sum").textContent, "3 blunders", "the findings, without a run");
+});
+
+test("another PGN or workbook starts with no audit, even where it shares positions", async () => {
+	app.reset();
+	await app.loadPgn("1. e4 e5 *");
+	if (!panel() || panel().hidden) chip().click();
+	panel().querySelector(".audit-run").click();
+	await until(() => audit.state.status === "done" && audit.state.source === getCurrent());
+	assert.match(panel().querySelector(".audit-status").textContent, /All 3 positions/);
+
+	// the same first moves, then more: nothing carried over
+	app.reset();
+	await app.loadPgn("1. e4 e5 2. Nf3 *");
+	assert.strictEqual(audit.evals.size, 0);
+	if (!panel() || panel().hidden) chip().click();
+	assert.match(panel().querySelector(".audit-status").textContent, /Searches each of the workbook's 4 positions/);
+	assert.strictEqual(panel().querySelector(".audit-run").textContent, "Run audit");
+
+	// a run going on stops when another one is loaded
+	panel().querySelector(".audit-run").click();
+	app.reset();
+	assert.notStrictEqual(audit.state.status, "running");
+	assert.strictEqual(audit.evals.size, 0);
 });

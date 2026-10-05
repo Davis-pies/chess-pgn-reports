@@ -27,7 +27,6 @@ let chip = null; // the toolbar's chip, likewise
 let notice = null; // why a run could not start, until the next start
 let fullUrl = null; // the stored full engine's blob: URL, made once per page
 let drawn = { done: -1, at: 0 }; // what the table's evals were last drawn from
-const restored = new WeakSet(); // workbooks whose kept evals have been read
 
 // "12.Nf3" or "12...Nf6"
 const moveText = (ply, san) => (ply % 2 === 0 ? `${ply / 2 + 1}.${san}` : `${(ply + 1) / 2}...${san}`);
@@ -86,8 +85,6 @@ export function auditChip(audit = sharedAudit()) {
 		title: "Search every position of the workbook with the engine, in the background",
 		onclick: () => {
 			ui.open = !ui.open;
-			// opening it with nothing found yet picks up an earlier visit's
-			if (ui.open && !audit.evals.size) audit.restore(auditPositions(getCurrent().lines));
 			paint(audit);
 			// on a phone the report stacks, and the panel sits below the table
 			if (ui.open) panel?.scrollIntoView?.({ block: "start", behavior: "smooth" });
@@ -116,12 +113,6 @@ export function auditPanel(audit = sharedAudit()) {
 	panel = el("section", { className: "audit" });
 	panel.setAttribute("aria-label", "Repertoire audit");
 	listen(audit);
-	// the table shows evals from the first render, so what an earlier visit
-	// found is read in without waiting for the panel to be opened
-	if (loadPrefs().auditInTable && !restored.has(getCurrent())) {
-		restored.add(getCurrent());
-		if (!audit.evals.size) audit.restore(auditPositions(getCurrent().lines));
-	}
 	// the workbook was redrawn, perhaps with lines added: a run takes them on
 	if (audit.state.status === "running") audit.add(auditPositions(getCurrent().lines));
 	paintPanel(audit);

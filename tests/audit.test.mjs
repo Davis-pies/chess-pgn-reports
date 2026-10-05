@@ -1,8 +1,6 @@
 // tests/audit.test.mjs
-import { test, beforeEach } from "node:test";
+import { test } from "node:test";
 import assert from "node:assert";
-import "fake-indexeddb/auto";
-import { IDBFactory } from "fake-indexeddb";
 import { Chess } from "chess.js";
 import {
 	assessOf,
@@ -19,7 +17,6 @@ import {
 	unpackEvals,
 	shareOf,
 } from "../src/audit.js";
-import { evalStore } from "../src/audit-store.js";
 import { parsePgn } from "../src/pgn.js";
 import { collectLines } from "../src/tree.js";
 
@@ -33,10 +30,6 @@ const keyAfter = (sans) => posKey(fenAfter(sans));
 const START = new Chess().fen();
 const MATED = "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3";
 const STALE = "7k/5Q2/6K1/8/8/8/8/8 b - - 0 1";
-
-beforeEach(() => {
-	globalThis.indexedDB = new IDBFactory();
-});
 
 test("a position's key leaves out the move counters", () => {
 	assert.strictEqual(posKey(START), "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -");
@@ -289,34 +282,6 @@ test("a finished game in the workbook is judged without asking the engine", asyn
 	assert.strictEqual(audit.state.searched, 4);
 });
 
-test("what one run finds is kept for the next visit, and a deeper eval is not overwritten", async () => {
-	const lines = linesOf("1. d4 d5 2. c4 *");
-	const pos = auditPositions(lines);
-	const first = createAudit({ makeWorker: fakeEngines().make, workers: 2, throttle: 0, store: evalStore });
-	await first.start(pos);
-	await settled(first);
-	await new Promise((r) => setTimeout(r, 20)); // the store's write
-	const kept = await evalStore.load([...pos.keys()]);
-	assert.strictEqual(kept.size, pos.size);
-
-	await evalStore.save([[posKey(START), { depth: 8, score: { cp: 1 }, best: "a2a3" }]]);
-	await new Promise((r) => setTimeout(r, 10));
-	assert.strictEqual((await evalStore.load([posKey(START)])).get(posKey(START)).depth, 16, "the deeper one stays");
-
-	const { make, made } = fakeEngines();
-	const second = createAudit({ makeWorker: make, workers: 2, throttle: 0, store: evalStore });
-	await second.start(pos);
-	assert.strictEqual(second.state.status, "done", "everything was found before");
-	assert.strictEqual(made.length, 0);
-	assert.strictEqual(second.evals.size, pos.size);
-});
-
-test("storage that fails leaves the audit to search again", async () => {
-	globalThis.indexedDB = undefined;
-	assert.strictEqual((await evalStore.load(["x"])).size, 0);
-	await evalStore.save([["x", { depth: 12 }]]); // does not throw
-});
-
 test("an engine that fails stops the run with its error, and a start that cannot make one too", async () => {
 	const pos = auditPositions(linesOf("1. e4 *"));
 	const a = createAudit({ makeWorker: fakeEngines(new Map(), { fail: "boot" }).make, workers: 2, throttle: 0 });
@@ -373,7 +338,7 @@ test("the full engine's evals are kept apart from the lite one's", async () => {
 	const pos = auditPositions(linesOf("1. e4 e5 *"));
 	const lite = fakeEngines(new Map([[keyAfter(["e4"]), 5]]));
 	const full = fakeEngines(new Map([[keyAfter(["e4"]), 77]]));
-	const audit = createAudit({ makeWorker: lite.make, workers: 1, throttle: 0, store: evalStore });
+	const audit = createAudit({ makeWorker: lite.make, workers: 1, throttle: 0 });
 	await audit.start(pos);
 	await settled(audit);
 	assert.strictEqual(audit.state.flavor, "lite");
@@ -385,10 +350,6 @@ test("the full engine's evals are kept apart from the lite one's", async () => {
 	await settled(audit);
 	assert.strictEqual(full.made.length, 1);
 	assert.deepStrictEqual(audit.evals.get(keyAfter(["e4"])).score, { cp: 77 });
-	await new Promise((r) => setTimeout(r, 20));
-	const kept = await evalStore.load([`full|${keyAfter(["e4"])}`, keyAfter(["e4"])]);
-	assert.deepStrictEqual(kept.get(`full|${keyAfter(["e4"])}`).score, { cp: 77 });
-	assert.deepStrictEqual(kept.get(keyAfter(["e4"])).score, { cp: 5 }, "the lite eval is kept as it was");
 
 	// switching back shows the lite evals; switching during a run stops it
 	audit.setFlavor("lite");
@@ -467,8 +428,8 @@ test("evals a hand-edited workbook got wrong are dropped", () => {
 	assert.deepStrictEqual(back.full.get("g"), { depth: 20, score: { mate: 2 }, best: null });
 });
 
-test("evals a workbook brings join what is known, deeper wins, and are kept in this browser", async () => {
-	const audit = createAudit({ throttle: 0, store: evalStore });
+test("evals a workbook brings join what is known, deeper wins; another workbook starts from nothing", async () => {
+	const audit = createAudit({ throttle: 0 });
 	let painted = 0;
 	audit.onUpdate = () => painted++;
 	audit.absorb({
@@ -482,8 +443,17 @@ test("evals a workbook brings join what is known, deeper wins, and are kept in t
 	audit.absorb({ lite: new Map([["a", { depth: 16, score: { cp: 7 }, best: null }]]) });
 	assert.deepStrictEqual(audit.all.lite.get("a").score, { cp: 7 });
 	assert.deepStrictEqual(audit.all.full.get("a").score, { cp: 9 });
+
+	// a run going on, then another workbook: it stops, and nothing is known
+	const { make } = fakeEngines();
+	const run = createAudit({ makeWorker: make, workers: 1, throttle: 0 });
+	run.absorb({ full: new Map([["a", { depth: 20, score: { cp: 9 }, best: null }]]) });
+	await run.start(auditPositions(linesOf("1. e4 e5 2. Nf3 Nc6 *")));
+	assert.strictEqual(run.state.status, "running");
+	run.reset();
+	assert.strictEqual(run.state.status, "idle");
+	assert.strictEqual(run.state.source, null);
+	assert.strictEqual(run.all.lite.size + run.all.full.size, 0);
 	await new Promise((r) => setTimeout(r, 20));
-	const kept = await evalStore.load(["a", "full|a"]);
-	assert.deepStrictEqual(kept.get("a").score, { cp: 7 });
-	assert.deepStrictEqual(kept.get("full|a").score, { cp: 9 });
+	assert.strictEqual(run.all.lite.size, 0, "a stopped engine's late answer is not taken");
 });

@@ -225,13 +225,16 @@ For a shorter overview see the [README](../README.md).
      under a pawn, **±**/**∓** under two, **+−**/**−+** beyond) and a
      **Note** for the line's last move. **Add assessments** and **Add notes**
      do every line at once; a line you have assessed yourself keeps yours.
-   - **What is kept** — what the audit finds is kept in this browser by
-     position, so a reload, another workbook with the same moves, or a run
-     after you add lines searches only what is new (**Continue** offers the
-     rest). It is also saved in the workbook (**Save** and **Save to file**),
-     so a workbook opened in another browser or on another device brings its
-     evals with it and does not need auditing again. Lines added while it runs join the run. **Stop** halts it;
-     **✕** hides the panel and leaves a run going. A changed depth starts the report over at that depth.
+   - **What is kept** — what the audit finds is saved in the workbook
+     (**Save** and **Save to file**), so the workbook brings its evals with
+     it to another browser or device and does not need auditing again. While
+     the workbook is open, a run after you add lines searches only what is
+     new (**Continue** offers the rest). Loading another PGN or workbook
+     starts its audit from nothing, even where it shares moves with the last
+     one; evals found since the last Save are lost on reload. Lines added
+     while it runs join the run. **Stop** halts it; **✕** hides the panel and
+     leaves a run going. A changed depth starts the report over at that
+     depth.
 6. **Render** — a table (plies down, lines across), or a linear
    **card** view (each table row with a board diagram of its end position) for
    print — footnotes don't get their own card, since they're not a table row.
