@@ -136,7 +136,10 @@ export function auditReport(lines, evals, depth, order = lines, side = "both") {
 			if (!best || best === m.san) return;
 			const key = kb + " " + m.san;
 			const hit = found.get(key);
-			if (hit) return hit.lines.push(l);
+			if (hit) {
+				hit.plies.push(m.ply);
+				return hit.lines.push(l);
+			}
 			found.set(key, {
 				key,
 				ply: m.ply,
@@ -150,6 +153,9 @@ export function auditReport(lines, evals, depth, order = lines, side = "both") {
 				// the moves to the position the move was played from
 				moves: l.moves.slice(0, i),
 				lines: [l],
+				// the move's ply on each of `lines`: a transposition reaches the
+				// same move at a ply of its own
+				plies: [m.ply],
 			});
 		});
 		const end = at(steps[steps.length - 1][0]);
@@ -160,6 +166,32 @@ export function auditReport(lines, evals, depth, order = lines, side = "both") {
 		(x, y) => severity(x) - severity(y) || rank.get(x.lines[0]) - rank.get(y.lines[0]) || x.ply - y.ply,
 	);
 	return { total: positions.size, done, findings, ends };
+}
+
+// The eval after each move of `moves`, by ply, where it is searched to
+// `depth`: what the table shows under each move once the audit has been.
+export function evalsAlong(moves, evals, depth) {
+	const steps = walk(moves);
+	const out = new Map();
+	moves.forEach((m, i) => {
+		const ev = evals.get(steps[i + 1][0]);
+		if (ev && ev.depth >= depth) out.set(m.ply, ev);
+	});
+	return out;
+}
+
+// The assessment glyph an eval suggests, White's view: within a third of a
+// pawn is level, under a pawn slightly better, under two clearly better,
+// and past that winning. A mate either way is winning.
+export function assessOf(score, mated = null) {
+	if (mated) return mated === "w" ? "−+" : "+−";
+	if (score.mate != null) return score.mate > 0 ? "+−" : "−+";
+	const p = Math.abs(score.cp);
+	const w = score.cp > 0;
+	if (p < 35) return "=";
+	if (p < 90) return w ? "⩲" : "⩱";
+	if (p < 200) return w ? "±" : "∓";
+	return w ? "+−" : "−+";
 }
 
 // How many engines the audit can run: one per logical core, which is the

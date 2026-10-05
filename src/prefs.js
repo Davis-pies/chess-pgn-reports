@@ -41,6 +41,8 @@ const DEFAULTS = Object.freeze({
 	// which build ("lite" or "full")
 	auditSide: "both",
 	auditFlavor: "lite",
+	// the audit's eval shown under each move in the table
+	auditInTable: false,
 });
 
 const store = () => {
@@ -100,6 +102,7 @@ export function loadPrefs() {
 				: DEFAULTS.auditEngines,
 		auditSide: ["white", "black", "both"].includes(d.auditSide) ? d.auditSide : DEFAULTS.auditSide,
 		auditFlavor: d.auditFlavor === "full" ? "full" : DEFAULTS.auditFlavor,
+		auditInTable: d.auditInTable === true,
 	};
 }
 

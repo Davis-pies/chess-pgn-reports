@@ -10,11 +10,12 @@
 
 import { el } from "./dom.js";
 import { getCurrent, getRenderHooks } from "./state.js";
-import { editorOrder } from "./line-editor.js";
+import { editorOrder, putNote, setMark } from "./line-editor.js";
 import { formatScore, fullWorker, liteWorker } from "./engine.js";
 import { storedFull } from "./engine-store.js";
-import { GRADES, MAX_DEPTH, MIN_DEPTH, auditPositions, auditReport, auditWorkers, maxAuditWorkers, sharedAudit } from "./audit.js";
+import { GRADES, MAX_DEPTH, MIN_DEPTH, assessOf, auditPositions, auditReport, auditWorkers, maxAuditWorkers, sharedAudit } from "./audit.js";
 import { loadPrefs, savePrefs } from "./prefs.js";
+import { markSym } from "./nags.js";
 
 // Session-only, like the table's open groups: whether the panel is shown,
 // and how much of it.
@@ -25,6 +26,8 @@ let panel = null; // the panel on the page, refilled in place
 let chip = null; // the toolbar's chip, likewise
 let notice = null; // why a run could not start, until the next start
 let fullUrl = null; // the stored full engine's blob: URL, made once per page
+let drawn = { done: -1, at: 0 }; // what the table's evals were last drawn from
+const restored = new WeakSet(); // workbooks whose kept evals have been read
 
 // "12.Nf3" or "12...Nf6"
 const moveText = (ply, san) => (ply % 2 === 0 ? `${ply / 2 + 1}.${san}` : `${(ply + 1) / 2}...${san}`);
@@ -113,6 +116,12 @@ export function auditPanel(audit = sharedAudit()) {
 	panel = el("section", { className: "audit" });
 	panel.setAttribute("aria-label", "Repertoire audit");
 	listen(audit);
+	// the table shows evals from the first render, so what an earlier visit
+	// found is read in without waiting for the panel to be opened
+	if (loadPrefs().auditInTable && !restored.has(getCurrent())) {
+		restored.add(getCurrent());
+		if (!audit.evals.size) audit.restore(auditPositions(getCurrent().lines));
+	}
 	// the workbook was redrawn, perhaps with lines added: a run takes them on
 	if (audit.state.status === "running") audit.add(auditPositions(getCurrent().lines));
 	paintPanel(audit);
@@ -132,9 +141,23 @@ function listen(audit) {
 // is tens of milliseconds.
 function paint(audit) {
 	forThisWorkbook(audit);
-	const r = audit.state.status === "running" || (ui.open && panel) ? report(audit) : null;
+	const inTable = loadPrefs().auditInTable;
+	const r = audit.state.status === "running" || (ui.open && panel) || inTable ? report(audit) : null;
 	paintChip(audit, r);
 	paintPanel(audit, r);
+	if (inTable) paintTable(audit, r);
+}
+
+// The table's evals follow the audit, but redrawing the table takes longer
+// than a progress bar and closes a menu open on it: while a run goes on, at
+// most every five seconds, and once more when it stops.
+const TABLE_EVERY = 5000;
+function paintTable(audit, r) {
+	if (r.done === drawn.done) return;
+	const t = Date.now();
+	if (audit.state.status === "running" && t - drawn.at < TABLE_EVERY) return;
+	drawn = { done: r.done, at: t };
+	getRenderHooks().rerenderTable?.();
 }
 
 function paintPanel(audit, r = null) {
@@ -315,9 +338,16 @@ function findingsBody(audit, r) {
 	);
 	const list = ui.minor ? r.findings : r.findings.filter((f) => f.grade.id !== "inaccuracy");
 	const rows = ui.all ? list : list.slice(0, LIMIT);
+	body.appendChild(
+		el("div", { className: "audit-acts" }, [
+			inTableChip(audit),
+			list.length ? bulk(`Add symbols (${n(list.length)})`, "Mark each move listed with its symbol, where it has none of yours", () => list.forEach((f) => markFinding(f, true))) : "",
+			list.length ? bulk(`Add notes (${n(list.length)})`, "Note the engine's verdict on each move listed", () => list.forEach((f) => noteFinding(f, audit))) : "",
+		]),
+	);
 	if (rows.length) {
 		const ol = el("ol", { className: "audit-list" });
-		rows.forEach((f) => ol.appendChild(findingRow(f)));
+		rows.forEach((f) => ol.appendChild(findingRow(f, audit)));
 		body.appendChild(ol);
 	}
 	const more = el("div", { className: "audit-more" });
@@ -367,7 +397,89 @@ const studyBtn = (moves, label) => {
 	return b;
 };
 
-function findingRow(f) {
+// The audit's verdicts into the workbook, where its notes, its table and its
+// PGN carry them: the symbol a finding's grade or a line end's eval suggests,
+// and a note of what the engine saw. Both go through the line editor's own
+// setMark and putNote, as a symbol or a note made by hand does. A note from
+// the engine replaces an earlier one on the same move rather than stacking.
+const isEngineNote = (t) => t.startsWith("Stockfish");
+const engine = (audit) => (audit.state.flavor === "full" ? "Stockfish (full)" : "Stockfish");
+
+const findingNote = (f, i, audit) =>
+	`${engine(audit)}: ${formatScore(f.before)} → ${formatScore(f.after)} (depth ${audit.state.depth}), best ${moveText(f.plies[i], f.best)}`;
+const endNote = (e, audit) => `${engine(audit)}: ${score(e.score, e.mated)} (depth ${audit.state.depth})`;
+const hasNote = (l, ply, text) => (l.comments || []).some((c) => c.ply === ply && c.text === text);
+const dropNote = (l, ply, text) => {
+	l.comments = (l.comments || []).filter((c) => c.ply !== ply || c.text !== text);
+};
+
+const findingMarked = (f) => f.lines.every((l, i) => markSym((l.marks || {})[f.plies[i]]) === f.grade.sym);
+// `keep`: a move the reader has marked already keeps their symbol
+function markFinding(f, keep = false) {
+	f.lines.forEach((l, i) => {
+		if (!keep || !(l.marks || {})[f.plies[i]]) setMark([l], f.plies[i], f.grade.sym);
+	});
+}
+const findingNoted = (f, audit) => f.lines.every((l, i) => hasNote(l, f.plies[i], findingNote(f, i, audit)));
+const noteFinding = (f, audit) =>
+	f.lines.forEach((l, i) => putNote([l], f.plies[i], findingNote(f, i, audit), isEngineNote));
+
+const lastPly = (e) => e.line.moves[e.line.moves.length - 1]?.ply;
+function markEnd(e, keep = false) {
+	if (!keep || !e.line.meta?.eval) setMark([e.line], null, assessOf(e.score, e.mated));
+}
+const noteEnd = (e, audit) => putNote([e.line], lastPly(e), endNote(e, audit), isEngineNote);
+
+// A button that writes into the workbook, which is then drawn again.
+function bulk(text, title, act) {
+	return el("button", {
+		className: "chip mini audit-bulk",
+		textContent: text,
+		title,
+		onclick: () => {
+			act();
+			getRenderHooks().renderApp();
+		},
+	});
+}
+
+// A suggestion's button, lit once the workbook has it; pressed again it
+// takes it back off, as the symbol palette does.
+function suggest(cls, text, label, on, add, remove) {
+	const b = el("button", {
+		className: `chip mini ${cls}${on ? " on" : ""}`,
+		textContent: text,
+		title: label,
+		onclick: () => {
+			if (on) remove();
+			else add();
+			getRenderHooks().renderApp();
+		},
+	});
+	b.setAttribute("aria-label", label);
+	b.setAttribute("aria-pressed", String(on));
+	return b;
+}
+
+// Under each move of the table, the eval after it.
+function inTableChip(audit) {
+	const on = loadPrefs().auditInTable;
+	const b = el("button", {
+		className: "chip mini audit-intable" + (on ? " on" : ""),
+		textContent: "Evals in the table",
+		title: "Show the audit's eval under each move of the table",
+		onclick: () => {
+			savePrefs({ auditInTable: !on });
+			drawn = { done: -1, at: 0 };
+			getRenderHooks().rerenderTable?.();
+			paint(audit);
+		},
+	});
+	b.setAttribute("aria-pressed", String(on));
+	return b;
+}
+
+function findingRow(f, audit) {
 	const move = moveText(f.ply, f.san);
 	const li = el("li", { className: "audit-row g-" + f.grade.id }, [
 		el("span", { className: "audit-sym", title: f.grade.label, textContent: f.grade.sym }),
@@ -375,7 +487,15 @@ function findingRow(f) {
 		el("span", { className: "audit-evals" }, `${formatScore(f.before)} → ${formatScore(f.after)}`),
 		el("span", { className: "audit-best" }, `best ${moveText(f.ply, f.best)}`),
 		el("span", { className: "audit-lines", title: f.lines.map((l) => l.name).join(", ") }, lineNames(f.lines)),
+		el("span", { className: "audit-do" }, [
+		suggest("audit-mark", f.grade.sym, `Mark ${move} ${f.grade.sym}`, findingMarked(f), () => markFinding(f), () =>
+			f.lines.forEach((l, i) => setMark([l], f.plies[i], "")),
+		),
+		suggest("audit-note", "Note", `Note the engine's verdict on ${move}`, findingNoted(f, audit), () => noteFinding(f, audit), () =>
+			f.lines.forEach((l, i) => dropNote(l, f.plies[i], findingNote(f, i, audit))),
+		),
 		studyBtn(f.moves, `Study the position before ${move}`),
+		]),
 	]);
 	li.querySelector(".audit-sym").setAttribute("aria-label", f.grade.label);
 	return li;
@@ -387,21 +507,48 @@ function endsList(audit, r) {
 	const box = el("details", { className: "audit-ends", open: ui.ends });
 	box.appendChild(el("summary", { textContent: `Where each line ends (${n(r.ends.length)})` }));
 	box.ontoggle = () => {
-		if (box.open === ui.ends) return;
+		// a box replaced since (the toggle event is queued) is not the reader's
+		if (!box.isConnected || box.open === ui.ends) return;
 		ui.ends = box.open;
 		paint(audit);
 	};
 	if (!ui.ends) return box;
+	// a line with no moves has no move to note, and one not yet searched no eval
+	const known = r.ends.filter((e) => e.score && e.line.moves.length);
+	if (known.length)
+		box.appendChild(
+			el("div", { className: "audit-acts" }, [
+				bulk(`Add assessments (${n(known.length)})`, "Give each line end the assessment its eval suggests, where it has none of yours", () =>
+					known.forEach((e) => markEnd(e, true)),
+				),
+				bulk(`Add notes (${n(known.length)})`, "Note the engine's eval on each line's last move", () => known.forEach((e) => noteEnd(e, audit))),
+			]),
+		);
 	const ol = el("ol", { className: "audit-list" });
 	for (const e of r.ends) {
 		const m = e.line.moves;
 		const last = m[m.length - 1];
+		const ok = e.score && last;
+		const sym = ok ? assessOf(e.score, e.mated) : "";
+		const text = ok ? endNote(e, audit) : "";
 		ol.appendChild(
 			el("li", { className: "audit-row" }, [
 				el("span", { className: "audit-lines", textContent: e.line.name }),
 				el("span", { className: "audit-move", textContent: last ? moveText(last.ply, last.san) : "" }),
 				el("span", { className: "audit-evals", textContent: score(e.score, e.mated) }),
+				el("span", { className: "audit-do" }, [
+				ok
+					? suggest("audit-mark", sym, `Assess the end of ${e.line.name} ${sym}`, e.line.meta?.eval === sym, () => markEnd(e), () =>
+							setMark([e.line], null, ""),
+						)
+					: "",
+				ok
+					? suggest("audit-note", "Note", `Note the engine's eval at the end of ${e.line.name}`, hasNote(e.line, last.ply, text), () => noteEnd(e, audit), () =>
+							dropNote(e.line, last.ply, text),
+						)
+					: "",
 				studyBtn(m, `Study the end of ${e.line.name}`),
+				]),
 			]),
 		);
 	}

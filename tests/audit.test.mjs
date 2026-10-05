@@ -5,8 +5,10 @@ import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 import { Chess } from "chess.js";
 import {
+	assessOf,
 	auditPositions,
 	auditReport,
+	evalsAlong,
 	auditWorkers,
 	maxAuditWorkers,
 	createAudit,
@@ -130,6 +132,7 @@ test("a move two lines share is one finding, with both lines in column order", (
 	assert.deepStrictEqual(f6.lines, lines, "both lines play 1...f6");
 	assert.strictEqual(f6.white, false);
 	assert.strictEqual(f6.best, "e5");
+	assert.deepStrictEqual(f6.plies, [1, 1], "the move's ply on each line");
 	// blunders first, then by line, then by move
 	assert.deepStrictEqual(
 		r.findings.map((f) => f.san),
@@ -393,4 +396,43 @@ test("the full engine's evals are kept apart from the lite one's", async () => {
 	assert.strictEqual(audit.state.status, "running");
 	audit.setFlavor("full");
 	assert.strictEqual(audit.state.status, "stopped");
+});
+
+test("a transposition's finding names the move's ply on each line", () => {
+	const lines = linesOf("1. Nf3 (1. e4 f6) Nf6 2. Ng1 Ng8 3. e4 f6 *");
+	const evals = evalsOf([
+		[[], 0, "e2e4"],
+		[["e4"], 0, "e7e5"],
+		[["e4", "f6"], 300, "d2d4"],
+		[["Nf3"], 0, "d7d5"],
+		[["Nf3", "Nf6"], 0, "d2d4"],
+		[["Nf3", "Nf6", "Ng1"], 0, "d7d5"],
+	]);
+	const f6 = auditReport(lines, evals, 12).findings.find((f) => f.san === "f6");
+	assert.deepStrictEqual(
+		f6.lines.map((l, i) => l.moves.find((m) => m.ply === f6.plies[i]).san),
+		["f6", "f6"],
+	);
+	assert.deepStrictEqual(new Set(f6.plies), new Set([1, 5]));
+});
+
+test("the eval after each move, by ply, where it is deep enough", () => {
+	const [line] = linesOf("1. e4 e5 2. Nf3 *");
+	const evals = evalsOf([
+		[["e4"], 30, "e7e5"],
+		[["e4", "e5", "Nf3"], -20, "b8c6"],
+	]);
+	evals.set(keyAfter(["e4", "e5"]), { depth: 4, score: { cp: 10 }, best: null });
+	const along = evalsAlong(line.moves, evals, 12);
+	assert.deepStrictEqual([...along.keys()], [0, 2], "1...e5 was searched too shallow");
+	assert.strictEqual(along.get(0), evals.get(keyAfter(["e4"])));
+});
+
+test("an eval suggests an assessment, from White's side", () => {
+	const a = (cp) => assessOf({ cp });
+	assert.deepStrictEqual([0, 34, -34, 50, -50, 150, -150, 250, -250].map(a), ["=", "=", "=", "⩲", "⩱", "±", "∓", "+−", "−+"]);
+	assert.strictEqual(assessOf({ mate: 3 }), "+−");
+	assert.strictEqual(assessOf({ mate: -2 }), "−+");
+	assert.strictEqual(assessOf({ mate: 0 }, "w"), "−+", "White is mated");
+	assert.strictEqual(assessOf({ mate: 0 }, "b"), "+−");
 });

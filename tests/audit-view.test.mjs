@@ -10,7 +10,7 @@ import { Chess } from "chess.js";
 import { bootApp } from "./helpers.mjs";
 import { getCurrent, getMode, getRenderHooks } from "../src/state.js";
 import { sharedAudit } from "../src/audit.js";
-import { loadPrefs } from "../src/prefs.js";
+import { loadPrefs, savePrefs } from "../src/prefs.js";
 import { genPgn } from "../tools/gen-pgn.mjs";
 import "fake-indexeddb/auto";
 import { fileToFull } from "../src/engine-store.js";
@@ -300,4 +300,81 @@ test("the full engine runs from the stored copy, and says so when there is none"
 	assert.match(panel().querySelector(".audit-status").textContent, /with the full engine\.$/);
 	flavor("lite");
 	assert.doesNotMatch(panel().querySelector(".audit-status").textContent, /full/);
+});
+
+test("a finding's symbol and note go onto its move, one at a time or all at once", async () => {
+	savePrefs({ auditDepth: 16, auditSide: "both", auditFlavor: "lite" });
+	app.reset();
+	await app.loadPgn("1. e4 e5 2. Nf3 Nc6 (2... d6 3. d4) 3. Bb5 *");
+	if (panel().hidden) chip().click();
+	// the first test searched this workbook already; what it found is kept
+	panel().querySelector(".audit-run")?.click();
+	await until(() => /All 8 positions/.test(panel().querySelector(".audit-status").textContent));
+	await finished();
+	const rows = () => [...panel().querySelectorAll(".audit-body > .audit-list .audit-row")];
+	const lines = () => getCurrent().lines;
+	// 1.e4 is not the fake engine's first move, so it is a blunder on both lines
+	const e4 = () => rows().find((r) => r.querySelector(".audit-move").textContent === "1.e4");
+	const stockfish = (l, ply) => (l.comments || []).filter((c) => c.ply === ply && c.text.startsWith("Stockfish"));
+
+	assert.strictEqual(e4().querySelector(".audit-mark").textContent, "??");
+	e4().querySelector(".audit-mark").click();
+	assert.ok(lines().every((l) => l.marks[0] === "$4"), "?? on 1.e4 of every line through it");
+	assert.ok(e4().querySelector(".audit-mark").classList.contains("on"));
+	e4().querySelector(".audit-mark").click();
+	assert.ok(lines().every((l) => !l.marks), "pressed again, it comes off");
+
+	e4().querySelector(".audit-note").click();
+	assert.ok(lines().every((l) => stockfish(l, 0).length === 1));
+	assert.match(stockfish(lines()[0], 0)[0].text, /^Stockfish: 0\.00 → −8\.00 \(depth 16\), best 1\.\S+$/);
+	e4().querySelector(".audit-note").click();
+	assert.ok(lines().every((l) => !stockfish(l, 0).length));
+
+	// all at once: a move the reader marked keeps their symbol, and a note
+	// written twice is not stacked
+	lines().forEach((l) => (l.marks = { 0: "$1" }));
+	getRenderHooks().renderApp();
+	const bulk = (re) => [...panel().querySelectorAll(".audit-bulk")].find((b) => re.test(b.textContent));
+	bulk(/^Add symbols/).click();
+	assert.ok(lines().every((l) => l.marks[0] === "$1"), "the reader's own ! stays");
+	assert.ok(lines().some((l) => l.marks[2] === "$4"), "2.Nf3 is marked");
+	bulk(/^Add notes/).click();
+	bulk(/^Add notes/).click();
+	assert.ok(lines().every((l) => stockfish(l, 0).length === 1));
+
+	// line ends: the assessment the eval suggests, and a note on the last move
+	const ends = panel().querySelector(".audit-ends");
+	ends.open = true;
+	ends.dispatchEvent(new app.dom.window.Event("toggle"));
+	const endRow = () => panel().querySelector(".audit-ends .audit-row");
+	assert.strictEqual(endRow().querySelector(".audit-mark").textContent, "−+", "the mainline ends at −8 after 3.Bb5");
+	endRow().querySelector(".audit-mark").click();
+	const main = lines().find((l) => l.moves.length === 5);
+	assert.strictEqual(main.meta.eval, "−+");
+	endRow().querySelector(".audit-note").click();
+	assert.match(stockfish(main, 4)[0].text, /^Stockfish: −8\.00 \(depth 16\)$/);
+	main.meta.eval = "∞";
+	getRenderHooks().renderApp();
+	[...panel().querySelectorAll(".audit-ends .audit-bulk")].find((b) => /^Add assessments/.test(b.textContent)).click();
+	assert.strictEqual(main.meta.eval, "∞", "the reader's own assessment stays");
+	assert.ok(lines().every((l) => l.meta.eval), "the other line gets one");
+	panel().querySelector(".audit-ends").open = false;
+	panel().querySelector(".audit-ends").dispatchEvent(new app.dom.window.Event("toggle"));
+});
+
+test("Evals in the table shows the eval after each move under it, and is remembered", async () => {
+	const evals = () => [...app.view().querySelectorAll(".tbl td .mv-eval")].map((e) => e.textContent);
+	assert.deepStrictEqual(evals(), []);
+	const toggle = () => panel().querySelector(".audit-intable");
+	assert.strictEqual(toggle().getAttribute("aria-pressed"), "false");
+	toggle().click();
+	assert.strictEqual(loadPrefs().auditInTable, true);
+	// White to move is level; Black to move is −8
+	const shown = evals();
+	assert.ok(shown.includes("0.00") && shown.includes("−8.00"), shown.join(" "));
+	getRenderHooks().renderApp();
+	assert.deepStrictEqual(evals(), shown, "drawn again the same");
+	panel().querySelector(".audit-intable").click();
+	assert.deepStrictEqual(evals(), []);
+	assert.strictEqual(loadPrefs().auditInTable, false);
 });

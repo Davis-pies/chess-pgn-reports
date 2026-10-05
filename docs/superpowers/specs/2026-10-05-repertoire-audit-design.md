@@ -87,6 +87,27 @@ start) and the study opened and stepped mid-run.
 - A run started for a workbook since closed is stopped; lines added while it
   runs join it.
 
-## Not in scope
+## Into the workbook
 
-Writing evals or symbols into the workbook.
+Added after the first review (Davis: see the eval at every move, and an easy
+way to keep evals as notes and the suggested symbols).
+
+- **Evals in the table**, a remembered preference (prefs.js `auditInTable`):
+  the eval of the position after each move, White's side, under the move in
+  the screen table. The table is redrawn from the audit at most every five
+  seconds during a run and once when it stops; a redraw is slower than the
+  progress bar and closes a menu open on the table.
+- **Per finding**: its grade's symbol and a Note, each a toggle. **Per line
+  end**: the assessment its eval suggests (= under 0.35, ⩲/⩱ under 0.9,
+  ±/∓ under 2, +−/−+ beyond or on mate) and a Note on the last move.
+- **Bulk**: Add symbols / Add notes for every listed finding, Add
+  assessments / Add notes for every line end. Bulk symbols never overwrite
+  a symbol or assessment the reader set.
+- Notes read "Stockfish: before → after (depth d), best m" ("Stockfish
+  (full)" for the full build). A note starting "Stockfish" on the same move
+  is replaced, so a second run's verdict does not stack on the first.
+- Writes go through line-editor.js `setMark` and `putNote`, the symbol
+  palette's own path. A finding names its move's ply on each line
+  (`plies`), since a transposition reaches the same move at another ply.
+- Notes go on findings and line ends only, not on every move: a note per
+  move would bury the reader's own notes in the Notes list.

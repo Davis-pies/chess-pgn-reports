@@ -1122,6 +1122,14 @@ sup {
 .mv-mark {
   margin-left: 0.18em;
 }
+/* the audit's eval after the move, under it ("Evals in the table") */
+.mv-eval {
+  display: block;
+  font-size: 0.72em;
+  line-height: 1.1;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
 .card-notes {
   margin-top: 10px;
   border-top: 1px solid var(--line);
@@ -2326,6 +2334,28 @@ kbd {
 }
 .audit-study {
   margin-left: auto;
+}
+/* the suggested symbol, the note and the study: kept together at the end,
+   and wrapped as one when the row is too narrow for them */
+.audit-do {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.audit-do .audit-study {
+  margin-left: 0;
+}
+.audit-mark {
+  min-width: 2.6em;
+  white-space: nowrap;
+  justify-content: center;
+  text-align: center;
+}
+.audit-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0;
 }
 .audit-more {
   display: flex;

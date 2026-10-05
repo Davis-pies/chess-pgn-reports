@@ -209,8 +209,22 @@ For a shorter overview see the [README](../README.md).
      that is the engine's own choice is never listed. The worst come first;
      inaccuracies and anything past the first 50 are a click away. **Study**
      on a finding opens the study at the position the move was played from.
+   - **Symbols and notes** — each finding offers its symbol (**??**, **?**
+     or **?!**) and a **Note** of what the engine saw ("Stockfish: +0.30 →
+     −1.20 (depth 20), best 7...d5"); one press puts it on that move of every
+     line through it, and a second press takes it off. **Add symbols** and
+     **Add notes** do the same for every finding listed; **Add symbols**
+     leaves a move you have marked yourself as it is. A note from the engine
+     replaces an earlier engine note on that move rather than adding a second.
+   - **Evals in the table** — shows the audit's eval under each move of the
+     table: the eval of the position after that move, from White's side. It
+     follows a run as it goes and is remembered.
    - **Where each line ends** — folded under the findings: each line's final
-     eval, in column order, with a way to the study at its end.
+     eval, in column order, with a way to the study at its end, the
+     assessment it suggests (**=** within a third of a pawn, **⩲**/**⩱**
+     under a pawn, **±**/**∓** under two, **+−**/**−+** beyond) and a
+     **Note** for the line's last move. **Add assessments** and **Add notes**
+     do every line at once; a line you have assessed yourself keeps yours.
    - **What is kept** — what the audit finds is kept in this browser by
      position, so a reload, another workbook with the same moves, or a run
      after you add lines searches only what is new (**Continue** offers the
