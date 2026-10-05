@@ -276,6 +276,9 @@ export function createAudit({
 		error: null,
 		startedAt: 0,
 		source: null,
+		// found since the workbook was last saved (or opened): the panel
+		// offers to save them, since a reload would lose them
+		unsaved: false,
 	};
 	const ev = () => evalsBy[state.flavor];
 	let queue = []; // [key, fen], next first
@@ -370,6 +373,7 @@ export function createAudit({
 					const found = { depth: state.depth, score: whiteScore(score, fen.split(" ")[1]), best };
 					ev().set(key, found);
 					state.searched++;
+					state.unsaved = true;
 					emit(false);
 				}
 				take();
@@ -430,13 +434,18 @@ export function createAudit({
 			}
 			emit(true);
 		},
+		// The workbook was saved with what is known now.
+		saved() {
+			state.unsaved = false;
+			emit(true);
+		},
 		// Another workbook: nothing found, nothing running. What the last one
 		// found is not this one's, even where they share positions.
 		reset() {
 			if (state.status === "running") finish("stopped");
 			evalsBy.lite.clear();
 			evalsBy.full.clear();
-			Object.assign(state, { status: "idle", searched: 0, error: null, source: null });
+			Object.assign(state, { status: "idle", searched: 0, error: null, source: null, unsaved: false });
 			emit(true);
 		},
 		// Search every position of `positions` (auditPositions) not yet known at

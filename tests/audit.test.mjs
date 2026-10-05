@@ -451,9 +451,27 @@ test("evals a workbook brings join what is known, deeper wins; another workbook 
 	await run.start(auditPositions(linesOf("1. e4 e5 2. Nf3 Nc6 *")));
 	assert.strictEqual(run.state.status, "running");
 	run.reset();
+	assert.strictEqual(run.state.unsaved, false);
 	assert.strictEqual(run.state.status, "idle");
 	assert.strictEqual(run.state.source, null);
 	assert.strictEqual(run.all.lite.size + run.all.full.size, 0);
 	await new Promise((r) => setTimeout(r, 20));
 	assert.strictEqual(run.all.lite.size, 0, "a stopped engine's late answer is not taken");
+});
+
+test("what a run finds is unsaved until the workbook is saved", async () => {
+	const { make } = fakeEngines();
+	const audit = createAudit({ makeWorker: make, workers: 1, throttle: 0 });
+	audit.absorb({ lite: new Map([["a", { depth: 12, score: { cp: 5 }, best: null }]]) });
+	assert.strictEqual(audit.state.unsaved, false, "what a workbook brought is in it already");
+	await audit.start(auditPositions(linesOf("1. e4 *")));
+	await settled(audit);
+	assert.strictEqual(audit.state.unsaved, true);
+	let painted = 0;
+	audit.onUpdate = () => painted++;
+	audit.saved();
+	assert.strictEqual(audit.state.unsaved, false);
+	assert.strictEqual(painted, 1);
+	await audit.start(auditPositions(linesOf("1. e4 *")));
+	assert.strictEqual(audit.state.unsaved, false, "a run that searches nothing new leaves it saved");
 });

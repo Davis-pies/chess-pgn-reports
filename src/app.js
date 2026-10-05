@@ -132,6 +132,7 @@ setRenderHooks({
   rerenderMarkup,
   rerenderNotes,
   lineEditor,
+  saveWorkbook,
 });
 let sideDragging = false; // dragging the table-panel resize handle
 
@@ -351,6 +352,20 @@ function auditCarried(lines) {
   return packEvals(all, auditPositions(lines));
 }
 
+// The toolbar's Save, which the audit panel also offers once a run has found
+// something: the workbook into this browser's store, under a new id the
+// first time. Says so when the store will not take it.
+function saveWorkbook() {
+  if (!getCurrent().name) getCurrent().name = "Untitled";
+  const ok = saveNotebook(
+    getCurrent().id || (getCurrent().id = "n" + Date.now()),
+    workbookState(),
+  );
+  if (ok) sharedAudit().saved();
+  else alert("Could not save: storage is full or unavailable.");
+  return ok;
+}
+
 // What both stores persist: the PGN, the annotated lines, and the layout
 // settings that change what a print looks like. Shared so a workbook written
 // to a file and one written to localStorage can never carry different fields.
@@ -533,16 +548,9 @@ function viewRoot() {
   top.appendChild(name);
   const save = el("button", { className: "chip primary", textContent: "Save" });
   save.onclick = () => {
-    if (!getCurrent().name) getCurrent().name = "Untitled";
-    const ok = saveNotebook(
-      getCurrent().id || (getCurrent().id = "n" + Date.now()),
-      workbookState(),
-    );
-    if (ok) {
+    if (saveWorkbook()) {
       save.textContent = "Saved ✓";
       setTimeout(() => (save.textContent = "Save"), 1200);
-    } else {
-      alert("Could not save: storage is full or unavailable.");
     }
   };
   top.appendChild(save);
@@ -565,6 +573,7 @@ function viewRoot() {
       JSON.stringify(toNotebook(workbookState()), null, 2),
       "application/json",
     );
+    sharedAudit().saved();
     // the toolbar's name field shows the old value until it is rebuilt
     renderApp();
   };

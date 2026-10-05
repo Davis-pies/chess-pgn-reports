@@ -391,6 +391,7 @@ test("a saved workbook carries what the audit found, and brings it to a page tha
 	cap.restore();
 	const text = await cap.blobs[0].text();
 	const nb = JSON.parse(text);
+	assert.strictEqual(audit.state.unsaved, false, "a file is a save too");
 	assert.strictEqual(Object.keys(nb.audit.lite).length, 4, "the start and the three moves");
 	assert.strictEqual(nb.version, 1, "older builds read it, ignoring the evals");
 
@@ -428,4 +429,32 @@ test("another PGN or workbook starts with no audit, even where it shares positio
 	app.reset();
 	assert.notStrictEqual(audit.state.status, "running");
 	assert.strictEqual(audit.evals.size, 0);
+});
+
+test("a run that found something offers to save the workbook, and the offer goes once it is saved", async () => {
+	app.reset();
+	await app.loadPgn("1. b3 b6 *");
+	if (!panel() || panel().hidden) chip().click();
+	assert.strictEqual(panel().querySelector(".audit-save"), null, "nothing found, nothing to save");
+	panel().querySelector(".audit-run").click();
+	assert.strictEqual(panel().querySelector(".audit-save"), null, "not while it runs");
+	await until(() => audit.state.status === "done" && audit.state.source === getCurrent());
+	const ask = panel().querySelector(".audit-save");
+	assert.match(ask.textContent, /not saved in the workbook yet/);
+	ask.querySelector("button").click();
+	assert.strictEqual(panel().querySelector(".audit-save"), null);
+	const saved = JSON.parse(app.dom.window.localStorage.getItem("ott:" + getCurrent().id));
+	assert.strictEqual(Object.keys(saved.audit.lite).length, 3);
+	assert.strictEqual(saved.name, "Untitled");
+
+	// opened again, its evals came from the workbook: nothing to offer
+	app.reset();
+	app.dom.window.localStorage.setItem("ott:again", JSON.stringify(saved));
+	await app.loadPgn("1. d4");
+	app.clickText("New / Import");
+	app.clickText("Open: ");
+	await app.settle();
+	assert.strictEqual(audit.evals.size, 3);
+	if (!panel() || panel().hidden) chip().click();
+	assert.strictEqual(panel().querySelector(".audit-save"), null);
 });

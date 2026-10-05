@@ -2332,6 +2332,17 @@ kbd {
 .audit-bar {
   margin-bottom: 8px;
 }
+.audit-save {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
 .audit-sum {
   margin: 8px 0 4px;
   font-size: 0.9rem;

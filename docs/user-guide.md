@@ -231,7 +231,8 @@ For a shorter overview see the [README](../README.md).
      the workbook is open, a run after you add lines searches only what is
      new (**Continue** offers the rest). Loading another PGN or workbook
      starts its audit from nothing, even where it shares moves with the last
-     one; evals found since the last Save are lost on reload. Lines added
+     one; evals found since the last Save are lost on reload, so when a run
+     ends with something unsaved the panel offers a **Save** right there. Lines added
      while it runs join the run. **Stop** halts it; **✕** hides the panel and
      leaves a run going. A changed depth starts the report over at that
      depth.

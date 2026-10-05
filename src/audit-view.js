@@ -290,6 +290,23 @@ function paintPanel(audit, r = null) {
 	bar.hidden = !r.done && !running;
 	bar.firstChild.style.width = `${((100 * r.done) / Math.max(1, r.total)).toFixed(1)}%`;
 
+	// What a run found lives in the workbook only once it is saved; a reload
+	// before that searches again. Offered when the run ends, not during it,
+	// so a save does not miss what is still to come.
+	let ask = panel.querySelector(".audit-save");
+	const unsaved = !running && st.unsaved;
+	if (unsaved && !ask) {
+		ask = el("p", { className: "audit-save" }, [
+			"These results are not saved in the workbook yet. ",
+			el("button", {
+				className: "chip primary mini",
+				textContent: "Save",
+				onclick: () => getRenderHooks().saveWorkbook?.(),
+			}),
+		]);
+		bar.after(ask);
+	} else if (!unsaved && ask) ask.remove();
+
 	// The list is rebuilt only when what it shows changes -- a new finding, a
 	// line end now known -- not for every position searched.
 	const sig2 = [

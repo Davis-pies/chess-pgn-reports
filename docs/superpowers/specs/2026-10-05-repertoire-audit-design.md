@@ -71,7 +71,9 @@ start) and the study opened and stepped mid-run.
   `[depth, score, best]`, score in centipawns or `"#n"`; `packEvals` /
   `unpackEvals`). Opening it resets the audit and loads them in. Older builds
   ignore the field, so `VERSION` stays 1. Evals found since the last Save
-  are lost on reload, like any other unsaved change.
+  are lost on reload, like any other unsaved change, so the audit tracks
+  `state.unsaved` and the panel offers **Save** (the toolbar's, through
+  `saveWorkbook` in the render hooks) once a run that found something ends.
 - **The report is derived.** `auditReport(lines, evals, depth, order)` is a
   pure function of the workbook as it stands, so it never shows a line the
   workbook no longer has. Line walks and the engine's move as SAN are cached
