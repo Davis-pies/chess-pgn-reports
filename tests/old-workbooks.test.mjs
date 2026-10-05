@@ -4,6 +4,7 @@ import fs from "node:fs";
 import { bootApp, captureDownloads } from "./helpers.mjs";
 import { getCurrent, getScratch } from "../src/state.js";
 import { isMainLine } from "../src/tree.js";
+import { sharedAudit } from "../src/audit.js";
 
 // Workbooks as older builds saved them. Each file in fixtures/workbooks was
 // written by that build's own toNotebook (its src/ taken from git at the
@@ -16,7 +17,8 @@ import { isMainLine } from "../src/tree.js";
 //                        dropped `root` filter
 //   2026-09-27-header    22fe5b0, Game info edits in `header`, and the since
 //                        dropped `view.printSummary`
-//   2026-10-03-current   this build, analysis lines with names
+//   2026-10-03-current   a354b13, analysis lines with names
+//   2026-10-05-audit     this build, the audit's evals in `audit`
 //
 // legacy-glyphs predates the history the repository keeps, so it was
 // rebuilt from what store.js and nags.js say such workbooks held: no format
@@ -31,6 +33,7 @@ const FIXTURES = [
   "2026-09-26-analysis",
   "2026-09-27-header",
   "2026-10-03-current",
+  "2026-10-05-audit",
 ];
 const read = (name) =>
   fs.readFileSync(
@@ -152,8 +155,23 @@ function checkFormat(name, nb) {
     assert.strictEqual(s.at, 2);
     assert.strictEqual(s.flipped, true);
     assert.deepStrictEqual(s.lines[1].comments, [{ ply: 1, text: "Sicilian" }]);
-    if (name === "2026-10-03-current")
+    if (name >= "2026-10-03")
       assert.strictEqual(s.lines[0].name, "Spanish");
+  }
+
+  if (nb.audit) {
+    // what the audit found comes back, per build, as the app's own evals
+    const { lite, full } = sharedAudit().all;
+    const start = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -";
+    assert.strictEqual(Object.keys(nb.audit.lite).length, 15);
+    for (const [k, [depth]] of Object.entries(nb.audit.lite))
+      assert.strictEqual(lite.get(k).depth, depth, `${name}: ${k}`);
+    assert.ok(Object.values(nb.audit.lite).some(([, s]) => s === "#4"));
+    assert.deepStrictEqual(full.get(start), {
+      depth: 24,
+      score: { cp: 15 },
+      best: "e2e4",
+    });
   }
 
   if (nb.header) {
@@ -196,6 +214,9 @@ for (const name of FIXTURES) {
     assert.strictEqual(again.format, "ott-workbook");
     assert.strictEqual(again.version, 1);
     assert.strictEqual(again.main, "e4 e5 Nf3 Nf6 Nxe5 d6");
+    // the evals go out as they came in; a workbook from before the audit,
+    // opened on a page that has audited nothing, carries none
+    assert.deepStrictEqual(again.audit, nb.audit);
     await openFromFile(name, JSON.stringify(again));
     checkAnnotations(name);
     checkFormat(name, nb);

@@ -43,6 +43,7 @@ import { analysisPanel } from "./analysis-view.js";
 import { studyPanel } from "./study-view.js";
 import { newStudy } from "./study.js";
 import { auditChip, auditPanel } from "./audit-view.js";
+import { auditPositions, packEvals, sharedAudit, unpackEvals } from "./audit.js";
 import { closeBoard, newScratch, openAt, packScratch, unpackScratch } from "./analysis.js";
 import { sharedEngine } from "./engine.js";
 import { sharedFlavors } from "./engine-flavor.js";
@@ -131,6 +132,7 @@ setRenderHooks({
   rerenderMarkup,
   rerenderNotes,
   lineEditor,
+  saveWorkbook,
 });
 let sideDragging = false; // dragging the table-panel resize handle
 
@@ -341,6 +343,29 @@ function cardFont() {
   return getCurrent().cardFont || 100;
 }
 
+// The audit's evals of these lines' positions. Walking the lines for their
+// positions is the cost on a big workbook, so a page that has audited
+// nothing skips it.
+function auditCarried(lines) {
+  const all = sharedAudit().all;
+  if (!Object.values(all).some((m) => m.size)) return null;
+  return packEvals(all, auditPositions(lines));
+}
+
+// The toolbar's Save, which the audit panel also offers once a run has found
+// something: the workbook into this browser's store, under a new id the
+// first time. Says so when the store will not take it.
+function saveWorkbook() {
+  if (!getCurrent().name) getCurrent().name = "Untitled";
+  const ok = saveNotebook(
+    getCurrent().id || (getCurrent().id = "n" + Date.now()),
+    workbookState(),
+  );
+  if (ok) sharedAudit().saved();
+  else alert("Could not save: storage is full or unavailable.");
+  return ok;
+}
+
 // What both stores persist: the PGN, the annotated lines, and the layout
 // settings that change what a print looks like. Shared so a workbook written
 // to a file and one written to localStorage can never carry different fields.
@@ -353,6 +378,8 @@ function workbookState() {
     header: c.header,
     // analysis in progress travels with the workbook
     analysis: packScratch(getScratch()),
+    // and so does what the audit found for it
+    audit: auditCarried(c.lines),
     view: {
       boardSize: c.boardSize,
       cardFont: c.cardFont,
@@ -480,6 +507,7 @@ function viewRoot() {
         // notebook you just discarded is not a place to land.
         setMode("report");
         setScratch(null);
+        sharedAudit().reset();
         setCurrent(
           freshState({
             boardSize: getCurrent().boardSize,
@@ -520,16 +548,9 @@ function viewRoot() {
   top.appendChild(name);
   const save = el("button", { className: "chip primary", textContent: "Save" });
   save.onclick = () => {
-    if (!getCurrent().name) getCurrent().name = "Untitled";
-    const ok = saveNotebook(
-      getCurrent().id || (getCurrent().id = "n" + Date.now()),
-      workbookState(),
-    );
-    if (ok) {
+    if (saveWorkbook()) {
       save.textContent = "Saved ✓";
       setTimeout(() => (save.textContent = "Save"), 1200);
-    } else {
-      alert("Could not save: storage is full or unavailable.");
     }
   };
   top.appendChild(save);
@@ -552,6 +573,7 @@ function viewRoot() {
       JSON.stringify(toNotebook(workbookState()), null, 2),
       "application/json",
     );
+    sharedAudit().saved();
     // the toolbar's name field shows the old value until it is rebuilt
     renderApp();
   };
@@ -870,6 +892,10 @@ function installNotebook(nb, id) {
       sideWidth: getCurrent().sideWidth,
     }),
   );
+  // what an audit found for this workbook, wherever it was run, and nothing
+  // found for the one open before
+  sharedAudit().reset();
+  if (nb.audit) sharedAudit().absorb(unpackEvals(nb.audit));
 }
 
 function openNotebook(id) {
@@ -908,6 +934,8 @@ function loadPgnText(text) {
         return;
       }
       clearViewState();
+      // a new PGN has no audit yet, whatever positions it shares
+      sharedAudit().reset();
       setCurrent(
         freshState({
           id: getCurrent().id,

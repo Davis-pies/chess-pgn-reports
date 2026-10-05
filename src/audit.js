@@ -13,15 +13,17 @@
 // threads share a search, which is what one deep position needs, not this).
 //
 // Every position is searched to the same depth, so one move's eval can be
-// set against the next. What it finds is kept by position (audit-store.js),
-// so a second run after an edit searches only the positions that are new.
+// set against the next. What it finds is kept by position while the workbook
+// is open, so a second run after an edit searches only the positions that
+// are new, and it is saved in the workbook (packEvals). Another workbook
+// starts from nothing (reset): it shows only its own audit, even where it
+// shares positions with the last one.
 //
 // The report is a pure function of the lines and the evals: drawn from the
 // workbook as it stands, it never shows a line the workbook no longer has.
 
 import { Chess } from "chess.js";
 import { fenMap } from "./pgn.js";
-import { evalStore } from "./audit-store.js";
 import { liteWorker, parseInfo, uciToSan, whiteScore, whiteShare } from "./engine.js";
 
 // Any depth the viewer types, within these. Past 40 a lite search of a single
@@ -194,6 +196,50 @@ export function assessOf(score, mated = null) {
 	return w ? "+−" : "−+";
 }
 
+// What the audit found, as a workbook carries it (store.js): the evals of
+// the workbook's own positions, per build, so they go wherever the workbook
+// goes -- a file, another browser, another device. Each is [depth, score, best]: the score a number of
+// centipawns or "#n" for a mate, White's view. A finished game is left out;
+// it is judged again without the engine (overEval), and its depth of
+// Infinity is not JSON. Null when there is nothing to carry.
+export function packEvals(maps, positions) {
+	const out = {};
+	for (const [flavor, map] of Object.entries(maps)) {
+		const got = {};
+		let any = false;
+		for (const k of positions.keys()) {
+			const ev = map.get(k);
+			if (!ev || !Number.isFinite(ev.depth)) continue;
+			got[k] = [ev.depth, ev.score.mate != null ? "#" + ev.score.mate : ev.score.cp, ev.best ?? null];
+			any = true;
+		}
+		if (any) out[flavor] = got;
+	}
+	return Object.keys(out).length ? out : null;
+}
+
+// The other way: { lite: Map, full: Map } of evals. A workbook can be edited
+// by hand, so an entry that is not one is dropped rather than shown.
+export function unpackEvals(packed) {
+	const out = { lite: new Map(), full: new Map() };
+	if (!packed || typeof packed !== "object") return out;
+	for (const flavor of Object.keys(out)) {
+		const got = packed[flavor];
+		if (!got || typeof got !== "object") continue;
+		for (const [k, e] of Object.entries(got)) {
+			if (!Array.isArray(e)) continue;
+			const [depth, s, best] = e;
+			if (!Number.isInteger(depth) || depth < 1) continue;
+			let score;
+			if (typeof s === "number" && Number.isFinite(s)) score = { cp: s };
+			else if (typeof s === "string" && /^#-?\d+$/.test(s)) score = { mate: +s.slice(1) };
+			else continue;
+			out[flavor].set(k, { depth, score, best: typeof best === "string" ? best : null });
+		}
+	}
+	return out;
+}
+
 // How many engines the audit can run: one per logical core, which is the
 // most that run at once.
 export const maxAuditWorkers = (g = globalThis) => Math.max(1, Math.floor(g.navigator?.hardwareConcurrency) || 2);
@@ -208,15 +254,13 @@ export function auditWorkers(saved = null, g = globalThis) {
 }
 
 // The audit's controller. `makeWorker` returns something with postMessage /
-// onmessage / onerror / terminate, as for engine.js createEngine; `store`
-// keeps evals between visits ({ load(keys) -> Map, save(entries) }).
+// onmessage / onerror / terminate, as for engine.js createEngine.
 //
 // The engines are started for a run and shut when it ends, so an audit that
 // is not running holds no memory and no cores.
 export function createAudit({
 	makeWorker = liteWorker,
 	workers = auditWorkers(),
-	store = null,
 	throttle = 1000,
 	now = () => Date.now(),
 } = {}) {
@@ -232,14 +276,14 @@ export function createAudit({
 		error: null,
 		startedAt: 0,
 		source: null,
+		// found since the workbook was last saved (or opened): the panel
+		// offers to save them, since a reload would lose them
+		unsaved: false,
 	};
 	const ev = () => evalsBy[state.flavor];
-	// the store's key: lite evals by the bare position, as they were first kept
-	const storeKey = (k) => (state.flavor === "lite" ? k : `${state.flavor}|${k}`);
 	let queue = []; // [key, fen], next first
 	let pool = [];
 	let run = 0; // which run a worker's answer belongs to
-	const unsaved = [];
 	let listener = () => {};
 	let timer = null;
 
@@ -252,9 +296,6 @@ export function createAudit({
 			if (timer) clearTimeout(timer);
 			emitNow();
 		} else if (!timer) timer = setTimeout(emitNow, throttle);
-	};
-	const flush = () => {
-		if (store && unsaved.length) store.save(unsaved.splice(0));
 	};
 	const known = (k) => {
 		const e = ev().get(k);
@@ -272,7 +313,6 @@ export function createAudit({
 		state.status = status;
 		state.error = error;
 		state.queued = 0;
-		flush();
 		emit(true);
 	}
 
@@ -332,9 +372,8 @@ export function createAudit({
 				if (score) {
 					const found = { depth: state.depth, score: whiteScore(score, fen.split(" ")[1]), best };
 					ev().set(key, found);
-					unsaved.push([storeKey(key), found]);
-					if (unsaved.length >= 50) flush();
 					state.searched++;
+					state.unsaved = true;
 					emit(false);
 				}
 				take();
@@ -353,7 +392,6 @@ export function createAudit({
 		state.queued = queue.length;
 	}
 
-	let asked = 0; // starts asked for, so only the last one asked for begins
 	function begin(positions, depth, source, engines) {
 		workers = engines;
 		Object.assign(state, { depth, source, searched: 0, startedAt: now(), error: null });
@@ -379,33 +417,48 @@ export function createAudit({
 		set onUpdate(fn) {
 			listener = fn || (() => {});
 		},
-		// Pick up what an earlier visit found. Evals already here stand.
-		async restore(positions) {
-			if (!store) return;
-			const map = ev();
-			const keys = [...positions.keys()];
-			const got = await store.load(keys.map(storeKey));
-			keys.forEach((k) => {
-				const e = got.get(storeKey(k));
-				const had = map.get(k);
-				if (e && (!had || had.depth < e.depth)) map.set(k, e);
-			});
+		// Every build's evals, as packEvals takes them.
+		get all() {
+			return evalsBy;
+		},
+		// Evals a workbook brought with it (unpackEvals): a deeper one than
+		// is known replaces it.
+		absorb(maps) {
+			for (const [flavor, map] of Object.entries(maps)) {
+				const into = evalsBy[flavor];
+				if (!into) continue;
+				map.forEach((e, k) => {
+					const had = into.get(k);
+					if (!had || had.depth < e.depth) into.set(k, e);
+				});
+			}
+			emit(true);
+		},
+		// The workbook was saved with what is known now.
+		saved() {
+			state.unsaved = false;
+			emit(true);
+		},
+		// Another workbook: nothing found, nothing running. What the last one
+		// found is not this one's, even where they share positions.
+		reset() {
+			if (state.status === "running") finish("stopped");
+			evalsBy.lite.clear();
+			evalsBy.full.clear();
+			Object.assign(state, { status: "idle", searched: 0, error: null, source: null, unsaved: false });
 			emit(true);
 		},
 		// Search every position of `positions` (auditPositions) not yet known at
 		// `depth`. `source` is what the run is for (the workbook), so the view
 		// can tell a run for a workbook since closed.
-		async start(
+		start(
 			positions,
 			{ depth = state.depth, source = null, engines = workers, flavor = state.flavor, factory = makeWorker } = {},
 		) {
 			if (state.status === "running") finish("stopped");
 			state.flavor = flavor;
 			makeWorker = factory;
-			const ticket = ++asked;
-			await this.restore(positions);
-			// a second start while this one read the store is the one that runs
-			if (ticket === asked) begin(positions, depth, source, engines);
+			begin(positions, depth, source, engines);
 		},
 		get workers() {
 			return workers;
@@ -436,6 +489,6 @@ export function createAudit({
 // The app's audit: one per page, created on first use.
 let shared = null;
 export function sharedAudit() {
-	if (!shared) shared = createAudit({ store: evalStore });
+	if (!shared) shared = createAudit();
 	return shared;
 }

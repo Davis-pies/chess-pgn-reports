@@ -167,9 +167,10 @@ test("the audit searches every position while the study stays usable", async ({ 
   await page.locator(".audit-ends .audit-study").first().click();
   await expect(page.locator(".st-window")).toBeVisible();
 
-  // kept in the browser by position: on a fresh page nothing is left to search
+  // nothing is kept in the browser: loaded again, the PGN has no audit yet
+  // (a saved workbook carries its own, store.js)
   await loadPgn(page);
   await page.locator(".audit-toggle").click();
-  await expect(page.locator(".audit-status")).toHaveText("All 11 positions searched at depth 16.");
-  await expect(page.locator(".audit-run")).toHaveCount(0);
+  await expect(page.locator(".audit-status")).toHaveText(/each of the workbook's 11 positions/);
+  await expect(page.locator(".audit-run")).toHaveText("Run audit");
 });

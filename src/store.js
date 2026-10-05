@@ -23,7 +23,7 @@ function keyFor(moves) {
 }
 
 // The workbook object: what gets JSON-stringified into localStorage or a file.
-export function toNotebook({ name, pgn, lines, view, analysis, header }) {
+export function toNotebook({ name, pgn, lines, view, analysis, header, audit }) {
   const mainLine = lines.find((l) => l.isMain) || lines[0];
   return {
     format: FORMAT,
@@ -41,6 +41,10 @@ export function toNotebook({ name, pgn, lines, view, analysis, header }) {
     ...(analysis ? { analysis } : {}),
     // the Game info dialog's edits over the PGN's own tags, or absent
     ...(header && Object.keys(header).length ? { header } : {}),
+    // the repertoire audit's evals of this workbook's positions (audit.js
+    // packEvals), or absent; they used to stay in the browser that searched
+    // them, so a workbook opened anywhere else had to be audited again
+    ...(audit ? { audit } : {}),
     tags: lines.map((l) => ({
       key: keyFor(l.moves),
       tag: l.tag || "sideline",

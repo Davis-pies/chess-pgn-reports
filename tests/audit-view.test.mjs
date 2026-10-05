@@ -7,7 +7,7 @@
 import { test, after } from "node:test";
 import assert from "node:assert";
 import { Chess } from "chess.js";
-import { bootApp } from "./helpers.mjs";
+import { bootApp, captureDownloads } from "./helpers.mjs";
 import { getCurrent, getMode, getRenderHooks } from "../src/state.js";
 import { sharedAudit } from "../src/audit.js";
 import { loadPrefs, savePrefs } from "../src/prefs.js";
@@ -237,7 +237,7 @@ test("a long list shows its worst first and the rest on asking; a run for a clos
 	assert.ok(getCurrent().lines.length);
 });
 
-test("a workbook with no losing moves says so, and the panel picks up an earlier visit's results", async () => {
+test("a workbook with no losing moves says so", async () => {
 	app.reset();
 	await app.loadPgn("1. a3 *");
 	panel().querySelector(".audit-run").click();
@@ -307,8 +307,7 @@ test("a finding's symbol and note go onto its move, one at a time or all at once
 	app.reset();
 	await app.loadPgn("1. e4 e5 2. Nf3 Nc6 (2... d6 3. d4) 3. Bb5 *");
 	if (panel().hidden) chip().click();
-	// the first test searched this workbook already; what it found is kept
-	panel().querySelector(".audit-run")?.click();
+	panel().querySelector(".audit-run").click();
 	await until(() => /All 8 positions/.test(panel().querySelector(".audit-status").textContent));
 	await finished();
 	const rows = () => [...panel().querySelectorAll(".audit-body > .audit-list .audit-row")];
@@ -377,4 +376,85 @@ test("Evals in the table shows the eval after each move under it, and is remembe
 	panel().querySelector(".audit-intable").click();
 	assert.deepStrictEqual(evals(), []);
 	assert.strictEqual(loadPrefs().auditInTable, false);
+});
+
+test("a saved workbook carries what the audit found, and brings it to a page that never ran it", async () => {
+	app.reset();
+	await app.loadPgn("1. h3 h6 2. g3 *");
+	getCurrent().name = "audited";
+	const show = () => (!panel() || panel().hidden) && chip().click();
+	show();
+	panel().querySelector(".audit-run").click();
+	await until(() => audit.state.status === "done" && audit.state.source === getCurrent());
+	const cap = captureDownloads(app.dom.window.document);
+	app.clickText("Save to file");
+	cap.restore();
+	const text = await cap.blobs[0].text();
+	const nb = JSON.parse(text);
+	assert.strictEqual(audit.state.unsaved, false, "a file is a save too");
+	assert.strictEqual(Object.keys(nb.audit.lite).length, 4, "the start and the three moves");
+	assert.strictEqual(nb.version, 1, "older builds read it, ignoring the evals");
+
+	// opened afresh, as on another device: the evals come from the file
+	app.reset();
+	assert.strictEqual(audit.evals.size, 0);
+	const input = app.view().querySelector("input.wbin");
+	Object.defineProperty(input, "files", { value: [new app.dom.window.File([text], "audited.json")], configurable: true });
+	input.onchange();
+	await app.settle();
+	assert.strictEqual(audit.evals.size, 4);
+	show();
+	assert.match(panel().querySelector(".audit-status").textContent, /All 4 positions searched/);
+	assert.strictEqual(panel().querySelector(".audit-sum").textContent, "3 blunders", "the findings, without a run");
+});
+
+test("another PGN or workbook starts with no audit, even where it shares positions", async () => {
+	app.reset();
+	await app.loadPgn("1. e4 e5 *");
+	if (!panel() || panel().hidden) chip().click();
+	panel().querySelector(".audit-run").click();
+	await until(() => audit.state.status === "done" && audit.state.source === getCurrent());
+	assert.match(panel().querySelector(".audit-status").textContent, /All 3 positions/);
+
+	// the same first moves, then more: nothing carried over
+	app.reset();
+	await app.loadPgn("1. e4 e5 2. Nf3 *");
+	assert.strictEqual(audit.evals.size, 0);
+	if (!panel() || panel().hidden) chip().click();
+	assert.match(panel().querySelector(".audit-status").textContent, /Searches each of the workbook's 4 positions/);
+	assert.strictEqual(panel().querySelector(".audit-run").textContent, "Run audit");
+
+	// a run going on stops when another one is loaded
+	panel().querySelector(".audit-run").click();
+	app.reset();
+	assert.notStrictEqual(audit.state.status, "running");
+	assert.strictEqual(audit.evals.size, 0);
+});
+
+test("a run that found something offers to save the workbook, and the offer goes once it is saved", async () => {
+	app.reset();
+	await app.loadPgn("1. b3 b6 *");
+	if (!panel() || panel().hidden) chip().click();
+	assert.strictEqual(panel().querySelector(".audit-save"), null, "nothing found, nothing to save");
+	panel().querySelector(".audit-run").click();
+	assert.strictEqual(panel().querySelector(".audit-save"), null, "not while it runs");
+	await until(() => audit.state.status === "done" && audit.state.source === getCurrent());
+	const ask = panel().querySelector(".audit-save");
+	assert.match(ask.textContent, /not saved in the workbook yet/);
+	ask.querySelector("button").click();
+	assert.strictEqual(panel().querySelector(".audit-save"), null);
+	const saved = JSON.parse(app.dom.window.localStorage.getItem("ott:" + getCurrent().id));
+	assert.strictEqual(Object.keys(saved.audit.lite).length, 3);
+	assert.strictEqual(saved.name, "Untitled");
+
+	// opened again, its evals came from the workbook: nothing to offer
+	app.reset();
+	app.dom.window.localStorage.setItem("ott:again", JSON.stringify(saved));
+	await app.loadPgn("1. d4");
+	app.clickText("New / Import");
+	app.clickText("Open: ");
+	await app.settle();
+	assert.strictEqual(audit.evals.size, 3);
+	if (!panel() || panel().hidden) chip().click();
+	assert.strictEqual(panel().querySelector(".audit-save"), null);
 });

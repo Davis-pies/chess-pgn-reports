@@ -42,7 +42,7 @@ start) and the study opened and stepped mid-run.
 - **Lite or full.** Lite by default. Full is offered (`auditFlavor`) and runs
   from the copy `engine-store.js` keeps; each full engine is its own ~100 MB,
   so the panel's status says which build runs. Their evals are kept apart
-  (store keys `full|<position>`; lite keeps the bare position).
+  (one map per build, and `lite` / `full` in a saved workbook).
 - **Your side.** `auditSide` is white, black or both. Only that side's moves
   are graded; the opponent's slips are theirs, not a flaw in the
   repertoire. Every position is still searched, since the opponent's moves
@@ -60,9 +60,20 @@ start) and the study opened and stepped mid-run.
   is judged without the engine.
 - **One finding per move.** A move several lines share is reported once,
   naming every line through it in the table's column order.
-- **Kept by position.** Evals go to IndexedDB (`audit-store.js`) keyed by
-  position; a deeper eval replaces a shallower one. A reload, another
-  workbook, or a re-run after an edit searches only what is new.
+- **Kept by position, per workbook.** While a workbook is open its evals are
+  kept by position, so a re-run after an edit searches only what is new.
+  Loading another PGN or workbook resets the audit (`reset`): Davis found
+  results carrying over to a workbook that shared positions confusing, so
+  each workbook shows only its own audit. (The first version kept evals in
+  IndexedDB across workbooks; that store is gone.)
+- **Carried by the workbook.** A saved workbook holds the evals of its own
+  positions, per build (`audit: { lite, full }`, each position's
+  `[depth, score, best]`, score in centipawns or `"#n"`; `packEvals` /
+  `unpackEvals`). Opening it resets the audit and loads them in. Older builds
+  ignore the field, so `VERSION` stays 1. Evals found since the last Save
+  are lost on reload, like any other unsaved change, so the audit tracks
+  `state.unsaved` and the panel offers **Save** (the toolbar's, through
+  `saveWorkbook` in the render hooks) once a run that found something ends.
 - **The report is derived.** `auditReport(lines, evals, depth, order)` is a
   pure function of the workbook as it stands, so it never shows a line the
   workbook no longer has. Line walks and the engine's move as SAN are cached
