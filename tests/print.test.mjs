@@ -3,6 +3,7 @@ import assert from "node:assert";
 import { installDom, loadState } from "./helpers.mjs";
 import { appendPrintTables, stemLength } from "../src/print.js";
 import { grid } from "../src/table.js";
+import { assignLineNames } from "../src/line-editor.js";
 import { openTablePaths, setTraced } from "../src/state.js";
 
 // A long mainline plus enough shallow sidelines to force packForPrint to emit
@@ -786,6 +787,22 @@ function noMainTables(pgn, setup = () => {}) {
   return box;
 }
 
+// The table refuses to break across pages, so on its own it jumped to the
+// next page and left its stem at the foot of the one before. The two are one
+// block, and the notes, which may run on, stay outside it.
+test("a print table's stem goes to the next page with it", () => {
+  const off = installDom();
+  const box = noMainTables(
+    "1. e4 c5 2. Nf3 d6 (2... Nc6 3. d4) (2... e6 3. d4) 3. d4 *",
+  );
+  const stem = box.querySelector(".print-stem");
+  const block = stem.parentElement;
+  assert.ok(block.classList.contains("print-block"));
+  assert.strictEqual(block.querySelector("table.tbl"), stem.nextElementSibling);
+  assert.ok(block.nextElementSibling.classList.contains("print-notes"), "notes follow the block, outside it");
+  off();
+});
+
 test("a print table states its shared moves once, above it", () => {
   const off = installDom();
   const box = noMainTables(
@@ -861,8 +878,8 @@ test("one row per move stacks White's and Black's moves in a cell", () => {
       [...r.children[col].querySelectorAll(".half")].map((h) => h.textContent),
     );
   // (with no mainline, the columns come in the order the report lays out)
-  assert.deepStrictEqual(halves(1), [["", "Nc6"], ["d4", ""]]);
-  assert.deepStrictEqual(halves(2), [["", "d6"], ["d4", "cxd4"]]);
+  assert.deepStrictEqual(halves(1), [["", "d6"], ["d4", "cxd4"]]);
+  assert.deepStrictEqual(halves(2), [["", "Nc6"], ["d4", ""]]);
   off();
 });
 
@@ -1115,16 +1132,19 @@ test("with nothing small, there is no odds-and-ends table", () => {
   off();
 });
 
-test("odds and ends are ordered shortest first", () => {
+test("odds and ends keep the report's column order, so their line numbers ascend", () => {
   const off = installDom();
-  // the long stray is written first in the PGN; the short one leads the table
+  // the long stray is written first in the PGN, so it is the earlier line:
+  // shorter or not, the one-move stub comes after it (shortest first, the
+  // headers read Line 15, Line 1, Line 14)
   const st = loadState(withStrays("(2... Nc6 3. d4 cxd4 4. Nxd4 g6 5. c4) (2... g6)"));
   st.noMain = true;
+  assignLineNames();
   const box = document.createElement("div");
   appendPrintTables(box, grid(st.lines));
   const table = [...box.querySelectorAll("table.tbl")].pop();
-  const firstCol = [...table.querySelectorAll("tr")].slice(1).map((tr) => tr.children[1].textContent).filter(Boolean);
-  assert.deepStrictEqual(firstCol, ["g6"], "the one-move stub is the first column");
+  const nums = [...table.querySelectorAll("tr")[0].children].slice(1).map((th) => Number(th.textContent.replace(/\D/g, "")));
+  assert.deepStrictEqual(nums, [1, 14, 15]);
   off();
 });
 
@@ -1192,7 +1212,7 @@ function mainlineNoteReport(pgn, ply) {
   return [...box.querySelectorAll("table.tbl")].map((t) => {
     const stem = t.previousElementSibling?.classList.contains("print-stem") ? t.previousElementSibling : null;
     return {
-      listed: /Test Note/.test(t.nextElementSibling.textContent),
+      listed: /Test Note/.test(t.parentElement.nextElementSibling.textContent),
       marked: !!(stem && stem.querySelector("sup")) || !!t.querySelector("td sup"),
     };
   });
@@ -1229,7 +1249,7 @@ test("with no mainline, every table that shows a noted move lists the note", () 
   assert.ok(tables.length > 1);
   tables.forEach((t, i) => {
     const marked = !!t.previousElementSibling?.querySelector?.("sup") || !!t.querySelector("td sup");
-    const listed = /Test Note/.test(t.nextElementSibling.textContent);
+    const listed = /Test Note/.test(t.parentElement.nextElementSibling.textContent);
     assert.strictEqual(listed, marked, `table ${i}: listed where marked, so it stands on its own`);
   });
   off();
