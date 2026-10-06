@@ -228,10 +228,10 @@ export function fillPrintTables(wrap, g) {
   (packs.length ? packs : [[]]).forEach((lines, i) => {
     const { off, pv, stem, maxPly } = tableShape(mainV, lines, i);
     // The stem and its table are one block that moves to the next page
-    // together. The table alone refuses to break (see style.css), and the
-    // stem's break-after: avoid loses to that: a table too tall for what was
-    // left of the page went over and left its stem alone at the foot of the
-    // page before, above a blank half page.
+    // together (see style.css). With only the table kept whole, Firefox,
+    // which ignores the stem's break-after: avoid, moved a table too tall for
+    // what was left of the page over and left its stem alone at the foot of
+    // the page before, above a blank half page.
     const block = el("div", { className: "print-block" });
     wrap.appendChild(block);
     if (stem) {
