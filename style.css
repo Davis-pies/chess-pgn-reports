@@ -1603,10 +1603,15 @@ sup {
     color: #444;
     opacity: 1; /* the 0.6 screen opacity prints as washed-out grey */
   }
-  .pv-htable table.tbl {
+  /* Keep each table whole: a table that doesn't fit the remaining page moves
+     to the next, and its stem goes with it. The rule is on the block holding
+     both, not on the table: Firefox ignores the stem's break-after: avoid, so
+     a table that kept itself whole left its stem alone at the foot of the
+     page before. A block taller than a page breaks inside the table, with the
+     stem still on top of its first rows. */
+  .pv-htable .print-block {
     break-inside: avoid;
-    page-break-inside: avoid; /* keep each table whole; a table that doesn't
-		                            fit the remaining page moves to the next */
+    page-break-inside: avoid;
   }
   /* "cell borders" off: MCO's look, with only a rule under the headers. The
      group rules are spans of their own and stay. */

@@ -334,7 +334,11 @@ For a shorter overview see the [README](../README.md).
    Where the report is cut into tables is chosen to use as little paper as
    possible, rather than filling each table to its column limit: a stray line
    that would cut a table's heading back to move two, and leave it thirty rows
-   of mostly empty column, gets a small table of its own instead.
+   of mostly empty column, is set apart instead. Lines set apart like that
+   are gathered into odds-and-ends tables at the end of the report, lines of
+   a similar length together; inside each, the columns keep the report's
+   order, so their Line numbers still count up. A table's heading always
+   goes to the next page with it.
    **The preview opens with a summary**: its title (the notebook's name, or
    the PGN's Opening and Variation when it has none), the PGN's ECO code and
    opening, the source game's players, event and year (only when both

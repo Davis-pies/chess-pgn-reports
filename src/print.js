@@ -227,14 +227,21 @@ export function fillPrintTables(wrap, g) {
   const packs = packForPrint(mainV, others, size);
   (packs.length ? packs : [[]]).forEach((lines, i) => {
     const { off, pv, stem, maxPly } = tableShape(mainV, lines, i);
+    // The stem and its table are one block that moves to the next page
+    // together (see style.css). With only the table kept whole, Firefox,
+    // which ignores the stem's break-after: avoid, moved a table too tall for
+    // what was left of the page over and left its stem alone at the foot of
+    // the page before, above a blank half page.
+    const block = el("div", { className: "print-block" });
+    wrap.appendChild(block);
     if (stem) {
       const s = el("div", { className: "print-stem" });
       // the stem's moves, marks and note markers: every column states these
       // moves, and the rows that carried the markers are gone
       buildCardMoves(s, off ? off.stem : { ...referenceFor(mainV, i), moves: mainV.moves.slice(0, stem) });
-      wrap.appendChild(s);
+      block.appendChild(s);
     }
-    renderTable(wrap, {
+    renderTable(block, {
       ...g,
       noMain: g.noMain || !!off,
       vars: pv,
@@ -417,7 +424,7 @@ function packForPrint(mainV, lines, size) {
     ...order.map((l) => l.moves.map((m) => m.san).join(" ")),
   ].join("|");
   if (lastCut.key === key) return rebuild(order, lastCut.cut);
-  const tables = combineSmall(mainV, packFresh(mainV, order, size), size);
+  const tables = combineSmall(mainV, packFresh(mainV, order, size), size, order);
   lastCut = { key, cut: tables.map((t) => t.map((l) => order.indexOf(l))) };
   return tables;
 }
@@ -434,7 +441,13 @@ function rebuild(order, cut) {
 // "odds and ends" table (or as many as they need) at the end of the report.
 // The first table stays where it is, small or not, when it carries the
 // mainline.
-function combineSmall(mainV, tables, size) {
+//
+// Length decides which odds-and-ends table a line lands on, not where its
+// column stands: inside each table the lines go back into report order. Left
+// shortest first, a table mixing a Sveshnikov and a Najdorf printed its
+// columns as "Line 156, Line 155, Line 45, Line 46, Line 1" -- numbers that
+// count the table's columns everywhere else ran backwards on that one table.
+function combineSmall(mainV, tables, size, order) {
   const width = (lines, i) => tableShape(mainV, lines, i).width;
   const keep = [];
   const odds = [];
@@ -452,7 +465,7 @@ function combineSmall(mainV, tables, size) {
   const per = Math.ceil(odds.length / Math.ceil(odds.length / size));
   let cur = [];
   const close = () => {
-    keep.push(cur);
+    keep.push(cur.sort((a, b) => order.indexOf(a) - order.indexOf(b)));
     cur = [];
   };
   for (const l of odds) {

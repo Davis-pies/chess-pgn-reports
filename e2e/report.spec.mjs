@@ -102,3 +102,19 @@ test("a note's [n] scrolls the table to its move", async ({ page }) => {
   await expect(cell).toBeInViewport();
   await expect(cell).toBeFocused();
 });
+
+// Firefox ignores break-after: avoid, so the stem's own rule could not hold it
+// to its table: a table kept whole went over a page break and left its stem
+// behind. The block around the two is what is kept whole now.
+test("a printed table and its stem are kept whole together", async ({ page }) => {
+  await loadPgn(page);
+  await page.evaluate(() => globalThis.dispatchEvent(new Event("beforeprint")));
+  await page.emulateMedia({ media: "print" });
+  const blocks = page.locator(".pv-htable .print-block");
+  await expect(blocks.first().locator(".print-stem + table.tbl")).toHaveCount(1);
+  const rules = await blocks.first().evaluate((b) => ({
+    block: globalThis.getComputedStyle(b).breakInside,
+    table: globalThis.getComputedStyle(b.querySelector("table.tbl")).breakInside,
+  }));
+  expect(rules).toEqual({ block: "avoid", table: "auto" });
+});
