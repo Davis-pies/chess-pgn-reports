@@ -10,6 +10,7 @@ import {
 	getCurrent,
 	setSharedInfo,
 } from "../src/state.js";
+import { setRenderHooks, getRenderHooks } from "../src/state.js";
 import { closeTableMenu, openTableMenu } from "../src/table-menu.js";
 
 const GROUP = "1. e4 e5 (1... c5 2. Nf3 d6 3. d4 (3. Bb5+)) 2. Nf3";
@@ -72,6 +73,7 @@ test("right-clicking a line's move offers the move and the line", () => {
 	assert.deepStrictEqual(items(menu), [
 		"Analyse from here",
 		"Study from here",
+		"Name this position…",
 		"★ Make mainline",
 		"Move to footnote",
 		"Focus",
@@ -99,7 +101,7 @@ test("a group column's menu acts on every line under it and offers no promote", 
 	const menu = rightClick(box, "d6");
 	assert.deepStrictEqual(
 		items(menu),
-		["Analyse from here", "Study from here", "Move to footnote", "Focus", "Hide"],
+		["Analyse from here", "Study from here", "Name this position…", "Move to footnote", "Focus", "Hide"],
 		"no Make mainline: a group is not one line",
 	);
 	assert.ok(menu.querySelector(".sympick"), "but its shared move is editable");
@@ -121,7 +123,7 @@ test("the mainline is offered none of the line controls", () => {
 	// so it stays; what the mainline is refused is the LINE controls.
 	assert.deepStrictEqual(
 		items(menu),
-		["Analyse from here", "Study from here"],
+		["Analyse from here", "Study from here", "Name this position…"],
 		"no promote, hide, focus or footnote",
 	);
 	assert.ok(menu.querySelector(".tmenu-note"), "and says why");
@@ -681,5 +683,19 @@ test("the menu is nudged back inside the viewport near an edge", () => {
 	} finally {
 		proto.getBoundingClientRect = real;
 	}
+	off();
+});
+
+test("Name this position… hands the hook the moves up to the clicked one", () => {
+	const off = installDom();
+	const got = [];
+	const { box } = preview();
+	setRenderHooks({ ...getRenderHooks(), nameAt: (m) => got.push(m.map((x) => x.san)) });
+	click(rightClick(box, "d4"), "Name this position…");
+	assert.deepStrictEqual(got, [["e4", "c5", "Nf3", "d6", "d4"]]);
+	// the group column names the shared position too
+	click(rightClick(box, "d6"), "Name this position…");
+	assert.deepStrictEqual(got[1], ["e4", "c5", "Nf3", "d6"]);
+	closeTableMenu();
 	off();
 });

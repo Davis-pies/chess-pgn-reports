@@ -123,3 +123,39 @@ test("the editor, the table, the print and the study count lines the same way", 
 	const picked = [...win().querySelectorAll(".st-pick option")].map((o) => o.textContent.split(" · ")[0]);
 	assert.deepStrictEqual(picked, names);
 });
+
+const NAMED =
+	'1. e4 c5 2. Nf3 d6 {[%name "...d6 Sicilians"]} 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 {[%name "Najdorf"]} *';
+
+test("Study shows the trail of names for the position reached, and names it", async () => {
+	app.reset();
+	await app.loadPgn(NAMED);
+	app.button("Study").click();
+	const trail = () => win().querySelector(".st-trail");
+	assert.ok(!trail() || trail().textContent === "", "no names before the first");
+	for (let i = 0; i < 10; i++) key(win().querySelector(".study"), "ArrowRight");
+	assert.strictEqual(trail().textContent, "...d6 Sicilians › Najdorf");
+
+	const got = [];
+	const hooks = getRenderHooks();
+	const realNameAt = hooks.nameAt;
+	hooks.nameAt = (m) => got.push(m.map((x) => x.san).join(" "));
+	[...win().querySelectorAll("button")].find((b) => b.textContent === "Name this position…").click();
+	hooks.nameAt = realNameAt;
+	assert.deepStrictEqual(got, ["e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6"]);
+});
+
+test("the real nameAt hook asks twice and stores the name with its tags", async () => {
+	app.reset();
+	await app.loadPgn(PGN);
+	const answers = ["Open Game", "e4; e5"];
+	const asked = [];
+	globalThis.prompt = (m, d) => {
+		asked.push(d);
+		return answers.shift();
+	};
+	getRenderHooks().nameAt([{ san: "e4" }, { san: "e5" }]);
+	const [v] = Object.values(getCurrent().names);
+	assert.deepStrictEqual(v, { name: "Open Game", tags: ["e4", "e5"] });
+	assert.deepStrictEqual(asked, ["", ""]);
+});

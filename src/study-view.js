@@ -15,6 +15,8 @@ import { boardAndEngine, boardRow, chipBtn, helpDialog, moveBox, navRow, speak, 
 import { engineBox } from "./engine-view.js";
 import { appendFootnote } from "./render.js";
 import { markSym } from "./nags.js";
+import { getCurrent, getRenderHooks } from "./state.js";
+import { trailOf } from "./names.js";
 import { defaultLineName } from "./tree.js";
 import { backToBook, ownFrom, readLine, stepStudyLine, studyMark, studyNotes, studyPlay, studyPlayAll } from "./study.js";
 
@@ -192,6 +194,16 @@ function lineHead(study, line, foot, onChange) {
 		);
 		return head;
 	}
+	// the names of the positions passed through, and a way to add one here
+	const played = line.moves.slice(0, study.at);
+	const trail = trailOf(played.map((m) => m.san), getCurrent().names || {});
+	head.appendChild(el("span", { className: "st-trail", textContent: trail.map((t) => t.name).join(" › "), hidden: !trail.length }));
+	head.appendChild(
+		chipBtn("st-name-pos", "Name this position…", "Give the position on the board a name", () => {
+			getRenderHooks().nameAt(played);
+			onChange();
+		}),
+	);
 	const meta = line.src.meta || {};
 	if (meta.eval) head.appendChild(el("span", { className: "st-eval", textContent: meta.eval }));
 	if (meta.note) {

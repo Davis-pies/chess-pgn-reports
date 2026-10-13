@@ -20,7 +20,9 @@ import {
   applyNotebook,
   parseWorkbook,
 } from "./store.js";
-import { namesFromNodes } from "./names.js";
+import { namesFromNodes, setName } from "./names.js";
+import { Chess } from "chess.js";
+import { posKey } from "./audit.js";
 import { loadProgress, saveProgress, moveProgress } from "./train.js";
 import { mergeAnnotations } from "./merge.js";
 import { buildPgn } from "./pgn-out.js";
@@ -131,6 +133,7 @@ setRenderHooks({
   renderApp,
   openAnalysis,
   openStudy,
+  nameAt,
   rerenderTable,
   rerenderMarkup,
   rerenderNotes,
@@ -440,6 +443,27 @@ export function openAnalysis(moves = []) {
 // start of the mainline. It is built afresh each time from the workbook as it
 // stands, so it never shows a line or a note the workbook no longer has.
 let study = null;
+
+// Name (or rename, or with a blank name unname) the position after `moves`.
+// Cancelling the first prompt does nothing; cancelling the tags keeps them.
+export function nameAt(moves) {
+  const chess = new Chess();
+  for (const m of moves) chess.move(m.san);
+  const fen = chess.fen();
+  const names = getCurrent().names;
+  const old = names[posKey(fen)];
+  const name = prompt("Name for this position (blank removes it):", old?.name || "");
+  if (name === null) return;
+  const tags = prompt("Tags, separated by ; (optional):", old?.tags.join("; ") || "");
+  setName(
+    names,
+    fen,
+    name,
+    tags === null ? old?.tags || [] : tags.split(";").map((t) => t.trim()).filter(Boolean),
+  );
+  renderApp();
+}
+
 export function openStudy(moves = []) {
 	if (getMode() !== "study") opener = focusKey($("view"), document.activeElement);
 	const lines = getCurrent().lines;
