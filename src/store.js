@@ -23,7 +23,7 @@ function keyFor(moves) {
 }
 
 // The workbook object: what gets JSON-stringified into localStorage or a file.
-export function toNotebook({ name, pgn, lines, view, analysis, header, audit }) {
+export function toNotebook({ name, pgn, lines, view, analysis, header, audit, names, train }) {
   const mainLine = lines.find((l) => l.isMain) || lines[0];
   return {
     format: FORMAT,
@@ -45,6 +45,11 @@ export function toNotebook({ name, pgn, lines, view, analysis, header, audit }) 
     // packEvals), or absent; they used to stay in the browser that searched
     // them, so a workbook opened anywhere else had to be audited again
     ...(audit ? { audit } : {}),
+    // named positions (names.js); also written into the PGN, but kept here so
+    // a rename survives a PGN the user has not re-exported
+    ...(names && Object.keys(names).length ? { names } : {}),
+    // Train progress, only in a file: localStorage keeps its own copy
+    ...(train ? { train } : {}),
     tags: lines.map((l) => ({
       key: keyFor(l.moves),
       tag: l.tag || "sideline",

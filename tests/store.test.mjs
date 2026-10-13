@@ -414,3 +414,13 @@ test("loadNotebook of a missing id is null and listNotebooks skips foreign keys"
     assert.deepStrictEqual(listNotebooks(), [{ id: "a", name: "A" }]);
   });
 });
+
+test("toNotebook carries named positions and Train progress only when given", () => {
+  const base = { name: "n", pgn: "1. e4 *", lines: [] };
+  const names = { k: { name: "N", tags: [] } };
+  assert.deepStrictEqual(toNotebook({ ...base, names }).names, names);
+  assert.ok(!("names" in toNotebook({ ...base, names: {} })));
+  assert.ok(!("names" in toNotebook(base)));
+  assert.ok(!("train" in toNotebook(base)));
+  assert.deepStrictEqual(toNotebook({ ...base, train: { cards: {} } }).train, { cards: {} });
+});

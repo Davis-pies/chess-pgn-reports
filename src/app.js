@@ -20,6 +20,8 @@ import {
   applyNotebook,
   parseWorkbook,
 } from "./store.js";
+import { namesFromNodes } from "./names.js";
+import { loadProgress, saveProgress, moveProgress } from "./train.js";
 import { mergeAnnotations } from "./merge.js";
 import { buildPgn } from "./pgn-out.js";
 import { el } from "./dom.js";
@@ -90,6 +92,7 @@ function freshState(overrides = {}) {
     name: "",
     pgn: "",
     lines: [],
+    names: {}, // posKey -> { name, tags }
     showBoards: false,
     // No mainline: every line is a peer. See tree.js's mainOf/isMainLine --
     // the flag is read there and nowhere else.
@@ -357,10 +360,13 @@ function auditCarried(lines) {
 // first time. Says so when the store will not take it.
 function saveWorkbook() {
   if (!getCurrent().name) getCurrent().name = "Untitled";
+  const hadId = !!getCurrent().id;
   const ok = saveNotebook(
     getCurrent().id || (getCurrent().id = "n" + Date.now()),
     workbookState(),
   );
+  // progress made before the first Save was kept under the "unsaved" key
+  if (ok && !hadId) moveProgress(null, getCurrent().id);
   if (ok) sharedAudit().saved();
   else alert("Could not save: storage is full or unavailable.");
   return ok;
@@ -376,6 +382,7 @@ function workbookState() {
     pgn: c.pgn,
     lines: c.lines,
     header: c.header,
+    names: c.names,
     // analysis in progress travels with the workbook
     analysis: packScratch(getScratch()),
     // and so does what the audit found for it
@@ -570,7 +577,11 @@ function viewRoot() {
     getCurrent().name = name.trim();
     download(
       slug() + ".json",
-      JSON.stringify(toNotebook(workbookState()), null, 2),
+      JSON.stringify(
+        toNotebook({ ...workbookState(), train: loadProgress(getCurrent().id) }),
+        null,
+        2,
+      ),
       "application/json",
     );
     sharedAudit().saved();
@@ -866,6 +877,7 @@ function installNotebook(nb, id) {
       name: nb.name || "",
       pgn: nb.pgn,
       header: nb.header || undefined,
+      names: { ...namesFromNodes(nodes), ...(nb.names || {}) },
       lines,
       // a saved notebook carries its own board settings; fall back to the
       // session's for notebooks saved before `view` existed
@@ -895,6 +907,7 @@ function installNotebook(nb, id) {
   // what an audit found for this workbook, wherever it was run, and nothing
   // found for the one open before
   sharedAudit().reset();
+  if (nb.train && typeof nb.train === "object") saveProgress(id, nb.train);
   if (nb.audit) sharedAudit().absorb(unpackEvals(nb.audit));
 }
 
@@ -941,6 +954,7 @@ function loadPgnText(text) {
           id: getCurrent().id,
           pgn: text,
           lines: collectLines(nodes),
+          names: namesFromNodes(nodes),
           boardSize: getCurrent().boardSize,
           cardFont: getCurrent().cardFont,
           sideWidth: getCurrent().sideWidth,
