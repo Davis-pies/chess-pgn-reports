@@ -3,6 +3,9 @@ import { markNag, markSym } from "./nags.js";
 import { numberNotes } from "./notes.js";
 import { visibleLines } from "./visibility.js";
 import { headerTags } from "./pgn.js";
+import { Chess } from "chess.js";
+import { nameCmd } from "./names.js";
+import { posKey } from "./audit.js";
 
 // Serializes the live editor state back to PGN.
 //
@@ -298,6 +301,28 @@ function tagPairs(state, result) {
 		.join("\n");
 }
 
+// Put each named position's command on the first move that reaches it,
+// replaying the tree: a variation starts from the position before its parent move.
+function writeNames(trunk, names) {
+	const done = new Set();
+	const walk = (nodes, fen) => {
+		const chess = new Chess(fen);
+		for (const n of nodes) {
+			const before = chess.fen();
+			if (n.san) {
+				chess.move(n.san);
+				const key = posKey(chess.fen());
+				if (names[key] && !done.has(key)) {
+					done.add(key);
+					n.comments.unshift(nameCmd(names[key]));
+				}
+			}
+			for (const v of n.variations) walk(v, before);
+		}
+	};
+	walk(trunk, new Chess().fen());
+}
+
 // The whole export: tag pairs, a blank line, movetext.
 //
 // `state` is passed in rather than read from state.js on purpose. The bug this
@@ -320,6 +345,7 @@ export function buildPgn(state) {
 		lines.length ? numberNotes(lines, opts).entries : [],
 		opts,
 	);
+	if (state.names && Object.keys(state.names).length) writeNames(tree.trunk, state.names);
 	return (
 		tagPairs(state, result) +
 		"\n\n" +

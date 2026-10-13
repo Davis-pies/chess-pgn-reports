@@ -1,4 +1,5 @@
 import { Chess } from "chess.js";
+import { readNameCmd } from "./names.js";
 
 const START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -274,6 +275,8 @@ function parseSeq(tokens, ctx, state, inVariation = false, intro = null) {
 		const t = tokens[ctx.i];
 		if (t.startsWith("{") || t.startsWith(";")) {
 			let text = t.startsWith("{") ? t.slice(1, -1) : t.slice(1);
+			const cmd = readNameCmd(text);
+			if (cmd && last) last.posName = cmd;
 			text = text
 				.trim()
 				.replace(/\[%.*?\]/g, "")
