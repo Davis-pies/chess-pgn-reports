@@ -15,7 +15,8 @@ import { boardSvg } from "./render.js";
 import { interactiveBoard } from "./board-input.js";
 import {
 	DEFAULT_SETTINGS, allTags, answer, checkBook, checkFamily, checkName, current, isLearned, isMastered, learnedCard,
-	markKnown, masteredCard, nameChoices, newSession, normalizeSettings, orderStep, resetVar, saveProgress, sessionSummary, skip, unlockedKeys,
+	isTricky, markKnown, masteredCard, nameChoices, newSession, normalizeSettings, orderStep, resetVar, saveProgress, sessionSummary, skip,
+	unlockedKeys, unlocksIfLearned,
 } from "./train.js";
 
 // Every question draws its board at one size, asked or answered, so the board
@@ -43,7 +44,7 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 		save();
 		onChange();
 	};
-	const live = deck.filter((c) => settings.types[c.type]);
+	const live = deck.filter((c) => c.type === "intro" || settings.types[c.type]);
 	// the variations the tag filter keeps: those carrying the tag, and below them
 	const tagged = (() => {
 		if (!ui.tag || !allTags(tree).includes(ui.tag)) return null;
@@ -74,7 +75,7 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 
 	function outlineScreen() {
 		const box = el("div", { className: "tr-outline" });
-		const queue = newSession(live, tree, progress, settings, { scope: ui.scope, keys: tagged }).queue;
+		const queue = newSession(live, tree, progress, settings, { scope: ui.scope, keys: tagged }).queue.filter((c) => c.type !== "intro");
 		const started = queue.filter((c) => progress.cards[c.id] && !masteredCard(progress.cards[c.id], settings)).length;
 		const fresh = queue.filter((c) => !progress.cards[c.id]).length;
 		const head = el("div", { className: "tr-head" });
@@ -148,6 +149,7 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 			r.append(bar);
 			if (!unlocked.has(n.key)) r.append(el("span", { className: "tr-badge", title: "Learn the variation above it to open this one", textContent: "locked" }));
 			if (skipped) r.append(el("span", { className: "tr-badge", title: "Left out of sessions", textContent: "skipped" }));
+			if (isTricky(n.key, deck, progress)) r.append(el("span", { className: "tr-badge", title: "A question here was missed three times: Learn it before drilling it again", textContent: "tricky" }));
 			const acts = el("span", { className: "tr-acts" });
 			acts.append(
 				chipBtn("tr-learn", "Learn", "Play through this variation with its notes", () => learn(n)),
@@ -236,6 +238,7 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 				num("masterStreak", "Right in a row to master", s.masterStreak, (n) => set({ masterStreak: n }), 1, 20, `How many right answers in a row master a question. Never below the learn setting. 1 to 20. Default ${D.masterStreak}.`),
 			),
 			group("Sessions",
+				check("introNew", "Show a new variation first", s.introNew, (on) => set({ introNew: on }), `Before the first question on a variation, show its position, the moves that reach it and the workbook's notes. Default ${onOff(D.introNew)}.`),
 				num("newPerSession", "New questions per session", s.newPerSession, (n) => set({ newPerSession: n }), 0, 50, `How many questions never asked before a session adds. 0 to 50. Default ${D.newPerSession}.`),
 				num("reviews", "Re-checks per session", s.reviews, (n) => set({ reviews: n }), 0, 20, `How many mastered questions a session asks again, the ones asked longest ago. 0 to 20. Default ${D.reviews}.`),
 				num("sessionLength", "Questions per session (0: no limit)", s.sessionLength, (n) => set({ sessionLength: n }), 0, undefined, `The most questions in a session; 0 for no limit. Default ${D.sessionLength}.`),
@@ -251,8 +254,10 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 		const card = ui.card;
 		const node = tree.byKey.get(card.key);
 		const box = el("div", { className: "tr-question" });
-		const total = ui.session.queue.length;
-		const place = ui.answered ? ui.session.i : ui.session.i + 1;
+		// intros are steps, not questions: only the others are counted
+		const asked = (n) => ui.session.queue.slice(0, n).filter((c) => c.type !== "intro").length;
+		const total = asked(Infinity);
+		const place = card.type === "intro" ? asked(ui.session.i) + 1 : ui.answered ? asked(ui.session.i) : asked(ui.session.i + 1);
 		const prompt = el("p", { className: "tr-prompt" });
 		const body = el("div", { className: "tr-body" });
 		// the card's level and streak, never the variation's name: it would give a name question away
@@ -261,30 +266,35 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 		const standing = masteredCard(rec, settings) ? "mastered"
 			: learnedCard(rec, settings) ? `learned · ${streak} of ${settings.masterStreak} right to master`
 			: `${streak} of ${settings.learnStreak} right to learn`;
+		const opens = card.vkey === "" || isLearned(card.vkey, deck, progress, settings) ? 0 : unlocksIfLearned(card.vkey, tree, deck, progress, settings);
 		const status = el("p", {
 			className: "tr-status",
 			title: `Answer it right ${settings.learnStreak} times in a row to learn it (unlocking what's below), ${settings.masterStreak} times to master it. A miss on a mastered question drops it back to learned; any other miss starts the count again.`,
-			textContent: `${card.vkey === "" ? "" : `Level ${card.level} · `}${standing}`,
+			textContent: `${card.vkey === "" ? "" : `Level ${card.level} · `}${standing}${opens ? ` · learn it to unlock ${opens} variation${opens === 1 ? "" : "s"}` : ""}`,
 		});
-		box.append(el("p", { className: "tr-progress", textContent: `Question ${place} of ${total}` }), prompt, status, body);
+		box.append(el("p", { className: "tr-progress", textContent: `Question ${place} of ${total}` }), prompt, ...(card.type === "intro" ? [] : [status]), body);
 
 		const next = () => {
 			setCard();
 			onChange();
 		};
-		const finish = (right, detail, notes = {}) => {
-			// before answer() counts this card as seen
-			const fresh = !deck.some((c) => c.vkey === card.vkey && progress.cards[c.id]?.seen > 0);
-			const { unlocked } = answer(ui.session, progress, card, right, settings, { deck: live, tree });
+		const finish = (right, detail) => {
+			const { unlocked, tooSoon } = answer(ui.session, progress, card, right, settings, { deck: live, tree });
 			save();
-			ui.answered = { right, detail, notes, fresh, unlocked };
+			ui.answered = { right, detail, tooSoon: !!tooSoon, unlocked };
 			onChange();
+		};
+		// an intro is passed, not answered: nothing is scored or stored
+		const gotIt = () => {
+			answer(ui.session, progress, card, true, settings);
+			next();
 		};
 		let typedInput = null; // the typed-name field, when this question has one
 		panel.onkeydown = (e) => {
 			if (e.key === "Enter") {
 				if (e.target.closest?.("button")) return; // a focused button handles Enter itself
-				if (ui.answered) next();
+				if (card.type === "intro") gotIt();
+				else if (ui.answered) next();
 				else if (typedInput && e.target === typedInput) pickName(typedInput.value);
 				return;
 			}
@@ -300,7 +310,23 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 		// the reader's side at the bottom (Black: flipped), unless turned by hand
 		const readerFlip = (settings.bookSide === "black") !== ui.flipped;
 
-		if (card.type === "name") {
+		// a note: the move it is on, then the workbook's text
+		const noteLine = (label, text) => {
+			const p = el("p", { className: "tr-note" }, [`${label} `]);
+			renderInline(p, text);
+			return p;
+		};
+		if (card.type === "intro") {
+			prompt.textContent = `New: ${node.name}`;
+			body.append(
+				boardSvg(node.fen, BOARD, { flipped: readerFlip }),
+				flip(),
+				el("p", { className: "tr-moves", textContent: node.orders[0].join(" ") }),
+				...card.notes.map((n) => noteLine(n.move, n.text)),
+				chipBtn("tr-learn", "Learn it", "Play through this variation with its notes in Study", () => learn(node)),
+				chipBtn("tr-next", "Got it", "Go on to the questions (Enter)", gotIt),
+			);
+		} else if (card.type === "name") {
 			prompt.textContent = "What is this position called?";
 			body.append(boardSvg(node.fen, BOARD, { flipped: readerFlip }));
 			if (!ui.answered) body.append(flip());
@@ -356,23 +382,20 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 			const play = (san) => {
 				const right = checkBook(card, san, settings);
 				const detail = [`Book: ${card.moves.join(", ")}${card.main ? ` (main: ${card.main})` : ""}`];
-				finish(right, detail, card.notes);
+				finish(right, detail);
 			};
 			body.append(ui.answered ? boardSvg(chess.fen(), BOARD, { flipped }) : interactiveBoard(chess.fen(), play, { size: BOARD, flipped }), flip());
 		}
 
 		if (ui.answered) {
-			const { right, detail, notes, fresh, unlocked } = ui.answered;
+			const { right, detail, tooSoon, unlocked } = ui.answered;
 			const res = el("div", { className: `tr-result ${right ? "right" : "wrong"}` }, [el("strong", { textContent: right ? "Right" : "Not quite" })]);
+			if (tooSoon) res.append(el("p", { className: "tr-soon", title: "A learned question's streak grows only after 10 other questions have been answered since it was last asked", textContent: "Too soon to count towards mastery: it counts when other questions come in between." }));
 			for (const d of detail) res.append(el("p", { textContent: d }));
-			for (const [san, text] of Object.entries(notes)) {
-				const p = el("p", { className: "tr-note" }, [`${san}: `]);
-				renderInline(p, text);
-				res.append(p);
-			}
+			// a book card keeps its notes by move, the others have a list
+			const notes = Array.isArray(card.notes) ? card.notes.map((n) => [n.move, n.text]) : Object.entries(card.notes);
+			for (const [move, text] of notes) res.append(noteLine(Array.isArray(card.notes) ? move : `${move}:`, text));
 			if (unlocked.length) res.append(el("p", { className: "tr-unlocked", textContent: `Unlocked: ${unlocked.join(", ")}` }));
-			const v = fresh && tree.byKey.get(card.vkey);
-			if (v) res.append(chipBtn("tr-learn", "New to you? Learn it", "Play through this variation with its notes", () => learn(v)));
 			res.append(chipBtn("tr-next", "Next", "Next question (Enter)", next));
 			box.append(res);
 		}
@@ -390,6 +413,12 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 		list("Mastered", sum.mastered, "Every question in it is now mastered");
 		list("Back to learned", sum.slipped, "Mastered before, missed this time: answer it right again to re-master it");
 		list("Unlocked", sum.unlocked, "Opened by what you learned");
+		if (sum.tricky.length) {
+			box.append(el("p", { title: "Missed three times: study it before drilling it again", textContent: `Tricky: ${sum.tricky.map((t) => `${t.name} (${t.id.split("|")[0] === "book" ? "book move" : t.id.split("|")[0]})`).join(", ")}` }));
+			for (const key of new Set(sum.tricky.map((t) => t.vkey).filter((k) => k !== ""))) {
+				box.append(chipBtn("tr-learn", `Learn it: ${tree.byKey.get(key).name}`, "Missed three times: study it before drilling it again", () => learn(tree.byKey.get(key))));
+			}
+		}
 		if (sum.locked) box.append(el("p", { title: "Learn the variations above them to open these", textContent: `Still locked: ${sum.locked} variation${sum.locked === 1 ? "" : "s"}` }));
 		box.append(chipBtn("tr-back", "Back to the outline", "Leave the summary", act(() => (ui.screen = "outline"))));
 		return box;

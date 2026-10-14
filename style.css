@@ -1945,7 +1945,7 @@ sup {
 .tr-subgroup { border-style: dashed; }
 .tr-unlocked { color: var(--main); }
 .tr-prompt { font-weight: 600; font-size: 1.05rem; }
-.tr-progress, .tr-status, .tr-overview { font-size: .8rem; color: var(--muted); }
+.tr-progress, .tr-status, .tr-overview, .tr-soon { font-size: .8rem; color: var(--muted); }
 /* Train shows one screen at a time, so it takes the whole window rather than
    the analysis board's 480px board column (which also capped its board). */
 .analysis.train { grid-template-columns: minmax(0, 1fr); }
