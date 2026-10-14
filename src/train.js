@@ -1,3 +1,4 @@
+import { Chess } from "chess.js";
 import { fenMap } from "./pgn.js";
 import { posKey } from "./audit.js";
 import { isMainLine } from "./tree.js";
@@ -38,34 +39,54 @@ const START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 // --- deck -------------------------------------------------------------
 
-// The workbook's comments on the moves that reach a variation, read off the
-// first line that reaches it by its first move order: `at` is the move's
-// index in that order, `own` marks the comments on the move that reaches the
-// variation. `from` is where its own moves begin, after the nearest named
-// position before it on that line (the start, at level 1). A question's
-// result shows only the `own` notes; the intro steps through the moves from
-// `from` and shows one move's notes at a time (2026-10-14: every note at
-// once was a wall of text at level 1).
-function notesOf(v, tree, lines) {
-	const order = v.orders[0];
-	const n = order.length;
-	const line = lines.find((l) => l.moves.length >= n && order.every((san, i) => l.moves[i].san === san));
-	if (!line) return { from: 0, notes: [] };
-	const fens = fenMap(line.moves);
-	let from = 0;
-	for (let i = n - 2; i >= 0; i--) {
-		if (tree.byKey.has(posKey(fens.get(line.moves[i].ply)))) { from = i + 1; break; }
+// Every line's comments, by the moves that lead to them. A PGN keeps a
+// comment only on the line that owns its move: a sideline's line has none of
+// the notes on the moves it shares with the mainline, and a sub-variation's
+// line none of its parent's. Reading one line lost them (Davis, 2026-10-14:
+// no notes at all on "New: ...Nc6 Sicilians", whose first line was a
+// sub-variation's), so a variation's notes are looked up here instead.
+function commentsByPath(lines) {
+	const out = new Map();
+	for (const l of lines) {
+		let path = "";
+		for (const m of l.moves) {
+			path += ` ${m.san}`;
+			for (const c of l.comments || []) {
+				if (c.ply === m.ply && c.text) (out.get(path) || out.set(path, new Set()).get(path)).add(c.text);
+			}
+		}
 	}
-	const notes = line.moves.slice(0, n).flatMap((m, at) =>
-		(line.comments || []).filter((x) => x.ply === m.ply && x.text).map((x) => ({ at, move: fullmoveLabel(m.ply) + m.san, text: x.text, own: at === n - 1 })));
+	return out;
+}
+
+// The workbook's comments on the moves that reach a variation by its first
+// move order: `at` is the move's index in that order, `own` marks the comments
+// on the move that reaches the variation. `from` is where its own moves begin,
+// after the nearest named position before it (the start, at level 1). A
+// question's result shows only the `own` notes; the intro steps through the
+// moves from `from` and shows one move's notes at a time (2026-10-14: every
+// note at once was a wall of text at level 1).
+function notesOf(v, tree, comments) {
+	const order = v.orders[0];
+	const chess = new Chess();
+	let from = 0;
+	let path = "";
+	const notes = [];
+	order.forEach((san, at) => {
+		chess.move(san);
+		path += ` ${san}`;
+		if (at < order.length - 1 && tree.byKey.has(posKey(chess.fen()))) from = at + 1;
+		for (const text of comments.get(path) || []) notes.push({ at, move: fullmoveLabel(at) + san, text, own: at === order.length - 1 });
+	});
 	return { from, notes };
 }
 
 export function buildDeck(tree, lines, settings) {
 	const deck = [];
 	const on = settings.types;
+	const comments = commentsByPath(lines);
 	for (const v of tree.byKey.values()) {
-		const { from, notes } = notesOf(v, tree, lines);
+		const { from, notes } = notesOf(v, tree, comments);
 		const base = { key: v.key, vkey: v.key, level: v.level };
 		// an intro is a step, not a question: it is never stored and never counts
 		if (settings.introNew) deck.push({ id: `intro|${v.key}`, type: "intro", ...base, notes, from });

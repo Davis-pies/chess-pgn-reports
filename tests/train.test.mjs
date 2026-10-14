@@ -450,6 +450,25 @@ test("notes: every comment on the way, by move, the variation's own marked, and 
 	assert.ok(d.filter((c) => c.type === "book").every((c) => typeof c.notes === "object" && !Array.isArray(c.notes)));
 });
 
+test("notes come from whichever line holds them, not the first line through the variation", () => {
+	// a comment sits only on the line that owns its move: the sideline's line
+	// has no 1...c5 or 2.Nf3 note, and its sub-variation's line (3.Bb5) not even
+	// the 2...Nc6 one. With that sub-line first, the intro had no notes at all.
+	const pgn = `1. e4 c5 {Why c5.} 2. Nf3 {Organised.} d6 {[%name "D6"]} (2... Nc6 {[%name "Nc6"]} {Nc6 note.} 3. d4 (3. Bb5 {[%name "Ross"]} {Ross note.} g6) cxd4) 3. d4 *`;
+	const { nodes: ns } = parsePgn(pgn);
+	const ls = collectLines(ns);
+	const t = variationTree(ls, namesFromNodes(ns));
+	for (const order of [ls, [...ls].reverse()]) {
+		const d = buildDeck(t, order, { ...S, introNew: true });
+		const intro = (name) => d.find((c) => c.type === "intro" && t.byKey.get(c.key).name === name);
+		assert.deepStrictEqual(intro("Nc6").notes.map((n) => [n.move, n.text, n.own]), [
+			["1...c5", "Why c5.", false], ["2.Nf3", "Organised.", false], ["2...Nc6", "Nc6 note.", true],
+		]);
+		assert.strictEqual(intro("Ross").from, 4);
+		assert.deepStrictEqual(intro("Ross").notes.filter((n) => n.own).map((n) => n.text), ["Ross note."]);
+	}
+});
+
 test("intro cards: one per variation when on, never in progress, never counted", () => {
 	assert.strictEqual(deckI.filter((c) => c.type === "intro").length, 5);
 	assert.strictEqual(deck.filter((c) => c.type === "intro").length, 0);
