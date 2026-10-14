@@ -1,4 +1,5 @@
-import { test, expect, loadPgn } from "./fixtures.mjs";
+import { readFileSync } from "node:fs";
+import { test, expect, loadPgn, playOnBoard, FIXTURE } from "./fixtures.mjs";
 
 const NAMED = '1. e4 c5 2. Nf3 d6 {[%name "...d6 Sicilians"]} (2... e6 {[%name "...e6 Sicilians"]}) *';
 
@@ -24,4 +25,28 @@ test("train quizzes the named variations and scores a right answer", async ({ pa
 
   await page.keyboard.press("Escape");
   await expect(page.locator(".tr-outline, .tr-question")).toHaveCount(0);
+});
+
+// The board you play on is the analysis board's, which stretches to fill its
+// row; in Train it must keep the size of the pictures the other questions and
+// the answered card show, or it jumps when the answer comes up.
+test("train's board keeps one size across questions and answers", async ({ page }) => {
+  await loadPgn(page, readFileSync(FIXTURE, "utf8"));
+  await page.getByRole("button", { name: "Train", exact: true }).click();
+  await page.locator(".tr-start").click();
+  const width = async () => (await page.locator(".tr-body svg").first().boundingBox()).width;
+  const seen = new Map(); // prompt kind -> widths
+  for (let i = 0; i < 6 && (await page.locator(".tr-question").count()); i++) {
+    const prompt = await page.locator(".tr-prompt").innerText();
+    const widths = [await width()];
+    if (prompt.startsWith("Play the moves")) await playOnBoard(page, "a2", "a3"); // never book here: a wrong answer
+    else if (await page.locator(".tr-choice").count()) await page.locator(".tr-choice").first().click();
+    else await page.locator(".tr-check").click();
+    await expect(page.locator(".tr-result")).toBeVisible();
+    widths.push(await width());
+    seen.set(prompt.split(" ")[0], widths);
+    await page.locator(".tr-next").click();
+  }
+  expect([...seen.keys()]).toEqual(expect.arrayContaining(["What", "Play"]));
+  expect(new Set([...seen.values()].flat())).toEqual(new Set([320]));
 });

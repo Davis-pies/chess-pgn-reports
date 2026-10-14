@@ -1943,6 +1943,12 @@ sup {
 .tr-prompt { font-weight: 600; font-size: 1.05rem; }
 .tr-progress { font-size: .8rem; color: var(--muted); }
 .tr-body { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .8rem; }
+/* The board you play on is the analysis board, which stretches to fill its
+   row. Here it keeps the size it is drawn at, like the pictures on the other
+   questions and the answered card, so the board does not jump when the answer
+   comes up. Both shrink to fit a narrow window. */
+.tr-body .an-board { flex: none; max-width: 100%; }
+.tr-body .an-board svg, .tr-body > svg { width: auto; max-width: 100%; height: auto; }
 .tr-choice { text-align: left; }
 .tr-result { margin-top: .6rem; padding: .5rem .8rem; border-radius: var(--radius-sm); border: 1px solid var(--line); }
 .tr-result.right { border-color: var(--main); }

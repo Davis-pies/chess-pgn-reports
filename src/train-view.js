@@ -18,6 +18,10 @@ import {
 	newSession, normalizeSettings, orderStep, resetVar, saveProgress, sessionSummary, setBox, skip, unlockedKeys,
 } from "./train.js";
 
+// Every question draws its board at one size, asked or answered, so the board
+// does not jump between cards (Name questions used to be smaller than Order).
+const BOARD = 320;
+
 export function newTrainUi(scope = null) {
 	return {
 		screen: "outline", session: null, card: null,
@@ -251,7 +255,7 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 
 		if (card.type === "name") {
 			prompt.textContent = "What is this position called?";
-			body.append(boardSvg(node.fen, 280, { flipped: readerFlip }));
+			body.append(boardSvg(node.fen, BOARD, { flipped: readerFlip }));
 			if (!ui.answered) body.append(flip());
 			if (settings.showMoves) body.append(el("p", { className: "tr-moves", textContent: node.orders[0].join(" ") }));
 			if (!ui.answered && settings.nameMode === "choice") {
@@ -274,14 +278,14 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 				const others = node.orders.filter((o) => o.join(" ") !== ui.played.join(" ")).map((o) => o.join(" "));
 				finish(true, others.length ? [`Also reached by: ${others.join("; ")}`] : []);
 			};
-			body.append(ui.answered ? boardSvg(chess.fen(), 320, { flipped: ui.flipped }) : interactiveBoard(chess.fen(), play, { flipped: ui.flipped }));
+			body.append(ui.answered ? boardSvg(chess.fen(), BOARD, { flipped: ui.flipped }) : interactiveBoard(chess.fen(), play, { size: BOARD, flipped: ui.flipped }));
 			if (settings.orderHint) body.append(el("div", { className: "tr-hint" }, boardSvg(node.fen, 140, { flipped: ui.flipped })));
 			body.append(flip());
 		} else if (card.type === "family") {
 			const group = settings.familyGroup;
 			const tags = group.length ? node.tags.filter((t) => group.includes(t)) : node.tags;
 			prompt.textContent = settings.familyShowName ? `Which families does the ${node.name} belong to?` : "Which families does this position belong to?";
-			body.append(boardSvg(node.fen, 280, { flipped: readerFlip }));
+			body.append(boardSvg(node.fen, BOARD, { flipped: readerFlip }));
 			if (!ui.answered) body.append(flip());
 			const options = group.length ? group : allTags(tree);
 			const radio = group.length > 0;
@@ -307,7 +311,7 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 				const detail = [`Book: ${card.moves.join(", ")}${card.main ? ` (main: ${card.main})` : ""}`];
 				finish(right, detail, card.notes);
 			};
-			body.append(ui.answered ? boardSvg(chess.fen(), 320, { flipped }) : interactiveBoard(chess.fen(), play, { flipped }), flip());
+			body.append(ui.answered ? boardSvg(chess.fen(), BOARD, { flipped }) : interactiveBoard(chess.fen(), play, { size: BOARD, flipped }), flip());
 		}
 
 		if (ui.answered) {

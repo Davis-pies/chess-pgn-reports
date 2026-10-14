@@ -160,6 +160,22 @@ test("a whole session: right answers, results, Enter for Next, summary", () => {
 	done();
 });
 
+test("every question draws its board at one size, asked and answered", () => {
+	const board = (root) => $(root, ".tr-question svg:not(.tr-hint svg)").getAttribute("width");
+	for (const type of ["name", "order", "family", "book"]) {
+		const c = deck.find((x) => x.type === type);
+		const m = mount({ settings: { bookSide: "black", orderHint: true } });
+		m.ui.session = { queue: [c], i: 0, results: [], unlockedBefore: new Set() };
+		m.ui.card = c;
+		m.ui.screen = "question";
+		m.draw();
+		assert.strictEqual(board(m.root), "320", `${type}, asked`);
+		solve(m.root, m.ui);
+		assert.strictEqual(board(m.root), "320", `${type}, answered`);
+	}
+	done();
+});
+
 test("name question: wrong choice, keys 1-9, typed mode accepts an alias", () => {
 	const key = v("...e6 Sicilians/Sicilian e6").key;
 	const c = deck.find((x) => x.id === `name|${key}`);
