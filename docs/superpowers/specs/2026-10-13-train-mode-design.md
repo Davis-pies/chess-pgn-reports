@@ -5,7 +5,7 @@
 Learn a workbook's openings in a sensible order and be quizzed on them: first
 the names of the main variations and the moves that reach them, then deeper
 sub-variations, then the book moves inside each one. What is learned comes
-back for review on a spaced schedule, and nearly everything is configurable.
+back to be re-checked, and nearly everything is configurable.
 
 Davis asked for this to study the Sicilian, 2026-10-13.
 
@@ -67,41 +67,74 @@ Answers score right or wrong; there is no partial credit.
 
 ## Progression
 
-- Level-1 variations start unlocked. Learning and mastery are separate
-  (2026-10-14: unlocking used to wait for mastery, which took at least four
-  days of reviews before anything below level 1 opened):
-  - A card is **learned** once it has been answered right a number of times
-    in a row (the card's `streak`; setting "Right in a row to learn", default
-    2, 1-10), or once it reaches the mastery box. A miss resets the streak.
-  - A variation is **learned** when each of its enabled name/order/family
-    cards is. Learning a variation unlocks its children and its book cards.
-  - A variation is **mastered** when each of those cards is in the mastery
-    box (default 3) or above. Mastery is the long-term measure: the outline's
-    bar shows it, and the review schedule keeps working towards it.
-- Leitner boxes 0-5. Intervals (editable): box 0 again this session, then 1,
-  3, 7, 16, 35 days. Right moves a card up one box, wrong sends it to box 1.
-- A session takes due cards first (most overdue first), then up to N new
-  cards from the unlocked set (default 10), and stops after M questions
-  (default 20, or unlimited) or when nothing is left. A miss comes back later
-  in the same session, and so does a right answer on a card not yet learned,
-  so a card can be learned in one sitting (its box still climbs at most once
-  a session). When an answer unlocks variations, their new cards join the
-  session at once, within the same new-card and length limits, so a first
-  session can go deeper than level 1.
-- Manual, per variation: **Mark known** (its cards to the mastery box,
-  unlocking its children), **Skip** (left out of sessions), **Reset**, **Set
-  box**. **Practice this** drills one subtree now, ignoring the schedule;
-  results still count.
+2026-10-14 (Davis): no boxes, no dates. "I don't want anything about mastery
+to be time based"; mastery is "based on what we know about the user's
+current knowledge level". The first version used Leitner boxes and review
+intervals; unlocking waited for mastery, which took at least four days, and
+the boxes were hard to follow.
+
+- Every card carries one number, its **streak**: a right answer adds one,
+  up to the master setting (it never counts past it).
+- A card is **learned** at a streak of "Right in a row to learn" (default 2)
+  and **mastered** at "Right in a row to master" (default 5, never below the
+  learn setting). Both read the current streak, so mastery says what the
+  reader knows now.
+- A miss takes a card down one stage, not back to the start (Davis: "We
+  also don't want it to be frustrating. Missing something you've mastered
+  shouldn't fully reset you"): a mastered card drops to learned (its streak
+  to the learn setting, so with the defaults three right answers master it
+  again); a card not yet mastered starts again at 0, as it was not known
+  yet. Nothing unlocked is locked again.
+- A variation is learned (or mastered) when each of its enabled
+  name/order/family cards is. Level-1 variations start unlocked; learning a
+  variation unlocks its children and its book cards, and a variation once
+  unlocked stays unlocked.
+- A session, from the unlocked cards (in scope, not skipped), in this order:
+  1. cards started but not mastered, least-recently asked first;
+  2. up to "New questions per session" cards never asked (default 5),
+     shallowest level first, in reading order;
+  3. up to "Re-checks per session" mastered cards (default 3), the ones
+     asked longest ago first.
+  It stops after "Questions per session" (default 20; 0: no limit) or when
+  nothing is left. Order matters only for what the limit cuts: the queue is
+  asked in that order.
+- In a session, a miss comes back three questions later, and so does a right
+  answer on a card not yet learned, so a card can be learned in one sitting.
+  (Mastery builds across sessions: once learned, a card is not repeated in
+  the same session.) When an answer unlocks variations, their new cards join
+  the session straight away, within the new-question and length limits, so a
+  first session goes deeper than level 1.
+- Manual, per variation: **Known** (its cards' streaks set to the master
+  setting: mastered, which unlocks its children), **Skip** (left out of
+  sessions), **Reset** (its cards forgotten). **Practice** drills one
+  subtree now, every card in it whatever its state, locked or not; answers
+  still count.
 
 ## Progress storage
 
 Per workbook in localStorage under `ott-train:<workbook id>`: settings plus,
-per card (`<type>|<position key>`), `{ box, seen, skip, streak }` (a record
-without `streak`, from before 2026-10-14, reads as 0). Saved after every
+per card (`<type>|<position key>`), `{ streak, seen, skip }`, `seen` the time
+it was last asked (used only to order the queue). A record from the first
+version (`{ box, seen, skip }`) reads with streak 0. Saved after every
 answer, without touching the workbook's own Save. **Save to file** includes
 it as `train`; opening that file restores it. PGN export and shared links do
 not carry it. A workbook never saved has no id; its progress lives under
 `ott-train:unsaved` until it is saved, then moves to its id.
+
+## Settings
+
+Grouped, each with a tooltip saying what it does and its default:
+
+- **Questions**: which types are asked (Name, Order, Book on; Family off).
+- **Name questions**: answer by choosing or typing; how many choices (2-8);
+  show the moves that lead there.
+- **Order questions**: show the target position as a hint.
+- **Family questions**: show the name; ask only within one group of tags.
+- **Book questions**: the side you play (White, Black, both); accept any
+  book move or only the mainline's.
+- **Progress**: right in a row to learn (1-10), to master (learn-20).
+- **Sessions**: new questions per session (0-50), re-checks per session
+  (0-20), questions per session (0: no limit).
 
 ## The Train window
 
@@ -109,19 +142,22 @@ A window over the report like Study: **Train** in the toolbar, **Train from
 here** in the table's context menu (Practice on the subtree at that
 position). Three screens:
 
-- **Outline** - a progress line over the tree (variations learned out of
-  all, how many mastered, the deepest level open), then the named-position
-  tree: level, a mastery bar, learned/mastered state, cards due,
-  locked/skipped state, the manual actions, rename/retag. Filters: subtree,
-  tags, card types. **Start** (scheduled session) and settings.
+- **Outline** - **Start**, **Settings**, what a session would hold ("N in
+  progress · M new · K to re-check"), a progress line (variations learned
+  out of all, how many mastered, the deepest level open), then the
+  named-position tree: level, a bar of progress towards mastery (the
+  streaks, each capped at the master setting, over what mastering every card
+  needs), learned/mastered/locked/skipped state, the manual actions,
+  rename/retag. Filters: subtree, tags. Every control has a tooltip.
 - **Question** - the board (the analysis board's `boardRow`), the prompt,
-  a status line (the card's level and its streak towards learned, or
-  learned/mastered; never the variation's name, which would give a name
+  a status line (the card's level and its streak towards learned or
+  mastered; never the variation's name, which would give a name
   question away), the answer area; after answering, right/wrong, the right
   answer, the workbook's note, what the answer unlocked, and **Next**. Keys: Enter next, 1-9 pick a choice,
   Escape closes.
-- **Summary** - score, cards up/down, newly unlocked variations, how many
-  are still locked, when the next review is due.
+- **Summary** - score; the variations newly learned, newly mastered, newly
+  unlocked, and those that slipped back from mastered; how many are still
+  locked.
 
 On phones the board is pinned on top as in Study. With no named positions
 the outline explains how to name one; book drilling still works, the whole
@@ -131,8 +167,8 @@ workbook treated as one unnamed variation.
 
 - `names.js` - position keys, the names map, hierarchy, stretches, reading
   names and tags out of PGN comments and writing them back.
-- `train.js` - cards, answer checking, Leitner scheduling, unlocking, manual
-  overrides, sessions, progress load/save. No DOM.
+- `train.js` - cards, answer checking, streaks, unlocking, sessions, manual
+  overrides, progress load/save. No DOM.
 - `train-view.js` - the window and its screens.
 
 ## Not in this version

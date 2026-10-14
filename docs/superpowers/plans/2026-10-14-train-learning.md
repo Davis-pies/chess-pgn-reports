@@ -1,141 +1,186 @@
-# Train: learning, in-session deepening and visible progress
+# Train: streaks instead of boxes, visible progress, settings with tooltips
 
 Spec: `docs/superpowers/specs/2026-10-13-train-mode-design.md` (Progression,
-Progress storage, The Train window; updated 2026-10-14).
+Progress storage, Settings, The Train window; rewritten 2026-10-14).
 
 Problem (Davis, 2026-10-14): after Start there was no way to see progress or
-level, and nothing deeper than level 1 ever came up. Unlocking waited for
-mastery (box 3), which a right answer reaches at best on day 4 (box 1 → due
-in 1 day → box 2 → due in 3 days → box 3), and the question screen showed
-only "Question n of m".
+level, and nothing deeper than level 1 came up for days: unlocking waited for
+mastery (box 3), a right answer climbed one box a session, and boxes waited
+1 and 3 days. He wants nothing about mastery to be time-based, finds boxes
+unintuitive, and wants mastery to reflect what he knows now. Boxes, review
+intervals and due dates go; each card keeps one number, its streak.
 
-Branch: `train-mode` (not merged; Davis signs off locally). Files use tabs in
-`src/train*.js` and `tests/train*.test.mjs`, two spaces in `e2e/` and
-`style.css`. Run single tests with `node --test tests/train.test.mjs`.
+Branch: `train-mode` (not merged; Davis signs off locally). Tabs in
+`src/train*.js` and `tests/train*.test.mjs`; two spaces in `e2e/` and
+`style.css`. Single test file: `node --test tests/train.test.mjs`.
 
 ---
 
-### Task 1: Learning in `src/train.js` (logic, no DOM)
+### Task 1: Streaks in `src/train.js` (logic, no DOM)
 
 **Files:** `src/train.js`, `tests/train.test.mjs`
 
-1. Setting `learnStreak`: `DEFAULT_SETTINGS.learnStreak = 2`, validated
-   `isInt(x, 1, 10)` in `VALID`.
-2. Card records gain `streak` (consecutive right answers). `loadProgress`
-   keeps it when it is an integer ≥ 0, else 0 (old records have none).
-   `markKnown`, `setBox` and `skip` keep or set records consistently
-   (`markKnown` may leave `streak` alone: the mastery box counts as learned).
-3. `export const isLearnedCard = (rec, settings) => !!rec && ((rec.streak ?? 0) >= settings.learnStreak || rec.box >= settings.masteryBox);`
-   `export const isLearned = (vkey, deck, progress, settings) => ownCards(vkey, deck).every((c) => isLearnedCard(progress.cards[c.id], settings));`
-   (A variation with no own cards is learned, as `masteredBy` treats it
-   mastered today.)
-4. Unlocking uses learned, not mastered: in `unlockedKeys` replace
-   `masteredBy` with the learned test; `bookOpen` uses `isLearned`.
-   `isMastered` stays (the outline's bar and "mastered" state use it).
-5. `answer(session, progress, card, right, settings, now, ctx = null)`:
-   - `streak`: right → `(rec.streak ?? 0) + 1`; wrong → 0. Box rule unchanged
-     (right climbs once per session, wrong → box 1).
-   - Requeue (splice at `session.i + 3`, as a miss already is) a miss, **and**
-     a right answer whose card is still not learned afterwards.
-   - When `ctx = { deck, tree }` is given and the session is not a practice
-     session: compute `unlockedKeys` before and after the record update; the
-     names of keys newly unlocked go on the pushed result as `unlocked`
-     (always an array). Then **deepen**: append to the queue the cards that
-     (a) have no progress record, (b) are not already in the queue, (c) are
-     in the session's pool (the scope/keys-filtered cards `newSession`
-     drew from), (d) pass the same unlocked + book-open test `newSession`
-     uses, sorted by level then deck order, at most `session.newLeft` of them
-     (decrement it), and only while the number of distinct cards in the queue
-     is below `settings.sessionLength` (0: no limit).
-6. `newSession` returns, besides `queue, i, results, unlockedBefore`:
-   `practice` (bool), `pool` (the filtered `cards` array) and `newLeft`
-   (`settings.newPerSession` minus the fresh cards it took; 0 for practice).
-   Factor the unlocked/book-open test into one helper both use.
-7. `sessionSummary` adds `locked`: the number of variations in the tree not
-   in `unlockedKeys` after the session.
+1. Settings. `DEFAULT_SETTINGS` loses `masteryBox` and `intervals`, gains
+   `learnStreak: 2` (int 1-10), `masterStreak: 5` (int 1-20), `reviews: 3`
+   (int 0-20); `newPerSession` defaults to 5 and validates int 0-50;
+   `choices` validates 2-8 (the field's own range). `normalizeSettings`
+   also raises `masterStreak` to `learnStreak` when it is lower. Old keys in
+   saved settings are simply dropped (normalizeSettings already only copies
+   known keys).
+2. Records are `{ streak, seen, skip }`. `loadProgress` reads `streak` when
+   an int ≥ 0, else 0 (a first-version record `{ box, seen, skip }` reads
+   with streak 0), keeps `seen` (number) and `skip`.
+3. `export const learnedCard = (rec, s) => (rec?.streak ?? 0) >= s.learnStreak;`
+   `export const masteredCard = (rec, s) => (rec?.streak ?? 0) >= s.masterStreak;`
+   `isLearned(vkey, deck, progress, s)` / `isMastered(...)`: every own
+   (name/order/family) card is. Unlocking (`unlockedKeys`, `bookOpen`) uses
+   learned. A variation with records stays unlocked (as today).
+4. Delete `DAY`'s scheduling use, `dueAt`, `isDue`, `setBox`, `MAX_BOX` and
+   anything else only boxes used (`DAY` itself goes too if nothing else
+   imports it; knip will tell you). Update importers (`train-view.js`) just
+   enough to keep compiling; Task 2 does the view properly.
+5. `newSession(deck, tree, progress, settings, { now, scope, practice, keys })`:
+   - pool = deck cards in scope/keys, not skipped.
+   - practice: every pool card (any state, locked or not), capped by
+     `sessionLength`; `newLeft` 0.
+   - otherwise, from the unlocked + book-open pool (one helper shared with
+     deepening): (1) started (has a record) and not mastered, by `seen`
+     ascending; (2) never asked, by level then deck order, at most
+     `newPerSession`; (3) mastered, by `seen` ascending, at most `reviews`.
+     Concatenate, cap at `sessionLength` (0: none).
+   - return `{ queue, i: 0, results: [], unlockedBefore, practice, pool, newLeft }`,
+     `newLeft` = `newPerSession` − new cards taken.
+6. `answer(session, progress, card, right, settings, now, ctx = null)`:
+   - streak: right → +1, capped at `masterStreak`; wrong on a mastered
+     card → `learnStreak` (down one stage), wrong otherwise → 0 (spec: "a
+     miss takes a card down one stage"); `seen = now`; `skip` kept.
+   - `wasLearned`/`wasMastered` before, the same after, on the result:
+     `{ id, right, from, to }` where from/to are the streaks.
+   - requeue at `session.i + 3` (clamped) a miss, and a right answer whose
+     card is still not learned.
+   - with `ctx = { deck, tree }` and not practice: `unlockedKeys` before and
+     after; the newly unlocked names on the result as `unlocked` (always an
+     array). Then deepen: append pool cards that have no record, are not in
+     the queue, pass the unlocked + book-open helper, by level then deck
+     order, at most `session.newLeft` (decrement), and only while distinct
+     cards in the queue < `sessionLength` (0: no limit).
+7. `sessionSummary(session, tree, deck, progress, settings)` returns
+   `{ right, wrong, learned, mastered, slipped, unlocked, locked }`:
+   variation names newly learned / newly mastered / mastered before the
+   session but not now (compare each variation's state before the session —
+   record it in `newSession` as `session.before = { learned: Set, mastered: Set }`
+   — with after), `unlocked` names, `locked` the count of tree variations
+   not unlocked now. No `now`, no next-due.
+8. `markKnown`: each own card's streak set to `masterStreak` (record created
+   if missing, `seen` = now, skip false). `skip`, `resetVar` unchanged in
+   spirit (no box fields).
 
-Tests (`tests/train.test.mjs`, reuse its PGN/tree/deck helpers):
-- default `learnStreak` 2; normalizeSettings rejects 0 and 11.
-- loadProgress keeps `streak`, defaults a missing one to 0.
-- right, right on a new card: streak 1 then 2, box 1 (once a session), the
-  card requeued after the first right and not after the second.
-- a miss resets the streak.
-- learning the level-1 variation's cards unlocks its children without
-  reaching the mastery box; `isMastered` is still false.
-- in-session deepening: a session whose answers learn "...d6 Sicilians"
-  gets Najdorf/Scheveningen cards appended, the result carries their names in
-  `unlocked`, `newLeft` limits how many, a practice session never appends.
-- `sessionSummary(...).locked` counts the still-locked variations.
-- existing tests that assumed mastery gates unlocking: update them to the new
-  rule only where the spec changed; do not loosen anything else.
+Tests (`tests/train.test.mjs`, rewrite the box/schedule tests for the new
+rules, keep the rest): settings defaults and ranges, `masterStreak` raised to
+`learnStreak`; loadProgress of a new record and of a first-version
+`{ box, seen, skip }` record; streak up (capped at master) and down (a
+mastered card to the learn setting, any other to 0); learned at 2, mastered
+at 5, a miss on a mastered card leaves it learned; unlocking on learned (not mastered); session order and
+limits (in-progress by seen, new by level, re-checks by seen, `reviews`
+limit, length cap); requeue until learned and not after; deepening (cards
+appended, `unlocked` names, `newLeft` limit, length cap, never in practice);
+practice includes locked cards; summary learned/mastered/slipped/unlocked/
+locked; markKnown masters and unlocks.
 
-Commit: "Unlock a Train variation once it is learned, within one session"
+Commit: "Track Train progress as streaks: learned, mastered, no schedule"
 
-### Task 2: Progress on screen in `src/train-view.js`
+### Task 2: The window in `src/train-view.js`
 
 **Files:** `src/train-view.js`, `style.css`, `tests/train-view.test.mjs`
 
-1. `finish` passes `{ deck: live, tree }` to `answer`, and keeps the result's
-   `unlocked` on `ui.answered`.
-2. Question screen: a `p.tr-status` after the prompt:
-   `Level N · S of K right to learn` while not learned (S the card's streak,
-   K `learnStreak`), `Level N · learned`, or `Level N · mastered` (box ≥
-   masteryBox). Book cards with no variation (`vkey === ""`) omit
-   "Level N · ". Never the variation's name (it would give away a name
-   question). While answered it reflects the record after the answer.
-3. After answering, when `unlocked` is non-empty: `p.tr-unlocked`
-   "Unlocked: A, B" in the result box.
-4. "Question n of m" keeps working as the queue grows (it already reads
-   `queue.length`).
-5. Outline: `p.tr-overview` under the head row:
-   `Learned L of V variations · M mastered · open to level D`, where V counts
-   the tree's variations (within the outline's scope/tag filter is not
-   needed: whole tree), D the deepest level among unlocked variations. Each
-   row gets `span.tr-state` "learned" or "mastered" (mastered wins) after
-   the level. Known's title becomes "Count its cards as learned and
-   mastered".
-6. Summary: "Still locked: N" (`p`), only when N > 0.
-7. Settings: `num("learnStreak", "Right in a row to learn (unlocks what's below)", s.learnStreak, …, 1, 10)` just before "Mastered from box"; relabel
-   that one "Mastered from box (long-term)".
-8. CSS: `.tr-status`, `.tr-overview` like `.tr-progress` (small, muted);
-   `.tr-state` like `.tr-level`; `.tr-unlocked` in `var(--main)`.
+1. `finish` passes `{ deck: live, tree }` to `answer`; `ui.answered` keeps
+   the result's `unlocked`.
+2. Question screen, `p.tr-status` after the prompt: `Level N · S of K right
+   to learn` (K = learnStreak), then `Level N · learned · S of M right to
+   master`, then `Level N · mastered`; S the record's streak (after the
+   answer once answered). Book cards with `vkey === ""` omit `Level N · `.
+   Never the variation's name. Tooltip: "Answer it right K times in a row to
+   learn it (unlocking what's below), M times to master it. A miss on a
+   mastered question drops it back to learned; any other miss starts the
+   count again."
+3. Result box: `p.tr-unlocked` "Unlocked: A, B" when non-empty.
+4. Outline head: Start (disabled, "Nothing to train", when the queue is
+   empty), Settings, `span.tr-count` "N in progress · M new · K to re-check"
+   (from the would-be queue), the tag filter; then `p.tr-overview`
+   "Learned L of V variations · M mastered · open to level D" (whole tree; D
+   the deepest unlocked level). Rows: drop the `Box…` select and the due
+   count; the bar is progress towards mastery (sum of min(streak,
+   masterStreak) over own cards ÷ (own cards × masterStreak)), title "S of T
+   questions mastered"; `span.tr-state` "mastered" / "learned" after the
+   level; locked/skipped badges stay. Known's title: "Count its questions as
+   mastered (unlocks what's below)". Empty-queue hint: "Nothing to train
+   here yet: Practice drills a variation anyway, Known unlocks what's below
+   it."
+5. Every outline/question/summary control and status has a `title` tooltip
+   explaining it (existing chips already have one; check the rest: Start,
+   tag filter, level badge "Level N: how deep this is among named
+   positions", bar, state, badges, count, overview).
+6. Settings screen: `fieldset.tr-group` sections with legends, in the
+   spec's order (Questions; Name questions; Order questions; Family
+   questions; Book questions; Progress; Sessions). Labels: "Name", "Order",
+   "Family", "Book" under Questions; "Answer by" (choose/type), "Choices",
+   "Show the moves"; "Show the target position"; "Show the name", "Ask
+   within one group" (the tag group checkboxes, legend "Tags in the
+   group"); "You play" (white/black/both), "Accept" (any book move / the
+   mainline's only); "Right in a row to learn", "Right in a row to master";
+   "New questions per session", "Re-checks per session", "Questions per
+   session (0: no limit)". Each field's label gets a `title` with what it
+   does and its default (from `DEFAULT_SETTINGS`, e.g. "… Default 2."). The
+   old box/interval fields are gone. Done stays.
+7. Summary: "Right R / T"; then, when non-empty, "Learned: …", "Mastered:
+   …", "Back to learned: …" (`slipped`; title: "Mastered before, missed this
+   time: answer it right again to re-master it"),
+   "Unlocked: …", "Still locked: N variations"; Back to the outline. No
+   "Next review", no moved up/down.
+8. CSS: `.tr-status`, `.tr-overview` like `.tr-progress`; `.tr-state` like
+   `.tr-level`; `.tr-unlocked` coloured `var(--main)`; `.tr-group` a plain
+   fieldset (border `var(--line)`, small radius, padding .5rem .7rem, legend
+   muted and small) inside `.tr-settings`. Remove rules only boxes used.
 
-Tests (`tests/train-view.test.mjs`): status text before and after answers
-(streak counts up, then "learned"); a name card's status has no name; the
-"Unlocked:" line appears when an answer unlocks; the outline overview line
-and states; summary "Still locked"; the new setting persists through
-`normalizeSettings` and saves.
+Tests (`tests/train-view.test.mjs`): rewrite box/due assertions; status
+text through learn → learned → mastered; a name card's status has no name;
+"Unlocked:" after an unlocking answer; outline count/overview/state/bar
+title; no `.tr-box`; settings groups and a tooltip on every field; the new
+settings save and clamp (masterStreak below learnStreak is raised); summary
+lists; the existing whole-session and per-type tests still pass.
 
-Commit: "Show Train progress: level, streak, unlocks and an overview"
+Commit: "Show Train progress and explain its settings"
 
-### Task 3: Saved-format fixture, docs, e2e
+### Task 3: Saved format, docs, e2e
 
 **Files:** `tests/fixtures/workbooks/2026-10-14-train.json`,
 `tests/old-workbooks.test.mjs`, `docs/user-guide.md`, `e2e/train.spec.mjs`
 
 1. The Train branch added `names` and `train` to saved workbooks without a
-   fixture. Write one with this build: take
-   `tests/fixtures/workbooks/2026-10-05-audit.json`'s PGN, name two positions
-   on it and give it Train progress with `streak` values, then save it through
-   `toNotebook` exactly as the app does (see how the header comment of
-   `tests/old-workbooks.test.mjs` says the others were made). Add it to
-   `FIXTURES` and the comment list ("2026-10-14-train  this build: named
-   positions in `names`, Train progress with streaks in `train`"), and check
-   in `checkFormat` that the names come back and that the progress lands in
-   `ott-train:<id>` with its streaks. Every existing expectation must still
-   hold for it.
-2. `docs/user-guide.md`'s Train section: learned vs mastered, the new
-   setting, cards coming back in the session until learned, unlocked
-   variations joining the session, where to see progress (status line,
-   overview, summary).
-3. `e2e/train.spec.mjs`: one test on `NAMED` with only Name questions and
-   "Right in a row to learn" 1: answer the first card right, see
-   `.tr-status` say learned and the result list nothing unlocked (no
-   children in NAMED) — or extend NAMED with a child so "Unlocked:" shows.
+   fixture. Make one with this build, the way the header comment of
+   `tests/old-workbooks.test.mjs` describes for the others: the same
+   annotated PGN as `2026-10-05-audit.json`, two positions named, Train
+   progress with streaks, written through `toNotebook` as the app does. Add
+   it to `FIXTURES` and the comment list ("2026-10-14-train  this build:
+   named positions in `names`, Train progress (streaks) in `train`");
+   `checkFormat` checks the names come back and the progress lands in
+   `ott-train:<id>` with its streaks. Every shared expectation must hold.
+2. `docs/user-guide.md`, the Train section (around lines 183-240): replace
+   the boxes/schedule text with streaks (learned, mastered, a miss takes a
+   mastered question back to learned and starts any other again), what a session holds, cards coming back until learned, unlocked
+   variations joining the session, where progress shows (status line,
+   outline count and overview, summary), the settings groups. Keep the rest.
+   README's Train bullet: adjust if it mentions spaced review.
+3. `e2e/train.spec.mjs`: keep both tests passing (update selectors/labels
+   only where Task 2 renamed them). Add one: `1. e4 e5 {[%name "Open"]} 2.
+   Nf3 Nc6 {[%name "Open Knight"]} *` with only Name questions and "Right in
+   a row to learn" 1: Start, answer right, the result shows "Unlocked: Open
+   Knight", Next asks the Open Knight card in the same session, and the
+   status line reads "Level 2 · …".
 
-Commit: "Document Train learning and keep its saved progress readable"
+Commit: "Document Train streaks and keep its saved progress readable"
 
 ### Verification (main session)
 
-`npm run check` and `npm run test:e2e` green; review the diff against the
-spec; try it on the dev server.
+`npm run check` and `npm run test:e2e` green; review against the spec; try
+it on the dev server.
