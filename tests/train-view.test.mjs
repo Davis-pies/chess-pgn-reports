@@ -7,6 +7,7 @@ import { collectLines } from "../src/tree.js";
 import { namesFromNodes, variationTree } from "../src/names.js";
 import { DEFAULT_SETTINGS, buildDeck, emptyProgress, markKnown, normalizeSettings, newSession, loadProgress } from "../src/train.js";
 import { newTrainUi, trainPanel } from "../src/train-view.js";
+import { movesText } from "../src/render.js";
 
 const PGN = `1. e4 c5 2. Nf3 d6 {[%name "...d6 Sicilians"]} (2... e6 {[%name "...e6 Sicilians/Sicilian e6"] [%tags "e6"]} 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 d6 {[%name "Scheveningen"]}) 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 e6 {[%name "Scheveningen"]} (5... a6 {[%name "Najdorf"] [%tags "d6; Nc3 committed"]} 6. Be3 {[%name "English Attack"]}) *`;
 const { nodes } = parsePgn(PGN);
@@ -475,13 +476,31 @@ test("a new variation opens with its intro: position, moves, notes, Learn it and
 	const q = $(root, ".tr-question");
 	assert.strictEqual($(q, ".tr-prompt").textContent, `New: ${tree.byKey.get(ui.card.key).name}`);
 	assert.ok($(q, ".an-board, svg"), "the board");
-	assert.strictEqual($(q, ".tr-moves").textContent, tree.byKey.get(ui.card.key).orders[0].join(" "));
+	const order = tree.byKey.get(ui.card.key).orders[0];
+	assert.strictEqual($(q, ".tr-moves").textContent, movesText(order.map((san, ply) => ({ san, ply }))).replace(/ +/g, " "));
 	assert.ok(!$(q, ".tr-status") && !$(q, ".tr-choices") && !$(q, ".tr-result:not(.tr-intro)"), "no status, choices or answer");
 	assert.ok($(q, ".tr-intro .tr-next"), "the moves, notes and buttons sit in the result's place, beside the board on a wide window");
 	assert.match($(q, ".tr-progress").textContent, /^Question 1 of \d+$/);
-	assert.deepStrictEqual([...q.querySelectorAll(".tr-note")].map((n) => n.textContent), ui.card.notes.map((n) => `${n.move} ${n.text}`));
+	// one move at a time: from where the variation's own moves begin, only the
+	// notes on the move just played
+	assert.strictEqual(ui.step, ui.card.from);
+	const shown = () => [...$(root, ".tr-question").querySelectorAll(".tr-note")].map((n) => n.textContent);
+	const at = (i) => ui.card.notes.filter((n) => n.at === i).map((n) => `${n.move} ${n.text}`);
+	assert.deepStrictEqual(shown(), at(ui.step - 1));
+	if (!shown().length) assert.match($(root, ".tr-intro .tr-hint").textContent, /Step through/);
+	while (!$(root, ".tr-fwd").disabled) {
+		click(root, ".tr-fwd");
+		assert.deepStrictEqual(shown(), at(ui.step - 1), `notes at step ${ui.step}`);
+	}
+	assert.strictEqual(ui.step, order.length);
+	assert.ok(ui.card.notes.some((n) => n.own) ? shown().length : true, "the variation's own note at the end");
+	$(root, ".tr-question").dispatchEvent(new window.KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+	assert.strictEqual(ui.step, order.length - 1, "← steps back");
+	click(root, `.tr-steps .an-move:nth-of-type(1)`);
+	assert.strictEqual(ui.step, 1, "a move jumps there");
+	assert.deepStrictEqual([ui.session.results.length, progress.asked], [0, 0], "stepping scores and stores nothing");
 	learned.length = 0;
-	click(q, ".tr-learn");
+	click(root, ".tr-learn");
 	assert.deepStrictEqual(learned, [tree.byKey.get(ui.card.key).name]);
 	// Got it: on to the first question, nothing scored or stored, the count unchanged
 	const before = ui.card;
@@ -540,7 +559,7 @@ test("with the setting off a session has no intros", () => {
 	done();
 });
 
-test("notes follow every answer: name and order show the notes on the way to the variation", () => {
+test("notes follow every answer: a name question shows the variation's own note, not the ones on the way", () => {
 	const pgn = `1. e4 {King pawn.} c5 2. Nf3 {[%name "Open"] Develops [the knight](x).} d6 *`;
 	const { nodes: ns } = parsePgn(pgn);
 	const ls = collectLines(ns);
@@ -550,9 +569,8 @@ test("notes follow every answer: name and order show the notes on the way to the
 	click(m.root, ".tr-start");
 	solveIn(m, t);
 	const notes = [...m.root.querySelectorAll(".tr-result .tr-note")].map((n) => n.textContent);
-	assert.strictEqual(notes.length, 2);
-	assert.strictEqual(notes[0], "1.e4 King pawn.");
-	assert.match(notes[1], /^2\.Nf3 Develops /);
+	assert.strictEqual(notes.length, 1);
+	assert.match(notes[0], /^2\.Nf3 Develops /);
 	assert.ok(!$(m.root, ".tr-result .tr-learn"), "no learn-it chip after answering any more");
 	// the notes come after the detail line
 	const kids = [...$(m.root, ".tr-result").children].map((c) => c.className || c.tagName);
@@ -596,7 +614,7 @@ test("the summary lists tricky questions with Learn it; the outline badges them"
 	m.ui.screen = "summary";
 	m.draw();
 	const text = [...m.root.querySelectorAll(".tr-summary p")].find((p) => p.textContent.startsWith("Tricky:"));
-	assert.ok(text.textContent.startsWith("Tricky: ...d6 Sicilians (name), ...d6 Sicilians (order), "));
+	assert.ok(text.textContent.startsWith("Tricky: ...d6 Sicilians (Name), ...d6 Sicilians (Order), "));
 	assert.match(text.textContent, new RegExp(`${book.vkey ? tree.byKey.get(book.vkey).name : "Book"} \\(book move\\)`));
 	assert.ok(text.title);
 	const chips = [...m.root.querySelectorAll(".tr-summary .tr-learn")];
@@ -708,9 +726,9 @@ test("settings: grouped, every field has a tooltip with its default, streaks cla
 	const { root, progress } = mount();
 	click(root, ".tr-settings-open");
 	const legends = [...root.querySelectorAll(".tr-group > legend")].map((l) => l.textContent);
-	assert.deepStrictEqual(legends, ["Questions", "Name questions", "Order questions", "Family questions", "Book questions", "Progress", "Sessions"]);
+	assert.deepStrictEqual(legends, ["Questions", "Name questions", "Order questions", "Tags questions", "Book questions", "Progress", "Sessions"]);
 	const labels = [...root.querySelectorAll(".tr-field > span")].map((l) => l.textContent);
-	for (const l of ["Name", "Order", "Family", "Book", "Answer by", "Choices", "Show the moves", "Show the target position", "Show the name", "You play", "Accept", "Right in a row to learn", "Right in a row to master", "Show a new variation first", "New questions per session", "Re-checks per session", "Questions per session (0: no limit)"]) {
+	for (const l of ["Name", "Order", "Tags", "Book", "Answer by", "Choices", "Show the moves", "Show the target position", "Show the name", "You play", "Accept", "Right in a row to learn", "Right in a row to master", "Show a new variation first", "New questions per session", "Re-checks per session", "Questions per session (0: no limit)"]) {
 		assert.ok(labels.includes(l), l);
 	}
 	for (const f of root.querySelectorAll(".tr-field")) assert.ok(f.title, `no tooltip on ${f.textContent}`);

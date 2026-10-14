@@ -425,20 +425,28 @@ const SI = { ...S, introNew: true };
 const deckI = buildDeck(tree, lines, SI);
 const idsOf = (q) => q.map((c) => c.id);
 
-test("notes: the comments from the parent's position to the variation's own, labelled with their move", () => {
+test("notes: every comment on the way, by move, the variation's own marked, and where its own moves begin", () => {
 	const pgn = `1. e4 {King pawn.} c5 {Sicilian.} 2. Nf3 {[%name "Open"] Develops.} d6 3. d4 {Centre.} cxd4 4. Nxd4 Nf6 5. Nc3 a6 {[%name "Najdorf"] Sharp.} *`;
 	const { nodes: ns } = parsePgn(pgn);
 	const ls = collectLines(ns);
 	const t = variationTree(ls, namesFromNodes(ns));
-	const d = buildDeck(t, ls, S);
+	const d = buildDeck(t, ls, { ...S, introNew: true });
 	const open = [...t.byKey.values()].find((x) => x.name === "Open");
 	const naj = [...t.byKey.values()].find((x) => x.name === "Najdorf");
 	const notes = (type, v) => d.find((c) => c.id === `${type}|${v.key}`).notes;
 	assert.deepStrictEqual(notes("name", open), [
-		{ move: "1.e4", text: "King pawn." }, { move: "1...c5", text: "Sicilian." }, { move: "2.Nf3", text: "Develops." },
+		{ at: 0, move: "1.e4", text: "King pawn.", own: false },
+		{ at: 1, move: "1...c5", text: "Sicilian.", own: false },
+		{ at: 2, move: "2.Nf3", text: "Develops.", own: true },
 	]);
-	assert.deepStrictEqual(notes("order", naj), [{ move: "3.d4", text: "Centre." }, { move: "5...a6", text: "Sharp." }]);
-	assert.deepStrictEqual(deckI.find((c) => c.id === `intro|${v("Najdorf").key}`), { id: `intro|${v("Najdorf").key}`, type: "intro", key: v("Najdorf").key, vkey: v("Najdorf").key, level: 2, notes: deckI.find((c) => c.id === `name|${v("Najdorf").key}`).notes });
+	assert.deepStrictEqual(notes("order", naj).map((x) => [x.at, x.move, x.own]), [
+		[0, "1.e4", false], [1, "1...c5", false], [2, "2.Nf3", false], [4, "3.d4", false], [9, "5...a6", true],
+	]);
+	// the intro steps from the parent's position (after 2.Nf3) to the Najdorf
+	const intro = (v) => d.find((c) => c.id === `intro|${v.key}`);
+	assert.strictEqual(intro(open).from, 0);
+	assert.strictEqual(intro(naj).from, 3);
+	assert.deepStrictEqual(intro(naj).notes, notes("name", naj));
 	assert.ok(d.filter((c) => c.type === "book").every((c) => typeof c.notes === "object" && !Array.isArray(c.notes)));
 });
 

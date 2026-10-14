@@ -11,7 +11,7 @@
 import { Chess } from "chess.js";
 import { el, renderInline } from "./dom.js";
 import { chipBtn } from "./analysis-view.js";
-import { boardSvg } from "./render.js";
+import { boardSvg, fullmoveLabel, movesText } from "./render.js";
 import { interactiveBoard } from "./board-input.js";
 import {
 	DEFAULT_SETTINGS, allTags, answer, checkBook, checkFamily, checkName, current, isLearned, isMastered, learnedCard,
@@ -27,13 +27,18 @@ const BOARD = 320;
 export function newTrainUi(scope = null) {
 	return {
 		screen: "outline", session: null, card: null,
-		picked: null, typed: "", played: [], answered: null,
+		picked: null, typed: "", played: [], answered: null, step: null, // step: how far an intro has played its moves
 		ticked: [], choices: null, // the family ticks and the name choices, kept so a redraw doesn't reshuffle
 		scope, open: new Set(), flipped: false, tag: "",
 	};
 }
 
 const TYPES = ["name", "order", "family", "book"];
+// what each type is called on screen: "family" questions are about tags, and
+// say so, while the id stays "family" so saved progress keeps its keys
+const TYPE_LABEL = { name: "Name", order: "Order", family: "Tags", book: "Book" };
+// a move order as PGN reads it, numbered from the start
+const numbered = (sans) => movesText(sans.map((san, ply) => ({ san, ply })));
 
 export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn }, onChange) {
 	const settings = progress.settings;
@@ -60,7 +65,7 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 	};
 	const setCard = () => {
 		ui.card = current(ui.session);
-		Object.assign(ui, { picked: null, typed: "", played: [], answered: null, ticked: [], choices: null });
+		Object.assign(ui, { picked: null, typed: "", played: [], answered: null, step: null, ticked: [], choices: null });
 		if (!ui.card) ui.screen = "summary";
 	};
 	const nameOf = (vkey) => (tree.byKey.get(vkey)?.name ?? "Book");
@@ -209,7 +214,7 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 			book: "Play through a variation's moves: the board plays the other side and you play yours.",
 		};
 		box.append(
-			group("Questions", ...TYPES.map((t) => check(`type-${t}`, `${t[0].toUpperCase()}${t.slice(1)}`, s.types[t], (on) => set({ types: { ...s.types, [t]: on } }), `${typeTips[t]} Default ${onOff(D.types[t])}.`))),
+			group("Questions", ...TYPES.map((t) => check(`type-${t}`, TYPE_LABEL[t], s.types[t], (on) => set({ types: { ...s.types, [t]: on } }), `${typeTips[t]} Default ${onOff(D.types[t])}.`))),
 			group("Name questions",
 				pick("nameMode", "Answer by", s.nameMode, ["choice", "typed"], (x) => set({ nameMode: x }), `Pick the name from choices, or type it. Default ${D.nameMode === "choice" ? "choose" : "type"}.`, { choice: "choose", typed: "type" }),
 				num("choices", "Choices", s.choices, (n) => set({ choices: n }), 2, 8, `How many names to pick from, 2 to 8. Default ${D.choices}.`),
@@ -220,12 +225,12 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 			),
 		);
 		const tags = allTags(tree);
-		const tagGroup = el("fieldset", { className: "tr-subgroup", title: "Ask a Family question about one group of tags only, picking the tag from that group. With none ticked, any tag can be asked. Default none." }, [el("legend", { textContent: "Ask within one group: tags in the group" })]);
+		const tagGroup = el("fieldset", { className: "tr-subgroup", title: "Ask a Tags question about one group of tags only, picking the tag from that group. With none ticked, any tag can be asked. Default none." }, [el("legend", { textContent: "Ask within one group: tags in the group" })]);
 		for (const t of tags) {
 			tagGroup.append(check(`tag-${t}`, t, s.familyGroup.includes(t), (on) => set({ familyGroup: on ? [...s.familyGroup, t] : s.familyGroup.filter((x) => x !== t) }), `Put ${t} in the group.`));
 		}
 		box.append(
-			group("Family questions",
+			group("Tags questions",
 				check("familyShowName", "Show the name", s.familyShowName, (on) => set({ familyShowName: on }), `Say the position's name in the question. Default ${onOff(D.familyShowName)}.`),
 				tagGroup,
 			),
@@ -298,6 +303,11 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 				else if (typedInput && e.target === typedInput) pickName(typedInput.value);
 				return;
 			}
+			if (card.type === "intro" && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+				e.preventDefault();
+				stepTo(ui.step + (e.key === "ArrowRight" ? 1 : -1));
+				return;
+			}
 			const n = +e.key;
 			if (!ui.answered && ui.choices && n >= 1 && n <= ui.choices.length) pickName(ui.choices[n - 1]);
 		};
@@ -311,19 +321,43 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 		const readerFlip = (settings.bookSide === "black") !== ui.flipped;
 
 		// a note: the move it is on, then the workbook's text
+		// an intro's board steps: a redraw only, nothing to save
+		const stepTo = (n) => {
+			ui.step = Math.max(0, Math.min(node.orders[0].length, n));
+			onChange();
+		};
 		const noteLine = (label, text) => {
 			const p = el("p", { className: "tr-note" }, [`${label} `]);
 			renderInline(p, text);
 			return p;
 		};
 		if (card.type === "intro") {
+			// A new variation, one move at a time: the board starts where its own
+			// moves begin (after the named position before it) and shows only the
+			// notes on the move just played. All of its notes at once were a wall of
+			// text (Davis, 2026-10-14). The moves before `from` are its parent's, so
+			// they are dimmed but can still be stepped back through.
 			prompt.textContent = `New: ${node.name}`;
-			body.append(boardSvg(node.fen, BOARD, { flipped: readerFlip }), flip());
-			// the moves and notes go where a question's result goes, beside the
-			// board on a wide window, so the buttons stay in view
+			const order = node.orders[0];
+			ui.step ??= card.from;
+			const chess = new Chess();
+			order.slice(0, ui.step).forEach((san) => chess.move(san));
+			body.append(boardSvg(chess.fen(), BOARD, { flipped: readerFlip }), flip());
+			const moves = el("p", { className: "tr-moves tr-steps" }, order.flatMap((san, i) => [i ? " " : "", el("button", {
+				className: `an-move${i === ui.step - 1 ? " at" : ""}${i < card.from ? " shared" : ""}`,
+				textContent: i % 2 === 0 ? fullmoveLabel(i) + san : san,
+				title: "Go to this move",
+				onclick: () => stepTo(i + 1),
+			})]));
+			const here = card.notes.filter((n) => n.at === ui.step - 1);
+			const hint = ui.step < order.length ? "Step through the moves with ▶ or the arrow keys." : "";
 			box.append(el("div", { className: "tr-result tr-intro" }, [
-				el("p", { className: "tr-moves", textContent: node.orders[0].join(" ") }),
-				...card.notes.map((n) => noteLine(n.move, n.text)),
+				moves,
+				el("div", { className: "tr-acts" }, [
+					chipBtn("tr-back", "◀", "Back a move (←)", () => stepTo(ui.step - 1), ui.step === 0),
+					chipBtn("tr-fwd", "▶", "Forward a move (→)", () => stepTo(ui.step + 1), ui.step === order.length),
+				]),
+				...(here.length ? here.map((n) => noteLine(n.move, n.text)) : [el("p", { className: "tr-hint", textContent: hint })]),
 				el("div", { className: "tr-acts" }, [
 					chipBtn("tr-learn", "Learn it", "Play through this variation with its notes in Study", () => learn(node)),
 					chipBtn("tr-next", "Got it", "Go on to the questions (Enter)", gotIt),
@@ -333,7 +367,7 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 			prompt.textContent = "What is this position called?";
 			body.append(boardSvg(node.fen, BOARD, { flipped: readerFlip }));
 			if (!ui.answered) body.append(flip());
-			if (settings.showMoves) body.append(el("p", { className: "tr-moves", textContent: node.orders[0].join(" ") }));
+			if (settings.showMoves) body.append(el("p", { className: "tr-moves", textContent: numbered(node.orders[0]) }));
 			if (!ui.answered && settings.nameMode === "choice") {
 				ui.choices ||= nameChoices(card, tree, settings, Math.random);
 				body.append(el("div", { className: "tr-choices" }, ui.choices.map((name, i) =>
@@ -351,7 +385,7 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 				if (!step.ok) return finish(false, [`Expected: ${step.accepted.join(" or ")}`]);
 				ui.played.push(san);
 				if (!step.done) return onChange(); // on to the next move
-				const others = node.orders.filter((o) => o.join(" ") !== ui.played.join(" ")).map((o) => o.join(" "));
+				const others = node.orders.filter((o) => o.join(" ") !== ui.played.join(" ")).map(numbered);
 				finish(true, others.length ? [`Also reached by: ${others.join("; ")}`] : []);
 			};
 			body.append(ui.answered ? boardSvg(chess.fen(), BOARD, { flipped: ui.flipped }) : interactiveBoard(chess.fen(), play, { size: BOARD, flipped: ui.flipped }));
@@ -360,7 +394,7 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 		} else if (card.type === "family") {
 			const group = settings.familyGroup;
 			const tags = group.length ? node.tags.filter((t) => group.includes(t)) : node.tags;
-			prompt.textContent = settings.familyShowName ? `Which families does the ${node.name} belong to?` : "Which families does this position belong to?";
+			prompt.textContent = settings.familyShowName ? `Which tags does the ${node.name} carry?` : "Which tags does this position carry?";
 			body.append(boardSvg(node.fen, BOARD, { flipped: readerFlip }));
 			if (!ui.answered) body.append(flip());
 			const options = group.length ? group : allTags(tree);
@@ -374,12 +408,12 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 				list.append(el("label", { className: "tr-tag" }, [i, t]));
 			}
 			body.append(list);
-			if (!ui.answered) body.append(chipBtn("tr-check", "Check", "Check the families", () => finish(checkFamily(ui.ticked, tags), [`Answer: ${tags.join(", ") || "none"}`])));
+			if (!ui.answered) body.append(chipBtn("tr-check", "Check", "Check the tags", () => finish(checkFamily(ui.ticked, tags), [`Answer: ${tags.join(", ") || "none"}`])));
 		} else {
 			const chess = new Chess();
 			card.sans.forEach((s) => chess.move(s));
 			prompt.textContent = `${nameOf(card.vkey)}: find the move`;
-			body.append(el("p", { className: "tr-moves", textContent: card.sans.join(" ") || "(start position)" }));
+			body.append(el("p", { className: "tr-moves", textContent: numbered(card.sans) || "(start position)" }));
 			const blackToPlay = settings.bookSide === "both" ? chess.turn() === "b" : settings.bookSide === "black";
 			const flipped = blackToPlay !== ui.flipped; // the reader's side at the bottom, unless flipped by hand
 			const play = (san) => {
@@ -395,8 +429,8 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 			const res = el("div", { className: `tr-result ${right ? "right" : "wrong"}` }, [el("strong", { textContent: right ? "Right" : "Not quite" })]);
 			if (tooSoon) res.append(el("p", { className: "tr-soon", title: "A learned question's streak grows only after 10 other questions have been answered since it was last asked", textContent: "Too soon to count towards mastery: it counts when other questions come in between." }));
 			for (const d of detail) res.append(el("p", { textContent: d }));
-			// a book card keeps its notes by move, the others have a list
-			const notes = Array.isArray(card.notes) ? card.notes.map((n) => [n.move, n.text]) : Object.entries(card.notes);
+			// a book card keeps its notes by move; the others show the variation's own note only (the intro steps through the rest)
+			const notes = Array.isArray(card.notes) ? card.notes.filter((n) => n.own).map((n) => [n.move, n.text]) : Object.entries(card.notes);
 			for (const [move, text] of notes) res.append(noteLine(Array.isArray(card.notes) ? move : `${move}:`, text));
 			if (unlocked.length) res.append(el("p", { className: "tr-unlocked", textContent: `Unlocked: ${unlocked.join(", ")}` }));
 			res.append(chipBtn("tr-next", "Next", "Next question (Enter)", next));
@@ -417,7 +451,7 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 		list("Back to learned", sum.slipped, "Mastered before, missed this time: answer it right again to re-master it");
 		list("Unlocked", sum.unlocked, "Opened by what you learned");
 		if (sum.tricky.length) {
-			box.append(el("p", { title: "Missed three times: study it before drilling it again", textContent: `Tricky: ${sum.tricky.map((t) => `${t.name} (${t.id.split("|")[0] === "book" ? "book move" : t.id.split("|")[0]})`).join(", ")}` }));
+			box.append(el("p", { title: "Missed three times: study it before drilling it again", textContent: `Tricky: ${sum.tricky.map((t) => `${t.name} (${t.id.split("|")[0] === "book" ? "book move" : TYPE_LABEL[t.id.split("|")[0]]})`).join(", ")}` }));
 			for (const key of new Set(sum.tricky.map((t) => t.vkey).filter((k) => k !== ""))) {
 				box.append(chipBtn("tr-learn", `Learn it: ${tree.byKey.get(key).name}`, "Missed three times: study it before drilling it again", () => learn(tree.byKey.get(key))));
 			}

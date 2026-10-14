@@ -207,19 +207,22 @@ For a shorter overview see the [README](../README.md).
      (or type; `/` separates accepted aliases, case and punctuation ignored)
      its name. **Order**: given a name, play the moves from the start; any
      move some line of the workbook still leads to the position from is
-     accepted. **Family**: tick the tags the position carries. **Book**: the
+     accepted. **Tags**: tick the tags the position carries. **Book**: the
      board plays one side and you the other along the variation's moves, each
      of your moves its own question; the workbook's note on the move is shown
-     after you answer. Name, Order and Book are on by default; Family is off.
-   - **Notes after every answer** — the result of a Name, Order or Family
-     question lists the workbook's notes on the moves that reach the
-     variation (from its parent's position, or the start at level 1), each
-     labelled with its move ("3...Nf6"), as a Book question lists its move's
-     note. A miss is explained, not just marked.
+     after you answer. Name, Order and Book are on by default; Tags is off.
+   - **Notes after every answer** — the result of a Name, Order or Tags
+     question shows the workbook's note on the move that reaches the
+     variation, labelled with its move ("3...Nf6"), as a Book question shows
+     its move's note. A miss is explained, not just marked. The notes on the
+     moves before it are in the variation's first step (below) and in Study.
    - **A new variation first** — the first time a session reaches a variation
      you have never been asked about, it shows "New: <name>" before any
-     question: its position, the moves that reach it and the notes, with
-     **Learn it** (opens it in Study) and **Got it**; Enter is Got it. It is
+     question. The board starts where the variation's own moves begin (after
+     the named position before it; the moves before are dimmed) and steps
+     through them with ◀ ▶ or the arrow keys, or a click on a move, showing
+     only the notes on the move just played. **Learn it** opens it in Study,
+     **Got it** (or Enter) goes on to the questions. It is
      not a question: nothing is scored or stored, and it is not counted in
      "Question n of m". Turn it off with "Show a new variation first" in the
      settings.
@@ -237,7 +240,7 @@ For a shorter overview see the [README](../README.md).
      back to learned (three right answers master it again), and any other
      question starts its count again.
    - **Unlocking** — level-1 variations start unlocked. A variation counts as
-     learned when each of its Name, Order and Family questions is learned;
+     learned when each of its Name, Order and Tags questions is learned;
      learning it unlocks its sub-variations and its Book questions, and what
      is unlocked stays unlocked.
    - **A session** — it asks, in this order, the questions you have started
@@ -253,7 +256,7 @@ For a shorter overview see the [README](../README.md).
      out: two of the same variation are not asked in a row where another
      order avoids it (a Name question right after its Order question would
      give it away). A variation's Book questions stay together, in move
-     order. New questions are the Name, Order and Family ones first, then
+     order. New questions are the Name, Order and Tags ones first, then
      Book questions, shallowest level first.
    - **When it is going badly** — while two of your last five answers in a
      session were misses, no new questions are added: those still waiting
@@ -289,13 +292,13 @@ For a shorter overview see the [README](../README.md).
      plays the variation through in Study with the PGN's notes; closing Study
      returns to Train as you left it. In a question, 1–9 pick a
      choice, Enter goes on and Escape closes.
-   - **The board** — Name and Family show the position from your side (Black
+   - **The board** — Name and Tags show the position from your side (Black
      by default, as set by "You play"); **Flip** turns it. After a wrong name
      the answer also shows what you gave.
    - **Settings** — in groups, each field with a tooltip giving its default.
      **Questions**: which types are on. **Name questions**: choose or type,
      how many choices, showing the moves. **Order questions**: showing the
-     target position. **Family questions**: showing the name, and a group of
+     target position. **Tags questions**: showing the name, and a group of
      tags to ask within. **Book questions**: the side you play, and whether
      any book move counts or only the mainline's. **Progress**: right in a row
      to learn and to master. **Sessions**: showing a new variation first, new

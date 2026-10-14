@@ -38,32 +38,37 @@ const START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 // --- deck -------------------------------------------------------------
 
-// The workbook's comments on the moves from the variation's parent to the
-// variation itself, read off the first line that reaches it by its first move
-// order. The parent is the nearest named position before it on that line (none
-// at level 1: from the start).
+// The workbook's comments on the moves that reach a variation, read off the
+// first line that reaches it by its first move order: `at` is the move's
+// index in that order, `own` marks the comments on the move that reaches the
+// variation. `from` is where its own moves begin, after the nearest named
+// position before it on that line (the start, at level 1). A question's
+// result shows only the `own` notes; the intro steps through the moves from
+// `from` and shows one move's notes at a time (2026-10-14: every note at
+// once was a wall of text at level 1).
 function notesOf(v, tree, lines) {
 	const order = v.orders[0];
 	const n = order.length;
 	const line = lines.find((l) => l.moves.length >= n && order.every((san, i) => l.moves[i].san === san));
-	if (!line) return [];
+	if (!line) return { from: 0, notes: [] };
 	const fens = fenMap(line.moves);
 	let from = 0;
 	for (let i = n - 2; i >= 0; i--) {
 		if (tree.byKey.has(posKey(fens.get(line.moves[i].ply)))) { from = i + 1; break; }
 	}
-	return line.moves.slice(from, n).flatMap((m) =>
-		(line.comments || []).filter((x) => x.ply === m.ply && x.text).map((x) => ({ move: fullmoveLabel(m.ply) + m.san, text: x.text })));
+	const notes = line.moves.slice(0, n).flatMap((m, at) =>
+		(line.comments || []).filter((x) => x.ply === m.ply && x.text).map((x) => ({ at, move: fullmoveLabel(m.ply) + m.san, text: x.text, own: at === n - 1 })));
+	return { from, notes };
 }
 
 export function buildDeck(tree, lines, settings) {
 	const deck = [];
 	const on = settings.types;
 	for (const v of tree.byKey.values()) {
-		const notes = notesOf(v, tree, lines);
+		const { from, notes } = notesOf(v, tree, lines);
 		const base = { key: v.key, vkey: v.key, level: v.level };
 		// an intro is a step, not a question: it is never stored and never counts
-		if (settings.introNew) deck.push({ id: `intro|${v.key}`, type: "intro", ...base, notes });
+		if (settings.introNew) deck.push({ id: `intro|${v.key}`, type: "intro", ...base, notes, from });
 		if (on.name) deck.push({ id: `name|${v.key}`, type: "name", ...base, notes });
 		if (on.order) deck.push({ id: `order|${v.key}`, type: "order", ...base, notes });
 		if (on.family && v.tags.length) deck.push({ id: `family|${v.key}`, type: "family", ...base, notes });

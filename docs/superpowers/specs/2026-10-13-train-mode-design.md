@@ -53,7 +53,7 @@ Each named position gives cards; each card type can be switched off.
   accepted while some workbook path still leads to the position; a move off
   all of them is wrong and the accepted moves are shown. Arriving lists the
   other move orders. Option: show the target position as a hint.
-- **family** - tick the tags the position carries, out of all the workbook's
+- **tags** (stored as `family`, so saved progress keeps its keys) - tick the tags the position carries, out of all the workbook's
   tags; exact set to score. Off by default. Options: show the name; pick-one
   mode restricted to one chosen group of tags.
 - **book** - a run through the variation's stretch: the board plays the
@@ -65,15 +65,18 @@ Each named position gives cards; each card type can be switched off.
 
 Answers score right or wrong; there is no partial credit.
 
-Name, order and family cards carry the variation's **notes**: the
-workbook's comments on the moves from its parent's defining position (the
-start, at level 1) to its own, each labelled with its move ("3...Nf6"). The
-result of every answer shows them, as a book card's shows its move's note
-(research, finding 4: explained feedback beats right/wrong).
+Name, order and tags cards carry the variation's **notes**: the workbook's
+comments on the moves that reach it, each labelled with its move
+("3...Nf6"). The result of every answer shows the note on the variation's
+own move, as a book card's shows its move's note (research, finding 4:
+explained feedback beats right/wrong). The rest are for the intro: all of
+them at once were a wall of text (Davis, 2026-10-14).
 
 - **intro** - not a question: the first time a session reaches a variation
-  never asked, a "New: <name>" step shows its position, the moves that reach
-  it and its notes, with **Learn it** (Study) and **Got it**. Unscored, never
+  never asked, a "New: <name>" step plays its moves on the board one at a
+  time (◀ ▶, arrow keys, or a click on a move), starting where its own moves
+  begin after its parent's position, and shows only the notes on the move
+  just played; **Learn it** (Study) and **Got it**. Unscored, never
   stored. Setting "Show a new variation first" (on). (Research, finding 5:
   an example before the test.)
 
@@ -161,11 +164,11 @@ not carry it. A workbook never saved has no id; its progress lives under
 
 Grouped, each with a tooltip saying what it does and its default:
 
-- **Questions**: which types are asked (Name, Order, Book on; Family off).
+- **Questions**: which types are asked (Name, Order, Book on; Tags off).
 - **Name questions**: answer by choosing or typing; how many choices (2-8);
   show the moves that lead there.
 - **Order questions**: show the target position as a hint.
-- **Family questions**: show the name; ask only within one group of tags.
+- **Tags questions**: show the name; ask only within one group of tags.
 - **Book questions**: the side you play (White, Black, both); accept any
   book move or only the mainline's.
 - **Progress**: right in a row to learn (1-10), to master (learn-20).

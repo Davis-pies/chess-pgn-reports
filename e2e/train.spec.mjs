@@ -93,8 +93,14 @@ test("train shows a new variation before its first question", async ({ page }) =
   await page.getByRole("button", { name: "Train", exact: true }).click();
   await page.locator(".tr-start").click();
   await expect(page.locator(".tr-prompt")).toHaveText("New: Open");
-  await expect(page.locator(".tr-moves")).toHaveText("e4 e5");
-  await expect(page.locator(".tr-note")).toHaveText(["1.e4 King pawn.", "1...e5 Symmetry."]);
+  await expect(page.locator(".tr-moves")).toHaveText("1.e4 e5");
+  // one move at a time, with only that move's notes
+  await expect(page.locator(".tr-note")).toHaveCount(0);
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator(".tr-note")).toHaveText(["1.e4 King pawn."]);
+  await page.locator(".tr-fwd").click();
+  await expect(page.locator(".tr-note")).toHaveText(["1...e5 Symmetry."]);
+  await expect(page.locator(".tr-steps .an-move.at")).toHaveText("e5");
   await expect(page.locator(".tr-choice")).toHaveCount(0);
   await page.getByRole("button", { name: "Got it" }).click();
   await expect(page.locator(".tr-prompt")).not.toHaveText(/^New:/);
