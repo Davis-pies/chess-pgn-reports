@@ -671,6 +671,23 @@ test("a right answer too soon says so and does not count", () => {
 	done();
 });
 
+test("a right answer just after its variation's intro says so; the summary leaves it out of the score", () => {
+	const key = v("Najdorf").key;
+	const c = deck.find((x) => x.id === `name|${key}`);
+	const m = mount();
+	sessionOf(m, c, { passed: new Map([[key, 0]]), before: { learned: new Set(), mastered: new Set() } });
+	solve(m.root, m.ui);
+	assert.strictEqual($(m.root, ".tr-result strong").textContent, "Right");
+	assert.strictEqual($(m.root, ".tr-soon").textContent, "Too soon to count: it was just shown. It counts once other questions come in between.");
+	assert.ok($(m.root, ".tr-soon").title);
+	assert.strictEqual(m.progress.cards[c.id].streak, 0);
+	click(m.root, ".tr-end");
+	assert.strictEqual($(m.root, ".tr-summary h3").textContent, "Right 0 / 0");
+	assert.strictEqual($(m.root, ".tr-summary .tr-soon").textContent, "1 too soon to count");
+	assert.ok($(m.root, ".tr-summary .tr-soon").title);
+	done();
+});
+
 test("the summary lists tricky questions with Learn it; the outline badges them", () => {
 	const root = v("...d6 Sicilians").key;
 	const a = deck.find((x) => x.id === `name|${root}`);

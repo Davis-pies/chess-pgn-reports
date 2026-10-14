@@ -216,6 +216,14 @@ For a shorter overview see the [README](../README.md).
      board plays one side and you the other along the variation's moves, each
      of your moves its own question; the workbook's note on the move is shown
      after you answer. Name, Order and Book are on by default; Tags is off.
+   - **Name choices** — the wrong names are the ones easiest to confuse with
+     the right one: first its siblings (the same parent; the other level-1
+     variations for a level-1 one), then variations sharing a tag with it,
+     then others at its level, then the rest. Names you have already been
+     asked about come before ones you have never met, which only fill the
+     list. A question you have not learned yet takes at most one sibling, so
+     it is not a toss-up between near twins; once learned it takes the
+     closest ones first, which makes it harder. They change every time.
    - **Notes after every answer** — the result of a Name, Order or Tags
      question shows the workbook's note on the move that reaches the
      variation, labelled with its move ("3...Nf6"), as a Book question shows
@@ -230,10 +238,13 @@ For a shorter overview see the [README](../README.md).
      **Got it** (or Enter) goes on to the questions. It is
      not a question: nothing is scored or stored, and it is not counted in
      "Question n". Turn it off with "Show a new variation first" in the
-     settings.
+     settings. The first question about it comes at least 3 other questions
+     later where the session has them to put in between, and a right answer
+     given sooner than that is "Too soon to count: it was just shown": it
+     keeps the streak where it was and the question comes back.
    - **Streaks** — every question carries one number, its streak: a right
      answer adds one (up to the mastery setting), and nothing about it
-     depends on time. A question is **learned** at 2 right in a row by default
+     depends on time. A question is **learned** at 3 right in a row by default
      and **mastered** at 5, so mastery says what you know now. Once a question
      is learned, a right answer adds to its streak only when at least 10 other
      questions have been answered since it was last asked; sooner, it is still
@@ -242,7 +253,7 @@ For a shorter overview see the [README](../README.md).
      out, rather than the same question asked again and again in one sitting.
      A miss takes a
      question down one stage rather than to nothing: a mastered question drops
-     back to learned (three right answers master it again), and any other
+     back to learned (two right answers master it again), and any other
      question starts its count again.
    - **Unlocking** — level-1 variations start unlocked. A variation counts as
      learned when each of its Name, Order and Tags questions is learned;
@@ -289,7 +300,8 @@ For a shorter overview see the [README](../README.md).
      answer, "Unlocked:" lists what it opened. The outline
      counts the questions in view ("3 in progress · 5 new · 2 mastered") and sums up the workbook ("Learned 4 of 12 variations · 1
      mastered · open to level 2"); each row has a bar of progress towards
-     mastery and says learned or mastered. The question counter reads "Question 4 of 20", or "Question 4" with no limit. The summary shows the score and the
+     mastery and says learned or mastered. The question counter reads "Question 4 of 20", or "Question 4" with no limit. The summary shows the score ("Right 7 / 9", counting only answers that
+     counted, then "2 too soon to count" when there were any) and the
      variations newly learned, newly mastered, newly unlocked and those that
      slipped back from mastered, and how many are still locked. Every control
      has a tooltip.

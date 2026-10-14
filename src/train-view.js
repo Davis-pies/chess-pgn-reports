@@ -315,9 +315,9 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn, engine = n
 			onChange();
 		};
 		const finish = (right, detail) => {
-			const { unlocked, tooSoon } = answer(ui.session, progress, card, right, settings, { deck: live, tree });
+			const { unlocked, tooSoon, soon } = answer(ui.session, progress, card, right, settings, { deck: live, tree });
 			save();
-			ui.answered = { right, detail, tooSoon: !!tooSoon, unlocked };
+			ui.answered = { right, detail, tooSoon: !!tooSoon, soon, unlocked };
 			onChange();
 		};
 		// an intro is passed, not answered: nothing is scored or stored
@@ -415,7 +415,7 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn, engine = n
 			if (!ui.answered) body.append(flip());
 			if (settings.showMoves) body.append(el("p", { className: "tr-moves", textContent: numbered(node.orders[0]) }));
 			if (!ui.answered && settings.nameMode === "choice") {
-				ui.choices ||= nameChoices(card, tree, settings, Math.random);
+				ui.choices ||= nameChoices(card, tree, settings, Math.random, { progress, deck: live });
 				body.append(el("div", { className: "tr-choices" }, ui.choices.map((name, i) =>
 					el("button", { className: "tr-choice chip", textContent: name, title: `Key ${i + 1}`, onclick: () => pickName(name) }))));
 			} else if (!ui.answered) {
@@ -471,9 +471,15 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn, engine = n
 		}
 
 		if (ui.answered) {
-			const { right, detail, tooSoon, unlocked } = ui.answered;
+			const { right, detail, tooSoon, soon, unlocked } = ui.answered;
 			const res = el("div", { className: `tr-result ${right ? "right" : "wrong"}` }, [el("strong", { textContent: right ? "Right" : "Not quite" })]);
-			if (tooSoon) res.append(el("p", { className: "tr-soon", title: "A learned question's streak grows only after 10 other questions have been answered since it was last asked", textContent: "Too soon to count towards mastery: it counts when other questions come in between." }));
+			if (tooSoon) {
+				// two rules make an answer too soon: a learned card asked again within SPACING answers, and a card asked straight after its variation's intro
+				const [tip, text] = soon === "intro"
+					? ["A question asked right after the variation was shown would be a free answer: it counts once 3 other questions have been answered", "Too soon to count: it was just shown. It counts once other questions come in between."]
+					: ["A learned question's streak grows only after 10 other questions have been answered since it was last asked", "Too soon to count towards mastery: it counts when other questions come in between."];
+				res.append(el("p", { className: "tr-soon", title: tip, textContent: text }));
+			}
 			for (const d of detail) res.append(el("p", { textContent: d }));
 			// a book card keeps its notes by move; the others show the variation's own note only (the intro steps through the rest)
 			const notes = Array.isArray(card.notes) ? card.notes.filter((n) => n.own).map((n) => [n.move, n.text]) : Object.entries(card.notes);
@@ -500,6 +506,7 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn, engine = n
 		};
 		const box = el("div", { className: "tr-summary" }, [
 			el("h3", { textContent: `Right ${sum.right} / ${total}` }),
+			...(sum.soon ? [el("p", { className: "tr-soon", title: "Answers right after a variation was shown, or on a learned question asked again too soon, are not scored", textContent: `${sum.soon} too soon to count` })] : []),
 			chipBtn("tr-again", "Keep going", "Carry on where you left off: a new session with the same variations (Enter)", keepGoing, !more),
 		]);
 		const list = (title, items, tip) => items.length && box.append(el("p", { title: tip, textContent: `${title}: ${items.join(", ")}` }));
