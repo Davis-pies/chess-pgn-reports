@@ -5,7 +5,7 @@ import { installDom } from "./helpers.mjs";
 import { parsePgn } from "../src/pgn.js";
 import { collectLines } from "../src/tree.js";
 import { namesFromNodes, variationTree } from "../src/names.js";
-import { DEFAULT_SETTINGS, buildDeck, emptyProgress, markKnown, normalizeSettings, newSession, loadProgress } from "../src/train.js";
+import { DEFAULT_SETTINGS, buildDeck, emptyProgress, markKnown, normalizeSettings, newSession, loadProgress, positionDiff } from "../src/train.js";
 import { newTrainUi, trainPanel } from "../src/train-view.js";
 import { movesText } from "../src/render.js";
 import { createEngine } from "../src/engine.js";
@@ -626,6 +626,55 @@ test("with the setting off a session has no intros", () => {
 	click(m.root, ".tr-start");
 	assert.ok(m.ui.session.queue.every((c) => c.type !== "intro") && m.ui.card.type !== "intro");
 	done();
+});
+
+// a wrong name answer shows the asked position beside the picked name's, with
+// the squares that differ marked on both, where the two names part, and the
+// picked variation's own note; a right answer or a name no variation has gets none
+test("a wrong name answer compares the asked and picked positions", () => {
+	const parsed = parsePgn(`1. e4 c5 2. Nf3 e6 {[%name "Sicilian e6"]} (2... d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 {[%name "Najdorf"] Sharp, and the main line.}) *`);
+	const lines2 = collectLines(parsed.nodes);
+	const t2 = variationTree(lines2, namesFromNodes(parsed.nodes));
+	const d2 = buildDeck(t2, lines2, { ...DEFAULT_SETTINGS, types: ALL });
+	const asked = [...t2.byKey.values()].find((x) => x.name === "Sicilian e6");
+	const picked = [...t2.byKey.values()].find((x) => x.name === "Najdorf");
+	const c = d2.find((x) => x.id === `name|${asked.key}`);
+	const start = () => {
+		const m = mount({ t: t2, d: d2, settings: { nameMode: "typed" } });
+		m.ui.session = hand([c]);
+		m.ui.card = c;
+		m.ui.screen = "question";
+		m.draw();
+		return m;
+	};
+	let m = start();
+	$(m.root, ".tr-typed").value = "Najdorf";
+	click(m.root, ".tr-check");
+	const cmp = $(m.root, ".tr-compare");
+	assert.ok(cmp);
+	const figs = [...cmp.querySelectorAll("figure")];
+	assert.strictEqual(figs.length, 2);
+	assert.match(figs[0].textContent, /Asked: Sicilian e6/);
+	assert.match(figs[1].textContent, /You said: Najdorf/);
+	const diff = positionDiff(asked.fen, picked.fen);
+	assert.ok(diff.length > 0 && diff.length < 64);
+	for (const f of figs) {
+		for (const sq of diff) assert.ok(f.querySelector(`rect[data-sq="${sq}"]`).classList.contains("diff"), sq);
+		assert.ok(!f.querySelector('rect[data-sq="a1"]').classList.contains("diff"));
+	}
+	assert.match($(m.root, ".tr-diverge").textContent, /Sicilian e6 2\.\.\.e6 · Najdorf 2\.\.\.d6/);
+	assert.match($(m.root, ".tr-result p.tr-note").textContent, /Sharp/);
+
+	m = start();
+	$(m.root, ".tr-typed").value = "Sicilian e6";
+	click(m.root, ".tr-check");
+	assert.ok($(m.root, ".tr-result.right"));
+	assert.strictEqual($(m.root, ".tr-compare"), null);
+
+	m = start();
+	$(m.root, ".tr-typed").value = "nope";
+	click(m.root, ".tr-check");
+	assert.strictEqual($(m.root, ".tr-compare"), null);
 });
 
 test("notes follow every answer: a name question shows the variation's own note, not the ones on the way", () => {

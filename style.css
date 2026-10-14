@@ -1972,6 +1972,12 @@ sup {
 .tr-result.right { border-color: var(--main); }
 .tr-result.wrong { border-color: var(--warn); }
 .tr-result p { margin: .25rem 0; }
+/* a wrong name: the two positions side by side; the differing squares are gold, a shade darker on dark squares */
+.tr-compare { display: flex; gap: .8rem; flex-wrap: wrap; }
+.tr-compare figure { margin: 0; }
+.tr-compare figcaption, .tr-diverge { font-size: .85rem; color: var(--muted); }
+.tr-compare svg rect.diff { fill: #e5b84f; }
+.tr-compare svg rect.diff[fill="#b58863"] { fill: #c99a3e; }
 /* On a wide window a question's result, or a new variation's moves and
    notes, sit beside the board instead of under it: with the notes every
    answer now shows, a result under a full-height board pushed Next off the

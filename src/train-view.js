@@ -15,8 +15,8 @@ import { engineBox } from "./engine-view.js";
 import { boardSvg, fullmoveLabel, movesText } from "./render.js";
 import { interactiveBoard } from "./board-input.js";
 import {
-	DEFAULT_SETTINGS, allTags, answer, checkBook, checkFamily, checkName, current, isLearned, isMastered, learnedCard,
-	isTricky, markKnown, masteredCard, nameChoices, newSession, normalizeSettings, orderStep, resetVar, saveProgress, scopeCards, sessionSummary, skip,
+	DEFAULT_SETTINGS, allTags, answer, checkBook, checkFamily, checkName, current, divergence, isLearned, isMastered, learnedCard,
+	isTricky, markKnown, masteredCard, nameChoices, newSession, normalizeSettings, orderStep, positionDiff, resetVar, saveProgress, scopeCards, sessionSummary, skip,
 	unlockedKeys, unlocksIfLearned,
 } from "./train.js";
 
@@ -482,6 +482,22 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn, engine = n
 				res.append(el("p", { className: "tr-soon", title: tip, textContent: text }));
 			}
 			for (const d of detail) res.append(el("p", { textContent: d }));
+			// a wrong name: the asked position beside the picked name's, the squares that differ marked on both, where the two orders part, and the picked name's own note
+			const other = !right && card.type === "name" && ui.picked && [...tree.byKey.values()].find((x) => x.name === ui.picked);
+			if (other) {
+				const diff = positionDiff(node.fen, other.fen);
+				const figure = (fen, caption) => {
+					const svg = boardSvg(fen, BOARD / 2, { flipped: readerFlip });
+					for (const sq of diff) svg.querySelector(`rect[data-sq="${sq}"]`).classList.add("diff");
+					return el("figure", {}, [svg, el("figcaption", { textContent: caption })]);
+				};
+				const dv = divergence(node, other);
+				const picked = live.find((c) => c.id === `name|${other.key}`);
+				res.append(
+					el("div", { className: "tr-compare" }, [figure(node.fen, `Asked: ${node.name}`), figure(other.fen, `You said: ${other.name}`)]),
+					el("p", { className: "tr-diverge", textContent: `${node.name} ${dv.a} · ${other.name} ${dv.b}` }),
+					...(picked ? picked.notes.filter((n) => n.own).map((n) => noteLine(n.move, n.text)) : []));
+			}
 			// a book card keeps its notes by move; the others show the variation's own note only (the intro steps through the rest)
 			const notes = Array.isArray(card.notes) ? card.notes.filter((n) => n.own).map((n) => [n.move, n.text]) : Object.entries(card.notes);
 			for (const [move, text] of notes) res.append(noteLine(Array.isArray(card.notes) ? move : `${move}:`, text));
