@@ -5,7 +5,7 @@ import { installDom } from "./helpers.mjs";
 import { parsePgn } from "../src/pgn.js";
 import { collectLines } from "../src/tree.js";
 import { namesFromNodes, variationTree } from "../src/names.js";
-import { DEFAULT_SETTINGS, buildDeck, emptyProgress, normalizeSettings, newSession, loadProgress } from "../src/train.js";
+import { DAY, DEFAULT_SETTINGS, buildDeck, emptyProgress, normalizeSettings, newSession, loadProgress } from "../src/train.js";
 import { newTrainUi, trainPanel } from "../src/train-view.js";
 
 const PGN = `1. e4 c5 2. Nf3 d6 {[%name "...d6 Sicilians"]} (2... e6 {[%name "...e6 Sicilians/Sicilian e6"] [%tags "e6"]} 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 d6 {[%name "Scheveningen"]}) 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 e6 {[%name "Scheveningen"]} (5... a6 {[%name "Najdorf"] [%tags "d6; Nc3 committed"]} 6. Be3 {[%name "English Attack"]}) *`;
@@ -30,11 +30,11 @@ beforeEach(() => {
 });
 after(() => delete global.localStorage);
 
-function mount({ ui = newTrainUi(), t = tree, d = deck, l = lines, settings = {}, progress = emptyProgress() } = {}) {
+function mount({ ui = newTrainUi(), t = tree, d = deck, settings = {}, progress = emptyProgress() } = {}) {
 	progress.settings = normalizeSettings({ types: ALL, ...settings });
 	const root = document.createElement("div");
 	document.body.append(root); // change events only fire on connected inputs
-	const draw = () => root.replaceChildren(trainPanel(ui, { tree: t, deck: d, progress, lines: l, workbookId: "t1" }, draw, NOW));
+	const draw = () => root.replaceChildren(trainPanel(ui, { tree: t, deck: d, progress, workbookId: "t1" }, draw, NOW));
 	draw();
 	return { root, ui, progress, draw };
 }
@@ -133,7 +133,7 @@ test("outline: Practice starts a scoped question screen, scope shows the subtree
 });
 
 test("empty tree: hint, and Nothing due when there is nothing to drill", () => {
-	const { root } = mount({ t: variationTree([], {}), d: [], l: [] });
+	const { root } = mount({ t: variationTree([], {}), d: [] });
 	assert.match($(root, ".tr-empty").textContent, /Name this position/);
 	assert.ok($(root, ".tr-start").disabled);
 	assert.match($(root, ".tr-start").textContent, /Nothing due/);
@@ -310,8 +310,40 @@ test("summary lists moved cards and says when the next review is", () => {
 	assert.match(t, /Right 1 \/ 2/);
 	assert.match(t, /\.\.\.d6 Sicilians \(name\)/);
 	assert.match(t, /in 3 days/);
-	progress.cards = {};
+	const wait = (rec) => {
+		progress.cards = { [c.id]: rec };
+		m.draw();
+		return $(m.root, ".tr-summary").textContent;
+	};
+	assert.match(wait({ box: 1, seen: NOW, skip: false }), /in 1 dayBack/);
+	assert.match(wait({ box: 2, seen: NOW - 3 * DAY + 3600000, skip: false }), /in 1 hourBack/);
+	assert.match(wait({ box: 2, seen: NOW - 3 * DAY + 7200000, skip: false }), /in 2 hours/);
+	assert.match(wait({ box: 3, seen: NOW - 8 * DAY, skip: false }), /Next review: now/);
+	assert.match(wait({ box: 0, seen: NOW, skip: true }), /nothing scheduled/);
+	done();
+});
+
+test("a stale deck never quizzes a type switched off in settings", () => {
+	const { root, ui, draw } = mount({ settings: { types: { name: false, order: true, family: false, book: false } } });
+	click(root, ".tr-start");
+	assert.ok(ui.session.queue.length > 0 && ui.session.queue.every((c) => c.type === "order"));
+	ui.screen = "outline";
+	draw();
+	click(row(root, "...d6 Sicilians"), ".tr-practice");
+	assert.ok(ui.session.queue.every((c) => c.type === "order"));
+	done();
+});
+
+test("digit keys pick a choice even with a choice button focused", () => {
+	const key = v("...d6 Sicilians").key;
+	const c = deck.find((x) => x.id === `name|${key}`);
+	const m = mount();
+	m.ui.session = { queue: [c], i: 0, results: [], unlockedBefore: new Set() };
+	m.ui.card = c;
+	m.ui.screen = "question";
 	m.draw();
-	assert.match($(m.root, ".tr-summary").textContent, /nothing scheduled/);
+	const btns = m.root.querySelectorAll(".tr-choice");
+	btns[0].dispatchEvent(new window.KeyboardEvent("keydown", { key: "2", bubbles: true }));
+	assert.strictEqual(m.ui.picked, m.ui.choices[1]);
 	done();
 });

@@ -3,6 +3,10 @@
 // one question at a time, and the summary. Like studyPanel it is a pure
 // function of its state (the ui object plus the progress): every control
 // mutates them, saves, and calls onChange, which redraws.
+//
+// The caller owns `deck`: it must rebuild it from progress.settings (buildDeck)
+// before every render, i.e. in its onChange. As a guard against a stale deck,
+// sessions never include a card type switched off in settings.types.
 
 import { Chess } from "chess.js";
 import { el, renderInline } from "./dom.js";
@@ -34,8 +38,9 @@ export function trainPanel(ui, { tree, deck, progress, workbookId }, onChange, n
 		save();
 		onChange();
 	};
+	const live = deck.filter((c) => settings.types[c.type]);
 	const begin = (opts) => {
-		ui.session = newSession(deck, tree, progress, settings, { now, ...opts });
+		ui.session = newSession(live, tree, progress, settings, { now, ...opts });
 		ui.screen = "question";
 		setCard();
 	};
@@ -56,7 +61,7 @@ export function trainPanel(ui, { tree, deck, progress, workbookId }, onChange, n
 
 	function outlineScreen() {
 		const box = el("div", { className: "tr-outline" });
-		const queue = newSession(deck, tree, progress, settings, { now, scope: ui.scope }).queue;
+		const queue = newSession(live, tree, progress, settings, { now, scope: ui.scope }).queue;
 		const fresh = queue.filter((c) => !progress.cards[c.id]).length;
 		const head = el("div", { className: "tr-head" });
 		const start = chipBtn("tr-start", queue.length ? "Start" : "Nothing due", "Study what is due, then new cards", act(() => begin({ scope: ui.scope })), !queue.length);
@@ -89,7 +94,7 @@ export function trainPanel(ui, { tree, deck, progress, workbookId }, onChange, n
 			const r = el("div", { className: "tr-var" });
 			r.append(
 				n.children.length
-					? chipBtn("tr-toggle", open ? "▾" : "▸", open ? "Hide the sub-variations" : "Show the sub-variations", act(() => ui.open[open ? "delete" : "add"](n.key)))
+					? chipBtn("tr-toggle", open ? "▾" : "▸", open ? "Hide the sub-variations" : "Show the sub-variations", act(() => (open ? ui.open.delete(n.key) : ui.open.add(n.key))))
 					: el("span", { className: "tr-toggle-gap" }),
 				el("span", { className: "tr-name", textContent: n.name }),
 				el("span", { className: "tr-level", textContent: `L${n.level}` }),
@@ -197,14 +202,16 @@ export function trainPanel(ui, { tree, deck, progress, workbookId }, onChange, n
 			ui.answered = { right, detail, notes };
 			onChange();
 		};
+		let typedInput = null; // the typed-name field, when this question has one
 		panel.onkeydown = (e) => {
-			if (e.target.closest?.("button")) return; // a focused button handles Enter itself
-			if (ui.answered) {
-				if (e.key === "Enter") next();
+			if (e.key === "Enter") {
+				if (e.target.closest?.("button")) return; // a focused button handles Enter itself
+				if (ui.answered) next();
+				else if (typedInput && e.target === typedInput) pickName(typedInput.value);
 				return;
 			}
 			const n = +e.key;
-			if (card.type === "name" && settings.nameMode === "choice" && n >= 1 && n <= (ui.choices?.length ?? 0)) pickName(ui.choices[n - 1]);
+			if (!ui.answered && ui.choices && n >= 1 && n <= ui.choices.length) pickName(ui.choices[n - 1]);
 		};
 		const flip = () => chipBtn("tr-flip", "Flip", "Turn the board round", act(() => (ui.flipped = !ui.flipped)));
 		const pickName = (text) => {
@@ -221,9 +228,8 @@ export function trainPanel(ui, { tree, deck, progress, workbookId }, onChange, n
 				body.append(el("div", { className: "tr-choices" }, ui.choices.map((name, i) =>
 					el("button", { className: "tr-choice chip", textContent: name, title: `Key ${i + 1}`, onclick: () => pickName(name) }))));
 			} else if (!ui.answered) {
-				const input = el("input", { className: "tr-typed", type: "text", value: ui.typed, placeholder: "Name" });
-				body.append(input, chipBtn("tr-check", "Check", "Check the name", () => pickName(input.value)));
-				panel.onkeydown = ((old) => (e) => (e.key === "Enter" && e.target === input ? pickName(input.value) : old(e)))(panel.onkeydown);
+				typedInput = el("input", { className: "tr-typed", type: "text", value: ui.typed, placeholder: "Name" });
+				body.append(typedInput, chipBtn("tr-check", "Check", "Check the name", () => pickName(typedInput.value)));
 			}
 		} else if (card.type === "order") {
 			prompt.textContent = `Play the moves to the ${node.name}`;
@@ -233,7 +239,7 @@ export function trainPanel(ui, { tree, deck, progress, workbookId }, onChange, n
 				const step = orderStep(node.orders, ui.played, san);
 				if (!step.ok) return finish(false, [`Expected: ${step.accepted.join(" or ")}`]);
 				ui.played.push(san);
-				if (!step.done) return act(() => {})();
+				if (!step.done) return onChange(); // on to the next move
 				const others = node.orders.filter((o) => o.join(" ") !== ui.played.join(" ")).map((o) => o.join(" "));
 				finish(true, others.length ? [`Also reached by: ${others.join("; ")}`] : []);
 			};
@@ -262,7 +268,8 @@ export function trainPanel(ui, { tree, deck, progress, workbookId }, onChange, n
 			card.sans.forEach((s) => chess.move(s));
 			prompt.textContent = `${nameOf(card.vkey)}: find the move`;
 			body.append(el("p", { className: "tr-moves", textContent: card.sans.join(" ") || "(start position)" }));
-			const flipped = (settings.bookSide === "both" ? chess.turn() === "b" : settings.bookSide === "black") !== ui.flipped;
+			const blackToPlay = settings.bookSide === "both" ? chess.turn() === "b" : settings.bookSide === "black";
+			const flipped = blackToPlay !== ui.flipped; // the reader's side at the bottom, unless flipped by hand
 			const play = (san) => {
 				const right = checkBook(card, san, settings);
 				const detail = [`Book: ${card.moves.join(", ")}${card.main ? ` (main: ${card.main})` : ""}`];
@@ -300,7 +307,14 @@ export function trainPanel(ui, { tree, deck, progress, workbookId }, onChange, n
 		list("Moved up", sum.up.map(name));
 		list("Moved down", sum.down.map(name));
 		list("Newly unlocked", sum.unlocked);
-		const wait = sum.nextDue === null ? "nothing scheduled" : sum.nextDue - now >= DAY ? `in ${Math.ceil((sum.nextDue - now) / DAY)} days` : `in ${Math.ceil((sum.nextDue - now) / 3600000)} hours`;
+		const unit = (n, word) => `in ${n} ${word}${n === 1 ? "" : "s"}`;
+		const ahead = sum.nextDue === null ? 0 : sum.nextDue - now;
+		// sessionSummary only looks ahead, so a card already overdue means "now"
+		const overdue = Object.values(progress.cards).some((r) => isDue(r, settings, now));
+		let wait = "nothing scheduled";
+		if (overdue) wait = "now";
+		else if (ahead >= DAY) wait = unit(Math.ceil(ahead / DAY), "day");
+		else if (ahead > 0) wait = unit(Math.ceil(ahead / 3600000), "hour");
 		box.append(
 			el("p", { textContent: `Next review: ${wait}` }),
 			chipBtn("tr-back", "Back to the outline", "", act(() => (ui.screen = "outline"))),
