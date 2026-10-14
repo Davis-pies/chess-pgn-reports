@@ -45,10 +45,19 @@ each line through it, up to (not including) the next named position.
 Each named position gives cards; each card type can be switched off.
 
 - **name** - the board shows the defining position; answer with its name.
-  Multiple choice (choices from the same level first, then other names) or
+  Multiple choice or
   typed (case and punctuation ignored, `/` separates accepted aliases, so
   "Kan/Paulsen" accepts either). Options: answer mode, number of choices,
   show the moves that led there, board orientation.
+  **Choices** (Davis, 2026-10-14: make it difficult, ensure understanding;
+  research, findings 3 and 6: discrimination between similar items, at the
+  right difficulty). The wrong answers are ranked by how confusable they
+  are: (1) siblings (same parent; the other roots at level 1), (2) variations
+  sharing a tag with it, (3) the same level elsewhere, (4) the rest. Names
+  the reader has met (any card of that variation asked) come before unmet
+  ones within each rank; an unmet name is used only to fill. A card not yet
+  learned takes at most one sibling and the rest from the farther ranks; a
+  learned card takes the closest ranks first. Shuffled every time.
 - **order** - given the name, play the moves from the start. A move is
   accepted while some workbook path still leads to the position; a move off
   all of them is wrong and the accepted moves are shown. Arriving lists the
@@ -96,7 +105,14 @@ the boxes were hard to follow.
   sooner, it is still right but "too soon to count". Before a card is
   learned every right answer counts, so learning happens in one sitting;
   after that each step towards mastery is a separate re-check.
-- A card is **learned** at a streak of "Right in a row to learn" (default 2)
+- **Not straight after the intro** (Davis, 2026-10-14: being asked right
+  after being shown "feels like a free correct answer"). A variation's
+  first question comes at least 3 other questions after its intro where
+  the session has them to put in between. A right answer given sooner than
+  that is "too soon to count": no streak, and like the spacing rule's, it is
+  left out of the summary's score.
+- A card is **learned** at a streak of "Right in a row to learn" (default 3,
+  as successive relearning recommends; it was 2 until 2026-10-14)
   and **mastered** at "Right in a row to master" (default 5, never below the
   learn setting). Both read the current streak, so mastery says what the
   reader knows now.
@@ -221,7 +237,8 @@ position). Three screens:
   and **Next**. An intro shows instead its position, moves and notes with
   **Learn it** and **Got it**. Keys: Enter next, 1-9 pick a choice,
   Escape closes.
-- **Summary** - score; the variations newly learned, newly mastered, newly
+- **Summary** - score, counting only answers that counted ("Right n / m",
+  then "k too soon to count" when there were any); the variations newly learned, newly mastered, newly
   unlocked, and those that slipped back from mastered; the tricky questions
   with **Learn it**; how many are still locked; **Keep going** (Enter: a new
   session with the same scope and filter, picking up where this one left
