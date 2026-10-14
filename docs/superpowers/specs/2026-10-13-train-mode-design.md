@@ -67,15 +67,27 @@ Answers score right or wrong; there is no partial credit.
 
 ## Progression
 
-- Level-1 variations start unlocked. A variation is **mastered** when each
-  of its enabled name/order/family cards is in the mastery box (default 3)
-  or above. Mastering a variation unlocks its children and its book cards.
+- Level-1 variations start unlocked. Learning and mastery are separate
+  (2026-10-14: unlocking used to wait for mastery, which took at least four
+  days of reviews before anything below level 1 opened):
+  - A card is **learned** once it has been answered right a number of times
+    in a row (the card's `streak`; setting "Right in a row to learn", default
+    2, 1-10), or once it reaches the mastery box. A miss resets the streak.
+  - A variation is **learned** when each of its enabled name/order/family
+    cards is. Learning a variation unlocks its children and its book cards.
+  - A variation is **mastered** when each of those cards is in the mastery
+    box (default 3) or above. Mastery is the long-term measure: the outline's
+    bar shows it, and the review schedule keeps working towards it.
 - Leitner boxes 0-5. Intervals (editable): box 0 again this session, then 1,
   3, 7, 16, 35 days. Right moves a card up one box, wrong sends it to box 1.
 - A session takes due cards first (most overdue first), then up to N new
   cards from the unlocked set (default 10), and stops after M questions
   (default 20, or unlimited) or when nothing is left. A miss comes back later
-  in the same session.
+  in the same session, and so does a right answer on a card not yet learned,
+  so a card can be learned in one sitting (its box still climbs at most once
+  a session). When an answer unlocks variations, their new cards join the
+  session at once, within the same new-card and length limits, so a first
+  session can go deeper than level 1.
 - Manual, per variation: **Mark known** (its cards to the mastery box,
   unlocking its children), **Skip** (left out of sessions), **Reset**, **Set
   box**. **Practice this** drills one subtree now, ignoring the schedule;
@@ -84,7 +96,8 @@ Answers score right or wrong; there is no partial credit.
 ## Progress storage
 
 Per workbook in localStorage under `ott-train:<workbook id>`: settings plus,
-per card (`<type>|<position key>`), `{ box, seen, skip }`. Saved after every
+per card (`<type>|<position key>`), `{ box, seen, skip, streak }` (a record
+without `streak`, from before 2026-10-14, reads as 0). Saved after every
 answer, without touching the workbook's own Save. **Save to file** includes
 it as `train`; opening that file restores it. PGN export and shared links do
 not carry it. A workbook never saved has no id; its progress lives under
@@ -96,15 +109,19 @@ A window over the report like Study: **Train** in the toolbar, **Train from
 here** in the table's context menu (Practice on the subtree at that
 position). Three screens:
 
-- **Outline** - the named-position tree: level, a mastery bar, cards due,
+- **Outline** - a progress line over the tree (variations learned out of
+  all, how many mastered, the deepest level open), then the named-position
+  tree: level, a mastery bar, learned/mastered state, cards due,
   locked/skipped state, the manual actions, rename/retag. Filters: subtree,
   tags, card types. **Start** (scheduled session) and settings.
 - **Question** - the board (the analysis board's `boardRow`), the prompt,
-  the answer area; after answering, right/wrong, the right answer, the
-  workbook's note and **Next**. Keys: Enter next, 1-9 pick a choice,
+  a status line (the card's level and its streak towards learned, or
+  learned/mastered; never the variation's name, which would give a name
+  question away), the answer area; after answering, right/wrong, the right
+  answer, the workbook's note, what the answer unlocked, and **Next**. Keys: Enter next, 1-9 pick a choice,
   Escape closes.
-- **Summary** - score, cards up/down, newly unlocked variations, when the
-  next review is due.
+- **Summary** - score, cards up/down, newly unlocked variations, how many
+  are still locked, when the next review is due.
 
 On phones the board is pinned on top as in Study. With no named positions
 the outline explains how to name one; book drilling still works, the whole
