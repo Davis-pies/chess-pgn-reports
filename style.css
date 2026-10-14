@@ -1925,6 +1925,9 @@ sup {
 .tr-outline > .tr-tree { padding-left: 0; }
 .tr-var { padding: .2rem 0; border-bottom: 1px solid var(--line); }
 .tr-name { font-weight: 600; }
+/* the actions share the name's line when they fit, else wrap as one block under it */
+.tr-acts { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-left: 1.6rem; }
+.tr-also, .tr-hint { font-size: .8rem; color: var(--muted); }
 .tr-level, .tr-due { font-size: .78rem; color: var(--muted); }
 .tr-toggle-gap { display: inline-block; width: 1.6rem; }
 .tr-bar { display: inline-block; width: 5rem; height: .5rem; border-radius: var(--radius-sm); background: var(--line); overflow: hidden; }

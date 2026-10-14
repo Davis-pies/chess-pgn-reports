@@ -174,8 +174,9 @@ export function unlockedKeys(tree, deck, progress, settings) {
 	return out;
 }
 
-// Mastered implies unlocked (it needs records, and a record unlocks), so the
-// tree isn't needed here.
+// Only mastery is checked here, not unlocking: newSession checks both. (A
+// mastered variation has records, and a record unlocks it, so the tree isn't
+// needed.)
 export const bookOpen = (vkey, deck, progress, settings) => vkey === "" || isMastered(vkey, deck, progress, settings);
 
 // --- sessions ------------------------------------------------------------
@@ -188,10 +189,12 @@ function inScope(tree, scope) {
 	return set;
 }
 
-export function newSession(deck, tree, progress, settings, { now, scope = null, practice = false }) {
+export function newSession(deck, tree, progress, settings, { now, scope = null, practice = false, keys = null }) {
 	const unlockedBefore = unlockedKeys(tree, deck, progress, settings);
 	const sc = inScope(tree, scope);
-	const cards = sc ? deck.filter((c) => sc.has(c.vkey)) : deck;
+	// `keys` is a further limit (the outline's tag filter); it only narrows the
+	// cards, so unlocking still sees the whole deck
+	const cards = deck.filter((c) => (!sc || sc.has(c.vkey)) && (!keys || keys.has(c.vkey)));
 	const cap = (q) => (settings.sessionLength > 0 ? q.slice(0, settings.sessionLength) : q);
 	if (practice) return { queue: cap(cards), i: 0, results: [], unlockedBefore };
 	const open = new Map();
@@ -224,7 +227,9 @@ export const current = (s) => s.queue[s.i] || null;
 export function answer(session, progress, card, right, settings, now) {
 	const rec = progress.cards[card.id] || { box: 0, seen: 0, skip: false };
 	const from = rec.box;
-	const to = right ? Math.min(from + 1, MAX_BOX) : 1;
+	// a card requeued after a miss can't climb again in the same session
+	const again = session.results.some((r) => r.id === card.id);
+	const to = right ? (again ? from : Math.min(from + 1, MAX_BOX)) : 1;
 	progress.cards[card.id] = { ...rec, box: to, seen: now };
 	session.results.push({ id: card.id, right, from, to });
 	if (!right) session.queue.splice(Math.min(session.i + 3, session.queue.length), 0, card);

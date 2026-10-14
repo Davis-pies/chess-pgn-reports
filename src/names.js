@@ -17,8 +17,9 @@ export function readNameCmd(text) {
 	return { name: m[1], tags };
 }
 
-// A quote would end the command early, so it becomes an apostrophe.
-const q = (s) => s.replace(/"/g, "'");
+// A quote would end the command early, so it becomes an apostrophe; a closing
+// brace or bracket would end the comment or the command, so it becomes a paren.
+const q = (s) => s.replace(/"/g, "'").replace(/[}\]]/g, ")");
 
 export function nameCmd({ name, tags = [] }) {
 	const out = `[%name "${q(name)}"]`;

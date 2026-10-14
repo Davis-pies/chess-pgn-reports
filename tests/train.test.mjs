@@ -136,10 +136,13 @@ test("newSession: an unnamed workbook is one book variation", () => {
 test("answer: right climbs to 5, wrong drops to 1 and returns 3 later", () => {
 	const p = emptyProgress();
 	const c = deck[0];
-	const s = { queue: [c, deck[1], deck[2], deck[3], deck[4]], i: 0, results: [], unlockedBefore: new Set() };
-	for (let k = 0; k < 6; k++) answer(s, p, c, true, S, NOW);
+	let s;
+	for (let k = 0; k < 6; k++) {
+		s = { queue: [c, deck[1], deck[2], deck[3], deck[4]], i: 0, results: [], unlockedBefore: new Set() };
+		answer(s, p, c, true, S, NOW);
+	}
 	assert.strictEqual(p.cards[c.id].box, 5);
-	assert.deepStrictEqual(s.results[0], { id: c.id, right: true, from: 0, to: 1 });
+	assert.deepStrictEqual(s.results[0], { id: c.id, right: true, from: 5, to: 5 });
 	assert.strictEqual(p.cards[c.id].seen, NOW);
 	const w = { queue: [c, deck[1], deck[2], deck[3], deck[4]], i: 0, results: [], unlockedBefore: new Set() };
 	answer(w, p, c, false, S, NOW);
@@ -150,6 +153,18 @@ test("answer: right climbs to 5, wrong drops to 1 and returns 3 later", () => {
 	answer(end, p, c, false, S, NOW);
 	assert.deepStrictEqual(end.queue, [c, c]);
 	assert.strictEqual(current({ queue: [c], i: 1 }), null);
+});
+
+test("answer: a requeued miss is not promoted again in the same session", () => {
+	const p = emptyProgress();
+	const c = deck[0];
+	const s = { queue: [c], i: 0, results: [], unlockedBefore: new Set() };
+	answer(s, p, c, false, S, NOW);
+	answer(s, p, c, true, S, NOW + 1);
+	assert.strictEqual(p.cards[c.id].box, 1, "stays in box 1");
+	assert.strictEqual(p.cards[c.id].seen, NOW + 1);
+	answer(s, p, c, false, S, NOW + 2);
+	assert.strictEqual(p.cards[c.id].box, 1);
 });
 
 test("sessionSummary: up, down, unlocked and next due", () => {

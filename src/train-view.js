@@ -23,13 +23,13 @@ export function newTrainUi(scope = null) {
 		screen: "outline", session: null, card: null,
 		picked: null, typed: "", played: [], answered: null,
 		ticked: [], choices: null, // the family ticks and the name choices, kept so a redraw doesn't reshuffle
-		scope, open: new Set(), flipped: false,
+		scope, open: new Set(), flipped: false, tag: "",
 	};
 }
 
 const TYPES = ["name", "order", "family", "book"];
 
-export function trainPanel(ui, { tree, deck, progress, workbookId }, onChange, now = Date.now()) {
+export function trainPanel(ui, { tree, deck, progress, workbookId, rename }, onChange, now = Date.now()) {
 	const settings = progress.settings;
 	const panel = el("div", { className: "analysis train", tabIndex: -1 });
 	const save = () => saveProgress(workbookId, progress);
@@ -39,8 +39,16 @@ export function trainPanel(ui, { tree, deck, progress, workbookId }, onChange, n
 		onChange();
 	};
 	const live = deck.filter((c) => settings.types[c.type]);
+	// the variations the tag filter keeps: those carrying the tag, and below them
+	const tagged = (() => {
+		if (!ui.tag || !allTags(tree).includes(ui.tag)) return null;
+		const set = new Set();
+		const add = (v) => { set.add(v.key); v.children.forEach(add); };
+		for (const v of tree.byKey.values()) if (v.tags.includes(ui.tag)) add(v);
+		return set;
+	})();
 	const begin = (opts) => {
-		ui.session = newSession(live, tree, progress, settings, { now, ...opts });
+		ui.session = newSession(live, tree, progress, settings, { now, keys: tagged, ...opts });
 		ui.screen = "question";
 		setCard();
 	};
@@ -61,7 +69,7 @@ export function trainPanel(ui, { tree, deck, progress, workbookId }, onChange, n
 
 	function outlineScreen() {
 		const box = el("div", { className: "tr-outline" });
-		const queue = newSession(live, tree, progress, settings, { now, scope: ui.scope }).queue;
+		const queue = newSession(live, tree, progress, settings, { now, scope: ui.scope, keys: tagged }).queue;
 		const fresh = queue.filter((c) => !progress.cards[c.id]).length;
 		const head = el("div", { className: "tr-head" });
 		const start = chipBtn("tr-start", queue.length ? "Start" : "Nothing due", "Study what is due, then new cards", act(() => begin({ scope: ui.scope })), !queue.length);
@@ -71,13 +79,24 @@ export function trainPanel(ui, { tree, deck, progress, workbookId }, onChange, n
 			el("span", { className: "tr-count", textContent: `${queue.length - fresh} due · ${fresh} new` }),
 		);
 		if (ui.scope !== null) head.append(chipBtn("tr-whole", "Whole workbook", "List every variation", act(() => (ui.scope = null))));
+		const tags = allTags(tree);
+		if (tags.length) {
+			const sel = el("select", { className: "tr-tagfilter st-pick", title: "Show only the variations with this tag" }, [
+				el("option", { value: "", textContent: "All variations" }),
+				...tags.map((t) => el("option", { value: t, textContent: t, selected: t === ui.tag })),
+			]);
+			sel.onchange = act(() => (ui.tag = sel.value));
+			head.append(sel);
+		}
 		box.append(head);
 		if (!tree.byKey.size) {
 			box.append(el("p", { className: "tr-empty", textContent: "Name positions (right-click a move in the table → Name this position…) to be quizzed on them. Until then, Start drills the book moves." }));
 			return box;
 		}
 		const unlocked = unlockedKeys(tree, deck, progress, settings);
-		const roots = ui.scope !== null && tree.byKey.has(ui.scope) ? [tree.byKey.get(ui.scope)] : tree.roots;
+		let roots = ui.scope !== null && tree.byKey.has(ui.scope) ? [tree.byKey.get(ui.scope)] : tree.roots;
+		// under a tag filter the tagged variations head the list, wherever they sit
+		if (tagged) roots = [...tagged].map((k) => tree.byKey.get(k)).filter((v) => !v.parent || !tagged.has(v.parent.key));
 		const list = (nodes) => {
 			const ul = el("ul", { className: "tr-tree" });
 			for (const n of nodes) ul.append(varRow(n, unlocked));
@@ -94,11 +113,12 @@ export function trainPanel(ui, { tree, deck, progress, workbookId }, onChange, n
 			const r = el("div", { className: "tr-var" });
 			r.append(
 				n.children.length
-					? chipBtn("tr-toggle", open ? "▾" : "▸", open ? "Hide the sub-variations" : "Show the sub-variations", act(() => (open ? ui.open.delete(n.key) : ui.open.add(n.key))))
+					? chipBtn("tr-open", open ? "▾" : "▸", open ? "Hide the sub-variations" : "Show the sub-variations", act(() => (open ? ui.open.delete(n.key) : ui.open.add(n.key))))
 					: el("span", { className: "tr-toggle-gap" }),
 				el("span", { className: "tr-name", textContent: n.name }),
 				el("span", { className: "tr-level", textContent: `L${n.level}` }),
 			);
+			if (n.also.length) r.append(el("span", { className: "tr-also", textContent: `also reached from ${n.also.map((a) => a.name).join(", ")}` }));
 			const bar = el("span", { className: "tr-bar", title: `${mastered} of ${solid.length} mastered` }, el("span"));
 			bar.firstChild.style.width = `${solid.length ? Math.round((100 * mastered) / solid.length) : 0}%`;
 			r.append(bar, el("span", { className: "tr-due", textContent: due ? `${due} due` : "" }));
@@ -109,7 +129,8 @@ export function trainPanel(ui, { tree, deck, progress, workbookId }, onChange, n
 				...[0, 1, 2, 3, 4, 5].map((b) => el("option", { value: String(b), textContent: `Box ${b}` })),
 			]);
 			box.onchange = act(() => box.value !== "" && setBox(progress, n.key, deck, +box.value, now));
-			r.append(
+			const acts = el("span", { className: "tr-acts" });
+			acts.append(
 				chipBtn("tr-practice", "Practice", "Drill this variation and below, due or not", act(() => begin({ scope: n.key, practice: true }))),
 				chipBtn("tr-known", "Known", "Count its cards as mastered", act(() => markKnown(progress, n.key, deck, settings, now))),
 				chipBtn("tr-skip", skipped ? "Unskip" : "Skip", "Leave its cards out", act(() => skip(progress, n.key, deck, !skipped))),
@@ -119,12 +140,15 @@ export function trainPanel(ui, { tree, deck, progress, workbookId }, onChange, n
 					save();
 					onChange();
 				}),
+				chipBtn("tr-rename", "Rename…", "Rename or retag this position", () => rename(n)),
 				box,
 			);
+			r.append(acts);
 			li.append(r);
 			if (open && n.children.length) li.append(list(n.children));
 			return li;
 		};
+		if (!queue.length) box.append(el("p", { className: "tr-hint", textContent: "Nothing due now. Use Practice on a variation to drill it anyway, or Known to mark it learned and unlock what's below it." }));
 		box.append(list(roots));
 		return box;
 	}
@@ -216,12 +240,16 @@ export function trainPanel(ui, { tree, deck, progress, workbookId }, onChange, n
 		const flip = () => chipBtn("tr-flip", "Flip", "Turn the board round", act(() => (ui.flipped = !ui.flipped)));
 		const pickName = (text) => {
 			ui.picked = ui.typed = text;
-			finish(checkName(text, node.name), [`Answer: ${node.name}`]);
+			const right = checkName(text, node.name);
+			finish(right, right ? [`Answer: ${node.name}`] : [`Answer: ${node.name}`, `You answered: ${text}`]);
 		};
+		// the reader's side at the bottom (Black: flipped), unless turned by hand
+		const readerFlip = (settings.bookSide === "black") !== ui.flipped;
 
 		if (card.type === "name") {
 			prompt.textContent = "What is this position called?";
-			body.append(boardSvg(node.fen, 280, { flipped: ui.flipped }));
+			body.append(boardSvg(node.fen, 280, { flipped: readerFlip }));
+			if (!ui.answered) body.append(flip());
 			if (settings.showMoves) body.append(el("p", { className: "tr-moves", textContent: node.orders[0].join(" ") }));
 			if (!ui.answered && settings.nameMode === "choice") {
 				ui.choices ||= nameChoices(card, tree, settings, Math.random);
@@ -250,7 +278,8 @@ export function trainPanel(ui, { tree, deck, progress, workbookId }, onChange, n
 			const group = settings.familyGroup;
 			const tags = group.length ? node.tags.filter((t) => group.includes(t)) : node.tags;
 			prompt.textContent = settings.familyShowName ? `Which families does the ${node.name} belong to?` : "Which families does this position belong to?";
-			body.append(boardSvg(node.fen, 280, { flipped: ui.flipped }));
+			body.append(boardSvg(node.fen, 280, { flipped: readerFlip }));
+			if (!ui.answered) body.append(flip());
 			const options = group.length ? group : allTags(tree);
 			const radio = group.length > 0;
 			const list = el("div", { className: "tr-tags" });

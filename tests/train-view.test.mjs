@@ -76,10 +76,10 @@ test("outline: roots listed, children behind a toggle, locked badge", () => {
 	const { root } = mount();
 	assert.ok(row(root, "...d6 Sicilians") && row(root, "...e6 Sicilians/Sicilian e6"));
 	assert.ok(!row(root, "Najdorf"));
-	click(row(root, "...d6 Sicilians"), ".tr-toggle");
+	click(row(root, "...d6 Sicilians"), ".tr-open");
 	assert.match(row(root, "Najdorf").textContent, /locked/);
 	assert.doesNotMatch(row(root, "...d6 Sicilians").textContent, /locked/);
-	click(row(root, "...d6 Sicilians"), ".tr-toggle");
+	click(row(root, "...d6 Sicilians"), ".tr-open");
 	assert.ok(!row(root, "Najdorf"));
 	assert.match($(root, ".tr-count").textContent, /\d+ due · \d+ new/);
 	done();
@@ -123,7 +123,7 @@ test("outline: Practice starts a scoped question screen, scope shows the subtree
 	m.ui.scope = v("Najdorf").key;
 	m.draw();
 	assert.ok(row(m.root, "Najdorf") && row(m.root, "English Attack") === undefined);
-	click(row(m.root, "Najdorf"), ".tr-toggle");
+	click(row(m.root, "Najdorf"), ".tr-open");
 	assert.ok(row(m.root, "English Attack"));
 	assert.ok(!row(m.root, "...d6 Sicilians"));
 	click(m.root, ".tr-whole");
@@ -345,5 +345,99 @@ test("digit keys pick a choice even with a choice button focused", () => {
 	const btns = m.root.querySelectorAll(".tr-choice");
 	btns[0].dispatchEvent(new window.KeyboardEvent("keydown", { key: "2", bubbles: true }));
 	assert.strictEqual(m.ui.picked, m.ui.choices[1]);
+	done();
+});
+
+test("outline: a variation reached another way says so", () => {
+	const { root } = mount();
+	const sch = row(root, "Scheveningen");
+	assert.ok(!sch || !$(sch, ".tr-also") || /also reached from/.test($(sch, ".tr-also").textContent));
+	const t = variationTree([], {});
+	const a = { key: "a", fen: tree.roots[0].fen, name: "A", tags: [], parent: null, also: [], children: [], level: 1, orders: [["e4"]] };
+	const b = { ...a, key: "b", name: "B" };
+	const c = { ...a, key: "c", name: "C", parent: a, also: [b], level: 2 };
+	a.children.push(c);
+	t.byKey.set("a", a).set("b", b).set("c", c);
+	t.roots.push(a, b);
+	const m = mount({ t, d: [], ui: Object.assign(newTrainUi(), { open: new Set(["a"]) }) });
+	assert.strictEqual($(row(m.root, "C"), ".tr-also").textContent, "also reached from B");
+	assert.ok(!$(row(m.root, "A"), ".tr-also"));
+	done();
+});
+
+test("outline: Rename calls back with the variation, from its action chips", () => {
+	const seen = [];
+	const progress = emptyProgress();
+	progress.settings = normalizeSettings({ types: ALL });
+	const root = document.createElement("div");
+	document.body.append(root);
+	const ui = newTrainUi();
+	root.append(trainPanel(ui, { tree, deck, progress, workbookId: "t1", rename: (n) => seen.push(n.name) }, () => {}, NOW));
+	click(row(root, "...d6 Sicilians"), ".tr-acts .tr-rename");
+	assert.deepStrictEqual(seen, ["...d6 Sicilians"]);
+	done();
+});
+
+test("outline: the tag filter lists tagged variations and limits Start", () => {
+	const m = mount();
+	const sel = $(m.root, ".tr-tagfilter");
+	assert.deepStrictEqual([...sel.options].map((o) => o.value), ["", "Nc3 committed", "d6", "e6"]);
+	sel.value = "e6";
+	sel.dispatchEvent(new window.Event("change"));
+	assert.strictEqual(m.ui.tag, "e6");
+	const names = [...m.root.querySelectorAll(".tr-name")].map((n) => n.textContent);
+	assert.deepStrictEqual(names, ["...e6 Sicilians/Sicilian e6"]);
+	click(m.root, ".tr-start");
+	const below = new Set([v("...e6 Sicilians/Sicilian e6").key]);
+	const add = (x) => x.children.forEach((c) => { below.add(c.key); add(c); });
+	add(v("...e6 Sicilians/Sicilian e6"));
+	assert.ok(m.ui.session.queue.length > 0);
+	assert.ok(m.ui.session.queue.every((c) => below.has(c.vkey)));
+	done();
+});
+
+test("outline: Nothing due explains Practice and Known", () => {
+	const t = variationTree(lines, namesFromNodes(nodes));
+	const d = buildDeck(t, lines, { ...DEFAULT_SETTINGS, types: ALL });
+	const m = mount({ settings: { newPerSession: 0 }, t, d });
+	assert.ok($(m.root, ".tr-start").disabled);
+	assert.match($(m.root, ".tr-hint").textContent, /Nothing due now\. Use Practice/);
+	done();
+});
+
+test("a wrong name says what was answered", () => {
+	const key = v("...e6 Sicilians/Sicilian e6").key;
+	const c = deck.find((x) => x.id === `name|${key}`);
+	const m = mount({ settings: { nameMode: "typed" } });
+	m.ui.session = { queue: [c], i: 0, results: [], unlockedBefore: new Set() };
+	m.ui.card = c;
+	m.ui.screen = "question";
+	m.draw();
+	$(m.root, ".tr-typed").value = "banana";
+	click(m.root, ".tr-check");
+	assert.match($(m.root, ".tr-result").textContent, /You answered: banana/);
+	done();
+});
+
+test("name and family boards: Flip toggles, and Black readers start flipped", () => {
+	const key = v("...e6 Sicilians/Sicilian e6").key;
+	const first = (m) => $(m.root, "rect[data-sq]").dataset.sq;
+	for (const type of ["name", "family"]) {
+		const c = deck.find((x) => x.id === `${type}|${key}`);
+		const start = (settings) => {
+			const m = mount({ settings });
+			m.ui.session = { queue: [c], i: 0, results: [], unlockedBefore: new Set() };
+			m.ui.card = c;
+			m.ui.screen = "question";
+			m.draw();
+			return m;
+		};
+		const white = first(start({ bookSide: "white" }));
+		const m = start({ bookSide: "black" });
+		assert.notStrictEqual(first(m), white, "Black readers see it flipped");
+		click(m.root, ".tr-flip");
+		assert.strictEqual(m.ui.flipped, true);
+		assert.strictEqual(first(m), white, "flipping by hand turns it back");
+	}
 	done();
 });

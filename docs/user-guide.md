@@ -215,15 +215,22 @@ For a shorter overview see the [README](../README.md).
      again this session; boxes 1 to 5 wait 1, 3, 7, 16 and 35 days. A session
      takes what is due first, most overdue first, then up to 10 new cards,
      and stops after 20 questions. A miss comes back later in the same
-     session. The summary shows the score, cards that moved, newly unlocked
+     session, and a right answer then does not move it up again. The summary shows the score, cards that moved, newly unlocked
      variations and when the next review is due.
    - **Controls** — in the outline, per variation: **Known** (its cards
      count as mastered, unlocking what is below), **Skip** / **Unskip**,
-     **Reset**, **Box…** to set a box by hand, and **Practice** to drill that
-     variation and below now, due or not (the results still count). **Start**
-     runs the scheduled session. **Train from here**, in the table's menu,
+     **Reset**, **Box…** to set a box by hand, **Rename…** to rename or retag
+     it (the same prompts as in the table), and **Practice** to drill that
+     variation and below now, due or not (the results still count). A
+     variation reachable under several names shows "also reached from…". The
+     tag menu at the top narrows the outline, and **Start**, to the variations
+     carrying a tag and those below them. **Start** runs the scheduled
+     session; when nothing is due it says so and points to Practice and Known. **Train from here**, in the table's menu,
      opens Train practising from that position. In a question, 1–9 pick a
      choice, Enter goes on and Escape closes.
+   - **The board** — Name and Family show the position from your side (Black
+     by default, as set by "Book side"); **Flip** turns it. After a wrong name
+     the answer also shows what you gave.
    - **Settings** — which question types are on; choice or typed names and
      how many choices; showing the moves, the order target and the family
      name; a group of tags for Family questions; which side you play in Book

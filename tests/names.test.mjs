@@ -9,6 +9,11 @@ import { readNameCmd, nameCmd, namesFromNodes, setName, variationTree, trailOf }
 const PGN = `1. e4 c5 2. Nf3 d6 {[%name "...d6 Sicilians"]} (2... e6 {[%name "...e6 Sicilians"] [%tags "e6"]} 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 d6 {[%name "Scheveningen"] Small centre.}) 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 e6 {[%name "Scheveningen"]} (5... a6 {[%name "Najdorf"] [%tags "d6; Nc3 committed"]} 6. Be3 {[%name "English Attack"]}) *`;
 const parsed = () => parsePgn(PGN);
 
+test("nameCmd turns braces and brackets into parens so the comment survives", () => {
+	const out = nameCmd({ name: "A} b]", tags: ["x]y"] });
+	assert.strictEqual(out, '[%name "A) b)"] [%tags "x)y"]');
+});
+
 test("readNameCmd reads a name and ;-separated tags, and nameCmd writes them back", () => {
 	assert.deepStrictEqual(readNameCmd('[%name "Najdorf"] [%tags "d6; Nc3 committed ;"] text'), { name: "Najdorf", tags: ["d6", "Nc3 committed"] });
 	assert.deepStrictEqual(readNameCmd('[%name "Kan/Paulsen"]'), { name: "Kan/Paulsen", tags: [] });

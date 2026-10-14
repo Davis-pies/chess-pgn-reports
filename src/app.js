@@ -24,7 +24,7 @@ import { namesFromNodes, setName, trailOf, variationTree } from "./names.js";
 import { trainPanel, newTrainUi } from "./train-view.js";
 import { Chess } from "chess.js";
 import { posKey } from "./audit.js";
-import { loadProgress, saveProgress, moveProgress, buildDeck } from "./train.js";
+import { loadProgress, saveProgress, moveProgress, buildDeck, emptyProgress } from "./train.js";
 import { mergeAnnotations } from "./merge.js";
 import { buildPgn } from "./pgn-out.js";
 import { el } from "./dom.js";
@@ -489,9 +489,12 @@ export function openTrain(moves = []) {
 	const names = getCurrent().names;
 	const trail = trailOf(moves.map((m) => m.san), names);
 	const id = getCurrent().id;
+	const tree = variationTree(lines, names);
+	// the last named position on the way, if some visible line still has it
+	const last = trail.length ? trail[trail.length - 1].key : null;
 	train = {
-		ui: newTrainUi(trail.length ? trail[trail.length - 1].key : null),
-		tree: variationTree(lines, names),
+		ui: newTrainUi(last !== null && tree.byKey.has(last) ? last : null),
+		tree,
 		lines,
 		progress: loadProgress(id),
 		workbookId: id,
@@ -506,7 +509,21 @@ function rerenderTrain() {
 	if (getMode() !== "train" || !trainBox?.isConnected) return renderApp();
 	const win = trainBox.querySelector(".an-window");
 	keepFocus = win ? focusKey(win, document.activeElement) : null;
+	// the window is rebuilt, so its scroll position is carried over by hand
+	const top = trainBox.querySelector(".tr-window")?.scrollTop ?? 0;
 	trainBox.replaceWith(trainOverlay());
+	trainBox.querySelector(".tr-window").scrollTop = top;
+}
+
+// Rename or retag a variation from the outline through the same prompts as the
+// table, then rebuild the tree: names are what it is made of.
+function renameVariation(n) {
+	const top = trainBox.querySelector(".tr-window")?.scrollTop ?? 0;
+	nameAt(n.orders[0].map((san) => ({ san })));
+	train.tree = variationTree(train.lines, getCurrent().names);
+	if (train.ui.scope !== null && !train.tree.byKey.has(train.ui.scope)) train.ui.scope = null;
+	rerenderTrain();
+	trainBox.querySelector(".tr-window").scrollTop = top; // nameAt's own redraw reset it
 }
 
 // The study window alone, as rerenderAnalysis does for the board: stepping
@@ -907,7 +924,7 @@ function trainOverlay() {
   };
   // settings change which cards exist, so the deck is rebuilt for every draw
   const deck = buildDeck(train.tree, train.lines, train.progress.settings);
-  const panel = trainPanel(train.ui, { tree: train.tree, deck, progress: train.progress, workbookId: train.workbookId }, rerenderTrain);
+  const panel = trainPanel(train.ui, { tree: train.tree, deck, progress: train.progress, workbookId: train.workbookId, rename: renameVariation }, rerenderTrain);
   const head = el("div", { className: "an-head" }, [
     el("h3", { id: "tr-title", textContent: "Train" }),
     el("button", {
@@ -990,7 +1007,9 @@ function installNotebook(nb, id) {
       name: nb.name || "",
       pgn: nb.pgn,
       header: nb.header || undefined,
-      names: { ...namesFromNodes(nodes), ...(nb.names || {}) },
+      // a saved `names` is the whole truth, even when empty; only workbooks
+      // from before it existed read their names from the PGN
+      names: nb.names && typeof nb.names === "object" ? nb.names : namesFromNodes(nodes),
       lines,
       // a saved notebook carries its own board settings; fall back to the
       // session's for notebooks saved before `view` existed
@@ -1020,7 +1039,10 @@ function installNotebook(nb, id) {
   // what an audit found for this workbook, wherever it was run, and nothing
   // found for the one open before
   sharedAudit().reset();
-  if (nb.train && typeof nb.train === "object") saveProgress(id, nb.train);
+  // an unsaved workbook has one shared progress slot: take the file's, or clear
+  // the previous workbook's rather than inherit it
+  const saved = nb.train && typeof nb.train === "object" ? nb.train : null;
+  if (saved || id === null) saveProgress(id, saved || emptyProgress());
   if (nb.audit) sharedAudit().absorb(unpackEvals(nb.audit));
 }
 
@@ -1073,6 +1095,7 @@ function loadPgnText(text) {
           sideWidth: getCurrent().sideWidth,
         }),
       );
+      if (getCurrent().id === null) saveProgress(null, emptyProgress()); // not the last unsaved workbook's
       renderApp();
       if (moreGames)
         alert(
@@ -1462,7 +1485,7 @@ function openUpdateDialog() {
       const r = mergeAnnotations(getCurrent().lines, lines, {
         keepDropped: keep.checked,
       });
-      pending = { pgn: ta.value, lines, keepDropped: keep.checked };
+      pending = { pgn: ta.value, lines, keepDropped: keep.checked, names: namesFromNodes(nodes) };
       apply.disabled = false;
       report.replaceChildren(
         ...(moreGames
@@ -1508,7 +1531,7 @@ function openUpdateDialog() {
   };
   apply.onclick = () => {
     if (!pending) return;
-    const { pgn, lines, keepDropped } = pending;
+    const { pgn, lines, keepDropped, names } = pending;
     clearTimeout(timer);
     ov.remove();
     withLoading(() => {
@@ -1516,6 +1539,8 @@ function openUpdateDialog() {
       // newer PGN, so its id, name and view settings are left exactly as they
       // were and only `pgn`/`lines` are swapped.
       getCurrent().lines = lines;
+      // names the new PGN brings are added; the ones already here win
+      getCurrent().names = { ...names, ...getCurrent().names };
       // In additive mode the pasted text no longer describes the line set --
       // it never mentioned the lines that were kept -- so the stored PGN is
       // rebuilt from the lines themselves, the same way Export PGN builds one.

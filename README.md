@@ -28,7 +28,9 @@ a `.json` file you keep.
   jump to any of them, try your own moves, and run the engine.
 - **Train** on the openings you have named: quizzes on the names of
   variations, the moves that reach them and the book moves inside them,
-  unlocked level by level and brought back on a spaced-review schedule.
+  unlocked level by level and brought back on a spaced-review schedule. The
+  outline renames variations, filters them by tag and shows where one is
+  also reached from.
   Progress stays in your browser and goes into Save to file.
 - **Audit** the whole repertoire: the engine searches every position once, in
   the background while you keep working, and lists the moves that lose
