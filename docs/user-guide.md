@@ -190,8 +190,9 @@ For a shorter overview see the [README](../README.md).
      (an empty name removes it). Names are stored by position, so a
      transposition is one variation and a name survives re-importing the PGN.
      In a PGN a name sits in a comment on the move that reaches the position:
-     `{[%name "Najdorf"] [%tags "...d6; Nc3 committed"]}`. A name set in the
-     app wins over the PGN's, and PGN export writes them back. Study heads
+     `{[%name "Najdorf"] [%tags "...d6; Nc3 committed"]}`. A PGN is read for
+     names when you import it; after that they live in the workbook, a name
+     set in the app wins over the PGN's, and PGN export leaves them out. Study heads
      the line with every named position along it (Sicilian > Najdorf >
      English Attack); click one to jump there. The deepest one reached is
      bold, the ones still ahead are grey. On a named position that the
@@ -246,7 +247,8 @@ For a shorter overview see the [README](../README.md).
    - **Where progress lives** — in this browser, separately for each
      workbook, saved after every answer. **Save to file** includes it, and
      opening that file restores it. PGN export and share links do not carry
-     it (names do travel in PGN export). Names are part of the workbook.
+     it. Names are part of the workbook and travel with Save to file, not
+     with PGN export.
 6. **Audit** — **Audit** in the toolbar opens the repertoire audit, which
    runs the engine over every position in the workbook and reports the moves
    that lose ground. Press **Run audit** and keep working: it runs in the

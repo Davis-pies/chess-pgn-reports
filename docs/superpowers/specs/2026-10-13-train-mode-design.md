@@ -19,7 +19,8 @@ Davis asked for this to study the Sicilian, 2026-10-13.
 - In a PGN a name lives in a comment on the move that reaches the position:
   `{[%name "Najdorf"] [%tags "...d6; Nc3 committed"]}`. Tags are separated by
   `;`. The parser reads these commands (it already strips `[%...]` from note
-  text), and PGN export writes them back. A name set in the app wins over the
+  text). PGN export does not write them (2026-10-13: exports stay plain PGN;
+  the workbook is where names live). A name set in the app wins over the
   PGN's.
 - Named in the app from the table's context menu (**Name this position...**),
   from Study (the same, on the board's position) and from Train's outline.

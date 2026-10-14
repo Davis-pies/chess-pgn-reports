@@ -45,8 +45,8 @@ export function toNotebook({ name, pgn, lines, view, analysis, header, audit, na
     // packEvals), or absent; they used to stay in the browser that searched
     // them, so a workbook opened anywhere else had to be audited again
     ...(audit ? { audit } : {}),
-    // named positions (names.js); also written into the PGN, but kept here so
-    // a rename survives a PGN the user has not re-exported. An empty object is
+    // named positions (names.js). Only here: a PGN is read for names when it is
+    // imported, but an export never writes them, so it stays plain. An empty object is
     // kept: it says "all names removed", where an absent key means "read them
     // from the PGN" (a workbook saved before names existed).
     ...(names && typeof names === "object" ? { names } : {}),

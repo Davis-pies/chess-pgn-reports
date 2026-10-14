@@ -1894,7 +1894,6 @@ sup {
 .st-trail-pos { font: inherit; color: inherit; background: none; border: 0; padding: 0 .1rem; cursor: pointer; }
 .st-trail-pos:hover { text-decoration: underline; }
 .st-trail-pos.ahead { font-weight: 400; color: var(--muted); }
-.st-order.on { background: color-mix(in srgb, var(--main) 18%, transparent); }
 .st-trail[hidden] { display: none; }
 .st-tag, .st-eval { font-size: .78rem; padding: .05rem .4rem; border-radius: .25rem; background: color-mix(in srgb, var(--main) 14%, transparent); }
 .st-off { font-size: .85rem; color: var(--warn); }
