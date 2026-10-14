@@ -6,7 +6,7 @@ import { namesFromNodes, variationTree } from "../src/names.js";
 import {
 	DEFAULT_SETTINGS, buildDeck, normalizeSettings, emptyProgress, loadProgress, saveProgress, mergeProgress, parseProgress, progressFor, hasProgress,
 	learnedCard, masteredCard, isLearned, isMastered, unlockedKeys, bookOpen, newSession, current, answer, sessionSummary,
-	markKnown, skip, resetVar, isTricky, unlocksIfLearned, checkName, nameChoices, orderStep, checkFamily, checkBook, allTags,
+	markKnown, skip, resetVar, isTricky, unlocksIfLearned, checkName, nameChoices, orderStep, checkFamily, checkBook, allTags, positionDiff, divergence, leadsTo,
 } from "../src/train.js";
 
 const PGN = `1. e4 c5 2. Nf3 d6 {[%name "...d6 Sicilians"]} (2... e6 {[%name "...e6 Sicilians"] [%tags "e6"]} 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 d6 {[%name "Scheveningen"] Small centre.}) 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 e6 {[%name "Scheveningen"]} (5... a6 {[%name "Najdorf"] [%tags "d6; Nc3 committed"]} 6. Be3 {[%name "English Attack"]}) *`;
@@ -884,4 +884,22 @@ test("sessionSummary scores only what counted and reports the rest as soon", () 
 	const sum = sessionSummary(s, tree, deck, p, S);
 	assert.deepStrictEqual([sum.right, sum.wrong, sum.soon], [1, 1, 2]);
 	assert.strictEqual(sessionSummary(hand([], { before }), tree, deck, p, S).soon, 0);
+});
+
+test("positionDiff lists the squares whose piece differs, and nothing for the same position", () => {
+	const start = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+	const e4 = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1";
+	assert.deepStrictEqual(positionDiff(start, start), []);
+	assert.deepStrictEqual(positionDiff(start, e4).sort(), ["e2", "e4"]);
+});
+
+test("divergence gives each order's move where they part, and an empty string past a prefix", () => {
+	assert.deepStrictEqual(divergence(v("...d6 Sicilians"), v("...e6 Sicilians")), { a: "2...d6", b: "2...e6" });
+	assert.deepStrictEqual(divergence({ orders: [["e4", "c5"]] }, { orders: [["e4", "c5", "Nf3"]] }), { a: "", b: "2.Nf3" });
+});
+
+test("leadsTo names the shortest variation starting with the moves, or null", () => {
+	assert.strictEqual(leadsTo(tree, ["e4", "c5", "Nf3", "e6"]), "...e6 Sicilians");
+	assert.strictEqual(leadsTo(tree, ["e4", "c5", "Nf3", "e6", "d4", "cxd4", "Nxd4", "Nf6", "Nc3", "d6"]), "Scheveningen");
+	assert.strictEqual(leadsTo(tree, ["d4"]), null);
 });

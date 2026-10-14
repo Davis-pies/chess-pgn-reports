@@ -329,16 +329,18 @@ export function interactiveBoard(
 
 // Arrows over a board drawn by interactiveBoard: the engine's best move, and
 // its other candidates fainter. Redrawn in place, so an engine update never
-// rebuilds the board (and never drops a piece the user is holding).
-export function drawArrows(wrap, arrows) {
+// rebuilds the board (and never drops a piece the user is holding). Each
+// group is redrawn on its own, so Train's feedback arrows survive the engine's
+// default redraws; `tone` adds a class (e.g. "bad") for colouring.
+export function drawArrows(wrap, arrows, group = "an-arrows") {
 	const svg = wrap.querySelector("svg");
 	const { size, flipped } = wrap._geom;
-	svg.querySelector(".an-arrows")?.remove();
+	svg.querySelector(`.${group}`)?.remove();
 	if (!arrows.length) return;
 	const g = document.createElementNS(SVG_NS, "g");
-	g.setAttribute("class", "an-arrows");
+	g.setAttribute("class", group);
 	const s = size / 8;
-	arrows.forEach(({ from, to, weight = 1 }) => {
+	arrows.forEach(({ from, to, weight = 1, tone }) => {
 		const [x1, y1] = centre(from, size, flipped);
 		const [x2, y2] = centre(to, size, flipped);
 		const len = Math.hypot(x2 - x1, y2 - y1);
@@ -359,7 +361,7 @@ export function drawArrows(wrap, arrows) {
 		const py = ux * head * 0.6;
 		tip.setAttribute("points", `${x2},${y2} ${bx + px},${by + py} ${bx - px},${by - py}`);
 		const arrow = document.createElementNS(SVG_NS, "g");
-		arrow.setAttribute("class", "an-arrow");
+		arrow.setAttribute("class", tone ? `an-arrow ${tone}` : "an-arrow");
 		arrow.setAttribute("opacity", weight);
 		arrow.append(line, tip);
 		g.appendChild(arrow);

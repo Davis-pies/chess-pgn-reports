@@ -683,4 +683,46 @@ export const checkFamily = (selected, tags) => selected.length === tags.length &
 export const checkBook = (card, san, settings) =>
 	settings.bookRule === "main" && card.main ? san === card.main : card.moves.includes(san);
 
+// Squares whose piece (type and colour, or none) differs between two FENs, so
+// a wrong answer's feedback can highlight where the two positions part.
+export function positionDiff(fenA, fenB) {
+	const a = new Chess(fenA).board();
+	const b = new Chess(fenB).board();
+	const piece = (sq) => (sq ? sq.color + sq.type : "");
+	const out = [];
+	a.forEach((row, r) => row.forEach((sq, f) => {
+		if (piece(sq) !== piece(b[r][f])) out.push(`${"abcdefgh"[f]}${8 - r}`);
+	}));
+	return out;
+}
+
+// The first move where two variations' main orders part, as "2...d6" style
+// labels, so feedback can say where the names split. A move missing from a
+// shorter order (one a prefix of the other) gives "".
+export function divergence(a, b) {
+	const x = a.orders[0];
+	const y = b.orders[0];
+	let at = 0;
+	while (at < x.length && at < y.length && x[at] === y[at]) at++;
+	const label = (order) => (at < order.length ? fullmoveLabel(at) + order[at] : "");
+	return { a: label(x), b: label(y) };
+}
+
+// The name of the shortest variation whose order starts with all of `sans`
+// (the moves a learner has just played), or null. Used to say "That leads to
+// the <name>" when a wrong move follows a named variation's order.
+export function leadsTo(tree, sans) {
+	let best = null;
+	let bestLen = Infinity;
+	for (const v of tree.byKey.values()) {
+		for (const o of v.orders) {
+			if (o.length >= sans.length && o.length < bestLen && sans.every((s, i) => o[i] === s)) {
+				best = v;
+				bestLen = o.length;
+			}
+		}
+	}
+	return best ? best.name : null;
+}
+
 export const allTags = (tree) => [...new Set([...tree.byKey.values()].flatMap((v) => v.tags))].sort();

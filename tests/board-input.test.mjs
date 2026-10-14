@@ -381,6 +381,20 @@ test("arrows are drawn over the board and replaced in place", () => {
 	done();
 });
 
+test("a named arrow group survives a default redraw, and a tone sets the arrow's class", () => {
+	const done = installDom();
+	const board = interactiveBoard(START, () => {}, { size: 320 });
+	drawArrows(board, [{ from: "e2", to: "e4", tone: "bad" }], "tr-feedback");
+	drawArrows(board, [{ from: "g1", to: "f3" }]);
+	assert.strictEqual(board.querySelectorAll(".tr-feedback").length, 1);
+	assert.strictEqual(board.querySelectorAll(".an-arrows").length, 1);
+	assert.ok(board.querySelector(".tr-feedback .an-arrow.bad"));
+	drawArrows(board, [], "tr-feedback");
+	assert.strictEqual(board.querySelector(".tr-feedback"), null);
+	assert.strictEqual(board.querySelectorAll(".an-arrows").length, 1);
+	done();
+});
+
 test("arrows follow a flipped board", () => {
 	const done = installDom();
 	const board = interactiveBoard(START, () => {}, { size: 320, flipped: true });
