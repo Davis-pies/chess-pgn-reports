@@ -35,7 +35,7 @@ function mount({ ui = newTrainUi(), t = tree, d = deck, settings = {}, progress 
 	progress.settings = normalizeSettings({ types: ALL, ...settings });
 	const root = document.createElement("div");
 	document.body.append(root); // change events only fire on connected inputs
-	const draw = () => root.replaceChildren(trainPanel(ui, { tree: t, deck: d, progress, workbookId: "t1", learn: (n) => learned.push(n.name) }, draw, NOW));
+	const draw = () => root.replaceChildren(trainPanel(ui, { tree: t, deck: d, progress, workbookId: "t1", learn: (n) => learned.push(n.name) }, draw));
 	draw();
 	return { root, ui, progress, draw };
 }
@@ -319,7 +319,7 @@ test("summary lists what was learned, mastered, slipped and unlocked", () => {
 	const progress = m.progress;
 	const root = v("...d6 Sicilians").key;
 	m.ui.session = newSession(deck, tree, progress, progress.settings, {});
-	markKnown(progress, root, deck, progress.settings, NOW);
+	markKnown(progress, root, deck, progress.settings);
 	m.ui.screen = "summary";
 	m.draw();
 	const t = $(m.root, ".tr-summary").textContent;
@@ -384,7 +384,7 @@ test("outline: Rename calls back with the variation, from its action chips", () 
 	const root = document.createElement("div");
 	document.body.append(root);
 	const ui = newTrainUi();
-	root.append(trainPanel(ui, { tree, deck, progress, workbookId: "t1", rename: (n) => seen.push(n.name) }, () => {}, NOW));
+	root.append(trainPanel(ui, { tree, deck, progress, workbookId: "t1", rename: (n) => seen.push(n.name) }, () => {}));
 	click(row(root, "...d6 Sicilians"), ".tr-acts .tr-rename");
 	assert.deepStrictEqual(seen, ["...d6 Sicilians"]);
 	done();
@@ -483,7 +483,7 @@ test("a first card of a variation offers to learn it after answering, never befo
 });
 
 const sessionOf = (m, c, extra = {}) => {
-	m.ui.session = { queue: [c], i: 0, results: [], unlockedBefore: new Set(), practice: false, newLeft: 0, pool: [], ...extra };
+	m.ui.session = { queue: [c], i: 0, results: [], unlockedBefore: new Set(), practice: false, newLeft: 0, pool: [], intros: new Map(), introduced: new Set(), tricky: new Set(), ...extra };
 	m.ui.card = c;
 	m.ui.screen = "question";
 	Object.assign(m.ui, { answered: null, played: [], choices: null });

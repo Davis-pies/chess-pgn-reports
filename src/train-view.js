@@ -34,7 +34,7 @@ export function newTrainUi(scope = null) {
 
 const TYPES = ["name", "order", "family", "book"];
 
-export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn }, onChange, now = Date.now()) {
+export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn }, onChange) {
 	const settings = progress.settings;
 	const panel = el("div", { className: "analysis train", tabIndex: -1 });
 	const save = () => saveProgress(workbookId, progress);
@@ -124,7 +124,7 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 		};
 		const varRow = (n, unlocked) => {
 			const li = el("li");
-			const own = deck.filter((c) => c.vkey === n.key);
+			const own = deck.filter((c) => c.vkey === n.key && c.type !== "intro");
 			const solid = own.filter((c) => c.type !== "book");
 			const mastered = solid.filter((c) => masteredCard(progress.cards[c.id], settings)).length;
 			const streaks = solid.reduce((sum, c) => sum + Math.min(progress.cards[c.id]?.streak ?? 0, settings.masterStreak), 0);
@@ -152,7 +152,7 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 			acts.append(
 				chipBtn("tr-learn", "Learn", "Play through this variation with its notes", () => learn(n)),
 				chipBtn("tr-practice", "Practice", "Drill this variation and below now, whatever their state; answers still count", act(() => begin({ scope: n.key, practice: true }))),
-				chipBtn("tr-known", "Known", "Count its questions as mastered (unlocks what's below)", act(() => markKnown(progress, n.key, deck, settings, now))),
+				chipBtn("tr-known", "Known", "Count its questions as mastered (unlocks what's below)", act(() => markKnown(progress, n.key, deck, settings))),
 				chipBtn("tr-skip", skipped ? "Unskip" : "Skip", "Leave its questions out of sessions", act(() => skip(progress, n.key, deck, !skipped))),
 				chipBtn("tr-reset", "Reset", "Forget the progress on its questions", () => {
 					if (!confirm(`Reset the progress on ${n.name}?`)) return;
@@ -275,7 +275,7 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 		const finish = (right, detail, notes = {}) => {
 			// before answer() counts this card as seen
 			const fresh = !deck.some((c) => c.vkey === card.vkey && progress.cards[c.id]?.seen > 0);
-			const { unlocked } = answer(ui.session, progress, card, right, settings, now, { deck: live, tree });
+			const { unlocked } = answer(ui.session, progress, card, right, settings, { deck: live, tree });
 			save();
 			ui.answered = { right, detail, notes, fresh, unlocked };
 			onChange();

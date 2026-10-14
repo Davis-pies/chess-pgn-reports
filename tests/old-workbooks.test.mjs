@@ -234,8 +234,18 @@ for (const name of FIXTURES) {
     // the evals go out as they came in; a workbook from before the audit,
     // opened on a page that has audited nothing, carries none
     assert.deepStrictEqual(again.audit, nb.audit);
+    if (nb.train && !Number.isInteger(nb.train.asked)) {
+      // progress saved before the answer counter: `seen` was a timestamp, and
+      // is renumbered 1..n in the same order
+      const stamps = Object.values(nb.train.cards).map((r) => r.seen).filter((x) => x > 0).sort((x, y) => x - y);
+      assert.strictEqual(again.train.asked, stamps.length, `${name}: the counter is the number of answers`);
+      for (const [k, r] of Object.entries(nb.train.cards)) {
+        assert.strictEqual(again.train.cards[k].seen, r.seen > 0 ? stamps.indexOf(r.seen) + 1 : 0, `${name}: ${k} keeps its place in the order`);
+        assert.strictEqual(again.train.cards[k].streak, r.streak);
+      }
+    }
     await openFromFile(name, JSON.stringify(again));
     checkAnnotations(name);
-    checkFormat(name, nb);
+    checkFormat(name, { ...nb, train: nb.train && again.train });
   });
 }
