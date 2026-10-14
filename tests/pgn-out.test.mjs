@@ -387,13 +387,9 @@ test("a footnote's sub-notes reach the moves they annotate", () => {
 	const lines = linesOf("1. e4 e5 (1... c5 2. Nf3 {develops} d6) *");
 	lines[1].tag = "foot";
 	const out = buildPgn({ name: "T", lines });
-	// parsePgn merges a variation's fragment comments with the moves that
-	// follow them into one note (see parseSeq), so the text arrives as
-	// "develops 2... d6" anchored on d6 — inside the footnote's variation,
-	// which is what matters here.
 	assert.match(
 		visible(out).replace(/\s+/g, " "),
-		/\(1\.\.\. c5 2\. Nf3 d6 \{develops[^}]*\}\)/,
+		/\(1\.\.\. c5 2\. Nf3 \{develops\} 2\.\.\. d6\)/,
 		out,
 	);
 });

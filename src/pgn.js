@@ -233,43 +233,19 @@ export function fenMap(moves) {
 // Returns the node list. `state` is never mutated across sub-variations because
 // every step draws its position from the previous node's fen.
 //
-// Comment handling:
-//  - Trunk comments are individual notes; a trunk comment that directly leads
-//    into a variation (next token is '(' and it doesn't end in sentence
-//    punctuation, e.g. "White threatened") is a lead-in: it is NOT emitted
-//    standalone but merged into the variation's note.
-//  - Within a variation, fragment comments separated only by moves merge into
-//    ONE note with the moves inline, attached to the variation's first move
-//    (so it lives on the variation, not on a ply-colliding mainline move).
-function parseSeq(tokens, ctx, state, inVariation = false, intro = null) {
+// A comment is a note on the move it follows (or, before any move, on the
+// first one), in a variation as on the trunk. Comments used to be glued to the
+// moves after them inside a variation, and a trunk comment to the variation it
+// led into; that folded a book's notes on each line of a variation into one
+// note on its first move, so the moves they were about had none.
+function parseSeq(tokens, ctx, state, inVariation = false) {
 	const nodes = [];
 	let last = null;
 	let stateBeforeLast = state; // position before the most recent move
 	let cur = state;
 	// this run's own walker: a variation gets its own, from where it branches
 	const w = walker(state.fen);
-	let pendingComment = null; // trunk comment seen before any move yet
-	let variationIntro = null; // trunk lead-in carried into the next variation
-	let narrative = intro
-		? { ply: state.ply, parts: [intro], firstNode: null }
-		: null; // merged variation note: { ply, parts, firstNode }
-	const flushNarrative = () => {
-		if (narrative) {
-			const text = narrative.parts.join(" ");
-			const ply = narrative.firstNode ? narrative.firstNode.ply : narrative.ply;
-			ctx.comments.push({ ply, text, inVar: inVariation });
-			// the merged note lives on the variation's first move; when the
-			// comment trails the variation (no move follows it), it attaches to
-			// the move it follows — like trunk comments
-			if (narrative.firstNode) narrative.firstNode.comments.push(text);
-			else if (last) last.comments.push(text);
-			narrative = null;
-		}
-	};
-	const mvText = (m) => {
-		const n = Math.floor(m.ply / 2) + 1;
-		return (m.ply % 2 === 0 ? n + ". " : n + "... ") + m.san;
-	};
+	let pendingComment = null; // comment seen before any move yet
 
 	while (ctx.i < tokens.length) {
 		const t = tokens[ctx.i];
@@ -285,35 +261,20 @@ function parseSeq(tokens, ctx, state, inVariation = false, intro = null) {
 				ctx.i++;
 				continue;
 			}
-			if (inVariation) {
-				if (narrative) narrative.parts.push(text);
-				else
-					narrative = {
-						ply: last ? last.ply : state.ply,
-						parts: [text],
-						firstNode: null,
-					};
-			} else if (tokens[ctx.i + 1] === "(" && !/[.!?、。！？]$/.test(text)) {
-				// trunk lead-in straight into a variation -> merge, don't emit
-				variationIntro = text;
-			} else {
-				ctx.comments.push({
-					ply: last ? last.ply : state.ply,
-					text,
-					inVar: false,
-				});
-				if (last) last.comments.push(text);
-				else
-					pendingComment = pendingComment ? pendingComment + "\n" + text : text;
-			}
+			ctx.comments.push({
+				ply: last ? last.ply : state.ply,
+				text,
+				inVar: inVariation,
+			});
+			if (last) last.comments.push(text);
+			else
+				pendingComment = pendingComment ? pendingComment + "\n" + text : text;
 			ctx.i++;
 			continue;
 		}
 		if (t === "(") {
-			flushNarrative();
 			ctx.i++;
-			const sub = parseSeq(tokens, ctx, stateBeforeLast, true, variationIntro);
-			variationIntro = null;
+			const sub = parseSeq(tokens, ctx, stateBeforeLast, true);
 			if (last) last.variations.push(sub);
 			else
 				nodes.push({
@@ -329,7 +290,6 @@ function parseSeq(tokens, ctx, state, inVariation = false, intro = null) {
 			// here would silently drop the rest of the game
 			if (!inVariation) throw new Error("Unmatched ')' with no variation open");
 			ctx.i++;
-			flushNarrative();
 			return nodes;
 		}
 		if (/^(1-0|0-1|1\/2-1\/2|\*)$/.test(t)) {
@@ -343,7 +303,6 @@ function parseSeq(tokens, ctx, state, inVariation = false, intro = null) {
 			}
 			ctx.result = t;
 			ctx.i++;
-			flushNarrative();
 			return nodes;
 		}
 		if (/^\d+\.\.?/.test(t) || t === "...") {
@@ -386,10 +345,6 @@ function parseSeq(tokens, ctx, state, inVariation = false, intro = null) {
 				comments: attachPending(pendingComment),
 			};
 			pendingComment = null;
-			if (narrative) {
-				narrative.parts.push(mvText(node));
-				if (!narrative.firstNode) narrative.firstNode = node;
-			}
 			nodes.push(node);
 			stateBeforeLast = cur;
 			cur = { fen: node.fen, ply: node.ply + 1 };
@@ -401,10 +356,6 @@ function parseSeq(tokens, ctx, state, inVariation = false, intro = null) {
 		const node = stepFrom(w, cur, t);
 		node.comments = attachPending(pendingComment);
 		pendingComment = null;
-		if (narrative) {
-			narrative.parts.push(mvText(node));
-			if (!narrative.firstNode) narrative.firstNode = node;
-		}
 		nodes.push(node);
 		stateBeforeLast = cur;
 		cur = { fen: node.fen, ply: node.ply + 1 };
@@ -419,6 +370,5 @@ function parseSeq(tokens, ctx, state, inVariation = false, intro = null) {
 		// wrong table.
 		throw new Error("Unclosed variation: missing closing ')'");
 	}
-	flushNarrative();
 	return nodes;
 }

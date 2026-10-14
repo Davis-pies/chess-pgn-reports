@@ -60,6 +60,16 @@ test("a comment at the end of a variation attaches to its last move", () => {
 	assert.strictEqual(note.ply, bb5.ply, "note sits on the move it follows");
 });
 
+// notes on the line's moves, as { san: text }
+const varNotes = (pgn) => {
+	const line = collectLines(parsePgn(pgn).nodes).find((l) => !l.isMain);
+	return Object.fromEntries(line.comments.map((c) => [line.moves.find((m) => m.ply === c.ply).san, c.text]));
+};
+
+test("in a variation, each comment stays on the move it follows", () => {
+	assert.deepStrictEqual(varNotes("1. e4 e5 (1... c5 {Sharp.} 2. Nf3 d6 {Najdorf next!}) 2. Nf3"), { c5: "Sharp.", d6: "Najdorf next!" });
+});
+
 test("rejects illegal moves", () => {
 	assert.throws(
 		() => parsePgn("1. e4 e5 2. Nf3 e6 3. Qh5 Nf6 4. Nc5 d6"),

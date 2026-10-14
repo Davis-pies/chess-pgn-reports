@@ -255,9 +255,9 @@ test("a bulk chip does not toggle the section it sits in", () => {
 test("a group's count reaches notes buried inside its branches", () => {
 	const off = installDom();
 	closedNotePaths.clear();
-	// the parser merges a comment inside a variation with the moves after it,
-	// so this gives branch [a] a sub-note of its own (see parseSeq in pgn.js)
-	loadState("1. e4 e5 (1... c5 {sharp} 2. Nf3) (1... c5 2. Nc3) 2. Nf3", {
+	// a note on a move after the branches part gives branch [a] a sub-note of
+	// its own
+	loadState("1. e4 e5 (1... c5 2. Nf3 {sharp}) (1... c5 2. Nc3) 2. Nf3", {
 		tags: { 1: "foot", 2: "foot" },
 	});
 	const box = notesPanel();

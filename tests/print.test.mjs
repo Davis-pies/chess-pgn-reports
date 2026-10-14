@@ -1168,11 +1168,11 @@ test("a redraw keeps the odds-and-ends table", () => {
 // table and referenced from nowhere in it.
 test("a note on a group's shared move is marked where the move is printed", () => {
   const off = installDom();
-  // the comment is on 4...g6 (a comment goes with the move after it), owned by
-  // the variation's own line, which runs on to 5.Bg5; the sub-variation 5.Be2
-  // is laid out first, so its column carries the shared run on paper
+  // the comment is on 4...g6, owned by the variation's own line, which runs on
+  // to 5.Bg5; the sub-variation 5.Be2 is laid out first, so its column carries
+  // the shared run on paper
   const box = noMainTables(
-    "1. e4 c5 2. Nf3 d6 3. d4 cxd4 (3... Nf6 4. Nc3 {the point} 4... g6 5. Bg5 (5. Be2)) 4. Nxd4 *",
+    "1. e4 c5 2. Nf3 d6 3. d4 cxd4 (3... Nf6 4. Nc3 g6 {the point} 5. Bg5 (5. Be2)) 4. Nxd4 *",
   );
   const cell = [...box.querySelectorAll("table.tbl td")].find((td) => td.textContent.startsWith("g6"));
   assert.ok(cell, "4...g6 is printed in a cell");
@@ -1185,7 +1185,7 @@ test("a note on a stem move owned by any line on the table is marked in the stem
   const off = installDom();
   // two lines on the table (the 1.d4 line hidden), the note owned by the
   // second: 2...Nc6 is in the stem, and so must its marker be
-  const box = noMainTables("1. d4 (1. e4 e5 2. Nf3 {the point} 2... Nc6 3. Bb5 (3. Bc4)) 1... d5 *", (s) => {
+  const box = noMainTables("1. d4 (1. e4 e5 2. Nf3 Nc6 {the point} 3. Bb5 (3. Bc4)) 1... d5 *", (s) => {
     s.lines[0].hidden = true;
   });
   const stem = box.querySelector(".print-stem");
