@@ -19,7 +19,7 @@ let lastShare = 0.5; // viewBox units; CSS scales it to the column
 
 // How many rows of lines the box holds, for the layout that budgets its
 // height: none when it shows the evaluation only.
-export const pvRows = (engine) => (loadPrefs().engineLines ? engine.multiPv : 0);
+export const pvRows = (engine) => (loadPrefs().engineLines > 0 ? engine.multiPv : 0);
 
 // The engine's corner. Built once per panel; `paint` refills it from the
 // engine's state and is what the engine calls as its output comes in.
@@ -38,7 +38,7 @@ export function engineBox(engine, pos, onChange, { board, bar, flavors, playLine
 	// The evaluation has a place of its own in the head, so it shows with the
 	// lines hidden ("Eval only") and does not depend on reading the first line.
 	const score = el("span", { className: "an-score an-engine-eval" });
-	const showLines = loadPrefs().engineLines;
+	const showLines = loadPrefs().engineLines > 0;
 	const info = el("span", { className: "an-engine-info" });
 	const opts = el("span", { className: "an-engine-opts" });
 	if (on) {
@@ -56,7 +56,7 @@ export function engineBox(engine, pos, onChange, { board, bar, flavors, playLine
 		opts.append(
 			pick("an-engine-pv", "Lines shown", [[0, "Eval only"], [1, "1 line"], [2, "2 lines"], [3, "3 lines"], [5, "5 lines"]], showLines ? engine.multiPv : 0, (n) => {
 				// eval only searches one line: the others would never be seen
-				savePrefs({ engineLines: n > 0 });
+				savePrefs({ engineLines: n });
 				engine.setMultiPv(Math.max(n, 1));
 				onChange();
 			}),
@@ -296,6 +296,7 @@ function depthBox(engine) {
 		}
 		hint.textContent = d ? "" : "∞";
 		engine.setDepth(d);
+		savePrefs({ engineDepth: d });
 	};
 	return el("label", { className: "an-engine-depthbox" }, ["depth ", input, hint]);
 }

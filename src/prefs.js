@@ -32,9 +32,12 @@ const DEFAULTS = Object.freeze({
 	// how many threads the engine searches with; null means "pick for this
 	// machine" (engine.js startThreads), and a count is capped to its cores
 	engineThreads: null,
-	// whether the engine box lists its lines, or shows the evaluation only
-	// ("Eval only" in its lines menu), on every board that has one
-	engineLines: true,
+	// the engine box's lines menu and depth, on every board that has one: how
+	// many lines it lists (0: "Eval only") and how deep it searches (0: no
+	// limit). Kept so they need not be set again on every visit (Davis,
+	// 2026-10-14); the depth's default is engine.js's.
+	engineLines: 3,
+	engineDepth: 22,
 	// how deep the repertoire audit searches each position (audit.js
 	// MIN_DEPTH..MAX_DEPTH), and on how many engines; null means "pick for
 	// this machine" (audit.js auditWorkers)
@@ -98,7 +101,9 @@ export function loadPrefs() {
 			Number.isInteger(d.engineThreads) && d.engineThreads >= 1 && d.engineThreads <= 256
 				? d.engineThreads
 				: DEFAULTS.engineThreads,
-		engineLines: d.engineLines !== false,
+		// `false` was briefly how Eval only was stored, before the line count was
+		engineLines: [0, 1, 2, 3, 5].includes(d.engineLines) ? d.engineLines : d.engineLines === false ? 0 : DEFAULTS.engineLines,
+		engineDepth: Number.isInteger(d.engineDepth) && d.engineDepth >= 0 && d.engineDepth <= 99 ? d.engineDepth : DEFAULTS.engineDepth,
 		auditDepth: Number.isInteger(d.auditDepth) && d.auditDepth >= 1 && d.auditDepth <= 40 ? d.auditDepth : DEFAULTS.auditDepth,
 		auditEngines:
 			Number.isInteger(d.auditEngines) && d.auditEngines >= 1 && d.auditEngines <= 256

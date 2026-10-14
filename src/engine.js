@@ -413,8 +413,10 @@ export const fullWorker = (wasmUrl) => () =>
 let shared = null;
 export function sharedEngine() {
 	if (!shared) {
-		const threads = threadsAvailable() ? startThreads(loadPrefs().engineThreads, maxThreads()) : 0;
-		shared = createEngine(liteWorker, { threads });
+		const p = loadPrefs();
+		const threads = threadsAvailable() ? startThreads(p.engineThreads, maxThreads()) : 0;
+		// the lines menu and depth as this browser left them (Eval only searches one line)
+		shared = createEngine(liteWorker, { threads, multiPv: Math.max(p.engineLines, 1), depth: p.engineDepth });
 	}
 	return shared;
 }

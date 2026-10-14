@@ -129,8 +129,9 @@ For a shorter overview see the [README](../README.md).
      beside the On/Off button, the top lines (1–5) with their scores right
      under the board, and arrows for their first moves. **Eval only**, first
      in the lines menu, keeps just the bar and the evaluation: no lines and no
-     arrows. This browser remembers the choice, on every board with an
-     engine. On
+     arrows. This browser remembers the lines menu and the search depth (as
+     it does the threads and Lite/Full), on every board with an engine, so
+     they need not be set again on the next visit. On
      a phone the lines are pinned with the board, so they stay on screen while
      the rest (the steppers included) scrolls; the board keeps its full width
      held upright, and held sideways it shrinks to make room for them (the

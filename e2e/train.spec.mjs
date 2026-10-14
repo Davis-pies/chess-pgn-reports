@@ -186,3 +186,19 @@ test("Eval only, in the engine box's lines menu, shows the score in its head and
   await page.locator(".tr-again").click();
   await expect(page.locator(".an-engine-pv")).toHaveValue("0");
 });
+
+// The engine's lines menu and depth are this browser's, kept across visits
+// (prefs.js), so they are not set again every time.
+test("the engine's lines menu and depth come back after a reload", async ({ page }) => {
+  await (await trainOnly(page, ["Order", "Book"])).click();
+  await page.locator(".tr-start").click();
+  await page.locator(".an-engine-toggle").click();
+  await page.locator(".an-engine-pv").selectOption({ label: "Eval only" });
+  await page.locator(".an-engine-depth").fill("15");
+  await page.locator(".an-engine-depth").press("Enter");
+  await (await trainOnly(page, ["Order", "Book"])).click(); // loads the page afresh
+  await page.locator(".tr-start").click();
+  await page.locator(".an-engine-toggle").click();
+  await expect(page.locator(".an-engine-pv")).toHaveValue("0");
+  await expect(page.locator(".an-engine-depth")).toHaveValue("15");
+});

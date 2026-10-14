@@ -128,7 +128,7 @@ way in (see `migrate()`).
 | `src/audit-view.js` | the audit's panel in the report and its progress chip in the toolbar, refilled in place while it runs |
 | `src/engine-store.js` | the full engine's one-time download, its SHA-256 check and its IndexedDB copy |
 | `src/engine-flavor.js` | which engine build runs (lite or full) and the download box's state |
-| `src/prefs.js` | what the viewer's browser remembers between visits: theme, board orientation, panel width, the engine's thread count, the audit's depth, the last workbook and its board |
+| `src/prefs.js` | what the viewer's browser remembers between visits: theme, board orientation, panel width, the engine's thread count, lines and depth, the audit's depth, the last workbook and its board |
 | `src/settings-view.js` | the Settings drop-down over `prefs.js` |
 | `sw.js` | service worker adding COOP/COEP headers so the page is cross-origin isolated and the threaded engine can run |
 | `vendor/stockfish/` | Stockfish 19 WebAssembly builds (GPL-3.0, unmodified; not linted) |

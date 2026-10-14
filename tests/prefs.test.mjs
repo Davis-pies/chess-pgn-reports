@@ -38,7 +38,8 @@ test("defaults when nothing is stored", () => {
 		last: null,
 		wbCollapsed: false,
 		engineThreads: null,
-		engineLines: true,
+		engineLines: 3,
+		engineDepth: 22,
 		auditDepth: 16,
 		auditEngines: null,
 		auditSide: "both",
@@ -59,8 +60,11 @@ test("saved fields round-trip and merge", () => {
 	assert.strictEqual(loadPrefs().orientation, "black", "the other fields stay");
 	assert.ok(savePrefs({ engineThreads: 3 }));
 	assert.strictEqual(loadPrefs().engineThreads, 3);
+	assert.ok(savePrefs({ engineLines: 0, engineDepth: 30 }));
+	assert.strictEqual(loadPrefs().engineLines, 0, "Eval only is kept");
+	assert.strictEqual(loadPrefs().engineDepth, 30);
 	assert.ok(savePrefs({ engineLines: false }));
-	assert.strictEqual(loadPrefs().engineLines, false, "Eval only is kept");
+	assert.strictEqual(loadPrefs().engineLines, 0, "the brief boolean form reads as Eval only");
 	assert.ok(savePrefs({ auditDepth: 23, auditEngines: 11 }));
 	assert.strictEqual(loadPrefs().auditDepth, 23);
 	assert.strictEqual(loadPrefs().auditEngines, 11);
@@ -73,7 +77,7 @@ test("saved fields round-trip and merge", () => {
 test("junk in storage falls back to defaults field by field", () => {
 	localStorage.setItem(
 		"ott-prefs",
-		JSON.stringify({ orientation: "sideways", sideWidth: "wide", restore: "no", last: { id: 7 }, wbCollapsed: "yes", engineThreads: 2.5, engineLines: "no", auditDepth: 41, auditEngines: 0, auditSide: "red", auditFlavor: "max", auditInTable: "yes" }),
+		JSON.stringify({ orientation: "sideways", sideWidth: "wide", restore: "no", last: { id: 7 }, wbCollapsed: "yes", engineThreads: 2.5, engineLines: 4, engineDepth: 100, auditDepth: 41, auditEngines: 0, auditSide: "red", auditFlavor: "max", auditInTable: "yes" }),
 	);
 	assert.deepStrictEqual(loadPrefs(), {
 		orientation: "white",
@@ -82,7 +86,8 @@ test("junk in storage falls back to defaults field by field", () => {
 		last: null,
 		wbCollapsed: false,
 		engineThreads: null,
-		engineLines: true,
+		engineLines: 3,
+		engineDepth: 22,
 		auditDepth: 16,
 		auditEngines: null,
 		auditSide: "both",

@@ -462,7 +462,7 @@ test("an engine box with no way to play a line shows its moves as plain text", (
 	done();
 });
 
-test("Eval only, from the lines menu, hides the lines and arrows and keeps the score in the head", () => {
+test("the lines menu (Eval only too) and the depth are remembered; Eval only hides the lines and arrows and keeps the score in the head", () => {
 	const done = installDom();
 	// the choice is a viewer preference, kept in this browser (prefs.js)
 	const kept = new Map();
@@ -479,7 +479,7 @@ test("Eval only, from the lines menu, hides the lines and arrows and keeps the s
 	let panel = analysisPanel(s, () => {}, { engine });
 	assert.strictEqual(panel.querySelector(".an-engine-pv").options[0].textContent, "Eval only");
 	pick(panel, "0");
-	assert.strictEqual(loadPrefs().engineLines, false, "remembered in this browser");
+	assert.strictEqual(loadPrefs().engineLines, 0, "remembered in this browser");
 	assert.strictEqual(engine.multiPv, 1, "one line searched: the others would never be seen");
 	panel = analysisPanel(s, () => {}, { engine });
 	w().reply("info depth 12 multipv 1 score cp -30 pv c7c5 g1f3");
@@ -489,12 +489,18 @@ test("Eval only, from the lines menu, hides the lines and arrows and keeps the s
 	assert.strictEqual(panel.style.getPropertyValue("--pv-rows"), "0");
 	assert.strictEqual(panel.querySelector(".an-engine-pv").value, "0");
 	pick(panel, "3");
-	assert.strictEqual(loadPrefs().engineLines, true);
+	assert.strictEqual(loadPrefs().engineLines, 3);
 	assert.strictEqual(engine.multiPv, 3);
 	panel = analysisPanel(s, () => {}, { engine });
 	w().reply("info depth 12 multipv 1 score cp -30 pv c7c5 g1f3");
 	assert.ok(panel.querySelector(".an-pvs"), "lines are back");
 	assert.strictEqual(panel.querySelector(".an-engine-eval").textContent, "+0.30", "and the head keeps the score");
+	// the depth is remembered as well, so it need not be set on every visit
+	const depth = panel.querySelector(".an-engine-depth");
+	depth.value = "30";
+	depth.dispatchEvent(new window.Event("change"));
+	assert.strictEqual(loadPrefs().engineDepth, 30);
+	assert.strictEqual(engine.depth, 30);
 	delete global.localStorage;
 	done();
 });
