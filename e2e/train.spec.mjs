@@ -136,3 +136,48 @@ test("train shows a new variation before its first question", async ({ page }) =
   await expect(page.locator(".tr-prompt")).not.toHaveText(/^New:/);
   await expect(page.locator(".tr-progress")).toHaveText(/^Question 1 of /);
 });
+
+// The engine is Study's, shown under Train's board while learning: on a name
+// question before and after answering, never while an order question waits
+// for moves. The real engine worker runs here, so the first line can take a
+// while to arrive.
+async function trainOnly(page, off) {
+  await loadPgn(page, NAMED);
+  await page.getByRole("button", { name: "Train", exact: true }).click();
+  await page.locator(".tr-settings-open").click();
+  for (const label of [...off, "Show a new variation first"]) await page.getByLabel(label, { exact: true }).click();
+  return page.locator(".tr-settings-done");
+}
+
+test("train's engine shows its bar and lines on a name question, not on an order question", async ({ page }) => {
+  await (await trainOnly(page, ["Order", "Book"])).click();
+  await page.locator(".tr-start").click();
+  await expect(page.locator(".tr-prompt")).toHaveText("What is this position called?");
+  await expect(page.locator(".tr-body .an-evalbar")).toBeHidden(); // its place is kept, empty
+  await page.locator(".an-engine-toggle").click();
+  await expect(page.locator(".tr-body .an-evalbar")).toBeVisible();
+  await expect(page.locator(".tr-body .an-pv .an-pvmove").first()).toBeVisible({ timeout: 60_000 });
+  // the lines are text here: nothing plays when one is clicked
+  expect(await page.locator(".tr-body .an-pv button.an-pvmove").count()).toBe(0);
+  await page.keyboard.press("Escape");
+
+  await page.getByRole("button", { name: "Train", exact: true }).click();
+  await page.locator(".tr-settings-open").click();
+  await page.getByLabel("Name", { exact: true }).click();
+  await page.getByLabel("Order", { exact: true }).click();
+  await page.locator(".tr-settings-done").click();
+  await page.locator(".tr-start").click();
+  await expect(page.locator(".tr-prompt")).toHaveText(/^Play the moves/);
+  await expect(page.locator(".tr-body .an-board")).toBeVisible();
+  await expect(page.locator(".an-engine")).toHaveCount(0);
+});
+
+test("with Engine lines off the bar shows and the lines do not", async ({ page }) => {
+  const done = await trainOnly(page, ["Order", "Book", "Engine lines"]);
+  await done.click();
+  await page.locator(".tr-start").click();
+  await page.locator(".an-engine-toggle").click();
+  await expect(page.locator(".tr-body .an-evalbar")).toBeVisible();
+  await expect(page.locator(".an-engine-info")).toContainText(/depth|Thinking|Loading/, { timeout: 60_000 });
+  await expect(page.locator(".an-pvs")).toBeHidden();
+});

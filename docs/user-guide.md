@@ -304,13 +304,23 @@ For a shorter overview see the [README](../README.md).
    - **The board** — Name and Tags show the position from your side (Black
      by default, as set by "You play"); **Flip** turns it. After a wrong name
      the answer also shows what you gave.
+   - **The engine** — the same Stockfish as Study's, under the board: on a
+     new variation's intro (following its steps), on Name and Tags questions
+     before and after you answer, and on any question once answered. It is
+     never there while an Order or Book question waits for your moves, and it
+     pauses then and when Train closes. It starts off: switch it on with its
+     button or **E** (not while typing a name); it is on or off in Study and
+     Train alike. The eval bar sits beside every Train board, empty when the
+     engine is off, so the board does not move. Clicking an engine line does
+     nothing here (Study plays it). **Engine lines** in Settings, off, keeps
+     only the evaluation: no lines and no arrows.
    - **Settings** — in groups, each field with a tooltip giving its default.
      **Questions**: which types are on. **Name questions**: choose or type,
      how many choices, showing the moves. **Order questions**: showing the
      target position. **Tags questions**: showing the name, and a group of
      tags to ask within. **Book questions**: the side you play, and whether
      any book move counts or only the mainline's. **Progress**: right in a row
-     to learn and to master. **Sessions**: showing a new variation first, how many
+     to learn and to master. **Engine**: engine lines. **Sessions**: showing a new variation first, how many
      questions you learn at once, how often a learned one is re-checked, and
      the questions per session (0 for no limit).
    - **Where progress lives** — in this browser, one store for every

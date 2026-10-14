@@ -29,7 +29,7 @@ a `.json` file you keep.
 - **Train** on the openings you have named: quizzes on the names of
   variations, the moves that reach them and the book moves inside them,
   unlocked level by level as you learn them, with your progress shown as it
-  grows. The
+  grows, with the engine's evaluation and lines while you learn. The
   outline renames variations, filters them by tag and shows where one is
   also reached from.
   Progress stays in your browser and goes into Save to file.
