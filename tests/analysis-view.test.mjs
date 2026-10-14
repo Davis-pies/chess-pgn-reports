@@ -6,6 +6,7 @@ import { getCurrent } from "../src/state.js";
 import { analysisPanel, evalBar, numberedMoves } from "../src/analysis-view.js";
 import { interactiveBoard } from "../src/board-input.js";
 import { engineBox } from "../src/engine-view.js";
+import { loadPrefs } from "../src/prefs.js";
 import { newScratch, activeLine, play, goTo, forward, select } from "../src/analysis.js";
 
 const click = (root, sel) => {
@@ -458,6 +459,43 @@ test("an engine box with no way to play a line shows its moves as plain text", (
 	const box = engineBox(engine, { fen, over: null }, () => {}, { board, bar: evalBar(false), flavors: null });
 	w().reply("info depth 12 multipv 1 score cp -30 pv c7c5 g1f3");
 	assert.deepStrictEqual([...box.querySelectorAll(".an-pv .an-pvmove")].map((n) => n.tagName + n.textContent), ["SPAN1...c5", "SPAN2.Nf3"]);
+	done();
+});
+
+test("Eval only, from the lines menu, hides the lines and arrows and keeps the score in the head", () => {
+	const done = installDom();
+	// the choice is a viewer preference, kept in this browser (prefs.js)
+	const kept = new Map();
+	global.localStorage = { getItem: (k) => (kept.has(k) ? kept.get(k) : null), setItem: (k, v) => kept.set(k, String(v)), removeItem: (k) => kept.delete(k) };
+	const { engine, w } = engineWith();
+	engine.enable();
+	const s = newScratch([{ san: "e4" }]);
+	const pick = (panel, value) => {
+		const menu = panel.querySelector(".an-engine-pv");
+		menu.value = value;
+		menu.dispatchEvent(new window.Event("change"));
+		w().reply("bestmove c7c5"); // the search stopped for the new line count ends
+	};
+	let panel = analysisPanel(s, () => {}, { engine });
+	assert.strictEqual(panel.querySelector(".an-engine-pv").options[0].textContent, "Eval only");
+	pick(panel, "0");
+	assert.strictEqual(loadPrefs().engineLines, false, "remembered in this browser");
+	assert.strictEqual(engine.multiPv, 1, "one line searched: the others would never be seen");
+	panel = analysisPanel(s, () => {}, { engine });
+	w().reply("info depth 12 multipv 1 score cp -30 pv c7c5 g1f3");
+	assert.strictEqual(panel.querySelector(".an-pvs"), null);
+	assert.strictEqual(panel.querySelector(".an-engine-head .an-engine-eval").textContent, "+0.30");
+	assert.strictEqual(panel.querySelectorAll(".an-arrow").length, 0);
+	assert.strictEqual(panel.style.getPropertyValue("--pv-rows"), "0");
+	assert.strictEqual(panel.querySelector(".an-engine-pv").value, "0");
+	pick(panel, "3");
+	assert.strictEqual(loadPrefs().engineLines, true);
+	assert.strictEqual(engine.multiPv, 3);
+	panel = analysisPanel(s, () => {}, { engine });
+	w().reply("info depth 12 multipv 1 score cp -30 pv c7c5 g1f3");
+	assert.ok(panel.querySelector(".an-pvs"), "lines are back");
+	assert.strictEqual(panel.querySelector(".an-engine-eval").textContent, "+0.30", "and the head keeps the score");
+	delete global.localStorage;
 	done();
 });
 

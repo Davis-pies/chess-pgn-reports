@@ -125,8 +125,12 @@ For a shorter overview see the [README](../README.md).
      not shown. The multi-threaded Full engine is a different file from the
      single-threaded one, so a Full engine downloaded before this needs
      downloading once more. The engine
-     shows an eval bar beside the board, the top lines (1–5) with scores from
-     White's side right under the board, and arrows for their first moves. On
+     shows an eval bar beside the board, its evaluation (from White's side)
+     beside the On/Off button, the top lines (1–5) with their scores right
+     under the board, and arrows for their first moves. **Eval only**, first
+     in the lines menu, keeps just the bar and the evaluation: no lines and no
+     arrows. This browser remembers the choice, on every board with an
+     engine. On
      a phone the lines are pinned with the board, so they stay on screen while
      the rest (the steppers included) scrolls; the board keeps its full width
      held upright, and held sideways it shrinks to make room for them (the
@@ -312,15 +316,15 @@ For a shorter overview see the [README](../README.md).
      button or **E** (not while typing a name); it is on or off in Study and
      Train alike. The eval bar sits beside every Train board, empty when the
      engine is off, so the board does not move. Clicking an engine line does
-     nothing here (Study plays it). **Engine lines** in Settings, off, keeps
-     only the evaluation: no lines and no arrows.
+     nothing here (Study plays it). **Eval only** in the box's lines menu
+     keeps just the bar and the evaluation, as everywhere.
    - **Settings** — in groups, each field with a tooltip giving its default.
      **Questions**: which types are on. **Name questions**: choose or type,
      how many choices, showing the moves. **Order questions**: showing the
      target position. **Tags questions**: showing the name, and a group of
      tags to ask within. **Book questions**: the side you play, and whether
      any book move counts or only the mainline's. **Progress**: right in a row
-     to learn and to master. **Engine**: engine lines. **Sessions**: showing a new variation first, how many
+     to learn and to master. **Sessions**: showing a new variation first, how many
      questions you learn at once, how often a learned one is re-checked, and
      the questions per session (0 for no limit).
    - **Where progress lives** — in this browser, one store for every

@@ -11,11 +11,15 @@ import { el } from "./dom.js";
 import { drawArrows } from "./board-input.js";
 import { formatScore, maxThreads, numberedFrom, whiteShare } from "./engine.js";
 import { FULL } from "./engine-store.js";
-import { savePrefs } from "./prefs.js";
+import { loadPrefs, savePrefs } from "./prefs.js";
 
 // Where the eval bar stood, carried across redraws so a new position starts
 // the bar from the last reading rather than from even.
 let lastShare = 0.5; // viewBox units; CSS scales it to the column
+
+// How many rows of lines the box holds, for the layout that budgets its
+// height: none when it shows the evaluation only.
+export const pvRows = (engine) => (loadPrefs().engineLines ? engine.multiPv : 0);
 
 // The engine's corner. Built once per panel; `paint` refills it from the
 // engine's state and is what the engine calls as its output comes in.
@@ -31,6 +35,10 @@ export function engineBox(engine, pos, onChange, { board, bar, flavors, playLine
 			onChange();
 		},
 	});
+	// The evaluation has a place of its own in the head, so it shows with the
+	// lines hidden ("Eval only") and does not depend on reading the first line.
+	const score = el("span", { className: "an-score an-engine-eval" });
+	const showLines = loadPrefs().engineLines;
 	const info = el("span", { className: "an-engine-info" });
 	const opts = el("span", { className: "an-engine-opts" });
 	if (on) {
@@ -46,7 +54,12 @@ export function engineBox(engine, pos, onChange, { board, bar, flavors, playLine
 			return s;
 		};
 		opts.append(
-			pick("an-engine-pv", "Lines shown", [[1, "1 line"], [2, "2 lines"], [3, "3 lines"], [5, "5 lines"]], engine.multiPv, (n) => engine.setMultiPv(n)),
+			pick("an-engine-pv", "Lines shown", [[0, "Eval only"], [1, "1 line"], [2, "2 lines"], [3, "3 lines"], [5, "5 lines"]], showLines ? engine.multiPv : 0, (n) => {
+				// eval only searches one line: the others would never be seen
+				savePrefs({ engineLines: n > 0 });
+				engine.setMultiPv(Math.max(n, 1));
+				onChange();
+			}),
 			depthBox(engine),
 		);
 		// Only a multi-threaded build has a count to pick, and only on a
@@ -78,10 +91,10 @@ export function engineBox(engine, pos, onChange, { board, bar, flavors, playLine
 	// head row with the toggle, and the settings go in a slim row after the
 	// lines rather than a row of their own above them.
 	const acts = el("span", { className: "orow an-engine-acts" });
-	box.appendChild(el("div", { className: "an-engine-head" }, [toggle, info, acts]));
+	box.appendChild(el("div", { className: "an-engine-head" }, [toggle, score, info, acts]));
 	if (flavors) box.appendChild(fullBox(flavors));
 	const lines = el("div", { className: "an-pvs" });
-	box.appendChild(lines);
+	if (showLines) box.appendChild(lines);
 	if (on) box.appendChild(opts);
 	const deeper = el("button", {
 		className: "chip mini an-deeper",
@@ -94,6 +107,7 @@ export function engineBox(engine, pos, onChange, { board, bar, flavors, playLine
 		const fresh = st.fen === pos.fen;
 		bar.hidden = !st.enabled;
 		if (!st.enabled) {
+			score.textContent = "";
 			info.textContent = "Stockfish 19, on this device";
 			lines.replaceChildren();
 			acts.replaceChildren();
@@ -115,6 +129,9 @@ export function engineBox(engine, pos, onChange, { board, bar, flavors, playLine
 		const best = shown[0];
 		if (best) lastShare = whiteShare(best.score);
 		bar.firstChild.style.height = `${(lastShare * 100).toFixed(1)}%`;
+		score.textContent = best ? formatScore(best.score) : "";
+		score.className = "an-score an-engine-eval" + (!best ? "" : best.score.mate != null || best.score.cp > 0 ? " w" : best.score.cp < 0 ? " b" : "");
+		score.title = best ? "The evaluation, from White's side" : "";
 		bar.title = best ? `${formatScore(best.score)} from White's side` : "";
 		bar.setAttribute("aria-label", best ? `Evaluation ${formatScore(best.score)} from White's side` : "Evaluation");
 		// One row per line asked for, whether or not the search has filled it
@@ -184,7 +201,7 @@ export function engineBox(engine, pos, onChange, { board, bar, flavors, playLine
 		}
 		drawArrows(
 			board,
-			shown.map((l, i) => ({ from: l.moves[0].from, to: l.moves[0].to, weight: i === 0 ? 0.85 : 0.35 })),
+			(showLines ? shown : []).map((l, i) => ({ from: l.moves[0].from, to: l.moves[0].to, weight: i === 0 ? 0.85 : 0.35 })),
 		);
 	};
 	engine.onUpdate = paint;

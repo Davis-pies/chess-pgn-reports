@@ -794,9 +794,9 @@ test("settings: grouped, every field has a tooltip with its default, streaks cla
 	const { root, progress } = mount();
 	click(root, ".tr-settings-open");
 	const legends = [...root.querySelectorAll(".tr-group > legend")].map((l) => l.textContent);
-	assert.deepStrictEqual(legends, ["Questions", "Name questions", "Order questions", "Tags questions", "Book questions", "Progress", "Engine", "Sessions"]);
+	assert.deepStrictEqual(legends, ["Questions", "Name questions", "Order questions", "Tags questions", "Book questions", "Progress", "Sessions"]);
 	const labels = [...root.querySelectorAll(".tr-field > span")].map((l) => l.textContent);
-	for (const l of ["Name", "Order", "Tags", "Book", "Answer by", "Choices", "Show the moves", "Show the target position", "Show the name", "You play", "Accept", "Right in a row to learn", "Right in a row to master", "Engine lines", "Show a new variation first", "Learning at once", "Re-check every", "Questions per session (0: no limit)"]) {
+	for (const l of ["Name", "Order", "Tags", "Book", "Answer by", "Choices", "Show the moves", "Show the target position", "Show the name", "You play", "Accept", "Right in a row to learn", "Right in a row to master", "Show a new variation first", "Learning at once", "Re-check every", "Questions per session (0: no limit)"]) {
 		assert.ok(labels.includes(l), l);
 	}
 	for (const f of root.querySelectorAll(".tr-field")) assert.ok(f.title, `no tooltip on ${f.textContent}`);
@@ -901,19 +901,6 @@ test("an intro's box follows the step", () => {
 	assert.strictEqual(engine.calls.analyse.at(-1), chess.fen());
 	click(m.root, ".tr-back");
 	assert.notStrictEqual(engine.calls.analyse.at(-1), chess.fen());
-	done();
-});
-
-test("Engine lines off marks the panel eval-only; the bar and toggle stay", () => {
-	const engine = fakeEngine();
-	const name = deck.find((x) => x.type === "name");
-	let m = mount({ settings: { engineLines: false }, engine });
-	asked(m, name);
-	assert.ok(m.root.firstChild.classList.contains("tr-eval-only"));
-	assert.ok($(m.root, ".an-engine-toggle") && $(m.root, ".an-evalbar"));
-	m = mount({ engine });
-	asked(m, name);
-	assert.ok(!m.root.firstChild.classList.contains("tr-eval-only"));
 	done();
 });
 

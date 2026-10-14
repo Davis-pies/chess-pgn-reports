@@ -1802,6 +1802,9 @@ sup {
 .an-score { flex: none; min-width: 3.4rem; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; border-radius: 4px; padding: 0 .25rem; margin-right: .3rem; background: var(--head-bg); }
 .an-score.w { background: #f4f4f0; color: #222; border: 1px solid var(--line); }
 .an-score.b { background: #403d39; color: #f4f4f0; }
+/* the evaluation in the engine box's head, there whether or not lines are */
+.an-engine-eval { margin-right: 0; }
+.an-engine-eval:empty { display: none; }
 .an-pvmove { background: none; border: 0; padding: 0 .15rem; font: inherit; color: inherit; cursor: pointer; border-radius: 3px; }
 .an-pvmove:hover, .an-move:hover { background: color-mix(in srgb, var(--main) 18%, transparent); }
 
@@ -1962,12 +1965,6 @@ sup {
 /* the engine's lines are text here: clicking one does nothing in Train */
 .train span.an-pvmove { cursor: default; }
 .train span.an-pvmove:hover { background: none; }
-/* "Engine lines" off: the evaluation only. The best line's score stays, as a
-   number beside the bar; its moves, the other lines, the line count and the
-   arrows go. (Hiding the whole lines box left only the bar's tooltip to read
-   the score from.) */
-.tr-eval-only .an-pv:not(:first-child), .tr-eval-only .an-pv > :not(.an-score),
-.tr-eval-only .an-engine-pv, .tr-eval-only .an-arrows { display: none; }
 .tr-choice { text-align: left; }
 .tr-result { margin-top: .6rem; padding: .5rem .8rem; border-radius: var(--radius-sm); border: 1px solid var(--line); }
 .tr-result.right { border-color: var(--main); }

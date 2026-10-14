@@ -53,7 +53,7 @@ import {
 } from "./analysis-commit.js";
 import { commentEditor } from "./line-editor.js";
 import { shareTools } from "./share-tools.js";
-import { engineBox } from "./engine-view.js";
+import { engineBox, pvRows } from "./engine-view.js";
 import { getCurrent } from "./state.js";
 import { loadPrefs, savePrefs } from "./prefs.js";
 import { visibleLines } from "./visibility.js";
@@ -545,7 +545,7 @@ export function boardAndEngine(panel, row, box, engine) {
 	pin.appendChild(box);
 	if (engine.state.enabled) {
 		panel.classList.add("engine-on");
-		panel.style.setProperty("--pv-rows", String(engine.multiPv));
+		panel.style.setProperty("--pv-rows", String(pvRows(engine)));
 	}
 	return pin;
 }

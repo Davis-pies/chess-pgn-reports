@@ -476,9 +476,7 @@ test("progress: round trip, repair and unreadable data", () => {
 	range("recheckEvery", [0, 50], [-1, 51]);
 	assert.ok(!("newPerSession" in normalizeSettings({ newPerSession: 3, reviews: 2 })) && !("reviews" in normalizeSettings({ reviews: 2 })), "the old batch limits are dropped");
 	range("choices", [2, 8], [1, 9]);
-	assert.strictEqual(DEFAULT_SETTINGS.engineLines, true);
-	assert.strictEqual(normalizeSettings({ engineLines: false }).engineLines, false);
-	assert.strictEqual(normalizeSettings({ engineLines: "no" }).engineLines, true, "not a boolean: the default");
+	assert.ok(!("engineLines" in normalizeSettings({ engineLines: false })), "Eval only is the engine box's own menu now");
 	assert.strictEqual(normalizeSettings({ learnStreak: 6, masterStreak: 4 }).masterStreak, 6);
 	assert.strictEqual(normalizeSettings({ types: { name: false, x: 1 } }).types.name, false);
 	assert.strictEqual(normalizeSettings({ bookSide: "up", familyGroup: ["a", 3] }).bookSide, "black");

@@ -60,7 +60,7 @@ function trainBoard(fen, { flipped, play = null }) {
 
 export function trainPanel(ui, { tree, deck, progress, rename, learn, engine = null, flavors = null }, onChange) {
 	const settings = progress.settings;
-	const panel = el("div", { className: "analysis train" + (settings.engineLines ? "" : " tr-eval-only"), tabIndex: -1 });
+	const panel = el("div", { className: "analysis train", tabIndex: -1 });
 	const save = () => saveProgress(progress);
 	const act = (fn) => () => {
 		fn();
@@ -265,9 +265,6 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn, engine = n
 			group("Progress",
 				num("learnStreak", "Right in a row to learn", s.learnStreak, (n) => set({ learnStreak: n }), 1, 10, `How many right answers in a row learn a question; learning every question of a variation unlocks what is below it. 1 to 10. Default ${D.learnStreak}.`),
 				num("masterStreak", "Right in a row to master", s.masterStreak, (n) => set({ masterStreak: n }), 1, 20, `How many right answers in a row master a question. Never below the learn setting. 1 to 20. Default ${D.masterStreak}.`),
-			),
-			group("Engine",
-				check("engineLines", "Engine lines", s.engineLines, (on) => set({ engineLines: on }), `Show the engine's lines and arrows as well as its evaluation. Off: the evaluation only. Default ${onOff(D.engineLines)}.`),
 			),
 			group("Sessions",
 				check("introNew", "Show a new variation first", s.introNew, (on) => set({ introNew: on }), `Before the first question on a variation, show its position, the moves that reach it and the workbook's notes. Default ${onOff(D.introNew)}.`),

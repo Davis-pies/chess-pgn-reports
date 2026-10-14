@@ -191,7 +191,6 @@ Grouped, each with a tooltip saying what it does and its default:
 - **Book questions**: the side you play (White, Black, both); accept any
   book move or only the mainline's.
 - **Progress**: right in a row to learn (1-10), to master (learn-20).
-- **Engine**: engine lines (on; off: evaluation only).
 - **Sessions**: show a new variation first (on), learning at once (1-20,
   default 5), re-check every N questions (0-50, default 6; 0: never),
   questions per session (default 20; 0: no limit). Saved settings with the
@@ -236,8 +235,12 @@ bar, lines, arrows, the shared Stockfish) under Train's board, on the intro
 answering, and on every result once answered. Never while an order or book
 question waits for moves: the engine pauses as such a question comes up, and
 when Train closes. Off until switched on (the toggle, or E); it is the one
-shared engine, so it is on or off in Study and Train alike. Setting "Engine
-lines" (on): off shows the evaluation only, without lines or arrows. Every
+shared engine, so it is on or off in Study and Train alike. The box shows its
+evaluation in its head, beside the toggle; **Eval only** in its lines menu
+(a viewer preference in `prefs.js`, the same on every board with an engine)
+hides the lines and arrows and searches one line. (A Train setting "Engine
+lines" did this first; Davis wanted it in the box's own menu, with the
+evaluation no longer read off the first line.) Every
 Train board keeps the eval bar's place beside it, shown or not, so the board
 does not shift between questions. Clicking an engine line does nothing in
 Train (in Study it plays the line).

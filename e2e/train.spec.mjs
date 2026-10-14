@@ -172,15 +172,17 @@ test("train's engine shows its bar and lines on a name question, not on an order
   await expect(page.locator(".an-engine")).toHaveCount(0);
 });
 
-test("with Engine lines off the bar and the score show, the lines do not", async ({ page }) => {
-  const done = await trainOnly(page, ["Order", "Book", "Engine lines"]);
-  await done.click();
+test("Eval only, in the engine box's lines menu, shows the score in its head and no lines", async ({ page }) => {
+  await (await trainOnly(page, ["Order", "Book"])).click();
   await page.locator(".tr-start").click();
   await page.locator(".an-engine-toggle").click();
+  await page.locator(".an-engine-pv").selectOption({ label: "Eval only" });
   await expect(page.locator(".tr-body .an-evalbar")).toBeVisible();
-  await expect(page.locator(".an-engine-info")).toContainText(/depth|Thinking|Loading/, { timeout: 60_000 });
-  // the best line's score stays as a number; its moves and the other lines go
-  await expect(page.locator(".an-pv:not(.empty) .an-score").first()).toBeVisible({ timeout: 60_000 });
-  await expect(page.locator(".an-pv .an-pvmove").first()).toBeHidden();
-  await expect(page.locator(".an-pv").nth(1)).toBeHidden();
+  await expect(page.locator(".an-engine-head .an-engine-eval")).toHaveText(/^[+-]|^#/, { timeout: 60_000 });
+  await expect(page.locator(".an-pvs")).toHaveCount(0);
+  await expect(page.locator(".an-arrows")).toHaveCount(0);
+  // remembered: the next board's box starts on Eval only too
+  await page.getByRole("button", { name: "End session" }).click();
+  await page.locator(".tr-again").click();
+  await expect(page.locator(".an-engine-pv")).toHaveValue("0");
 });

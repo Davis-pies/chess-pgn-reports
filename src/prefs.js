@@ -32,6 +32,9 @@ const DEFAULTS = Object.freeze({
 	// how many threads the engine searches with; null means "pick for this
 	// machine" (engine.js startThreads), and a count is capped to its cores
 	engineThreads: null,
+	// whether the engine box lists its lines, or shows the evaluation only
+	// ("Eval only" in its lines menu), on every board that has one
+	engineLines: true,
 	// how deep the repertoire audit searches each position (audit.js
 	// MIN_DEPTH..MAX_DEPTH), and on how many engines; null means "pick for
 	// this machine" (audit.js auditWorkers)
@@ -95,6 +98,7 @@ export function loadPrefs() {
 			Number.isInteger(d.engineThreads) && d.engineThreads >= 1 && d.engineThreads <= 256
 				? d.engineThreads
 				: DEFAULTS.engineThreads,
+		engineLines: d.engineLines !== false,
 		auditDepth: Number.isInteger(d.auditDepth) && d.auditDepth >= 1 && d.auditDepth <= 40 ? d.auditDepth : DEFAULTS.auditDepth,
 		auditEngines:
 			Number.isInteger(d.auditEngines) && d.auditEngines >= 1 && d.auditEngines <= 256
