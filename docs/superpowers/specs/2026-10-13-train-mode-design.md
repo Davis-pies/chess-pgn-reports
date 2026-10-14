@@ -110,30 +110,37 @@ the boxes were hard to follow.
   name/order/family cards is. Level-1 variations start unlocked; learning a
   variation unlocks its children and its book cards, and a variation once
   unlocked stays unlocked.
-- A session, from the unlocked cards (in scope, not skipped), in this order:
-  1. cards started but not mastered, least-recently asked first;
-  2. up to "New questions per session" cards never asked (default 5):
-     name/order/family cards first, shallowest level first, then book
-     cards, in reading order (names and move orders first, then deeper
-     variations, then the book moves inside each one, as the Goal says);
-  3. up to "Re-checks per session" mastered cards (default 3), the ones
-     asked longest ago first.
-  It stops after "Questions per session" (default 20; 0: no limit) or when
-  nothing is left. The order decides what the limit cuts; the queue is then
-  **interleaved** (research, finding 6): no two cards of one variation back
-  to back where another order avoids it, a variation's book cards kept
-  together in move order as one run, and each intro just before its
+- A session is a **flow**, not a batch fixed at the start (Davis,
+  2026-10-14: "if you set 30 questions, there's actual progression within the
+  session"; with 0, "constantly unlock and be integrated"). From the unlocked
+  cards in scope, not skipped:
+  1. it opens with the cards started but not learned, least-recently asked
+     first;
+  2. new cards join whenever fewer than "Learning at once" (default 5, 1-20)
+     cards in the session are started but not yet learned, one for each
+     free place: name/order/tags cards first, shallowest level first, then
+     book cards, in reading order (names and move orders, then deeper
+     variations, then the book moves inside each one, as the Goal says). So
+     as cards are learned, new ones take their place, including from the
+     variations they unlocked;
+  3. a mastered card joins every "Re-check every" questions (default 6, 0:
+     never), the one asked longest ago that the spacing rule would count;
+     learned-not-mastered cards from earlier sessions are in step 1's
+     "started" only until learned, so they come back the same way.
+  The session ends after "Questions per session" answers (default 20; 0: no
+  limit), when nothing is left to ask, or with **End session**. The queue is
+  **interleaved** as it grows (research, finding 6): no two cards of one
+  variation back to back where another order avoids it, a variation's book
+  cards kept together in move order as one run, each intro just before its
   variation's first card.
 - In a session, a miss comes back three questions later, and so does a right
   answer on a card not yet learned, so a card can be learned in one sitting.
-  (Mastery builds across sessions: once learned, a card is not repeated in
-  the same session.) When an answer unlocks variations, their new cards join
-  the session straight away, within the new-question and length limits, so a
-  first session goes deeper than level 1.
+  (Mastery builds across the flow: once learned, a card is not repeated in
+  the same session except as a re-check.)
 - **The right difficulty** (research, findings 3 and 8): while two of the
   last five answers in a session were misses, cards never asked are held
-  back: those still queued leave the session (with their intros), and no
-  unlocked cards join it.
+  back: those still queued leave the session (with their intros), and no new
+  cards join it until the misses scroll out of the last five.
 - **Tricky questions** (research, finding 7): a card missed three times in a
   session is not asked again in it and is marked tricky (`tricky: true` on
   its record) until it is next learned. The summary lists this session's
@@ -172,9 +179,10 @@ Grouped, each with a tooltip saying what it does and its default:
 - **Book questions**: the side you play (White, Black, both); accept any
   book move or only the mainline's.
 - **Progress**: right in a row to learn (1-10), to master (learn-20).
-- **Sessions**: show a new variation first (on), new questions per session
-  (0-50), re-checks per session (0-20), questions per session (0: no
-  limit).
+- **Sessions**: show a new variation first (on), learning at once (1-20,
+  default 5), re-check every N questions (0-50, default 6; 0: never),
+  questions per session (default 20; 0: no limit). Saved settings with the
+  old `newPerSession` / `reviews` keys drop them.
 
 ## The Train window
 
@@ -182,15 +190,16 @@ A window over the report like Study: **Train** in the toolbar, **Train from
 here** in the table's context menu (Practice on the subtree at that
 position). Three screens:
 
-- **Outline** - **Start**, **Settings**, what a session would hold ("N in
-  progress · M new · K to re-check"), a progress line (variations learned
+- **Outline** - **Start**, **Settings**, what is waiting ("N in progress ·
+  M new · K mastered"; new = unlocked and never asked), a progress line (variations learned
   out of all, how many mastered, the deepest level open), then the
   named-position tree: level, a bar of progress towards mastery (the
   streaks, each capped at the master setting, over what mastering every card
   needs), learned/mastered/locked/skipped state, the manual actions,
   rename/retag, a "tricky" badge. Filters: subtree, tags. Every control has
   a tooltip.
-- **Question** - "Question n of m" (intros not counted), the board (the
+- **Question** - "Question n of m", or "Question n" with no limit (intros
+  not counted), **End session** (to the summary), the board (the
   analysis board's `boardRow`), the prompt, a status line (the card's level,
   its streak towards learned or mastered, and while its variation is not
   learned how many variations learning it unlocks; never the variation's
@@ -202,7 +211,9 @@ position). Three screens:
   Escape closes.
 - **Summary** - score; the variations newly learned, newly mastered, newly
   unlocked, and those that slipped back from mastered; the tricky questions
-  with **Learn it**; how many are still locked.
+  with **Learn it**; how many are still locked; **Keep going** (Enter: a new
+  session with the same scope and filter, picking up where this one left
+  off) and **Back to the outline**.
 
 On phones the board is pinned on top as in Study. With no named positions
 the outline explains how to name one; book drilling still works, the whole
