@@ -229,6 +229,16 @@ For a shorter overview see the [README](../README.md).
      variation, labelled with its move ("3...Nf6"), as a Book question shows
      its move's note. A miss is explained, not just marked. The notes on the
      moves before it are in the variation's first step (below) and in Study.
+   - **What went wrong** — a wrong name shows the position you were asked
+     beside the one whose name you gave, the squares where they differ
+     highlighted on both, where their move orders part ("Najdorf 5...a6 ·
+     Scheveningen 5...e6", or "… goes on from the … with …" when one carries
+     on from the other), and the note for the name you gave. A wrong move,
+     in an Order or Book question, shows the board before it with your move
+     as a red arrow and the right move or moves green, says where your move
+     leads ("That leads to the Dragon", or "Not in this workbook"), and in an
+     Order question lists the whole order with the moves from your slip on
+     marked, and the note on the right move.
    - **A new variation first** — the first time a session reaches a variation
      you have never been asked about, it shows "New: <name>" before any
      question. The board starts where the variation's own moves begin (after

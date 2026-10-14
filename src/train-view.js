@@ -496,8 +496,10 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn, engine = n
 				const picked = live.find((c) => c.id === `name|${other.key}`);
 				res.append(
 					el("div", { className: "tr-compare" }, [figure(node.fen, `Asked: ${node.name}`), figure(other.fen, `You said: ${other.name}`)]),
-					el("p", { className: "tr-diverge", textContent: `${node.name} ${dv.a} · ${other.name} ${dv.b}` }),
-					...(picked ? picked.notes.filter((n) => n.own).map((n) => noteLine(n.move, n.text)) : []));
+					// one order can carry on from the other: then say so, rather than set a move against nothing
+					el("p", { className: "tr-diverge", textContent: !dv.a ? `${other.name} goes on from the ${node.name} with ${dv.b}` : !dv.b ? `${node.name} goes on from the ${other.name} with ${dv.a}` : `${node.name} ${dv.a} · ${other.name} ${dv.b}` }),
+					// named, so it is not read as the asked variation's own note
+					...(picked ? picked.notes.filter((n) => n.own).map((n) => noteLine(`${other.name}: ${n.move}`, n.text)) : []));
 			}
 			// a wrong move: the board (still the position before it) shows the move in red and the right moves in green; the line says which named variation the move leads to, and an order shows its full order with the moves still to play marked
 			if (miss) {

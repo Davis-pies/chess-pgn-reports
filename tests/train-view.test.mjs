@@ -728,7 +728,8 @@ test("a wrong name answer compares the asked and picked positions", () => {
 		assert.ok(!f.querySelector('rect[data-sq="a1"]').classList.contains("diff"));
 	}
 	assert.match($(m.root, ".tr-diverge").textContent, /Sicilian e6 2\.\.\.e6 · Najdorf 2\.\.\.d6/);
-	assert.match($(m.root, ".tr-result p.tr-note").textContent, /Sharp/);
+	// the picked variation's note says whose it is
+	assert.ok([...m.root.querySelectorAll(".tr-result p.tr-note")].some((n) => n.textContent === "Najdorf: 5...a6 Sharp, and the main line."));
 
 	m = start();
 	$(m.root, ".tr-typed").value = "Sicilian e6";
@@ -740,6 +741,23 @@ test("a wrong name answer compares the asked and picked positions", () => {
 	$(m.root, ".tr-typed").value = "nope";
 	click(m.root, ".tr-check");
 	assert.strictEqual($(m.root, ".tr-compare"), null);
+
+	// one order carrying on from the other is said so, not set against nothing
+	const p3 = parsePgn(`1. e4 c5 {[%name "Sicilian"]} 2. Nf3 d6 {[%name "Najdorf-ish"]} *`);
+	const l3 = collectLines(p3.nodes);
+	const t3 = variationTree(l3, namesFromNodes(p3.nodes));
+	const d3 = buildDeck(t3, l3, { ...DEFAULT_SETTINGS, types: ALL });
+	const sic = [...t3.byKey.values()].find((x) => x.name === "Sicilian");
+	const deep = [...t3.byKey.values()].find((x) => x.name === "Najdorf-ish");
+	for (const [ask, say, text] of [[sic, "Najdorf-ish", "Najdorf-ish goes on from the Sicilian with 2.Nf3"], [deep, "Sicilian", "Najdorf-ish goes on from the Sicilian with 2.Nf3"]]) {
+		const card = d3.find((x) => x.id === `name|${ask.key}`);
+		const m3 = mount({ t: t3, d: d3, settings: { nameMode: "typed" } });
+		Object.assign(m3.ui, { session: hand([card]), card, screen: "question" });
+		m3.draw();
+		$(m3.root, ".tr-typed").value = say;
+		click(m3.root, ".tr-check");
+		assert.strictEqual($(m3.root, ".tr-diverge").textContent, text);
+	}
 });
 
 test("notes follow every answer: a name question shows the variation's own note, not the ones on the way", () => {
