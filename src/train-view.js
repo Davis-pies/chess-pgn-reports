@@ -13,10 +13,10 @@ import { el, renderInline } from "./dom.js";
 import { boardAndEngine, chipBtn, evalBar } from "./analysis-view.js";
 import { engineBox } from "./engine-view.js";
 import { boardSvg, fullmoveLabel, movesText } from "./render.js";
-import { interactiveBoard } from "./board-input.js";
+import { drawArrows, interactiveBoard } from "./board-input.js";
 import {
 	DEFAULT_SETTINGS, allTags, answer, checkBook, checkFamily, checkName, current, divergence, isLearned, isMastered, learnedCard,
-	isTricky, markKnown, masteredCard, nameChoices, newSession, normalizeSettings, orderStep, positionDiff, resetVar, saveProgress, scopeCards, sessionSummary, skip,
+	isTricky, leadsTo, markKnown, masteredCard, nameChoices, newSession, normalizeSettings, orderStep, positionDiff, resetVar, saveProgress, scopeCards, sessionSummary, skip,
 	unlockedKeys, unlocksIfLearned,
 } from "./train.js";
 
@@ -315,10 +315,11 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn, engine = n
 			setCard();
 			onChange();
 		};
-		const finish = (right, detail) => {
+		// a wrong move passes `miss`: the moves before it, the move itself and the right moves there
+		const finish = (right, detail, miss = null) => {
 			const { unlocked, tooSoon, soon } = answer(ui.session, progress, card, right, settings, { deck: live, tree });
 			save();
-			ui.answered = { right, detail, tooSoon: !!tooSoon, soon, unlocked };
+			ui.answered = { right, detail, tooSoon: !!tooSoon, soon, unlocked, miss };
 			onChange();
 		};
 		// an intro is passed, not answered: nothing is scored or stored
@@ -429,7 +430,7 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn, engine = n
 			ui.played.forEach((s) => chess.move(s));
 			const play = (san) => {
 				const step = orderStep(node.orders, ui.played, san);
-				if (!step.ok) return finish(false, [`Expected: ${step.accepted.join(" or ")}`]);
+				if (!step.ok) return finish(false, [`Expected: ${step.accepted.join(" or ")}`], { played: [...ui.played], san, rightMoves: step.accepted });
 				ui.played.push(san);
 				if (!step.done) return onChange(); // on to the next move
 				const others = node.orders.filter((o) => o.join(" ") !== ui.played.join(" ")).map(numbered);
@@ -466,13 +467,13 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn, engine = n
 			const play = (san) => {
 				const right = checkBook(card, san, settings);
 				const detail = [`Book: ${card.moves.join(", ")}${card.main ? ` (main: ${card.main})` : ""}`];
-				finish(right, detail);
+				finish(right, detail, right ? null : { played: [...card.sans], san, rightMoves: card.moves });
 			};
 			body.append(stage(chess.fen(), { flipped, play: ui.answered ? null : play, box: !!ui.answered }), flip());
 		}
 
 		if (ui.answered) {
-			const { right, detail, tooSoon, soon, unlocked } = ui.answered;
+			const { right, detail, tooSoon, soon, unlocked, miss } = ui.answered;
 			const res = el("div", { className: `tr-result ${right ? "right" : "wrong"}` }, [el("strong", { textContent: right ? "Right" : "Not quite" })]);
 			if (tooSoon) {
 				// two rules make an answer too soon: a learned card asked again within SPACING answers, and a card asked straight after its variation's intro
@@ -498,8 +499,31 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn, engine = n
 					el("p", { className: "tr-diverge", textContent: `${node.name} ${dv.a} · ${other.name} ${dv.b}` }),
 					...(picked ? picked.notes.filter((n) => n.own).map((n) => noteLine(n.move, n.text)) : []));
 			}
+			// a wrong move: the board (still the position before it) shows the move in red and the right moves in green; the line says which named variation the move leads to, and an order shows its full order with the moves still to play marked
+			if (miss) {
+				const before = new Chess();
+				miss.played.forEach((s) => before.move(s));
+				const fen = before.fen();
+				const arrow = (san) => {
+					const m = new Chess(fen).move(san);
+					return { from: m.from, to: m.to };
+				};
+				drawArrows(body.querySelector(".an-board"), [{ ...arrow(miss.san), tone: "bad" }, ...miss.rightMoves.map(arrow)], "tr-feedback");
+				const lead = leadsTo(tree, [...miss.played, miss.san]);
+				res.append(el("p", { className: "tr-leads", textContent: lead ? `That leads to the ${lead}` : "Not in this workbook" }));
+				if (card.type === "order") {
+					const all = node.orders[0].map((san, ply) => ({ san, ply }));
+					const k = miss.played.length;
+					res.append(el("p", { className: "tr-order" }, [
+						k ? `${movesText(all.slice(0, k))}${k % 2 === 0 ? "  " : " "}` : "",
+						el("mark", { textContent: movesText(all.slice(k)) }),
+					]));
+					// the note on the move that was right here is shown with the rest of the line, not again below
+					for (const n of card.notes.filter((x) => x.at === k)) res.append(noteLine(n.move, n.text));
+				}
+			}
 			// a book card keeps its notes by move; the others show the variation's own note only (the intro steps through the rest)
-			const notes = Array.isArray(card.notes) ? card.notes.filter((n) => n.own).map((n) => [n.move, n.text]) : Object.entries(card.notes);
+			const notes = Array.isArray(card.notes) ? card.notes.filter((n) => n.own && !(miss && n.at === miss.played.length)).map((n) => [n.move, n.text]) : Object.entries(card.notes);
 			for (const [move, text] of notes) res.append(noteLine(Array.isArray(card.notes) ? move : `${move}:`, text));
 			if (unlocked.length) res.append(el("p", { className: "tr-unlocked", textContent: `Unlocked: ${unlocked.join(", ")}` }));
 			res.append(chipBtn("tr-next", "Next", "Next question (Enter)", next));

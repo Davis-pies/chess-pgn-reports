@@ -303,6 +303,44 @@ test("order question: a wrong first move, then a right run listing other orders"
 	done();
 });
 
+test("wrong order move: the right and wrong moves drawn, what it leads to, the order with the rest marked", () => {
+	const key = v("Scheveningen").key;
+	const base = deck.find((x) => x.id === `order|${key}`);
+	// a note on the right move (ply 3), to see it shown on the picture's feedback
+	const c = { ...base, notes: [{ at: 3, move: "3... d6", text: "The Scheveningen move.", own: false }] };
+	const m = mount();
+	const ask = (played) => {
+		m.ui.session = hand([c]);
+		m.ui.card = c;
+		m.ui.screen = "question";
+		m.ui.played = played;
+		m.ui.answered = null;
+		m.draw();
+	};
+	// after 1.e4 c5 2.Nf3 the Scheveningen order wants d6 or e6; Nc6 is in no named variation here
+	ask(["e4", "c5", "Nf3"]);
+	const chess = new Chess();
+	["e4", "c5", "Nf3"].forEach((s) => chess.move(s));
+	move(m.root, chess, "Nc6");
+	assert.ok($(m.root, ".tr-result.wrong"));
+	assert.strictEqual(m.root.querySelectorAll(".tr-feedback .an-arrow.bad").length, 1);
+	assert.strictEqual(m.root.querySelectorAll(".tr-feedback .an-arrow:not(.bad)").length, 2);
+	assert.strictEqual($(m.root, ".tr-leads").textContent, "Not in this workbook");
+	assert.match($(m.root, ".tr-order").textContent, /e4/);
+	assert.ok($(m.root, ".tr-order mark").textContent.includes("d6"));
+	assert.doesNotMatch($(m.root, ".tr-order mark").textContent, /e4/);
+	assert.match($(m.root, ".tr-result").textContent, /The Scheveningen move\./);
+	// after 5.Nc3 the Scheveningen wants e6; a6 starts the Najdorf
+	ask(["e4", "c5", "Nf3", "d6", "d4", "cxd4", "Nxd4", "Nf6", "Nc3"]);
+	const chess2 = new Chess();
+	["e4", "c5", "Nf3", "d6", "d4", "cxd4", "Nxd4", "Nf6", "Nc3"].forEach((s) => chess2.move(s));
+	move(m.root, chess2, "a6");
+	assert.match($(m.root, ".tr-leads").textContent, /^That leads to the Najdorf$/);
+	assert.ok($(m.root, ".tr-order mark").textContent.includes("e6"));
+	assert.doesNotMatch($(m.root, ".tr-order mark").textContent, /e4/);
+	done();
+});
+
 test("family question: tick the tags; a group makes it radio buttons", () => {
 	const key = v("Najdorf").key;
 	const c = deck.find((x) => x.id === `family|${key}`);
@@ -349,6 +387,33 @@ test("book question: a wrong move shows the book moves and the note", () => {
 	assert.match(r.textContent, /a6: Najdorf idea\./);
 	click(m.root, ".tr-flip");
 	assert.strictEqual(m.ui.flipped, true);
+	done();
+});
+
+test("wrong book move: the book moves drawn green, the one played red, and where it leads", () => {
+	const c = deck.find((x) => x.type === "book" && x.moves.length === 2);
+	const m = mount({ settings: { bookSide: "black" } });
+	m.ui.session = hand([c]);
+	m.ui.card = c;
+	m.ui.screen = "question";
+	m.draw();
+	const chess = new Chess();
+	c.sans.forEach((s) => chess.move(s));
+	move(m.root, chess, "g6");
+	assert.strictEqual(m.root.querySelectorAll(".tr-feedback .an-arrow.bad").length, 1);
+	assert.strictEqual(m.root.querySelectorAll(".tr-feedback .an-arrow:not(.bad)").length, c.moves.length);
+	assert.match($(m.root, ".tr-leads").textContent, /^(That leads to the .+|Not in this workbook)$/);
+	// the right move draws nothing
+	const m2 = mount({ settings: { bookSide: "black" } });
+	m2.ui.session = hand([c]);
+	m2.ui.card = c;
+	m2.ui.screen = "question";
+	m2.draw();
+	const chess2 = new Chess();
+	c.sans.forEach((s) => chess2.move(s));
+	move(m2.root, chess2, c.moves[0]);
+	assert.ok($(m2.root, ".tr-result.right"));
+	assert.strictEqual($(m2.root, ".tr-feedback"), null);
 	done();
 });
 
