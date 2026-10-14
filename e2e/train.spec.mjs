@@ -202,3 +202,33 @@ test("the engine's lines menu and depth come back after a reload", async ({ page
   await expect(page.locator(".an-engine-pv")).toHaveValue("0");
   await expect(page.locator(".an-engine-depth")).toHaveValue("15");
 });
+
+// A wrong name shows the asked position beside the one named, the squares
+// where they differ marked on both, and where their move orders part.
+test("a wrong Train name compares the two positions", async ({ page }) => {
+  await (await trainOnly(page, ["Order", "Book", "Show the moves"])).click();
+  await page.locator(".tr-start").click();
+  const asked = (await page.locator(".tr-moves").innerText()).trim().endsWith("e6") ? "e6" : "d6";
+  const picked = asked === "e6" ? "d6" : "e6";
+  await page.locator(".tr-choice", { hasText: `...${picked} Sicilians` }).click();
+  await expect(page.locator(".tr-result.wrong")).toBeVisible();
+  const boards = page.locator(".tr-compare svg");
+  await expect(boards).toHaveCount(2);
+  for (const i of [0, 1]) await expect(boards.nth(i).locator("rect.diff")).not.toHaveCount(0);
+  await expect(page.locator(".tr-diverge")).toHaveText(`...${asked} Sicilians 2...${asked} · ...${picked} Sicilians 2...${picked}`);
+});
+
+// A wrong move in an order question draws it red beside the right one, says
+// which variation it leads to and marks the part of the order still to play.
+test("a wrong Train move shows the right one and where it leads", async ({ page }) => {
+  await (await trainOnly(page, ["Name", "Book"])).click();
+  await page.locator(".tr-start").click();
+  const prompt = await page.locator(".tr-prompt").innerText();
+  const [asked, other] = prompt.includes("...e6") ? ["e6", ["d7", "d6"]] : ["d6", ["e7", "e6"]];
+  for (const [from, to] of [["e2", "e4"], ["c7", "c5"], ["g1", "f3"], other]) await playOnBoard(page, from, to);
+  await expect(page.locator(".tr-result.wrong")).toBeVisible();
+  await expect(page.locator(".tr-feedback .an-arrow.bad")).toHaveCount(1);
+  await expect(page.locator(".tr-feedback .an-arrow:not(.bad)")).toHaveCount(1);
+  await expect(page.locator(".tr-leads")).toHaveText(`That leads to the ...${other[1]} Sicilians`);
+  await expect(page.locator(".tr-order mark")).toHaveText(new RegExp(asked));
+});
