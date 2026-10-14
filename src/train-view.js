@@ -15,7 +15,7 @@ import { boardSvg, fullmoveLabel, movesText } from "./render.js";
 import { interactiveBoard } from "./board-input.js";
 import {
 	DEFAULT_SETTINGS, allTags, answer, checkBook, checkFamily, checkName, current, isLearned, isMastered, learnedCard,
-	isTricky, markKnown, masteredCard, nameChoices, newSession, normalizeSettings, orderStep, resetVar, saveProgress, sessionSummary, skip,
+	isTricky, markKnown, masteredCard, nameChoices, newSession, normalizeSettings, orderStep, resetVar, saveProgress, scopeCards, sessionSummary, skip,
 	unlockedKeys, unlocksIfLearned,
 } from "./train.js";
 
@@ -80,18 +80,20 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 
 	function outlineScreen() {
 		const box = el("div", { className: "tr-outline" });
-		const queue = newSession(live, tree, progress, settings, { scope: ui.scope, keys: tagged }).queue.filter((c) => c.type !== "intro");
-		const started = queue.filter((c) => progress.cards[c.id] && !masteredCard(progress.cards[c.id], settings)).length;
-		const fresh = queue.filter((c) => !progress.cards[c.id]).length;
+		const queue = newSession(live, tree, progress, settings, { scope: ui.scope, keys: tagged }).queue;
+		const { pool, open } = scopeCards(live, tree, progress, settings, { scope: ui.scope, keys: tagged });
+		const started = open.filter((c) => progress.cards[c.id] && !masteredCard(progress.cards[c.id], settings)).length;
+		const fresh = open.filter((c) => !progress.cards[c.id]).length;
+		const mastered = pool.filter((c) => masteredCard(progress.cards[c.id], settings)).length;
 		const head = el("div", { className: "tr-head" });
-		const start = chipBtn("tr-start", queue.length ? "Start" : "Nothing to train", "Start a session: questions in progress first, then new ones, then a few to re-check", act(() => begin({ scope: ui.scope })), !queue.length);
+		const start = chipBtn("tr-start", queue.length ? "Start" : "Nothing to train", "Start a session: questions in progress first, then new ones joining as you learn, with a learned one now and then to re-check", act(() => begin({ scope: ui.scope })), !queue.length);
 		head.append(
 			start,
-			chipBtn("tr-settings-open", "Settings", "Choose the question types, how many right answers learn and master a question, and the session sizes", act(() => (ui.screen = "settings"))),
+			chipBtn("tr-settings-open", "Settings", "Choose the question types, how many right answers learn and master a question, and how a session flows", act(() => (ui.screen = "settings"))),
 			el("span", {
 				className: "tr-count",
-				title: "What a session would hold: questions in progress, new questions (up to the session limit) and mastered ones to re-check",
-				textContent: `${started} in progress · ${fresh} new · ${queue.length - started - fresh} to re-check`,
+				title: "Questions started and not yet mastered, new questions open to ask now, and mastered ones, in this view",
+				textContent: `${started} in progress · ${fresh} new · ${mastered} mastered`,
 			}),
 		);
 		if (ui.scope !== null) head.append(chipBtn("tr-whole", "Whole workbook", "List every variation, not just this subtree", act(() => (ui.scope = null))));
@@ -281,7 +283,10 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 			title: `Answer it right ${settings.learnStreak} times in a row to learn it (unlocking what's below), ${settings.masterStreak} times to master it. A miss on a mastered question drops it back to learned; any other miss starts the count again.`,
 			textContent: `${card.vkey === "" ? "" : `Level ${card.level} · `}${standing}${opens ? ` · learn it to unlock ${opens} variation${opens === 1 ? "" : "s"}` : ""}`,
 		});
-		box.append(el("p", { className: "tr-progress", textContent: `Question ${place}${limit > 0 ? ` of ${limit}` : ""}` }), prompt, ...(card.type === "intro" ? [] : [status]), body);
+		box.append(el("div", { className: "tr-head" }, [
+			el("span", { className: "tr-progress", textContent: `Question ${place}${limit > 0 ? ` of ${limit}` : ""}` }),
+			chipBtn("tr-end", "End session", "Stop here and see the summary", act(() => (ui.screen = "summary"))),
+		]), prompt, ...(card.type === "intro" ? [] : [status]), body);
 
 		const next = () => {
 			setCard();
@@ -448,7 +453,18 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 	function summaryScreen() {
 		const sum = sessionSummary(ui.session, tree, deck, progress, settings);
 		const total = sum.right + sum.wrong;
-		const box = el("div", { className: "tr-summary" }, [el("h3", { textContent: `Right ${sum.right} / ${total}` })]);
+		// the same scope, practice or not and tag filter: the flow carries on from
+		// what this session learned
+		const again = { scope: ui.session.scope, practice: ui.session.practice };
+		const more = again.practice || newSession(live, tree, progress, settings, { keys: tagged, scope: again.scope }).queue.length > 0;
+		const keepGoing = act(() => begin(again));
+		panel.onkeydown = (e) => {
+			if (e.key === "Enter" && more && !e.target.closest?.("button")) keepGoing();
+		};
+		const box = el("div", { className: "tr-summary" }, [
+			el("h3", { textContent: `Right ${sum.right} / ${total}` }),
+			chipBtn("tr-again", "Keep going", "Carry on where you left off: a new session with the same variations (Enter)", keepGoing, !more),
+		]);
 		const list = (title, items, tip) => items.length && box.append(el("p", { title: tip, textContent: `${title}: ${items.join(", ")}` }));
 		list("Learned", sum.learned, "Every question in it is now learned");
 		list("Mastered", sum.mastered, "Every question in it is now mastered");

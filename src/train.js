@@ -280,7 +280,7 @@ function openTest(deck, progress, settings, unlocked) {
 // The cards a session in this scope draws from (`pool`: in scope, not
 // skipped) and those of them that may be asked now (`open`). The outline counts
 // with it, so what it promises is what Start does.
-function scopeCards(deck, tree, progress, settings, { scope = null, keys = null }) {
+export function scopeCards(deck, tree, progress, settings, { scope = null, keys = null }) {
 	const sc = inScope(tree, scope);
 	const cards = deck.filter((c) => c.type !== "intro");
 	const pool = cards.filter((c) => (!sc || sc.has(c.vkey)) && (!keys || keys.has(c.vkey)) && !progress.cards[c.id]?.skip);

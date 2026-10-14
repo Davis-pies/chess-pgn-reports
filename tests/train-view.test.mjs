@@ -85,7 +85,7 @@ test("outline: roots listed, children behind a toggle, locked badge", () => {
 	assert.doesNotMatch(row(root, "...d6 Sicilians").textContent, /locked/);
 	click(row(root, "...d6 Sicilians"), ".tr-open");
 	assert.ok(!row(root, "Najdorf"));
-	assert.match($(root, ".tr-count").textContent, /\d+ in progress · \d+ new · \d+ to re-check/);
+	assert.match($(root, ".tr-count").textContent, /\d+ in progress · \d+ new · \d+ mastered/);
 	done();
 });
 
@@ -165,6 +165,65 @@ test("a whole session: right answers, results, Enter for Next, summary", () => {
 	assert.doesNotMatch(sum.textContent, /next review/i);
 	click(root, ".tr-back");
 	assert.ok($(root, ".tr-outline"));
+	done();
+});
+
+const noIntros = buildDeck(tree, lines, { ...DEFAULT_SETTINGS, introNew: false, types: ALL });
+
+test("End session goes to the summary of what was answered; Keep going carries on, by chip or Enter", () => {
+	const m = mount({ d: noIntros, settings: { introNew: false, sessionLength: 0, bookSide: "black" } });
+	click(m.root, ".tr-start");
+	assert.strictEqual($(m.root, ".tr-end").title, "Stop here and see the summary");
+	solve(m.root, m.ui);
+	click(m.root, ".tr-next");
+	const first = Object.keys(m.progress.cards);
+	assert.strictEqual(first.length, 1);
+	click(m.root, ".tr-end");
+	assert.match($(m.root, ".tr-summary h3").textContent, /Right 1 \/ 1/);
+	assert.strictEqual($(m.root, ".tr-summary .chip").className.includes("tr-again"), true, "Keep going comes first");
+	click(m.root, ".tr-again");
+	assert.strictEqual(m.ui.screen, "question");
+	assert.strictEqual(m.ui.session.results.length, 0, "a new session");
+	assert.strictEqual(m.ui.card.id, first[0], "what was in progress comes first");
+	// Enter on the summary does the same
+	click(m.root, ".tr-end");
+	$(m.root, ".tr-summary").dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+	assert.strictEqual(m.ui.screen, "question");
+	assert.match($(m.root, ".tr-progress").textContent, /^Question 1$/);
+	done();
+});
+
+test("Keep going after practice practises the same variation again; with nothing left it is disabled", () => {
+	const m = mount({ d: noIntros, settings: { introNew: false } });
+	click(row(m.root, "...d6 Sicilians"), ".tr-practice");
+	assert.strictEqual(m.ui.session.practice, true);
+	click(m.root, ".tr-end");
+	click(m.root, ".tr-again");
+	assert.deepStrictEqual([m.ui.screen, m.ui.session.practice, m.ui.session.scope], ["question", true, v("...d6 Sicilians").key]);
+	const t = variationTree(lines, namesFromNodes(nodes));
+	const progress = emptyProgress();
+	for (const k of t.byKey.keys()) markKnown(progress, k, deck, DEFAULT_SETTINGS);
+	const n = mount({ settings: { types: { ...ALL, book: false } }, progress });
+	n.ui.session = newSession(deck, tree, n.progress, n.progress.settings, {});
+	n.ui.screen = "summary";
+	n.draw();
+	assert.ok($(n.root, ".tr-again").disabled);
+	$(n.root, ".tr-summary").dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+	assert.strictEqual(n.ui.screen, "summary");
+	done();
+});
+
+test("the outline counts what is in progress, new and mastered in view", () => {
+	const progress = emptyProgress();
+	markKnown(progress, v("...d6 Sicilians").key, deck, DEFAULT_SETTINGS);
+	const e6 = v("...e6 Sicilians/Sicilian e6").key;
+	progress.cards[`name|${e6}`] = { streak: 1, seen: 1, skip: false };
+	const m = mount({ settings: { types: { ...ALL, book: false } }, progress });
+	// open and never asked: e6's order and tags, Najdorf's three, Scheveningen's two
+	assert.strictEqual($(m.root, ".tr-count").textContent, "1 in progress · 7 new · 2 mastered");
+	m.ui.scope = v("...d6 Sicilians").key;
+	m.draw();
+	assert.strictEqual($(m.root, ".tr-count").textContent, "0 in progress · 5 new · 2 mastered", "scoped to the subtree");
 	done();
 });
 
