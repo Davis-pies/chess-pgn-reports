@@ -154,18 +154,30 @@ the boxes were hard to follow.
 
 ## Progress storage
 
-Per workbook in localStorage under `ott-train:<workbook id>`: settings plus,
-`asked` (how many answers this progress has recorded) and, per card
-(`<type>|<position key>`), `{ streak, seen, skip, tricky }`, `seen` the value
-of `asked` when the card was last answered: a count, not a time, used for
-the spacing rule and to order the queue. Progress saved before `asked`
-existed (`seen` a timestamp) is renumbered on load in the order of those
-timestamps; a first-version record (`{ box, seen, skip }`) reads with
-streak 0. Saved after every
-answer, without touching the workbook's own Save. **Save to file** includes
-it as `train`; opening that file restores it. PGN export and shared links do
-not carry it. A workbook never saved has no id; its progress lives under
-`ott-train:unsaved` until it is saved, then moves to its id.
+One store per browser, not per workbook (Davis, 2026-10-14: progress was
+lost every time he reloaded the PGN, because an unsaved workbook's progress
+slot was cleared on every load). localStorage key `ott-train`: settings,
+`asked` (how many answers have been recorded) and, per card (`<type>|<position
+key>`), `{ streak, seen, skip, tricky }`, `seen` the value of `asked` when the
+card was last answered: a count, not a time, used for the spacing rule and
+to order the queue. Cards are keyed by position, so any workbook, saved or
+not, a reloaded or edited PGN, or a file, finds the progress on every
+position it still has. (The cost: two workbooks naming one position
+differently share its name card's streak.) Saved after every answer, without
+touching the workbook's own Save; deleting a workbook leaves it.
+
+**Save to file** includes, as `train`, the store's records for the
+workbook's own cards plus the settings; opening that file merges its records
+into the store, keeping for each card the record with the higher streak
+(skip and tricky from that record), and takes its settings only when the
+store has none. PGN export and shared links do not carry it.
+
+Migration: on first load, every older per-workbook key (`ott-train:<id>`,
+`ott-train:unsaved`) is merged into `ott-train` the same way and removed.
+Within a key, progress saved before `asked` existed (`seen` a timestamp) is
+renumbered in the order of those timestamps; a first-version record
+(`{ box, seen, skip }`) reads with streak 0. Merged keys' `seen` counts are
+renumbered together in the order they had, and `asked` set to their number.
 
 ## Settings
 
@@ -179,6 +191,7 @@ Grouped, each with a tooltip saying what it does and its default:
 - **Book questions**: the side you play (White, Black, both); accept any
   book move or only the mainline's.
 - **Progress**: right in a row to learn (1-10), to master (learn-20).
+- **Engine**: engine lines (on; off: evaluation only).
 - **Sessions**: show a new variation first (on), learning at once (1-20,
   default 5), re-check every N questions (0-50, default 6; 0: never),
   questions per session (default 20; 0: no limit). Saved settings with the
@@ -214,6 +227,20 @@ position). Three screens:
   with **Learn it**; how many are still locked; **Keep going** (Enter: a new
   session with the same scope and filter, picking up where this one left
   off) and **Back to the outline**.
+
+**The engine** (Davis, 2026-10-14: "nice to be able to see engine
+evaluations and engine lines (if desired) while learning", but not while
+being quizzed on moves). Study's engine box (`engine-view.js`: toggle, eval
+bar, lines, arrows, the shared Stockfish) under Train's board, on the intro
+(following its stepper), on name and tags questions before and after
+answering, and on every result once answered. Never while an order or book
+question waits for moves: the engine pauses as such a question comes up, and
+when Train closes. Off until switched on (the toggle, or E); it is the one
+shared engine, so it is on or off in Study and Train alike. Setting "Engine
+lines" (on): off shows the evaluation only, without lines or arrows. Every
+Train board keeps the eval bar's place beside it, shown or not, so the board
+does not shift between questions. Clicking an engine line does nothing in
+Train (in Study it plays the line).
 
 On phones the board is pinned on top as in Study. With no named positions
 the outline explains how to name one; book drilling still works, the whole
