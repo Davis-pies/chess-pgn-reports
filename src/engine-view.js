@@ -137,16 +137,19 @@ export function engineBox(engine, pos, onChange, { board, bar, flavors, playLine
 					}),
 				]);
 				labels.forEach((text, j) => {
+					// a caller with no way to play a line (Train) gets the moves as text
 					row.appendChild(
-						el("button", {
-							className: "an-pvmove",
-							textContent: text,
-							title: j === 0 ? "Play this move" : "Play the line up to here",
-							onclick: () => {
-								playLine(sans.slice(0, j + 1));
-								onChange();
-							},
-						}),
+						playLine
+							? el("button", {
+									className: "an-pvmove",
+									textContent: text,
+									title: j === 0 ? "Play this move" : "Play the line up to here",
+									onclick: () => {
+										playLine(sans.slice(0, j + 1));
+										onChange();
+									},
+								})
+							: el("span", { className: "an-pvmove", textContent: text }),
 					);
 				});
 				return row;

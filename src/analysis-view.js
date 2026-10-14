@@ -575,11 +575,18 @@ export function boardRow(scratch, pos, onPlay, onChange) {
 			},
 		},
 	);
-	const bar = el("div", { className: "an-evalbar" + (scratch.flipped ? " flipped" : "") }, [
+	const bar = evalBar(scratch.flipped);
+	return { row: el("div", { className: "an-boardrow" }, [bar, board]), board, bar };
+}
+
+// The eval bar beside a board, filled in by the engine box. Train builds the
+// same bar for its own boards.
+export function evalBar(flipped) {
+	const bar = el("div", { className: "an-evalbar" + (flipped ? " flipped" : "") }, [
 		el("div", { className: "an-evalfill" }),
 	]);
 	bar.setAttribute("role", "img");
-	return { row: el("div", { className: "an-boardrow" }, [bar, board]), board, bar };
+	return bar;
 }
 
 // Whose move it is, or how the game ended.

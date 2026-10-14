@@ -8,6 +8,7 @@ import { namesFromNodes, variationTree } from "../src/names.js";
 import { DEFAULT_SETTINGS, buildDeck, emptyProgress, markKnown, normalizeSettings, newSession, loadProgress } from "../src/train.js";
 import { newTrainUi, trainPanel } from "../src/train-view.js";
 import { movesText } from "../src/render.js";
+import { createEngine } from "../src/engine.js";
 
 const PGN = `1. e4 c5 2. Nf3 d6 {[%name "...d6 Sicilians"]} (2... e6 {[%name "...e6 Sicilians/Sicilian e6"] [%tags "e6"]} 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 d6 {[%name "Scheveningen"]}) 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 e6 {[%name "Scheveningen"]} (5... a6 {[%name "Najdorf"] [%tags "d6; Nc3 committed"]} 6. Be3 {[%name "English Attack"]}) *`;
 const { nodes } = parsePgn(PGN);
@@ -38,11 +39,11 @@ beforeEach(() => {
 after(() => delete global.localStorage);
 
 const learned = [];
-function mount({ ui = newTrainUi(), t = tree, d = deck, settings = {}, progress = emptyProgress() } = {}) {
+function mount({ ui = newTrainUi(), t = tree, d = deck, settings = {}, progress = emptyProgress(), engine = null } = {}) {
 	progress.settings = normalizeSettings({ types: ALL, ...settings });
 	const root = document.createElement("div");
 	document.body.append(root); // change events only fire on connected inputs
-	const draw = () => root.replaceChildren(trainPanel(ui, { tree: t, deck: d, progress, learn: (n) => learned.push(n.name) }, draw));
+	const draw = () => root.replaceChildren(trainPanel(ui, { tree: t, deck: d, progress, engine, learn: (n) => learned.push(n.name) }, draw));
 	draw();
 	return { root, ui, progress, draw };
 }
@@ -793,9 +794,9 @@ test("settings: grouped, every field has a tooltip with its default, streaks cla
 	const { root, progress } = mount();
 	click(root, ".tr-settings-open");
 	const legends = [...root.querySelectorAll(".tr-group > legend")].map((l) => l.textContent);
-	assert.deepStrictEqual(legends, ["Questions", "Name questions", "Order questions", "Tags questions", "Book questions", "Progress", "Sessions"]);
+	assert.deepStrictEqual(legends, ["Questions", "Name questions", "Order questions", "Tags questions", "Book questions", "Progress", "Engine", "Sessions"]);
 	const labels = [...root.querySelectorAll(".tr-field > span")].map((l) => l.textContent);
-	for (const l of ["Name", "Order", "Tags", "Book", "Answer by", "Choices", "Show the moves", "Show the target position", "Show the name", "You play", "Accept", "Right in a row to learn", "Right in a row to master", "Show a new variation first", "Learning at once", "Re-check every", "Questions per session (0: no limit)"]) {
+	for (const l of ["Name", "Order", "Tags", "Book", "Answer by", "Choices", "Show the moves", "Show the target position", "Show the name", "You play", "Accept", "Right in a row to learn", "Right in a row to master", "Engine lines", "Show a new variation first", "Learning at once", "Re-check every", "Questions per session (0: no limit)"]) {
 		assert.ok(labels.includes(l), l);
 	}
 	for (const f of root.querySelectorAll(".tr-field")) assert.ok(f.title, `no tooltip on ${f.textContent}`);
@@ -831,5 +832,138 @@ test("settings: grouped, every field has a tooltip with its default, streaks cla
 	intro.dispatchEvent(new window.Event("change"));
 	assert.strictEqual(progress.settings.introNew, false);
 	assert.strictEqual(loadProgress().settings.introNew, false);
+	done();
+});
+
+// --- the engine ---------------------------------------------------------------
+
+// the real engine over a worker that says nothing, as the study tests do
+function fakeEngine() {
+	const w = { postMessage(cmd) { if (cmd === "uci") w.onmessage({ data: "uciok" }); if (cmd === "isready") w.onmessage({ data: "readyok" }); }, terminate() {} };
+	const engine = createEngine(() => w, { throttle: 0, multiPv: 2 });
+	engine.calls = { analyse: [], pause: 0 };
+	const { analyse, pause } = engine;
+	engine.analyse = (fen) => { engine.calls.analyse.push(fen); analyse(fen); };
+	engine.pause = () => { engine.calls.pause++; pause(); };
+	return engine;
+}
+const keydown = (root, key, target = root.firstChild) =>
+	target.dispatchEvent(new window.KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+const asked = (m, c) => {
+	m.ui.session = hand([c]);
+	m.ui.card = c;
+	m.ui.screen = "question";
+	Object.assign(m.ui, { answered: null, played: [], choices: null, step: null });
+	m.draw();
+};
+
+test("the engine box shows on intros, name and tags questions and on any answered card, not on waiting move questions", () => {
+	const engine = fakeEngine();
+	engine.enable(true);
+	const box = (m) => $(m.root, ".tr-question .an-engine");
+	const m = mount({ settings: { bookSide: "black", sessionLength: 0 }, engine });
+	click(m.root, ".tr-start");
+	assert.strictEqual(m.ui.card.type, "intro");
+	assert.ok(box(m), "intro");
+	for (const type of ["name", "family"]) {
+		asked(m, deck.find((x) => x.type === type));
+		assert.ok(box(m), `${type}, asked`);
+		assert.strictEqual($(m.root, ".tr-body .an-stage > .an-boardrow + .an-engine"), box(m), "under the board row");
+		solve(m.root, m.ui);
+		assert.ok(box(m), `${type}, answered`);
+	}
+	for (const type of ["order", "book"]) {
+		const c = deck.find((x) => x.type === type);
+		asked(m, c);
+		const before = engine.calls.pause;
+		m.draw();
+		assert.ok(!box(m), `${type}, waiting for moves`);
+		assert.ok(engine.calls.pause > before, `${type}: the engine pauses`);
+		solve(m.root, m.ui);
+		assert.ok(box(m), `${type}, answered`);
+	}
+	m.ui.screen = "outline";
+	const before = engine.calls.pause;
+	m.draw();
+	assert.ok(engine.calls.pause > before, "the outline pauses it");
+	done();
+});
+
+test("an intro's box follows the step", () => {
+	const engine = fakeEngine();
+	engine.enable(true);
+	const m = mount({ settings: { bookSide: "black", sessionLength: 0 }, engine });
+	click(m.root, ".tr-start");
+	const order = tree.byKey.get(m.ui.card.key).orders[0];
+	click(m.root, ".tr-fwd");
+	const chess = new Chess();
+	order.slice(0, m.ui.step).forEach((san) => chess.move(san));
+	assert.strictEqual(engine.calls.analyse.at(-1), chess.fen());
+	click(m.root, ".tr-back");
+	assert.notStrictEqual(engine.calls.analyse.at(-1), chess.fen());
+	done();
+});
+
+test("Engine lines off marks the panel eval-only; the bar and toggle stay", () => {
+	const engine = fakeEngine();
+	const name = deck.find((x) => x.type === "name");
+	let m = mount({ settings: { engineLines: false }, engine });
+	asked(m, name);
+	assert.ok(m.root.firstChild.classList.contains("tr-eval-only"));
+	assert.ok($(m.root, ".an-engine-toggle") && $(m.root, ".an-evalbar"));
+	m = mount({ engine });
+	asked(m, name);
+	assert.ok(!m.root.firstChild.classList.contains("tr-eval-only"));
+	done();
+});
+
+test("E toggles the engine where there is a box, but not in the typed-name field or on a waiting move question", () => {
+	const engine = fakeEngine();
+	const m = mount({ settings: { nameMode: "typed" }, engine });
+	asked(m, deck.find((x) => x.type === "family"));
+	keydown(m.root, "e");
+	assert.ok(engine.state.enabled);
+	keydown(m.root, "E");
+	assert.ok(!engine.state.enabled);
+	asked(m, deck.find((x) => x.type === "name"));
+	keydown(m.root, "e", $(m.root, ".tr-typed"));
+	assert.ok(!engine.state.enabled, "typing an e is not the shortcut");
+	asked(m, deck.find((x) => x.type === "order"));
+	keydown(m.root, "e");
+	assert.ok(!engine.state.enabled, "no box, no key");
+	done();
+});
+
+test("every Train board has an eval bar beside it, shown or not", () => {
+	for (const engine of [null, fakeEngine()]) {
+		for (const type of ["name", "order", "family", "book"]) {
+			const m = mount({ settings: { bookSide: "black" }, engine });
+			asked(m, deck.find((x) => x.type === type));
+			const bar = $(m.root, ".tr-body .an-boardrow > .an-evalbar");
+			assert.ok(bar, `${type}, asked`);
+			assert.ok(bar.hidden, "hidden until the engine is on");
+			assert.ok($(m.root, ".tr-body .an-boardrow > .an-board")._geom, "arrows can be drawn");
+			solve(m.root, m.ui);
+			assert.ok($(m.root, ".tr-body .an-boardrow > .an-evalbar"), `${type}, answered`);
+		}
+	}
+	const engine = fakeEngine();
+	engine.enable(true);
+	const m = mount({ engine });
+	asked(m, deck.find((x) => x.type === "name"));
+	assert.ok(!$(m.root, ".an-evalbar").hidden, "shown while the engine is on");
+	assert.strictEqual($(m.root, ".an-engine"), $(m.root, ".an-stage").lastChild);
+	done();
+});
+
+test("with no engine given there is no box and nothing breaks", () => {
+	const m = mount();
+	for (const type of ["name", "order", "family", "book", "intro"]) {
+		const c = deck.find((x) => x.type === type);
+		if (!c) continue;
+		asked(m, c);
+		assert.ok(!$(m.root, ".an-engine"));
+		keydown(m.root, "e");
+	}
 	done();
 });

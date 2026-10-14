@@ -1955,8 +1955,15 @@ sup {
    answer comes up. It follows the window's height, leaving room for the
    prompt and the result below it, up to 640px, and shrinks to fit a narrow
    window. */
-.tr-body > svg, .tr-body > .an-board { flex: none; width: clamp(240px, 55vh, 640px); max-width: 100%; }
-.tr-body > svg { height: auto; }
+.tr-body > .an-stage { flex: none; width: calc(clamp(240px, 55vh, 640px) + 22px); max-width: 100%; }
+/* The eval bar keeps its place when it is hidden (no engine box on this
+   screen, or the engine off), so the board does not shift between questions. */
+.train .an-evalbar[hidden] { display: block; visibility: hidden; }
+/* the engine's lines are text here: clicking one does nothing in Train */
+.train span.an-pvmove { cursor: default; }
+.train span.an-pvmove:hover { background: none; }
+/* "Engine lines" off: the evaluation only */
+.tr-eval-only .an-pvs, .tr-eval-only .an-engine-pv, .tr-eval-only .an-arrows { display: none; }
 .tr-choice { text-align: left; }
 .tr-result { margin-top: .6rem; padding: .5rem .8rem; border-radius: var(--radius-sm); border: 1px solid var(--line); }
 .tr-result.right { border-color: var(--main); }
@@ -2334,6 +2341,10 @@ kbd {
 	.study.engine-on .an-engine-head { flex-wrap: nowrap; }
 	.study.engine-on .an-engine-acts { min-width: 0; flex: 0 1 auto; }
 	.study.engine-on .an-deeper { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+}
+@media (max-height: 500px) and (orientation: landscape) and (max-width: 1000px) {
+	/* Train has no board column: its one screen keeps the whole window */
+	.analysis.train.engine-on { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* The repertoire audit (audit-view.js): a panel in the report, refilled in

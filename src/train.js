@@ -33,6 +33,7 @@ export const DEFAULT_SETTINGS = {
 	recheckEvery: 6,
 	sessionLength: 20,
 	introNew: true,
+	engineLines: true,
 };
 
 const START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -149,6 +150,7 @@ const VALID = {
 	learning: (x) => isInt(x, 1, 20),
 	recheckEvery: (x) => isInt(x, 0, 50),
 	introNew: (x) => typeof x === "boolean",
+	engineLines: (x) => typeof x === "boolean",
 	sessionLength: (x) => isInt(x, 0),
 };
 

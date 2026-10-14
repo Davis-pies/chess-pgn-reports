@@ -925,7 +925,9 @@ function studyOverlay() {
 // The Train window over the report, closed like the study. Escape always
 // closes it, so the view itself does not handle Escape.
 function trainOverlay() {
+  const engine = sharedEngine();
   const close = () => {
+    engine.pause();
     setMode("report");
     const back = opener;
     opener = null;
@@ -944,7 +946,7 @@ function trainOverlay() {
   };
   // settings change which cards exist, so the deck is rebuilt for every draw
   const deck = buildDeck(train.tree, train.lines, train.progress.settings);
-  const panel = trainPanel(train.ui, { tree: train.tree, deck, progress: train.progress, rename: renameVariation, learn: learnVariation }, rerenderTrain);
+  const panel = trainPanel(train.ui, { tree: train.tree, deck, progress: train.progress, rename: renameVariation, learn: learnVariation, engine, flavors: sharedFlavors() }, rerenderTrain);
   const head = el("div", { className: "an-head" }, [
     el("h3", { id: "tr-title", textContent: "Train" }),
     el("button", {

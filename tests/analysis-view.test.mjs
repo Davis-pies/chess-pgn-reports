@@ -3,7 +3,9 @@ import { test } from "node:test";
 import assert from "node:assert";
 import { installDom, loadState } from "./helpers.mjs";
 import { getCurrent } from "../src/state.js";
-import { analysisPanel, numberedMoves } from "../src/analysis-view.js";
+import { analysisPanel, evalBar, numberedMoves } from "../src/analysis-view.js";
+import { interactiveBoard } from "../src/board-input.js";
+import { engineBox } from "../src/engine-view.js";
 import { newScratch, activeLine, play, goTo, forward, select } from "../src/analysis.js";
 
 const click = (root, sel) => {
@@ -444,6 +446,18 @@ test("the engine's lines, eval bar and arrows follow its output", () => {
 	rows[0].querySelectorAll(".an-pvmove")[1].click();
 	assert.deepStrictEqual(activeLine(s).moves.map((m) => m.san), ["e4", "c5", "Nf3"]);
 	assert.strictEqual(changed, 1);
+	done();
+});
+
+test("an engine box with no way to play a line shows its moves as plain text", () => {
+	const done = installDom();
+	const { engine, w } = engineWith();
+	engine.enable();
+	const fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
+	const board = interactiveBoard(fen, () => {});
+	const box = engineBox(engine, { fen, over: null }, () => {}, { board, bar: evalBar(false), flavors: null });
+	w().reply("info depth 12 multipv 1 score cp -30 pv c7c5 g1f3");
+	assert.deepStrictEqual([...box.querySelectorAll(".an-pv .an-pvmove")].map((n) => n.tagName + n.textContent), ["SPAN1...c5", "SPAN2.Nf3"]);
 	done();
 });
 

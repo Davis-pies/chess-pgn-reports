@@ -10,7 +10,8 @@
 
 import { Chess } from "chess.js";
 import { el, renderInline } from "./dom.js";
-import { chipBtn } from "./analysis-view.js";
+import { boardAndEngine, chipBtn, evalBar } from "./analysis-view.js";
+import { engineBox } from "./engine-view.js";
 import { boardSvg, fullmoveLabel, movesText } from "./render.js";
 import { interactiveBoard } from "./board-input.js";
 import {
@@ -40,9 +41,26 @@ const TYPE_LABEL = { name: "Name", order: "Order", family: "Tags", book: "Book" 
 // a move order as PGN reads it, numbered from the start
 const numbered = (sans) => movesText(sans.map((san, ply) => ({ san, ply })));
 
-export function trainPanel(ui, { tree, deck, progress, rename, learn }, onChange) {
+// A Train board in a row with the eval bar's place beside it, so the board
+// sits where it does whether or not the engine is shown. A picture gets the
+// `.an-board` wrapper (and its `_geom`) that an interactive board already has,
+// so the engine's arrows can be drawn on either. The bar is hidden until an
+// engine box paints it; CSS keeps its place.
+function trainBoard(fen, { flipped, play = null }) {
+	let board;
+	if (play) board = interactiveBoard(fen, play, { size: BOARD, flipped });
+	else {
+		board = el("div", { className: "an-board" }, [boardSvg(fen, BOARD, { flipped })]);
+		board._geom = { size: BOARD, flipped };
+	}
+	const bar = evalBar(flipped);
+	bar.hidden = true;
+	return { row: el("div", { className: "an-boardrow" }, [bar, board]), board, bar };
+}
+
+export function trainPanel(ui, { tree, deck, progress, rename, learn, engine = null, flavors = null }, onChange) {
 	const settings = progress.settings;
-	const panel = el("div", { className: "analysis train", tabIndex: -1 });
+	const panel = el("div", { className: "analysis train" + (settings.engineLines ? "" : " tr-eval-only"), tabIndex: -1 });
 	const save = () => saveProgress(progress);
 	const act = (fn) => () => {
 		fn();
@@ -70,10 +88,14 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn }, onChange
 	};
 	const nameOf = (vkey) => (tree.byKey.get(vkey)?.name ?? "Book");
 
+	// the position the engine box shows on this screen, if it shows one
+	let engined = false;
 	if (ui.screen === "settings") panel.append(settingsScreen());
 	else if (ui.screen === "question" && ui.card) panel.append(questionScreen());
 	else if (ui.screen === "summary" && ui.session) panel.append(summaryScreen());
 	else panel.append(outlineScreen());
+	// no board with an engine box: stop a search nobody is watching
+	if (engine && !engined) engine.pause();
 	return panel;
 
 	// --- outline ---------------------------------------------------------
@@ -244,6 +266,9 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn }, onChange
 				num("learnStreak", "Right in a row to learn", s.learnStreak, (n) => set({ learnStreak: n }), 1, 10, `How many right answers in a row learn a question; learning every question of a variation unlocks what is below it. 1 to 10. Default ${D.learnStreak}.`),
 				num("masterStreak", "Right in a row to master", s.masterStreak, (n) => set({ masterStreak: n }), 1, 20, `How many right answers in a row master a question. Never below the learn setting. 1 to 20. Default ${D.masterStreak}.`),
 			),
+			group("Engine",
+				check("engineLines", "Engine lines", s.engineLines, (on) => set({ engineLines: on }), `Show the engine's lines and arrows as well as its evaluation. Off: the evaluation only. Default ${onOff(D.engineLines)}.`),
+			),
 			group("Sessions",
 				check("introNew", "Show a new variation first", s.introNew, (on) => set({ introNew: on }), `Before the first question on a variation, show its position, the moves that reach it and the workbook's notes. Default ${onOff(D.introNew)}.`),
 				num("learning", "Learning at once", s.learning, (n) => set({ learning: n }), 1, 20, `How many new questions you work on at a time: when one is learned, the next joins, including from what it unlocked. 1 to 20. Default ${D.learning}.`),
@@ -317,8 +342,23 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn }, onChange
 				stepTo(ui.step + (e.key === "ArrowRight" ? 1 : -1));
 				return;
 			}
+			// E switches the engine where there is a box, but not out of a text field
+			if (engined && e.key.toLowerCase() === "e" && !e.ctrlKey && !e.metaKey && !e.altKey && !e.target.closest?.("input, textarea, select")) {
+				engine.enable(!engine.state.enabled);
+				onChange();
+				return;
+			}
 			const n = +e.key;
 			if (!ui.answered && ui.choices && n >= 1 && n <= ui.choices.length) pickName(ui.choices[n - 1]);
+		};
+		// the board in its row, with the engine's box under it where this screen
+		// has one (never while an order or book question waits for moves)
+		const stage = (fen, { flipped, play = null, box = true }) => {
+			const { row, board, bar } = trainBoard(fen, { flipped, play });
+			const shown = engine && box;
+			if (shown) engined = true;
+			const pos = { fen, over: new Chess(fen).isGameOver() };
+			return boardAndEngine(panel, row, shown ? engineBox(engine, pos, onChange, { board, bar, flavors }) : null, engine);
 		};
 		const flip = () => chipBtn("tr-flip", "Flip", "Turn the board round", act(() => (ui.flipped = !ui.flipped)));
 		const pickName = (text) => {
@@ -351,7 +391,7 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn }, onChange
 			ui.step ??= card.from;
 			const chess = new Chess();
 			order.slice(0, ui.step).forEach((san) => chess.move(san));
-			body.append(boardSvg(chess.fen(), BOARD, { flipped: readerFlip }), flip());
+			body.append(stage(chess.fen(), { flipped: readerFlip }), flip());
 			const moves = el("p", { className: "tr-moves tr-steps" }, order.flatMap((san, i) => [i ? " " : "", el("button", {
 				className: `an-move${i === ui.step - 1 ? " at" : ""}${i < card.from ? " shared" : ""}`,
 				textContent: i % 2 === 0 ? fullmoveLabel(i) + san : san,
@@ -374,7 +414,7 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn }, onChange
 			]));
 		} else if (card.type === "name") {
 			prompt.textContent = "What is this position called?";
-			body.append(boardSvg(node.fen, BOARD, { flipped: readerFlip }));
+			body.append(stage(node.fen, { flipped: readerFlip }));
 			if (!ui.answered) body.append(flip());
 			if (settings.showMoves) body.append(el("p", { className: "tr-moves", textContent: numbered(node.orders[0]) }));
 			if (!ui.answered && settings.nameMode === "choice") {
@@ -397,14 +437,14 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn }, onChange
 				const others = node.orders.filter((o) => o.join(" ") !== ui.played.join(" ")).map(numbered);
 				finish(true, others.length ? [`Also reached by: ${others.join("; ")}`] : []);
 			};
-			body.append(ui.answered ? boardSvg(chess.fen(), BOARD, { flipped: ui.flipped }) : interactiveBoard(chess.fen(), play, { size: BOARD, flipped: ui.flipped }));
+			body.append(stage(chess.fen(), { flipped: ui.flipped, play: ui.answered ? null : play, box: !!ui.answered }));
 			if (settings.orderHint) body.append(el("div", { className: "tr-hint" }, boardSvg(node.fen, 140, { flipped: ui.flipped })));
 			body.append(flip());
 		} else if (card.type === "family") {
 			const group = settings.familyGroup;
 			const tags = group.length ? node.tags.filter((t) => group.includes(t)) : node.tags;
 			prompt.textContent = settings.familyShowName ? `Which tags does the ${node.name} carry?` : "Which tags does this position carry?";
-			body.append(boardSvg(node.fen, BOARD, { flipped: readerFlip }));
+			body.append(stage(node.fen, { flipped: readerFlip }));
 			if (!ui.answered) body.append(flip());
 			const options = group.length ? group : allTags(tree);
 			const radio = group.length > 0;
@@ -430,7 +470,7 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn }, onChange
 				const detail = [`Book: ${card.moves.join(", ")}${card.main ? ` (main: ${card.main})` : ""}`];
 				finish(right, detail);
 			};
-			body.append(ui.answered ? boardSvg(chess.fen(), BOARD, { flipped }) : interactiveBoard(chess.fen(), play, { size: BOARD, flipped }), flip());
+			body.append(stage(chess.fen(), { flipped, play: ui.answered ? null : play, box: !!ui.answered }), flip());
 		}
 
 		if (ui.answered) {

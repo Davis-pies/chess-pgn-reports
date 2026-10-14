@@ -2,6 +2,7 @@ import { test, after } from "node:test";
 import assert from "node:assert";
 import { bootApp, captureDownloads } from "./helpers.mjs";
 import { getCurrent, getMode, getRenderHooks } from "../src/state.js";
+import { sharedEngine } from "../src/engine.js";
 import { emptyProgress, loadProgress, saveProgress } from "../src/train.js";
 
 const card = (streak, seen = 1) => ({ streak, seen, skip: false });
@@ -83,6 +84,22 @@ test("the toolbar's Train opens the window; Escape and the close button shut it"
   app.button("Train").click();
   trWin().querySelector(".an-close").click();
   assert.strictEqual(trWin(), null);
+});
+
+test("closing Train pauses the shared engine", async () => {
+  app.reset();
+  await app.loadPgn(NAJ);
+  const engine = sharedEngine();
+  const paused = [];
+  const pause = engine.pause;
+  engine.pause = () => {
+    paused.push(1);
+    pause();
+  };
+  app.button("Train").click();
+  esc(trWin());
+  engine.pause = pause;
+  assert.ok(paused.length);
 });
 
 test("a full redraw keeps Train open", async () => {
