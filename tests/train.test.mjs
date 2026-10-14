@@ -4,7 +4,7 @@ import { parsePgn } from "../src/pgn.js";
 import { collectLines } from "../src/tree.js";
 import { namesFromNodes, variationTree } from "../src/names.js";
 import {
-	DEFAULT_SETTINGS, buildDeck, normalizeSettings, emptyProgress, loadProgress, saveProgress, moveProgress,
+	DEFAULT_SETTINGS, buildDeck, normalizeSettings, emptyProgress, loadProgress, saveProgress, mergeProgress, parseProgress, progressFor, hasProgress,
 	learnedCard, masteredCard, isLearned, isMastered, unlockedKeys, bookOpen, newSession, current, answer, sessionSummary,
 	markKnown, skip, resetVar, isTricky, unlocksIfLearned, checkName, nameChoices, orderStep, checkFamily, checkBook, allTags,
 } from "../src/train.js";
@@ -27,6 +27,10 @@ beforeEach(() => {
 		getItem: (k) => (store.has(k) ? store.get(k) : null),
 		setItem: (k, x) => store.set(k, String(x)),
 		removeItem: (k) => store.delete(k),
+		key: (i) => [...store.keys()][i] ?? null,
+		get length() {
+			return store.size;
+		},
 	};
 });
 after(() => delete global.localStorage);
@@ -433,24 +437,19 @@ test("checkFamily, checkBook, allTags", () => {
 	assert.deepStrictEqual(allTags(tree), ["Nc3 committed", "d6", "e6"]);
 });
 
-test("progress: round trip, move, repair and unreadable data", () => {
-	assert.deepStrictEqual(loadProgress("a"), emptyProgress());
+test("progress: round trip, repair and unreadable data", () => {
+	assert.deepStrictEqual(loadProgress(), emptyProgress());
+	assert.strictEqual(hasProgress(), false);
 	const p = emptyProgress();
 	p.cards["name|x"] = { streak: 2, seen: 5, skip: false };
 	p.settings.choices = 6;
-	assert.strictEqual(saveProgress("a", p), true);
-	assert.deepStrictEqual(loadProgress("a"), p);
-	moveProgress("a", "b");
-	assert.deepStrictEqual(loadProgress("b"), p);
-	assert.strictEqual(store.has("ott-train:a"), false);
-	moveProgress("nothing", "c");
-	assert.strictEqual(store.has("ott-train:c"), false);
-	saveProgress(null, p);
-	assert.ok(store.has("ott-train:unsaved"));
-	store.set("ott-train:z", "{nope");
-	assert.deepStrictEqual(loadProgress("z"), emptyProgress());
-	store.set("ott-train:z", JSON.stringify({ settings: { choices: "x", bogus: 1, nameMode: "typed", masteryBox: 2, intervals: [1], masterStreak: 1, learnStreak: 3 }, cards: { a: { streak: 9 }, b: 3, c: { streak: 2, seen: 4, skip: true }, d: { box: 4, seen: 6, skip: false }, e: { streak: -1, seen: 1 } } }));
-	const r = loadProgress("z");
+	assert.strictEqual(saveProgress(p), true);
+	assert.strictEqual(hasProgress(), true);
+	assert.deepStrictEqual(loadProgress(), p);
+	store.set("ott-train", "{nope");
+	assert.deepStrictEqual(loadProgress(), emptyProgress());
+	store.set("ott-train", JSON.stringify({ settings: { choices: "x", bogus: 1, nameMode: "typed", masteryBox: 2, intervals: [1], masterStreak: 1, learnStreak: 3 }, cards: { a: { streak: 9 }, b: 3, c: { streak: 2, seen: 4, skip: true }, d: { box: 4, seen: 6, skip: false }, e: { streak: -1, seen: 1 } } }));
+	const r = loadProgress();
 	assert.strictEqual(r.settings.choices, 4);
 	assert.strictEqual(r.settings.nameMode, "typed");
 	assert.ok(!("bogus" in r.settings) && !("intervals" in r.settings) && !("masteryBox" in r.settings));
@@ -482,11 +481,58 @@ test("progress: round trip, move, repair and unreadable data", () => {
 	assert.strictEqual(normalizeSettings({ bookSide: "up", familyGroup: ["a", 3] }).bookSide, "black");
 	assert.deepStrictEqual(normalizeSettings({ familyGroup: ["a"] }).familyGroup, ["a"]);
 	global.localStorage.setItem = () => { throw new Error("full"); };
-	assert.strictEqual(saveProgress("q", p), false);
+	assert.strictEqual(saveProgress(p), false);
 	delete global.localStorage;
-	assert.deepStrictEqual(loadProgress("q"), emptyProgress());
-	assert.strictEqual(saveProgress("q", p), false);
-	moveProgress("q", "r");
+	assert.deepStrictEqual(loadProgress(), emptyProgress());
+	assert.strictEqual(hasProgress(), false);
+	assert.strictEqual(saveProgress(p), false);
+});
+
+test("older per-workbook keys are merged into the one store and removed", () => {
+	const rec = (streak, seen) => ({ streak, seen, skip: false });
+	store.set("ott-train:a1", JSON.stringify({ asked: 9, settings: { choices: 7 }, cards: { a: rec(1, 3), b: rec(4, 9) } }));
+	store.set("ott-train:unsaved", JSON.stringify({ asked: 5, settings: { choices: 3 }, cards: { a: rec(3, 5), c: rec(2, 1) } }));
+	store.set("ott-train:bad", "{nope");
+	const p = loadProgress();
+	assert.deepStrictEqual([...store.keys()].filter((k) => k.startsWith("ott-train")), ["ott-train"]);
+	assert.strictEqual(p.cards.a.streak, 3, "the higher streak wins");
+	assert.deepStrictEqual(Object.keys(p.cards).sort(), ["a", "b", "c"]);
+	assert.strictEqual(p.settings.choices, 7, "the first key's settings");
+	// renumbered 1..n in the order they had: c(1), a(5), b(9)
+	assert.deepStrictEqual([p.cards.c.seen, p.cards.a.seen, p.cards.b.seen, p.asked], [1, 2, 3, 3]);
+	assert.deepStrictEqual(loadProgress(), p, "saved, so the next load reads the store");
+	// an existing store keeps its settings
+	store.set("ott-train:late", JSON.stringify({ asked: 1, settings: { choices: 2 }, cards: { d: rec(1, 1) } }));
+	const q = loadProgress();
+	assert.strictEqual(q.settings.choices, 7);
+	assert.ok(q.cards.d);
+});
+
+test("mergeProgress: higher streak wins, a tie goes to the later answer, settings only when asked", () => {
+	const rec = (streak, seen, extra = {}) => ({ streak, seen, skip: false, ...extra });
+	const into = { settings: normalizeSettings({ choices: 5 }), asked: 4, cards: { a: rec(3, 4), b: rec(2, 2), c: rec(1, 1) } };
+	const from = { settings: normalizeSettings({ choices: 8 }), asked: 12, cards: { a: rec(2, 12), b: rec(2, 7, { tricky: true }), c: rec(4, 3, { skip: true }), d: rec(1, 6) } };
+	mergeProgress(into, from);
+	assert.strictEqual(into.cards.a.streak, 3, "lower streak ignored");
+	assert.strictEqual(into.cards.b.seen, 7, "tie: the later");
+	assert.ok(into.cards.b.tricky);
+	assert.ok(into.cards.c.skip && into.cards.c.streak === 4, "skip comes with the record");
+	assert.ok(into.cards.d);
+	assert.strictEqual(into.settings.choices, 5);
+	assert.strictEqual(into.asked, 7, "covers the newest incoming answer");
+	mergeProgress(into, from, true);
+	assert.strictEqual(into.settings.choices, 8);
+	assert.deepStrictEqual(parseProgress(null), emptyProgress());
+});
+
+test("progressFor keeps only the deck's cards, with the settings", () => {
+	const p = emptyProgress();
+	p.asked = 9;
+	p.cards["name|x"] = { streak: 1, seen: 2, skip: false };
+	p.cards["name|y"] = { streak: 1, seen: 3, skip: false };
+	const out = progressFor(p, [{ id: "name|x" }, { id: "order|z" }]);
+	assert.deepStrictEqual(Object.keys(out.cards), ["name|x"]);
+	assert.deepStrictEqual([out.asked, out.settings], [9, p.settings]);
 });
 
 // --- the research-backed changes (docs/superpowers/plans/2026-10-14-train-research.md) ---
@@ -603,11 +649,11 @@ test("spacing: a learned card's streak grows only after 10 other questions", () 
 });
 
 test("loadProgress: asked is kept when saved, else the timestamps are renumbered", () => {
-	store.set("ott-train:a", JSON.stringify({ asked: 40, cards: { x: { streak: 1, seen: 33, skip: false, tricky: true }, y: { streak: 0, seen: 0, skip: true } } }));
-	assert.deepStrictEqual(loadProgress("a").cards, { x: { streak: 1, seen: 33, skip: false, tricky: true }, y: { streak: 0, seen: 0, skip: true } });
-	assert.strictEqual(loadProgress("a").asked, 40);
-	store.set("ott-train:b", JSON.stringify({ asked: -1, cards: { x: { streak: 1, seen: 1760000009000, skip: false }, y: { streak: 0, seen: 0, skip: true }, z: { streak: 2, seen: 1760000001000, skip: false } } }));
-	const b = loadProgress("b");
+	store.set("ott-train", JSON.stringify({ asked: 40, cards: { x: { streak: 1, seen: 33, skip: false, tricky: true }, y: { streak: 0, seen: 0, skip: true } } }));
+	assert.deepStrictEqual(loadProgress().cards, { x: { streak: 1, seen: 33, skip: false, tricky: true }, y: { streak: 0, seen: 0, skip: true } });
+	assert.strictEqual(loadProgress().asked, 40);
+	store.set("ott-train", JSON.stringify({ asked: -1, cards: { x: { streak: 1, seen: 1760000009000, skip: false }, y: { streak: 0, seen: 0, skip: true }, z: { streak: 2, seen: 1760000001000, skip: false } } }));
+	const b = loadProgress();
 	assert.deepStrictEqual([b.cards.z.seen, b.cards.x.seen, b.cards.y.seen, b.asked], [1, 2, 0, 2]);
 });
 

@@ -28,6 +28,10 @@ beforeEach(() => {
 		getItem: (k) => (store.has(k) ? store.get(k) : null),
 		setItem: (k, x) => store.set(k, String(x)),
 		removeItem: (k) => store.delete(k),
+		key: (i) => [...store.keys()][i] ?? null,
+		get length() {
+			return store.size;
+		},
 	};
 	done = installDom();
 });
@@ -38,7 +42,7 @@ function mount({ ui = newTrainUi(), t = tree, d = deck, settings = {}, progress 
 	progress.settings = normalizeSettings({ types: ALL, ...settings });
 	const root = document.createElement("div");
 	document.body.append(root); // change events only fire on connected inputs
-	const draw = () => root.replaceChildren(trainPanel(ui, { tree: t, deck: d, progress, workbookId: "t1", learn: (n) => learned.push(n.name) }, draw));
+	const draw = () => root.replaceChildren(trainPanel(ui, { tree: t, deck: d, progress, learn: (n) => learned.push(n.name) }, draw));
 	draw();
 	return { root, ui, progress, draw };
 }
@@ -97,7 +101,7 @@ test("outline: Known, Skip, Reset update progress and save", () => {
 	assert.match(row(root, "...d6 Sicilians").querySelector(".tr-bar span").style.width, /^100%/);
 	assert.strictEqual($(row(root, "...d6 Sicilians"), ".tr-state").textContent, "mastered");
 	assert.ok(!$(root, ".tr-box") && !$(root, ".tr-due"));
-	assert.ok(store.get("ott-train:t1").includes(`name|${key}`));
+	assert.ok(store.get("ott-train").includes(`name|${key}`));
 	click(row(root, "...d6 Sicilians"), ".tr-skip");
 	assert.ok(progress.cards[`name|${key}`].skip);
 	assert.match(row(root, "...d6 Sicilians").textContent, /skipped/);
@@ -373,7 +377,7 @@ test("settings: changes persist to localStorage; Done returns", () => {
 	assert.deepStrictEqual(progress.settings.familyGroup, ["d6"]);
 	set('[name="tag-d6"]', "checked", false);
 	assert.deepStrictEqual(progress.settings.familyGroup, []);
-	const saved = loadProgress("t1");
+	const saved = loadProgress();
 	assert.strictEqual(saved.settings.choices, 6);
 	assert.strictEqual(saved.settings.showMoves, true);
 	click(root, ".tr-settings-done");
@@ -451,7 +455,7 @@ test("outline: Rename calls back with the variation, from its action chips", () 
 	const root = document.createElement("div");
 	document.body.append(root);
 	const ui = newTrainUi();
-	root.append(trainPanel(ui, { tree, deck, progress, workbookId: "t1", rename: (n) => seen.push(n.name) }, () => {}));
+	root.append(trainPanel(ui, { tree, deck, progress, rename: (n) => seen.push(n.name) }, () => {}));
 	click(row(root, "...d6 Sicilians"), ".tr-acts .tr-rename");
 	assert.deepStrictEqual(seen, ["...d6 Sicilians"]);
 	done();
@@ -820,12 +824,12 @@ test("settings: grouped, every field has a tooltip with its default, streaks cla
 	assert.match($(root, '[name="learning"]').closest("label").title, /Default 5\./);
 	assert.match($(root, '[name="recheckEvery"]').closest("label").title, /0: never.*Default 6\./);
 	assert.match($(root, '[name="sessionLength"]').closest("label").title, /with 0 it keeps going.*Default 20\./);
-	assert.strictEqual(loadProgress("t1").settings.masterStreak, 9);
+	assert.strictEqual(loadProgress().settings.masterStreak, 9);
 	const intro = $(root, '[name="introNew"]');
 	assert.ok(intro.checked && /Default on\./.test(intro.closest("label").title));
 	intro.checked = false;
 	intro.dispatchEvent(new window.Event("change"));
 	assert.strictEqual(progress.settings.introNew, false);
-	assert.strictEqual(loadProgress("t1").settings.introNew, false);
+	assert.strictEqual(loadProgress().settings.introNew, false);
 	done();
 });

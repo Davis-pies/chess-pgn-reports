@@ -24,7 +24,7 @@ import { namesFromNodes, setName, trailOf, variationTree } from "./names.js";
 import { trainPanel, newTrainUi } from "./train-view.js";
 import { Chess } from "chess.js";
 import { posKey } from "./audit.js";
-import { loadProgress, saveProgress, moveProgress, buildDeck, emptyProgress } from "./train.js";
+import { loadProgress, saveProgress, buildDeck, mergeProgress, parseProgress, progressFor, hasProgress } from "./train.js";
 import { mergeAnnotations } from "./merge.js";
 import { buildPgn } from "./pgn-out.js";
 import { el } from "./dom.js";
@@ -360,18 +360,23 @@ function auditCarried(lines) {
   return packEvals(all, auditPositions(lines));
 }
 
+// What Save to file writes as `train`: the browser's records for this
+// workbook's own cards, and its settings.
+function workbookProgress() {
+  const lines = editorOrder(getCurrent().lines).filter((l) => visibleLines(getCurrent().lines).includes(l));
+  const progress = loadProgress();
+  return progressFor(progress, buildDeck(variationTree(lines, getCurrent().names), lines, progress.settings));
+}
+
 // The toolbar's Save, which the audit panel also offers once a run has found
 // something: the workbook into this browser's store, under a new id the
 // first time. Says so when the store will not take it.
 function saveWorkbook() {
   if (!getCurrent().name) getCurrent().name = "Untitled";
-  const hadId = !!getCurrent().id;
   const ok = saveNotebook(
     getCurrent().id || (getCurrent().id = "n" + Date.now()),
     workbookState(),
   );
-  // progress made before the first Save was kept under the "unsaved" key
-  if (ok && !hadId) moveProgress(null, getCurrent().id);
   if (ok) sharedAudit().saved();
   else alert("Could not save: storage is full or unavailable.");
   return ok;
@@ -490,7 +495,6 @@ export function openTrain(moves = []) {
 	const lines = editorOrder(all).filter((l) => visibleLines(all).includes(l));
 	const names = getCurrent().names;
 	const trail = trailOf(moves.map((m) => m.san), names);
-	const id = getCurrent().id;
 	const tree = variationTree(lines, names);
 	// the last named position on the way, if some visible line still has it
 	const last = trail.length ? trail[trail.length - 1].key : null;
@@ -498,8 +502,7 @@ export function openTrain(moves = []) {
 		ui: newTrainUi(last !== null && tree.byKey.has(last) ? last : null),
 		tree,
 		lines,
-		progress: loadProgress(id),
-		workbookId: id,
+		progress: loadProgress(),
 	};
 	setMode("train");
 	const wrap = $("view").firstElementChild;
@@ -670,7 +673,7 @@ function viewRoot() {
     download(
       slug() + ".json",
       JSON.stringify(
-        toNotebook({ ...workbookState(), train: loadProgress(getCurrent().id) }),
+        toNotebook({ ...workbookState(), train: workbookProgress() }),
         null,
         2,
       ),
@@ -941,7 +944,7 @@ function trainOverlay() {
   };
   // settings change which cards exist, so the deck is rebuilt for every draw
   const deck = buildDeck(train.tree, train.lines, train.progress.settings);
-  const panel = trainPanel(train.ui, { tree: train.tree, deck, progress: train.progress, workbookId: train.workbookId, rename: renameVariation, learn: learnVariation }, rerenderTrain);
+  const panel = trainPanel(train.ui, { tree: train.tree, deck, progress: train.progress, rename: renameVariation, learn: learnVariation }, rerenderTrain);
   const head = el("div", { className: "an-head" }, [
     el("h3", { id: "tr-title", textContent: "Train" }),
     el("button", {
@@ -1056,10 +1059,12 @@ function installNotebook(nb, id) {
   // what an audit found for this workbook, wherever it was run, and nothing
   // found for the one open before
   sharedAudit().reset();
-  // an unsaved workbook has one shared progress slot: take the file's, or clear
-  // the previous workbook's rather than inherit it
-  const saved = nb.train && typeof nb.train === "object" ? nb.train : null;
-  if (saved || id === null) saveProgress(id, saved || emptyProgress());
+  // progress is the browser's, by position: a file's is merged into it, and
+  // loading never clears it
+  if (nb.train && typeof nb.train === "object") {
+    const p = loadProgress();
+    saveProgress(mergeProgress(p, parseProgress(nb.train), !hasProgress()));
+  }
   if (nb.audit) sharedAudit().absorb(unpackEvals(nb.audit));
 }
 
@@ -1112,7 +1117,6 @@ function loadPgnText(text) {
           sideWidth: getCurrent().sideWidth,
         }),
       );
-      if (getCurrent().id === null) saveProgress(null, emptyProgress()); // not the last unsaved workbook's
       renderApp();
       if (moreGames)
         alert(

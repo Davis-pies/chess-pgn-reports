@@ -4,6 +4,8 @@ import { bootApp, captureDownloads } from "./helpers.mjs";
 import { getCurrent, getMode, getRenderHooks } from "../src/state.js";
 import { emptyProgress, loadProgress, saveProgress } from "../src/train.js";
 
+const card = (streak, seen = 1) => ({ streak, seen, skip: false });
+
 const app = await bootApp();
 after(() => app.teardown());
 
@@ -19,42 +21,49 @@ test("loading a PGN reads its named positions into the state", async () => {
   assert.deepStrictEqual(getCurrent().names, {});
 });
 
-test("Save stores the names, and moves unsaved Train progress to the new id", async () => {
+test("Save stores the names and leaves Train progress where it is", async () => {
   app.reset();
   await app.loadPgn(PGN);
   const p = emptyProgress();
-  p.cards.x = { streak: 2, seen: 5, skip: false };
-  saveProgress(null, p);
-  assert.ok(ls().getItem("ott-train:unsaved"));
+  p.cards.x = card(2, 5);
+  saveProgress(p);
   app.clickText("Save");
   const id = getCurrent().id;
   assert.strictEqual(Object.keys(JSON.parse(ls().getItem("ott:" + id)).names).length, 1);
-  assert.strictEqual(ls().getItem("ott-train:unsaved"), null);
-  assert.strictEqual(loadProgress(id).cards.x.streak, 2);
+  assert.strictEqual(loadProgress().cards.x.streak, 2);
   assert.ok(!("train" in JSON.parse(ls().getItem("ott:" + id))), "localStorage Save omits train");
 });
 
-test("Save to file carries Train progress and opening the file restores it", async () => {
+test("Save to file carries the workbook's own cards, and opening it merges by higher streak", async () => {
   app.reset();
-  await app.loadPgn(PGN);
+  await app.loadPgn(NAJ);
+  const [key] = Object.keys(getCurrent().names);
   const p = emptyProgress();
-  p.cards.y = { streak: 3, seen: 9, skip: false };
-  saveProgress(null, p);
+  p.cards[`name|${key}`] = card(3, 9);
+  p.cards["name|elsewhere"] = card(4, 2);
+  p.asked = 9;
+  saveProgress(p);
   getCurrent().name = "Book";
   const cap = captureDownloads(app.dom.window.document);
   app.clickText("Save to file");
   cap.restore();
   const text = await cap.blobs[0].text();
-  assert.strictEqual(JSON.parse(text).train.cards.y.streak, 3);
+  assert.deepStrictEqual(Object.keys(JSON.parse(text).train.cards), [`name|${key}`], "only this workbook's cards");
 
   app.reset();
+  const mine = emptyProgress();
+  mine.cards[`name|${key}`] = card(1, 1);
+  mine.cards["name|other"] = card(2, 1);
+  saveProgress(mine);
   const input = [...app.view().querySelectorAll("input[type=file]")].find((i) => /json/.test(i.accept));
   const file = new app.dom.window.File([text], "Book.json");
   Object.defineProperty(input, "files", { value: [file], configurable: true });
   input.onchange();
   await app.settle();
   assert.strictEqual(Object.keys(getCurrent().names).length, 1);
-  assert.strictEqual(loadProgress(null).cards.y.streak, 3);
+  const got = loadProgress();
+  assert.strictEqual(got.cards[`name|${key}`].streak, 3, "the file's higher streak");
+  assert.strictEqual(got.cards["name|other"].streak, 2, "the rest of the store stays");
 });
 
 const NAJ = '1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 {[%name "Najdorf"]} 6. Be3 e5 *';
@@ -95,14 +104,12 @@ test("Train from here scopes the outline to the last named position", async () =
   assert.strictEqual(getMode(), "train");
 });
 
-test("acting in Train persists progress for a saved workbook", async () => {
+test("acting in Train persists progress in the browser's one store", async () => {
   app.reset();
   await app.loadPgn(NAJ);
-  app.clickText("Save");
-  const id = getCurrent().id;
   app.button("Train").click();
   trWin().querySelector(".tr-known").click();
-  assert.ok(ls().getItem("ott-train:" + id));
+  assert.ok(ls().getItem("ott-train"));
 });
 
 const win = () => app.dom.window;
@@ -172,37 +179,33 @@ test("Rename in the outline renames through the table's prompts and rebuilds the
   assert.strictEqual(getMode(), "train");
 });
 
-test("unsaved Train progress is not inherited by the next workbook", async () => {
+test("Train progress survives loading another PGN, reloading, saving, opening a file and deleting", async () => {
   app.reset();
   await app.loadPgn(NAJ);
+  const [key] = Object.keys(getCurrent().names);
   const p = emptyProgress();
-  p.cards.z = { streak: 4, seen: 1, skip: false };
-  saveProgress(null, p);
+  p.cards[`name|${key}`] = card(4);
+  saveProgress(p);
+  const kept = () => loadProgress().cards[`name|${key}`]?.streak;
+  toImport();
+  await app.loadPgn("1. d4 d5 *");
+  assert.strictEqual(kept(), 4, "another PGN");
   toImport();
   await app.loadPgn(NAJ);
-  assert.deepStrictEqual(loadProgress(null).cards, {});
-  saveProgress(null, p);
+  assert.strictEqual(kept(), 4, "the same PGN again");
+  app.clickText("Save");
+  assert.strictEqual(kept(), 4, "saving");
   const nb = { format: "ott-workbook", version: 1, name: "", pgn: NAJ, tags: [] };
-  app.reset();
+  toImport(); // unlike reset(), keeps localStorage
   const input = [...app.view().querySelectorAll("input[type=file]")].find((i) => /json/.test(i.accept));
   Object.defineProperty(input, "files", { value: [new (win().File)([JSON.stringify(nb)], "x.json")], configurable: true });
   input.onchange();
   await app.settle();
-  assert.deepStrictEqual(loadProgress(null).cards, {}, "a file without progress clears it");
-});
-
-test("deleting a saved workbook deletes its Train progress", async () => {
-  app.reset();
-  await app.loadPgn(NAJ);
+  assert.strictEqual(kept(), 4, "a file without progress");
   app.clickText("Save");
-  const id = getCurrent().id;
-  app.button("Train").click();
-  trWin().querySelector(".tr-known").click();
-  assert.ok(ls().getItem("ott-train:" + id));
-  esc(trWin());
   toImport();
   [...app.view().querySelectorAll(".notebooks button")].find((b) => b.textContent === "✕").click();
-  assert.strictEqual(ls().getItem("ott-train:" + id), null);
+  assert.strictEqual(kept(), 4, "deleting the workbook");
 });
 
 test("Train from a position no visible line reaches opens on the whole workbook", async () => {

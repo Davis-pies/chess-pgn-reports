@@ -167,51 +167,116 @@ export function normalizeSettings(raw) {
 
 export const emptyProgress = () => ({ settings: normalizeSettings(null), cards: {}, asked: 0 });
 
-const storeKey = (id) => `ott-train:${id || "unsaved"}`;
+// One store for the whole browser: cards are keyed by position, so any
+// workbook, saved or not, a reloaded or edited PGN, or a file finds the
+// progress on every position it still has. Before this, progress lived under
+// `ott-train:<workbook id>` and an unsaved workbook's slot was cleared on every
+// load, so reloading the PGN lost everything (Davis, 2026-10-14).
+const KEY = "ott-train";
+const OLD = `${KEY}:`;
 
-export function loadProgress(id) {
-	try {
-		const raw = JSON.parse(localStorage.getItem(storeKey(id)));
-		if (!raw || typeof raw !== "object") return emptyProgress();
-		const cards = {};
-		for (const [k, r] of Object.entries(raw.cards || {})) {
-			// a first-version record ({ box, seen, skip }) has no streak: it starts again
-			if (r && typeof r.seen === "number") {
-				cards[k] = { streak: isInt(r.streak, 0) ? r.streak : 0, seen: r.seen, skip: !!r.skip };
-				if (r.tricky === true) cards[k].tricky = true;
-			}
+// Saved or file data to a progress object, tolerating every older shape.
+export function parseProgress(raw) {
+	if (!raw || typeof raw !== "object") return emptyProgress();
+	const cards = {};
+	for (const [k, r] of Object.entries(raw.cards || {})) {
+		// a first-version record ({ box, seen, skip }) has no streak: it starts again
+		if (r && typeof r.seen === "number") {
+			cards[k] = { streak: isInt(r.streak, 0) ? r.streak : 0, seen: r.seen, skip: !!r.skip };
+			if (r.tricky === true) cards[k].tricky = true;
 		}
-		let asked = raw.asked;
-		if (!isInt(asked, 0)) {
-			// saved when `seen` was a timestamp: number the answers 1..n in that
-			// order. A seen of 0 is a record that only holds a skip, never asked.
-			const asc = Object.values(cards).filter((r) => r.seen > 0).sort((a, b) => a.seen - b.seen);
-			asc.forEach((r, i) => (r.seen = i + 1));
-			asked = asc.length;
-		}
-		return { settings: normalizeSettings(raw.settings), cards, asked };
-	} catch {
-		return emptyProgress(); // missing storage or unreadable JSON
 	}
+	let asked = raw.asked;
+	if (!isInt(asked, 0)) {
+		// saved when `seen` was a timestamp: number the answers 1..n in that
+		// order. A seen of 0 is a record that only holds a skip, never asked.
+		const asc = Object.values(cards).filter((r) => r.seen > 0).sort((a, b) => a.seen - b.seen);
+		asc.forEach((r, i) => (r.seen = i + 1));
+		asked = asc.length;
+	}
+	return { settings: normalizeSettings(raw.settings), cards, asked };
 }
 
-export function saveProgress(id, progress) {
+// Fold `from` into `into`: per card the record with the higher streak (a tie:
+// the later `seen`); `from`'s settings only when told `into` has none saved.
+// An incoming `seen` counts another store's answers; `asked` is raised to
+// cover it, or the spacing rule would see a card asked in the future.
+export function mergeProgress(into, from, takeSettings = false) {
+	for (const [k, r] of Object.entries(from.cards)) {
+		const mine = into.cards[k];
+		if (!mine || r.streak > mine.streak || (r.streak === mine.streak && r.seen > mine.seen)) {
+			into.cards[k] = { ...r };
+			into.asked = Math.max(into.asked, r.seen);
+		}
+	}
+	if (takeSettings) into.settings = from.settings;
+	return into;
+}
+
+// The records for a deck's own cards plus the settings: what Save to file writes.
+export function progressFor(progress, deck) {
+	const cards = {};
+	for (const c of deck) if (progress.cards[c.id]) cards[c.id] = progress.cards[c.id];
+	return { settings: progress.settings, asked: progress.asked, cards };
+}
+
+export const hasProgress = () => {
 	try {
-		localStorage.setItem(storeKey(id), JSON.stringify(progress));
-		return true;
+		return localStorage.getItem(KEY) !== null;
 	} catch {
 		return false;
 	}
+};
+
+// Older per-workbook keys are merged in once, then removed. Their `seen`
+// counts belong to different answer counters, so they are renumbered together
+// in the order they had.
+function migrate(store) {
+	const olds = [];
+	for (let i = 0; i < localStorage.length; i++) {
+		const k = localStorage.key(i);
+		if (k.startsWith(OLD)) olds.push(k);
+	}
+	if (!olds.length) return store;
+	olds.sort();
+	let p = store;
+	let fresh = !hasProgress();
+	for (const k of olds) {
+		try {
+			p = mergeProgress(p, parseProgress(JSON.parse(localStorage.getItem(k))), fresh);
+			fresh = false;
+		} catch {
+			// unreadable JSON: nothing to take
+		}
+		localStorage.removeItem(k);
+	}
+	const seen = Object.values(p.cards).filter((r) => r.seen > 0).sort((a, b) => a.seen - b.seen);
+	seen.forEach((r, i) => (r.seen = i + 1));
+	p.asked = seen.length;
+	saveProgress(p);
+	return p;
 }
 
-export function moveProgress(fromId, toId) {
+export function loadProgress() {
 	try {
-		const raw = localStorage.getItem(storeKey(fromId));
-		if (raw === null) return;
-		localStorage.setItem(storeKey(toId), raw);
-		localStorage.removeItem(storeKey(fromId));
+		let p;
+		try {
+			p = parseProgress(JSON.parse(localStorage.getItem(KEY)));
+		} catch {
+			p = emptyProgress(); // unreadable JSON
+		}
+		return migrate(p);
 	} catch {
-		// nothing to move
+		return emptyProgress(); // missing storage
+	}
+}
+
+export function saveProgress(progress) {
+	try {
+		localStorage.setItem(KEY, JSON.stringify(progress));
+		return true;
+	} catch {
+		return false;
 	}
 }
 

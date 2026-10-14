@@ -40,10 +40,10 @@ const TYPE_LABEL = { name: "Name", order: "Order", family: "Tags", book: "Book" 
 // a move order as PGN reads it, numbered from the start
 const numbered = (sans) => movesText(sans.map((san, ply) => ({ san, ply })));
 
-export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn }, onChange) {
+export function trainPanel(ui, { tree, deck, progress, rename, learn }, onChange) {
 	const settings = progress.settings;
 	const panel = el("div", { className: "analysis train", tabIndex: -1 });
-	const save = () => saveProgress(workbookId, progress);
+	const save = () => saveProgress(progress);
 	const act = (fn) => () => {
 		fn();
 		save();

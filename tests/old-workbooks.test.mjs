@@ -5,6 +5,7 @@ import { bootApp, captureDownloads } from "./helpers.mjs";
 import { getCurrent, getScratch } from "../src/state.js";
 import { isMainLine } from "../src/tree.js";
 import { sharedAudit } from "../src/audit.js";
+import { normalizeSettings } from "../src/train.js";
 
 // Workbooks as older builds saved them. Each file in fixtures/workbooks was
 // written by that build's own toNotebook (its src/ taken from git at the
@@ -182,12 +183,12 @@ function checkFormat(name, nb) {
   }
 
   if (nb.train) {
-    // the progress lands where the app keeps it: under the workbook's id when
-    // it was opened from this browser's list, in the shared slot from a file
-    const store = app.dom.window.localStorage;
-    const saved = JSON.parse(store.getItem("ott-train:old") ?? store.getItem("ott-train:unsaved"));
-    assert.deepStrictEqual(saved.cards, nb.train.cards, `${name}: streaks come back`);
-    assert.deepStrictEqual(saved.settings, nb.train.settings);
+    // the progress is merged into the browser's one store, by position, and
+    // read back in today's shape (settings repaired, timestamps renumbered)
+    const saved = JSON.parse(app.dom.window.localStorage.getItem("ott-train"));
+    assert.deepStrictEqual(Object.keys(saved.cards).sort(), Object.keys(nb.train.cards).sort(), `${name}: every card comes back`);
+    for (const [k, r] of Object.entries(nb.train.cards)) assert.strictEqual(saved.cards[k].streak, r.streak, `${name}: ${k}`);
+    assert.deepStrictEqual(saved.settings, normalizeSettings(nb.train.settings));
     assert.ok(Object.values(saved.cards).every((r) => Number.isInteger(r.streak)));
   }
 

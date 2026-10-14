@@ -173,5 +173,4 @@ export function loadNotebook(id) {
 
 export function deleteNotebook(id) {
   localStorage.removeItem(PREFIX + id);
-  localStorage.removeItem("ott-train:" + id); // its Train progress (train.js storeKey)
 }

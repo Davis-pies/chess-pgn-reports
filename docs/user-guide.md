@@ -313,11 +313,16 @@ For a shorter overview see the [README](../README.md).
      to learn and to master. **Sessions**: showing a new variation first, how many
      questions you learn at once, how often a learned one is re-checked, and
      the questions per session (0 for no limit).
-   - **Where progress lives** — in this browser, separately for each
-     workbook, saved after every answer. **Save to file** includes it, and
-     opening that file restores it. PGN export and share links do not carry
-     it. Names are part of the workbook and travel with Save to file, not
-     with PGN export.
+   - **Where progress lives** — in this browser, one store for every
+     workbook, by position, saved after every answer. Loading another PGN,
+     reloading the same one, editing it, saving the workbook or deleting it
+     never clears it: a position you still have keeps what you learned about it
+     (two workbooks that name one position differently share its name card).
+     **Save to file** includes the records for that workbook's own positions
+     and your settings; opening the file merges them into this browser's
+     store, keeping the higher streak for each card. PGN export and share
+     links do not carry it. Names are part of the workbook and travel with
+     Save to file, not with PGN export.
 6. **Audit** — **Audit** in the toolbar opens the repertoire audit, which
    runs the engine over every position in the workbook and reports the moves
    that lose ground. Press **Run audit** and keep working: it runs in the
