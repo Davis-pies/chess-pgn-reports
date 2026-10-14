@@ -1,0 +1,310 @@
+// src/train-view.js
+// The Train window's screens: the outline of named variations, the settings,
+// one question at a time, and the summary. Like studyPanel it is a pure
+// function of its state (the ui object plus the progress): every control
+// mutates them, saves, and calls onChange, which redraws.
+
+import { Chess } from "chess.js";
+import { el, renderInline } from "./dom.js";
+import { chipBtn } from "./analysis-view.js";
+import { boardSvg } from "./render.js";
+import { interactiveBoard } from "./board-input.js";
+import {
+	DAY, allTags, answer, checkBook, checkFamily, checkName, current, isDue, markKnown, nameChoices,
+	newSession, normalizeSettings, orderStep, resetVar, saveProgress, sessionSummary, setBox, skip, unlockedKeys,
+} from "./train.js";
+
+export function newTrainUi(scope = null) {
+	return {
+		screen: "outline", session: null, card: null,
+		picked: null, typed: "", played: [], answered: null,
+		ticked: [], choices: null, // the family ticks and the name choices, kept so a redraw doesn't reshuffle
+		scope, open: new Set(), flipped: false,
+	};
+}
+
+const TYPES = ["name", "order", "family", "book"];
+
+export function trainPanel(ui, { tree, deck, progress, workbookId }, onChange, now = Date.now()) {
+	const settings = progress.settings;
+	const panel = el("div", { className: "analysis train", tabIndex: -1 });
+	const save = () => saveProgress(workbookId, progress);
+	const act = (fn) => () => {
+		fn();
+		save();
+		onChange();
+	};
+	const begin = (opts) => {
+		ui.session = newSession(deck, tree, progress, settings, { now, ...opts });
+		ui.screen = "question";
+		setCard();
+	};
+	const setCard = () => {
+		ui.card = current(ui.session);
+		Object.assign(ui, { picked: null, typed: "", played: [], answered: null, ticked: [], choices: null });
+		if (!ui.card) ui.screen = "summary";
+	};
+	const nameOf = (vkey) => (tree.byKey.get(vkey)?.name ?? "Book");
+
+	if (ui.screen === "settings") panel.append(settingsScreen());
+	else if (ui.screen === "question" && ui.card) panel.append(questionScreen());
+	else if (ui.screen === "summary" && ui.session) panel.append(summaryScreen());
+	else panel.append(outlineScreen());
+	return panel;
+
+	// --- outline ---------------------------------------------------------
+
+	function outlineScreen() {
+		const box = el("div", { className: "tr-outline" });
+		const queue = newSession(deck, tree, progress, settings, { now, scope: ui.scope }).queue;
+		const fresh = queue.filter((c) => !progress.cards[c.id]).length;
+		const head = el("div", { className: "tr-head" });
+		const start = chipBtn("tr-start", queue.length ? "Start" : "Nothing due", "Study what is due, then new cards", act(() => begin({ scope: ui.scope })), !queue.length);
+		head.append(
+			start,
+			chipBtn("tr-settings-open", "Settings", "Choose the question types and the schedule", act(() => (ui.screen = "settings"))),
+			el("span", { className: "tr-count", textContent: `${queue.length - fresh} due · ${fresh} new` }),
+		);
+		if (ui.scope !== null) head.append(chipBtn("tr-whole", "Whole workbook", "List every variation", act(() => (ui.scope = null))));
+		box.append(head);
+		if (!tree.byKey.size) {
+			box.append(el("p", { className: "tr-empty", textContent: "Name positions (right-click a move in the table → Name this position…) to be quizzed on them. Until then, Start drills the book moves." }));
+			return box;
+		}
+		const unlocked = unlockedKeys(tree, deck, progress, settings);
+		const roots = ui.scope !== null && tree.byKey.has(ui.scope) ? [tree.byKey.get(ui.scope)] : tree.roots;
+		const list = (nodes) => {
+			const ul = el("ul", { className: "tr-tree" });
+			for (const n of nodes) ul.append(varRow(n, unlocked));
+			return ul;
+		};
+		const varRow = (n, unlocked) => {
+			const li = el("li");
+			const own = deck.filter((c) => c.vkey === n.key);
+			const solid = own.filter((c) => c.type !== "book");
+			const mastered = solid.filter((c) => (progress.cards[c.id]?.box ?? -1) >= settings.masteryBox).length;
+			const due = own.filter((c) => isDue(progress.cards[c.id], settings, now)).length;
+			const skipped = own.length > 0 && own.every((c) => progress.cards[c.id]?.skip);
+			const open = ui.open.has(n.key);
+			const r = el("div", { className: "tr-var" });
+			r.append(
+				n.children.length
+					? chipBtn("tr-toggle", open ? "▾" : "▸", open ? "Hide the sub-variations" : "Show the sub-variations", act(() => ui.open[open ? "delete" : "add"](n.key)))
+					: el("span", { className: "tr-toggle-gap" }),
+				el("span", { className: "tr-name", textContent: n.name }),
+				el("span", { className: "tr-level", textContent: `L${n.level}` }),
+			);
+			const bar = el("span", { className: "tr-bar", title: `${mastered} of ${solid.length} mastered` }, el("span"));
+			bar.firstChild.style.width = `${solid.length ? Math.round((100 * mastered) / solid.length) : 0}%`;
+			r.append(bar, el("span", { className: "tr-due", textContent: due ? `${due} due` : "" }));
+			if (!unlocked.has(n.key)) r.append(el("span", { className: "tr-badge", textContent: "locked" }));
+			if (skipped) r.append(el("span", { className: "tr-badge", textContent: "skipped" }));
+			const box = el("select", { className: "tr-box st-pick", title: "Put this variation's cards in a box" }, [
+				el("option", { value: "", textContent: "Box…" }),
+				...[0, 1, 2, 3, 4, 5].map((b) => el("option", { value: String(b), textContent: `Box ${b}` })),
+			]);
+			box.onchange = act(() => box.value !== "" && setBox(progress, n.key, deck, +box.value, now));
+			r.append(
+				chipBtn("tr-practice", "Practice", "Drill this variation and below, due or not", act(() => begin({ scope: n.key, practice: true }))),
+				chipBtn("tr-known", "Known", "Count its cards as mastered", act(() => markKnown(progress, n.key, deck, settings, now))),
+				chipBtn("tr-skip", skipped ? "Unskip" : "Skip", "Leave its cards out", act(() => skip(progress, n.key, deck, !skipped))),
+				chipBtn("tr-reset", "Reset", "Forget the progress on its cards", () => {
+					if (!confirm(`Reset the progress on ${n.name}?`)) return;
+					resetVar(progress, n.key, deck);
+					save();
+					onChange();
+				}),
+				box,
+			);
+			li.append(r);
+			if (open && n.children.length) li.append(list(n.children));
+			return li;
+		};
+		box.append(list(roots));
+		return box;
+	}
+
+	// --- settings ----------------------------------------------------------
+
+	function settingsScreen() {
+		const s = settings;
+		// every change goes back through normalizeSettings, so a bad value is
+		// replaced by the default rather than stored
+		const set = (patch) => act(() => (progress.settings = normalizeSettings({ ...progress.settings, ...patch })))();
+		const field = (label, control) => el("label", { className: "tr-field" }, [el("span", { textContent: label }), control]);
+		const check = (name, label, on, change) => {
+			const i = el("input", { type: "checkbox", name, checked: on });
+			i.onchange = () => change(i.checked);
+			return field(label, i);
+		};
+		const num = (name, label, value, change, min, max) => {
+			const i = el("input", { type: "number", name, value: String(value), min, max });
+			i.onchange = () => change(i.valueAsNumber);
+			return field(label, i);
+		};
+		const pick = (name, label, value, options, change) => {
+			const sel = el("select", { name }, options.map((o) => el("option", { value: o, textContent: o, selected: o === value })));
+			sel.onchange = () => change(sel.value);
+			return field(label, sel);
+		};
+		const box = el("div", { className: "tr-settings" });
+		for (const t of TYPES) box.append(check(`type-${t}`, `${t[0].toUpperCase()}${t.slice(1)} questions`, s.types[t], (on) => set({ types: { ...s.types, [t]: on } })));
+		box.append(
+			pick("nameMode", "Name questions", s.nameMode, ["choice", "typed"], (x) => set({ nameMode: x })),
+			num("choices", "Choices", s.choices, (n) => set({ choices: n }), 2, 8),
+			check("showMoves", "Show the moves", s.showMoves, (on) => set({ showMoves: on })),
+			check("orderHint", "Order questions: show the target", s.orderHint, (on) => set({ orderHint: on })),
+			check("familyShowName", "Family questions: show the name", s.familyShowName, (on) => set({ familyShowName: on })),
+		);
+		const group = el("fieldset", { className: "tr-field" }, [el("legend", { textContent: "Family group (none: any tag)" })]);
+		for (const t of allTags(tree)) {
+			group.append(check(`tag-${t}`, t, s.familyGroup.includes(t), (on) => set({ familyGroup: on ? [...s.familyGroup, t] : s.familyGroup.filter((x) => x !== t) })));
+		}
+		box.append(
+			group,
+			pick("bookSide", "Book side", s.bookSide, ["white", "black", "both"], (x) => set({ bookSide: x })),
+			pick("bookRule", "Book rule", s.bookRule, ["any", "main"], (x) => set({ bookRule: x })),
+			num("masteryBox", "Mastered from box", s.masteryBox, (n) => set({ masteryBox: n }), 1, 5),
+		);
+		s.intervals.forEach((d, i) => box.append(num(`interval-${i}`, `Days in box ${i}`, d, (n) => set({ intervals: s.intervals.map((x, j) => (j === i ? n : x)) }), 0)));
+		box.append(
+			num("newPerSession", "New cards per session", s.newPerSession, (n) => set({ newPerSession: n }), 0),
+			num("sessionLength", "Session length (0: no limit)", s.sessionLength, (n) => set({ sessionLength: n }), 0),
+			chipBtn("tr-settings-done", "Done", "Back to the outline", act(() => (ui.screen = "outline"))),
+		);
+		return box;
+	}
+
+	// --- questions -----------------------------------------------------------
+
+	function questionScreen() {
+		const card = ui.card;
+		const node = tree.byKey.get(card.key);
+		const box = el("div", { className: "tr-question" });
+		const total = ui.session.queue.length;
+		const place = ui.answered ? ui.session.i : ui.session.i + 1;
+		const prompt = el("p", { className: "tr-prompt" });
+		const body = el("div", { className: "tr-body" });
+		box.append(el("p", { className: "tr-progress", textContent: `Question ${place} of ${total}` }), prompt, body);
+
+		const next = () => {
+			setCard();
+			onChange();
+		};
+		const finish = (right, detail, notes = {}) => {
+			answer(ui.session, progress, card, right, settings, now);
+			save();
+			ui.answered = { right, detail, notes };
+			onChange();
+		};
+		panel.onkeydown = (e) => {
+			if (e.target.closest?.("button")) return; // a focused button handles Enter itself
+			if (ui.answered) {
+				if (e.key === "Enter") next();
+				return;
+			}
+			const n = +e.key;
+			if (card.type === "name" && settings.nameMode === "choice" && n >= 1 && n <= (ui.choices?.length ?? 0)) pickName(ui.choices[n - 1]);
+		};
+		const flip = () => chipBtn("tr-flip", "Flip", "Turn the board round", act(() => (ui.flipped = !ui.flipped)));
+		const pickName = (text) => {
+			ui.picked = ui.typed = text;
+			finish(checkName(text, node.name), [`Answer: ${node.name}`]);
+		};
+
+		if (card.type === "name") {
+			prompt.textContent = "What is this position called?";
+			body.append(boardSvg(node.fen, 280, { flipped: ui.flipped }));
+			if (settings.showMoves) body.append(el("p", { className: "tr-moves", textContent: node.orders[0].join(" ") }));
+			if (!ui.answered && settings.nameMode === "choice") {
+				ui.choices ||= nameChoices(card, tree, settings, Math.random);
+				body.append(el("div", { className: "tr-choices" }, ui.choices.map((name, i) =>
+					el("button", { className: "tr-choice chip", textContent: name, title: `Key ${i + 1}`, onclick: () => pickName(name) }))));
+			} else if (!ui.answered) {
+				const input = el("input", { className: "tr-typed", type: "text", value: ui.typed, placeholder: "Name" });
+				body.append(input, chipBtn("tr-check", "Check", "Check the name", () => pickName(input.value)));
+				panel.onkeydown = ((old) => (e) => (e.key === "Enter" && e.target === input ? pickName(input.value) : old(e)))(panel.onkeydown);
+			}
+		} else if (card.type === "order") {
+			prompt.textContent = `Play the moves to the ${node.name}`;
+			const chess = new Chess();
+			ui.played.forEach((s) => chess.move(s));
+			const play = (san) => {
+				const step = orderStep(node.orders, ui.played, san);
+				if (!step.ok) return finish(false, [`Expected: ${step.accepted.join(" or ")}`]);
+				ui.played.push(san);
+				if (!step.done) return act(() => {})();
+				const others = node.orders.filter((o) => o.join(" ") !== ui.played.join(" ")).map((o) => o.join(" "));
+				finish(true, others.length ? [`Also reached by: ${others.join("; ")}`] : []);
+			};
+			body.append(ui.answered ? boardSvg(chess.fen(), 320, { flipped: ui.flipped }) : interactiveBoard(chess.fen(), play, { flipped: ui.flipped }));
+			if (settings.orderHint) body.append(el("div", { className: "tr-hint" }, boardSvg(node.fen, 140, { flipped: ui.flipped })));
+			body.append(flip());
+		} else if (card.type === "family") {
+			const group = settings.familyGroup;
+			const tags = group.length ? node.tags.filter((t) => group.includes(t)) : node.tags;
+			prompt.textContent = settings.familyShowName ? `Which families does the ${node.name} belong to?` : "Which families does this position belong to?";
+			body.append(boardSvg(node.fen, 280, { flipped: ui.flipped }));
+			const options = group.length ? group : allTags(tree);
+			const radio = group.length > 0;
+			const list = el("div", { className: "tr-tags" });
+			for (const t of options) {
+				const i = el("input", { type: radio ? "radio" : "checkbox", name: "tr-tag", value: t, checked: ui.ticked.includes(t), disabled: !!ui.answered });
+				i.onchange = () => {
+					ui.ticked = radio ? [t] : i.checked ? [...ui.ticked, t] : ui.ticked.filter((x) => x !== t);
+				};
+				list.append(el("label", { className: "tr-tag" }, [i, t]));
+			}
+			body.append(list);
+			if (!ui.answered) body.append(chipBtn("tr-check", "Check", "Check the families", () => finish(checkFamily(ui.ticked, tags), [`Answer: ${tags.join(", ") || "none"}`])));
+		} else {
+			const chess = new Chess();
+			card.sans.forEach((s) => chess.move(s));
+			prompt.textContent = `${nameOf(card.vkey)}: find the move`;
+			body.append(el("p", { className: "tr-moves", textContent: card.sans.join(" ") || "(start position)" }));
+			const flipped = (settings.bookSide === "both" ? chess.turn() === "b" : settings.bookSide === "black") !== ui.flipped;
+			const play = (san) => {
+				const right = checkBook(card, san, settings);
+				const detail = [`Book: ${card.moves.join(", ")}${card.main ? ` (main: ${card.main})` : ""}`];
+				finish(right, detail, card.notes);
+			};
+			body.append(ui.answered ? boardSvg(chess.fen(), 320, { flipped }) : interactiveBoard(chess.fen(), play, { flipped }), flip());
+		}
+
+		if (ui.answered) {
+			const { right, detail, notes } = ui.answered;
+			const res = el("div", { className: `tr-result ${right ? "right" : "wrong"}` }, [el("strong", { textContent: right ? "Right" : "Not quite" })]);
+			for (const d of detail) res.append(el("p", { textContent: d }));
+			for (const [san, text] of Object.entries(notes)) {
+				const p = el("p", { className: "tr-note" }, [`${san}: `]);
+				renderInline(p, text);
+				res.append(p);
+			}
+			res.append(chipBtn("tr-next", "Next", "Next question (Enter)", next));
+			box.append(res);
+		}
+		return box;
+	}
+
+	// --- summary ---------------------------------------------------------------
+
+	function summaryScreen() {
+		const sum = sessionSummary(ui.session, tree, deck, progress, settings, now);
+		const total = sum.right + sum.wrong;
+		const name = (id) => {
+			const c = deck.find((x) => x.id === id);
+			return c ? `${nameOf(c.vkey)} (${c.type})` : id;
+		};
+		const box = el("div", { className: "tr-summary" }, [el("h3", { textContent: `Right ${sum.right} / ${total}` })]);
+		const list = (title, items) => items.length && box.append(el("p", { textContent: `${title}: ${items.join(", ")}` }));
+		list("Moved up", sum.up.map(name));
+		list("Moved down", sum.down.map(name));
+		list("Newly unlocked", sum.unlocked);
+		const wait = sum.nextDue === null ? "nothing scheduled" : sum.nextDue - now >= DAY ? `in ${Math.ceil((sum.nextDue - now) / DAY)} days` : `in ${Math.ceil((sum.nextDue - now) / 3600000)} hours`;
+		box.append(
+			el("p", { textContent: `Next review: ${wait}` }),
+			chipBtn("tr-back", "Back to the outline", "", act(() => (ui.screen = "outline"))),
+		);
+		return box;
+	}
+}

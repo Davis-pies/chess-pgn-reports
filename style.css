@@ -1917,6 +1917,31 @@ sup {
 .st-pick { font: inherit; font-size: .85rem; max-width: 16rem; padding: .15rem .3rem; border-radius: var(--radius-sm); border: 1px solid var(--line); background: var(--bg); color: inherit; }
 .st-count { font-size: .78rem; color: var(--muted); }
 
+/* ---- Train: the outline, settings, questions and summary ---- */
+.tr-head, .tr-var, .tr-choices, .tr-tags { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
+.tr-count { font-size: .85rem; color: var(--muted); }
+.tr-empty { color: var(--muted); font-size: .9rem; }
+.tr-tree { list-style: none; margin: .3rem 0 0; padding-left: 1rem; }
+.tr-outline > .tr-tree { padding-left: 0; }
+.tr-var { padding: .2rem 0; border-bottom: 1px solid var(--line); }
+.tr-name { font-weight: 600; }
+.tr-level, .tr-due { font-size: .78rem; color: var(--muted); }
+.tr-toggle-gap { display: inline-block; width: 1.6rem; }
+.tr-bar { display: inline-block; width: 5rem; height: .5rem; border-radius: var(--radius-sm); background: var(--line); overflow: hidden; }
+.tr-bar span { display: block; height: 100%; background: var(--main); }
+.tr-badge { font-size: .75rem; padding: .05rem .4rem; border-radius: .25rem; color: var(--warn); border: 1px solid var(--warn); }
+.tr-settings { display: flex; flex-direction: column; gap: .4rem; max-width: 26rem; }
+.tr-field { display: flex; justify-content: space-between; align-items: center; gap: .6rem; }
+.tr-field input[type=number] { width: 5rem; }
+.tr-prompt { font-weight: 600; font-size: 1.05rem; }
+.tr-progress { font-size: .8rem; color: var(--muted); }
+.tr-body { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .8rem; }
+.tr-choice { text-align: left; }
+.tr-result { margin-top: .6rem; padding: .5rem .8rem; border-radius: var(--radius-sm); border: 1px solid var(--line); }
+.tr-result.right { border-color: var(--main); }
+.tr-result.wrong { border-color: var(--warn); }
+.tr-result p { margin: .25rem 0; }
+
 /* ---- keyboard and screen-reader support ---- */
 /* read out, never seen: the live region and the board's piece list */
 .sr-only {
