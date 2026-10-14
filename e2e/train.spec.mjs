@@ -172,12 +172,15 @@ test("train's engine shows its bar and lines on a name question, not on an order
   await expect(page.locator(".an-engine")).toHaveCount(0);
 });
 
-test("with Engine lines off the bar shows and the lines do not", async ({ page }) => {
+test("with Engine lines off the bar and the score show, the lines do not", async ({ page }) => {
   const done = await trainOnly(page, ["Order", "Book", "Engine lines"]);
   await done.click();
   await page.locator(".tr-start").click();
   await page.locator(".an-engine-toggle").click();
   await expect(page.locator(".tr-body .an-evalbar")).toBeVisible();
   await expect(page.locator(".an-engine-info")).toContainText(/depth|Thinking|Loading/, { timeout: 60_000 });
-  await expect(page.locator(".an-pvs")).toBeHidden();
+  // the best line's score stays as a number; its moves and the other lines go
+  await expect(page.locator(".an-pv:not(.empty) .an-score").first()).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator(".an-pv .an-pvmove").first()).toBeHidden();
+  await expect(page.locator(".an-pv").nth(1)).toBeHidden();
 });

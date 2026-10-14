@@ -1962,8 +1962,12 @@ sup {
 /* the engine's lines are text here: clicking one does nothing in Train */
 .train span.an-pvmove { cursor: default; }
 .train span.an-pvmove:hover { background: none; }
-/* "Engine lines" off: the evaluation only */
-.tr-eval-only .an-pvs, .tr-eval-only .an-engine-pv, .tr-eval-only .an-arrows { display: none; }
+/* "Engine lines" off: the evaluation only. The best line's score stays, as a
+   number beside the bar; its moves, the other lines, the line count and the
+   arrows go. (Hiding the whole lines box left only the bar's tooltip to read
+   the score from.) */
+.tr-eval-only .an-pv:not(:first-child), .tr-eval-only .an-pv > :not(.an-score),
+.tr-eval-only .an-engine-pv, .tr-eval-only .an-arrows { display: none; }
 .tr-choice { text-align: left; }
 .tr-result { margin-top: .6rem; padding: .5rem .8rem; border-radius: var(--radius-sm); border: 1px solid var(--line); }
 .tr-result.right { border-color: var(--main); }
