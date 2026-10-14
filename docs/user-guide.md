@@ -191,9 +191,12 @@ For a shorter overview see the [README](../README.md).
      transposition is one variation and a name survives re-importing the PGN.
      In a PGN a name sits in a comment on the move that reaches the position:
      `{[%name "Najdorf"] [%tags "...d6; Nc3 committed"]}`. A name set in the
-     app wins over the PGN's, and PGN export writes them back. Study shows the
-     trail of names for the board's position (Sicilian > Najdorf > English
-     Attack).
+     app wins over the PGN's, and PGN export writes them back. Study heads
+     the line with every named position along it (Sicilian > Najdorf >
+     English Attack); click one to jump there. The deepest one reached is
+     bold, the ones still ahead are grey. On a named position that the
+     workbook reaches by more than one move order, "Reached by:" lists the
+     orders; click one to see that line.
    - **Levels** — the first named positions on a line are level 1, the names
      after them level 2, and so on. A variation reached under another name on
      a different line is listed under the first and marked "also reached
@@ -226,7 +229,10 @@ For a shorter overview see the [README](../README.md).
      tag menu at the top narrows the outline, and **Start**, to the variations
      carrying a tag and those below them. **Start** runs the scheduled
      session; when nothing is due it says so and points to Practice and Known. **Train from here**, in the table's menu,
-     opens Train practising from that position. In a question, 1–9 pick a
+     opens Train practising from that position. **Learn** on an outline row
+     plays the variation through in Study with the PGN's notes; closing Study
+     returns to Train as you left it. After the first card of a variation you
+     have not seen, the result offers **New to you? Learn it**. In a question, 1–9 pick a
      choice, Enter goes on and Escape closes.
    - **The board** — Name and Family show the position from your side (Black
      by default, as set by "Book side"); **Flip** turns it. After a wrong name

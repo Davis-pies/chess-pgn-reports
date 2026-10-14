@@ -445,6 +445,7 @@ export function openAnalysis(moves = []) {
 // start of the mainline. It is built afresh each time from the workbook as it
 // stands, so it never shows a line or a note the workbook no longer has.
 let study = null;
+let studyFromTrain = false; // Study was opened by Train's Learn, so closing it goes back there
 
 // Name (or rename, or with a blank name unname) the position after `moves`.
 // Cancelling the first prompt does nothing; cancelling the tags keeps them.
@@ -466,8 +467,9 @@ export function nameAt(moves) {
   renderApp();
 }
 
-export function openStudy(moves = []) {
-	if (getMode() !== "study") opener = focusKey($("view"), document.activeElement);
+export function openStudy(moves = [], fromTrain = false) {
+	studyFromTrain = fromTrain;
+	if (!fromTrain && getMode() !== "study") opener = focusKey($("view"), document.activeElement);
 	const lines = getCurrent().lines;
 	study = newStudy(visibleLines(lines), moves, { footNames: getCurrent().showFootNames }, editorOrder(lines));
 	study.flipped = loadPrefs().orientation === "black";
@@ -503,6 +505,13 @@ export function openTrain(moves = []) {
 	const wrap = $("view").firstElementChild;
 	if (wrap && !trainBox?.isConnected) wrap.appendChild(trainOverlay());
 	else renderApp();
+}
+
+// Learn: play a variation through in Study, with the PGN's notes. Train's
+// state (`train`) is left alone, and closing Study brings the window back.
+function learnVariation(n) {
+	trainBox.remove();
+	openStudy(n.orders[0].map((san) => ({ san })), true);
 }
 
 function rerenderTrain() {
@@ -863,6 +872,14 @@ function studyOverlay() {
     engine.pause();
     setMode("report");
     savePrefs({ orientation: study.flipped ? "black" : "white" });
+    if (studyFromTrain) {
+      // back to Train as it was, with `opener` kept for when Train itself closes
+      studyFromTrain = false;
+      setMode("train");
+      if (ov.isConnected) ov.replaceWith(trainOverlay());
+      else renderApp();
+      return;
+    }
     const back = opener;
     opener = null;
     if (!ov.isConnected) renderApp();
@@ -924,7 +941,7 @@ function trainOverlay() {
   };
   // settings change which cards exist, so the deck is rebuilt for every draw
   const deck = buildDeck(train.tree, train.lines, train.progress.settings);
-  const panel = trainPanel(train.ui, { tree: train.tree, deck, progress: train.progress, workbookId: train.workbookId, rename: renameVariation }, rerenderTrain);
+  const panel = trainPanel(train.ui, { tree: train.tree, deck, progress: train.progress, workbookId: train.workbookId, rename: renameVariation, learn: learnVariation }, rerenderTrain);
   const head = el("div", { className: "an-head" }, [
     el("h3", { id: "tr-title", textContent: "Train" }),
     el("button", {

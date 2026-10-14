@@ -47,6 +47,12 @@ export function newStudy(lines, moves = [], notesOpts = {}, order = lines) {
 		numbering: lines.length ? numberNotes(lines, notesOpts) : { entries: [], byLine: new Map() },
 	};
 	if (!s.lines.length) s.lines.push({ moves: [], off: true, offAt: 0 });
+	return studyGoto(s, moves);
+}
+
+// Put the study on the first book line through `moves` (objects with a `san`),
+// after the last of them. A position no line reaches leaves the study as it is.
+export function studyGoto(s, moves) {
 	const i = moves.length ? s.lines.findIndex((l) => through(moves, l)) : -1;
 	if (i !== -1) {
 		s.active = i;

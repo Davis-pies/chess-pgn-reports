@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert";
 import { installDom, loadState } from "./helpers.mjs";
 import { activeLine, goTo } from "../src/analysis.js";
-import { backToBook, newStudy, studyMark, studyNotes, studyPlay, studyPlayAll } from "../src/study.js";
+import { backToBook, newStudy, studyGoto, studyMark, studyNotes, studyPlay, studyPlayAll } from "../src/study.js";
 import { studyPanel, STUDY_KEYS } from "../src/study-view.js";
 import { createEngine } from "../src/engine.js";
 import { numberNotes } from "../src/notes.js";
@@ -388,4 +388,15 @@ test("the engine runs in the study, its lines play off the book, and no eval is 
 	assert.ok(!activeLine(st).off, "the engine's choice was the book's");
 	assert.strictEqual(studyPanel(st, () => {}, { engine }).querySelectorAll(".an-help-open").length, 1);
 	done();
+});
+
+test("studyGoto moves onto the first book line through the moves, and ignores others", () => {
+	const s = loadState(NOTED);
+	const st = newStudy(s.lines);
+	assert.strictEqual(studyGoto(st, [{ san: "e4" }, { san: "e5" }, { san: "Nf3" }, { san: "Nc6" }, { san: "Bb5" }]), st);
+	assert.deepStrictEqual([st.active, st.at], [0, 5]);
+	studyGoto(st, [{ san: "e4" }, { san: "e5" }, { san: "Nf3" }, { san: "Nf6" }]);
+	assert.deepStrictEqual([sans(activeLine(st)).join(" "), st.at], ["e4 e5 Nf3 Nf6 d4", 4]);
+	studyGoto(st, [{ san: "d4" }]);
+	assert.strictEqual(st.at, 4, "no such line: unchanged");
 });

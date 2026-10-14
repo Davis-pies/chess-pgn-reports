@@ -89,14 +89,14 @@ export function variationTree(lines, names) {
 export function trailOf(sans, names) {
 	const chess = new Chess();
 	const trail = [];
-	for (const san of sans) {
+	for (const [ply, san] of sans.entries()) {
 		try {
 			chess.move(san);
 		} catch {
 			break;
 		}
 		const key = posKey(chess.fen());
-		if (names[key]) trail.push({ key, name: names[key].name });
+		if (names[key]) trail.push({ key, name: names[key].name, ply });
 	}
 	return trail;
 }

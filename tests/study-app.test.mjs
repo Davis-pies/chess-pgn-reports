@@ -132,7 +132,17 @@ test("Study shows the trail of names for the position reached, and names it", as
 	await app.loadPgn(NAMED);
 	app.button("Study").click();
 	const trail = () => win().querySelector(".st-trail");
-	assert.ok(!trail() || trail().textContent === "", "no names before the first");
+	assert.strictEqual(win().querySelector(".st-head").firstElementChild, trail(), "the names lead the header");
+	const pos = () => [...trail().querySelectorAll(".st-trail-pos")];
+	assert.deepStrictEqual(pos().map((b) => b.textContent), ["...d6 Sicilians", "Najdorf"], "the whole line, ahead too");
+	assert.ok(pos().every((b) => b.classList.contains("ahead")) && !trail().querySelector(".on"));
+	assert.strictEqual(pos()[1].title, "5...a6");
+	pos()[1].click();
+	assert.ok(pos()[1].classList.contains("on") && pos()[1].getAttribute("aria-current") === "true");
+	assert.ok(!pos()[0].classList.contains("ahead") && !pos()[0].classList.contains("on"), "passed ones stay plain");
+	assert.strictEqual(win().querySelector(".an-move.at").textContent, "a6");
+	pos()[0].click();
+	assert.ok(pos()[0].classList.contains("on") && pos()[1].classList.contains("ahead"));
 	for (let i = 0; i < 10; i++) key(win().querySelector(".study"), "ArrowRight");
 	assert.strictEqual(trail().textContent, "...d6 Sicilians › Najdorf");
 
@@ -158,4 +168,26 @@ test("the real nameAt hook asks twice and stores the name with its tags", async 
 	const [v] = Object.values(getCurrent().names);
 	assert.deepStrictEqual(v, { name: "Open Game", tags: ["e4", "e5"] });
 	assert.deepStrictEqual(asked, ["", ""]);
+});
+
+test("Reached by lists the move orders exactly on a named position and switches line", async () => {
+	app.reset();
+	await app.loadPgn('1. e4 (1. d4 d5 2. e4 e6) 1... e6 2. d4 d5 {[%name "French"]} *');
+	app.button("Study").click();
+	const reached = () => win().querySelector(".st-reached");
+	const orders = () => [...win().querySelectorAll(".st-order")];
+	const at = () => win().querySelector(".an-move.at")?.textContent;
+	for (let i = 0; i < 3; i++) key(win().querySelector(".study"), "ArrowRight");
+	assert.strictEqual(reached(), null, "not before the position");
+	key(win().querySelector(".study"), "ArrowRight");
+	assert.strictEqual(win().querySelector(".st-head").children[1], reached(), "after the trail");
+	assert.deepStrictEqual(orders().map((b) => b.textContent), ["1.e4 e6 2.d4 d5", "1.d4 d5 2.e4 e6"]);
+	assert.deepStrictEqual(orders().map((b) => b.getAttribute("aria-pressed")), ["true", "false"]);
+	orders()[0].click();
+	assert.strictEqual(orders()[0].getAttribute("aria-pressed"), "true", "the current order does nothing harmful");
+	orders()[1].click();
+	assert.deepStrictEqual(orders().map((b) => b.getAttribute("aria-pressed")), ["false", "true"]);
+	assert.strictEqual(at(), "e6", "the same position, by the other line");
+	key(win().querySelector(".study"), "ArrowLeft");
+	assert.strictEqual(reached(), null, "not off it");
 });

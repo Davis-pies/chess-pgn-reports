@@ -16,9 +16,9 @@ import { engineBox } from "./engine-view.js";
 import { appendFootnote } from "./render.js";
 import { markSym } from "./nags.js";
 import { getCurrent, getRenderHooks } from "./state.js";
-import { trailOf } from "./names.js";
+import { trailOf, variationTree } from "./names.js";
 import { defaultLineName } from "./tree.js";
-import { backToBook, ownFrom, readLine, stepStudyLine, studyMark, studyNotes, studyPlay, studyPlayAll } from "./study.js";
+import { backToBook, ownFrom, readLine, stepStudyLine, studyMark, studyNotes, studyGoto, studyPlay, studyPlayAll } from "./study.js";
 
 export const STUDY_KEYS = [
 	["← →", "Back / forward one move"],
@@ -179,6 +179,33 @@ function keepInView(box, item) {
 // the reader's own, where they left the book.
 function lineHead(study, line, foot, onChange) {
 	const head = el("div", { className: "st-head" });
+	// the position's name leads on a book line; off the book there is none
+	const played = line.moves.slice(0, study.at);
+	const names = getCurrent().names || {};
+	if (!line.off) {
+		// the whole line's named positions, so an opening can be jumped to from
+		// a line running through it; the deepest one reached is marked
+		const trail = trailOf(line.moves.map((m) => m.san), names);
+		const here = trail.filter((t) => t.ply < study.at).pop();
+		const bar = el("span", { className: "st-trail", hidden: !trail.length });
+		trail.forEach((t, i) => {
+			if (i) bar.append(" › ");
+			const b = el("button", {
+				className: "st-trail-pos" + (t === here ? " on" : "") + (t.ply >= study.at ? " ahead" : ""),
+				textContent: t.name,
+				title: moveText(t.ply, line.moves[t.ply].san),
+				onclick: () => {
+					goTo(study, t.ply + 1);
+					onChange();
+				},
+			});
+			if (t === here) b.setAttribute("aria-current", "true");
+			bar.append(b);
+		});
+		head.appendChild(bar);
+		const reached = here && here.ply === study.at - 1 ? reachedBy(study, here.key, names, onChange) : null;
+		if (reached) head.appendChild(reached);
+	}
 	head.appendChild(linePicker(study, onChange));
 	if (foot) head.appendChild(el("span", { className: "st-tag", textContent: `footnote [${foot.n}]` }));
 	if (line.off) {
@@ -194,10 +221,7 @@ function lineHead(study, line, foot, onChange) {
 		);
 		return head;
 	}
-	// the names of the positions passed through, and a way to add one here
-	const played = line.moves.slice(0, study.at);
-	const trail = trailOf(played.map((m) => m.san), getCurrent().names || {});
-	head.appendChild(el("span", { className: "st-trail", textContent: trail.map((t) => t.name).join(" › "), hidden: !trail.length }));
+	// a way to name the position here
 	head.appendChild(
 		chipBtn("st-name-pos", "Name this position…", "Give the position on the board a name", () => {
 			getRenderHooks().nameAt(played);
@@ -212,6 +236,28 @@ function lineHead(study, line, foot, onChange) {
 		head.appendChild(note);
 	}
 	return head;
+}
+
+// "Reached by:" the move orders that arrive at the named position on the
+// board, only exactly on it and only when the workbook has more than one. The
+// one matching the moves played so far is marked; another jumps to a book line
+// through its moves, at this position.
+function reachedBy(study, key, names, onChange) {
+	// ponytail: rebuilds the tree on each draw while on a named position; cache on the study if a big workbook makes it slow
+	const orders = variationTree(study.lines.filter((l) => !l.off).map((l) => l.src), names).byKey.get(key)?.orders;
+	if (!orders || orders.length < 2) return null;
+	const mine = activeLine(study).moves.slice(0, study.at).map((m) => m.san).join(" ");
+	const box = el("div", { className: "st-reached" }, [el("span", { textContent: "Reached by:" })]);
+	for (const sans of orders) {
+		const on = sans.join(" ") === mine;
+		const b = chipBtn("st-order" + (on ? " on" : ""), sans.map((s, i) => moveText(i, s, i === 0)).join(" "), "Play through this move order", () => {
+			studyGoto(study, sans.map((san) => ({ san })));
+			onChange();
+		});
+		b.setAttribute("aria-pressed", String(on));
+		box.appendChild(b);
+	}
+	return box;
 }
 
 // The line written out, each move with its symbol and its note markers. A

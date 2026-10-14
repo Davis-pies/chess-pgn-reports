@@ -29,7 +29,7 @@ export function newTrainUi(scope = null) {
 
 const TYPES = ["name", "order", "family", "book"];
 
-export function trainPanel(ui, { tree, deck, progress, workbookId, rename }, onChange, now = Date.now()) {
+export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn }, onChange, now = Date.now()) {
 	const settings = progress.settings;
 	const panel = el("div", { className: "analysis train", tabIndex: -1 });
 	const save = () => saveProgress(workbookId, progress);
@@ -131,6 +131,7 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename }, onC
 			box.onchange = act(() => box.value !== "" && setBox(progress, n.key, deck, +box.value, now));
 			const acts = el("span", { className: "tr-acts" });
 			acts.append(
+				chipBtn("tr-learn", "Learn", "Play through this variation with its notes", () => learn(n)),
 				chipBtn("tr-practice", "Practice", "Drill this variation and below, due or not", act(() => begin({ scope: n.key, practice: true }))),
 				chipBtn("tr-known", "Known", "Count its cards as mastered", act(() => markKnown(progress, n.key, deck, settings, now))),
 				chipBtn("tr-skip", skipped ? "Unskip" : "Skip", "Leave its cards out", act(() => skip(progress, n.key, deck, !skipped))),
@@ -221,9 +222,11 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename }, onC
 			onChange();
 		};
 		const finish = (right, detail, notes = {}) => {
+			// before answer() counts this card as seen
+			const fresh = !deck.some((c) => c.vkey === card.vkey && progress.cards[c.id]?.seen > 0);
 			answer(ui.session, progress, card, right, settings, now);
 			save();
-			ui.answered = { right, detail, notes };
+			ui.answered = { right, detail, notes, fresh };
 			onChange();
 		};
 		let typedInput = null; // the typed-name field, when this question has one
@@ -308,7 +311,7 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename }, onC
 		}
 
 		if (ui.answered) {
-			const { right, detail, notes } = ui.answered;
+			const { right, detail, notes, fresh } = ui.answered;
 			const res = el("div", { className: `tr-result ${right ? "right" : "wrong"}` }, [el("strong", { textContent: right ? "Right" : "Not quite" })]);
 			for (const d of detail) res.append(el("p", { textContent: d }));
 			for (const [san, text] of Object.entries(notes)) {
@@ -316,6 +319,8 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename }, onC
 				renderInline(p, text);
 				res.append(p);
 			}
+			const v = fresh && tree.byKey.get(card.vkey);
+			if (v) res.append(chipBtn("tr-learn", "New to you? Learn it", "Play through this variation with its notes", () => learn(v)));
 			res.append(chipBtn("tr-next", "Next", "Next question (Enter)", next));
 			box.append(res);
 		}

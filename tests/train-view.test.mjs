@@ -30,11 +30,12 @@ beforeEach(() => {
 });
 after(() => delete global.localStorage);
 
+const learned = [];
 function mount({ ui = newTrainUi(), t = tree, d = deck, settings = {}, progress = emptyProgress() } = {}) {
 	progress.settings = normalizeSettings({ types: ALL, ...settings });
 	const root = document.createElement("div");
 	document.body.append(root); // change events only fire on connected inputs
-	const draw = () => root.replaceChildren(trainPanel(ui, { tree: t, deck: d, progress, workbookId: "t1" }, draw, NOW));
+	const draw = () => root.replaceChildren(trainPanel(ui, { tree: t, deck: d, progress, workbookId: "t1", learn: (n) => learned.push(n.name) }, draw, NOW));
 	draw();
 	return { root, ui, progress, draw };
 }
@@ -438,6 +439,34 @@ test("name and family boards: Flip toggles, and Black readers start flipped", ()
 		click(m.root, ".tr-flip");
 		assert.strictEqual(m.ui.flipped, true);
 		assert.strictEqual(first(m), white, "flipping by hand turns it back");
+	}
+	done();
+});
+
+test("outline: Learn calls back with the variation", () => {
+	const { root } = mount();
+	learned.length = 0;
+	click(row(root, "...d6 Sicilians"), ".tr-acts .tr-learn");
+	assert.deepStrictEqual(learned, ["...d6 Sicilians"]);
+	done();
+});
+
+test("a first card of a variation offers to learn it after answering, never before", () => {
+	const { root, ui, progress } = mount({ settings: { bookSide: "black" } });
+	learned.length = 0;
+	click(row(root, "...d6 Sicilians"), ".tr-practice");
+	assert.ok(!$(root, ".tr-question .tr-learn"), "not before the answer");
+	const vk = ui.card.vkey;
+	solve(root, ui);
+	click(root, ".tr-result .tr-learn");
+	assert.deepStrictEqual(learned, [tree.byKey.get(vk).name]);
+	// another card of the same variation was seen: no hint on the next one
+	const other = deck.find((c) => c.vkey === vk && c.id !== ui.card.id);
+	assert.ok(progress.cards[ui.card.id].seen > 0 && other);
+	click(root, ".tr-next");
+	if (ui.card && ui.card.vkey === vk) {
+		solve(root, ui);
+		assert.ok(!$(root, ".tr-result .tr-learn"));
 	}
 	done();
 });

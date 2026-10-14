@@ -214,3 +214,44 @@ test("Train from a position no visible line reaches opens on the whole workbook"
   openTrain([{ san: "d4" }]);
   assert.ok(!trWin().querySelector(".tr-whole"), "no scope");
 });
+
+test("Learn opens Study on the variation; closing it returns to Train with its state", async () => {
+  app.reset();
+  await app.loadPgn(NAJ);
+  app.button("Train").click();
+  trWin().querySelector(".tr-open")?.click();
+  trWin().querySelector(".tr-learn").click();
+  assert.strictEqual(getMode(), "study");
+  assert.strictEqual(trWin(), null);
+  const st = app.view().querySelector(".st-window");
+  assert.ok(st);
+  assert.strictEqual(st.querySelector(".an-move.at").textContent, "a6", "at the variation's position");
+  assert.strictEqual(st.querySelector(".st-trail .on").textContent, "Najdorf");
+  st.querySelector(".an-close").click();
+  assert.strictEqual(getMode(), "train");
+  assert.ok(trWin());
+  assert.strictEqual(app.view().querySelector(".st-window"), null);
+  trWin().querySelector(".an-close").click();
+  assert.strictEqual(getMode(), "report");
+});
+
+test("a session in progress survives a trip to Study, and a toolbar Study closes to the report", async () => {
+  app.reset();
+  await app.loadPgn(NAJ);
+  app.button("Train").click();
+  trWin().querySelector(".tr-practice").click();
+  assert.ok(trWin().querySelector(".tr-question"));
+  const progress = trWin().querySelector(".tr-progress").textContent;
+  // the question screen has no Learn chip; reach Study the way a result does
+  trWin().querySelector(".an-close").click();
+  app.button("Train").click();
+  trWin().querySelector(".tr-learn").click();
+  app.view().querySelector(".st-window .an-close").click();
+  assert.ok(trWin().querySelector(".tr-outline"));
+  trWin().querySelector(".an-close").click();
+  app.button("Study").click();
+  app.view().querySelector(".st-window .an-close").click();
+  assert.strictEqual(getMode(), "report");
+  assert.strictEqual(trWin(), null);
+  assert.ok(progress);
+});
