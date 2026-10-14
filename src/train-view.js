@@ -14,8 +14,8 @@ import { chipBtn } from "./analysis-view.js";
 import { boardSvg } from "./render.js";
 import { interactiveBoard } from "./board-input.js";
 import {
-	DAY, allTags, answer, checkBook, checkFamily, checkName, current, isDue, markKnown, nameChoices,
-	newSession, normalizeSettings, orderStep, resetVar, saveProgress, sessionSummary, setBox, skip, unlockedKeys,
+	allTags, answer, checkBook, checkFamily, checkName, current, markKnown, masteredCard, nameChoices,
+	newSession, normalizeSettings, orderStep, resetVar, saveProgress, sessionSummary, skip, unlockedKeys,
 } from "./train.js";
 
 // Every question draws its board at one size, asked or answered, so the board
@@ -111,8 +111,7 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 			const li = el("li");
 			const own = deck.filter((c) => c.vkey === n.key);
 			const solid = own.filter((c) => c.type !== "book");
-			const mastered = solid.filter((c) => (progress.cards[c.id]?.box ?? -1) >= settings.masteryBox).length;
-			const due = own.filter((c) => isDue(progress.cards[c.id], settings, now)).length;
+			const mastered = solid.filter((c) => masteredCard(progress.cards[c.id], settings)).length;
 			const skipped = own.length > 0 && own.every((c) => progress.cards[c.id]?.skip);
 			const open = ui.open.has(n.key);
 			const r = el("div", { className: "tr-var" });
@@ -126,14 +125,9 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 			if (n.also.length) r.append(el("span", { className: "tr-also", textContent: `also reached from ${n.also.map((a) => a.name).join(", ")}` }));
 			const bar = el("span", { className: "tr-bar", title: `${mastered} of ${solid.length} mastered` }, el("span"));
 			bar.firstChild.style.width = `${solid.length ? Math.round((100 * mastered) / solid.length) : 0}%`;
-			r.append(bar, el("span", { className: "tr-due", textContent: due ? `${due} due` : "" }));
+			r.append(bar);
 			if (!unlocked.has(n.key)) r.append(el("span", { className: "tr-badge", textContent: "locked" }));
 			if (skipped) r.append(el("span", { className: "tr-badge", textContent: "skipped" }));
-			const box = el("select", { className: "tr-box st-pick", title: "Put this variation's cards in a box" }, [
-				el("option", { value: "", textContent: "Box…" }),
-				...[0, 1, 2, 3, 4, 5].map((b) => el("option", { value: String(b), textContent: `Box ${b}` })),
-			]);
-			box.onchange = act(() => box.value !== "" && setBox(progress, n.key, deck, +box.value, now));
 			const acts = el("span", { className: "tr-acts" });
 			acts.append(
 				chipBtn("tr-learn", "Learn", "Play through this variation with its notes", () => learn(n)),
@@ -147,7 +141,6 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 					onChange();
 				}),
 				chipBtn("tr-rename", "Rename…", "Rename or retag this position", () => rename(n)),
-				box,
 			);
 			r.append(acts);
 			li.append(r);
@@ -199,12 +192,11 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 			group,
 			pick("bookSide", "Book side", s.bookSide, ["white", "black", "both"], (x) => set({ bookSide: x })),
 			pick("bookRule", "Book rule", s.bookRule, ["any", "main"], (x) => set({ bookRule: x })),
-			num("masteryBox", "Mastered from box", s.masteryBox, (n) => set({ masteryBox: n }), 1, 5),
-		);
-		s.intervals.forEach((d, i) => box.append(num(`interval-${i}`, `Days in box ${i}`, d, (n) => set({ intervals: s.intervals.map((x, j) => (j === i ? n : x)) }), 0)));
-		box.append(
-			num("newPerSession", "New cards per session", s.newPerSession, (n) => set({ newPerSession: n }), 0),
-			num("sessionLength", "Session length (0: no limit)", s.sessionLength, (n) => set({ sessionLength: n }), 0),
+			num("learnStreak", "Right in a row to learn", s.learnStreak, (n) => set({ learnStreak: n }), 1, 10),
+			num("masterStreak", "Right in a row to master", s.masterStreak, (n) => set({ masterStreak: n }), 1, 20),
+			num("newPerSession", "New questions per session", s.newPerSession, (n) => set({ newPerSession: n }), 0, 50),
+			num("reviews", "Re-checks per session", s.reviews, (n) => set({ reviews: n }), 0, 20),
+			num("sessionLength", "Questions per session (0: no limit)", s.sessionLength, (n) => set({ sessionLength: n }), 0),
 			chipBtn("tr-settings-done", "Done", "Back to the outline", act(() => (ui.screen = "outline"))),
 		);
 		return box;
@@ -229,9 +221,9 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 		const finish = (right, detail, notes = {}) => {
 			// before answer() counts this card as seen
 			const fresh = !deck.some((c) => c.vkey === card.vkey && progress.cards[c.id]?.seen > 0);
-			answer(ui.session, progress, card, right, settings, now);
+			const { unlocked } = answer(ui.session, progress, card, right, settings, now, { deck: live, tree });
 			save();
-			ui.answered = { right, detail, notes, fresh };
+			ui.answered = { right, detail, notes, fresh, unlocked };
 			onChange();
 		};
 		let typedInput = null; // the typed-name field, when this question has one
@@ -335,29 +327,16 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 	// --- summary ---------------------------------------------------------------
 
 	function summaryScreen() {
-		const sum = sessionSummary(ui.session, tree, deck, progress, settings, now);
+		const sum = sessionSummary(ui.session, tree, deck, progress, settings);
 		const total = sum.right + sum.wrong;
-		const name = (id) => {
-			const c = deck.find((x) => x.id === id);
-			return c ? `${nameOf(c.vkey)} (${c.type})` : id;
-		};
 		const box = el("div", { className: "tr-summary" }, [el("h3", { textContent: `Right ${sum.right} / ${total}` })]);
 		const list = (title, items) => items.length && box.append(el("p", { textContent: `${title}: ${items.join(", ")}` }));
-		list("Moved up", sum.up.map(name));
-		list("Moved down", sum.down.map(name));
-		list("Newly unlocked", sum.unlocked);
-		const unit = (n, word) => `in ${n} ${word}${n === 1 ? "" : "s"}`;
-		const ahead = sum.nextDue === null ? 0 : sum.nextDue - now;
-		// sessionSummary only looks ahead, so a card already overdue means "now"
-		const overdue = Object.values(progress.cards).some((r) => isDue(r, settings, now));
-		let wait = "nothing scheduled";
-		if (overdue) wait = "now";
-		else if (ahead >= DAY) wait = unit(Math.ceil(ahead / DAY), "day");
-		else if (ahead > 0) wait = unit(Math.ceil(ahead / 3600000), "hour");
-		box.append(
-			el("p", { textContent: `Next review: ${wait}` }),
-			chipBtn("tr-back", "Back to the outline", "", act(() => (ui.screen = "outline"))),
-		);
+		list("Learned", sum.learned);
+		list("Mastered", sum.mastered);
+		list("Back to learned", sum.slipped);
+		list("Unlocked", sum.unlocked);
+		if (sum.locked) box.append(el("p", { textContent: `Still locked: ${sum.locked} variation${sum.locked === 1 ? "" : "s"}` }));
+		box.append(chipBtn("tr-back", "Back to the outline", "", act(() => (ui.screen = "outline"))));
 		return box;
 	}
 }

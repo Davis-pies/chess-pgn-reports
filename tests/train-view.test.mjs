@@ -5,7 +5,7 @@ import { installDom } from "./helpers.mjs";
 import { parsePgn } from "../src/pgn.js";
 import { collectLines } from "../src/tree.js";
 import { namesFromNodes, variationTree } from "../src/names.js";
-import { DAY, DEFAULT_SETTINGS, buildDeck, emptyProgress, normalizeSettings, newSession, loadProgress } from "../src/train.js";
+import { DEFAULT_SETTINGS, buildDeck, emptyProgress, markKnown, normalizeSettings, newSession, loadProgress } from "../src/train.js";
 import { newTrainUi, trainPanel } from "../src/train-view.js";
 
 const PGN = `1. e4 c5 2. Nf3 d6 {[%name "...d6 Sicilians"]} (2... e6 {[%name "...e6 Sicilians/Sicilian e6"] [%tags "e6"]} 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 d6 {[%name "Scheveningen"]}) 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 e6 {[%name "Scheveningen"]} (5... a6 {[%name "Najdorf"] [%tags "d6; Nc3 committed"]} 6. Be3 {[%name "English Attack"]}) *`;
@@ -86,11 +86,11 @@ test("outline: roots listed, children behind a toggle, locked badge", () => {
 	done();
 });
 
-test("outline: Known, Skip, Reset, Box update progress and save", () => {
+test("outline: Known, Skip, Reset update progress and save", () => {
 	const { root, progress } = mount();
 	const key = v("...d6 Sicilians").key;
 	click(row(root, "...d6 Sicilians"), ".tr-known");
-	assert.strictEqual(progress.cards[`name|${key}`].box, 3);
+	assert.strictEqual(progress.cards[`name|${key}`].streak, 5);
 	assert.match(row(root, "...d6 Sicilians").querySelector(".tr-bar span").style.width, /^[1-9]/);
 	assert.ok(store.get("ott-train:t1").includes(`name|${key}`));
 	click(row(root, "...d6 Sicilians"), ".tr-skip");
@@ -99,10 +99,6 @@ test("outline: Known, Skip, Reset, Box update progress and save", () => {
 	assert.strictEqual($(row(root, "...d6 Sicilians"), ".tr-skip").textContent, "Unskip");
 	click(row(root, "...d6 Sicilians"), ".tr-skip");
 	assert.ok(!progress.cards[`name|${key}`].skip);
-	const sel = $(row(root, "...d6 Sicilians"), ".tr-box");
-	sel.value = "4";
-	sel.dispatchEvent(new window.Event("change"));
-	assert.strictEqual(progress.cards[`name|${key}`].box, 4);
 	const asked = [];
 	globalThis.confirm = (m) => !asked.push(m) && false;
 	click(row(root, "...d6 Sicilians"), ".tr-reset");
@@ -145,16 +141,18 @@ test("a whole session: right answers, results, Enter for Next, summary", () => {
 	const { root, ui } = mount({ settings: { sessionLength: 4, bookSide: "black" } });
 	click(root, ".tr-start");
 	assert.match($(root, ".tr-progress").textContent, /Question 1 of 4/);
-	for (let i = 0; i < 4; i++) {
-		assert.ok($(root, ".tr-question"));
+	// a right answer on a card not yet learned comes back, so the session runs past four answers
+	let n = 0;
+	while ($(root, ".tr-question")) {
 		solve(root, ui);
 		assert.ok($(root, ".tr-result.right"), `card ${ui.card.id}`);
-		if (i % 2) $(root, ".tr-question").dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+		if (n++ % 2) $(root, ".tr-question").dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 		else click(root, ".tr-next");
 	}
+	assert.ok(n > 4);
 	const sum = $(root, ".tr-summary");
-	assert.match(sum.textContent, /Right 4 \/ 4/);
-	assert.match(sum.textContent, /next review/i);
+	assert.match(sum.textContent, new RegExp(`Right ${n} / ${n}`));
+	assert.doesNotMatch(sum.textContent, /next review/i);
 	click(root, ".tr-back");
 	assert.ok($(root, ".tr-outline"));
 	done();
@@ -293,7 +291,7 @@ test("settings: changes persist to localStorage; Done returns", () => {
 	set('[name="choices"]', "value", "6");
 	set('[name="showMoves"]', "checked", true);
 	set('[name="bookSide"]', "value", "both");
-	set('[name="interval-1"]', "value", "2");
+	set('[name="learnStreak"]', "value", "3");
 	set('[name="tag-d6"]', "checked", true);
 	assert.ok(s);
 	// every control reports a change without breaking the settings
@@ -302,7 +300,7 @@ test("settings: changes persist to localStorage; Done returns", () => {
 	assert.strictEqual(progress.settings.nameMode, "typed");
 	assert.strictEqual(progress.settings.choices, 6);
 	assert.strictEqual(progress.settings.bookSide, "both");
-	assert.strictEqual(progress.settings.intervals[1], 2);
+	assert.strictEqual(progress.settings.learnStreak, 3);
 	assert.deepStrictEqual(progress.settings.familyGroup, ["d6"]);
 	set('[name="tag-d6"]', "checked", false);
 	assert.deepStrictEqual(progress.settings.familyGroup, []);
@@ -314,29 +312,24 @@ test("settings: changes persist to localStorage; Done returns", () => {
 	done();
 });
 
-test("summary lists moved cards and says when the next review is", () => {
+test("summary lists what was learned, mastered, slipped and unlocked", () => {
 	const m = mount();
 	const progress = m.progress;
-	const c = deck.find((x) => x.id === `name|${v("...d6 Sicilians").key}`);
-	m.ui.session = newSession(deck, tree, progress, progress.settings, { now: NOW });
-	m.ui.session.results.push({ id: c.id, right: true, from: 0, to: 1 }, { id: deck.find((x) => x.type === "book").id, right: false, from: 2, to: 1 });
-	progress.cards[c.id] = { box: 2, seen: NOW, skip: false };
+	const root = v("...d6 Sicilians").key;
+	m.ui.session = newSession(deck, tree, progress, progress.settings, {});
+	markKnown(progress, root, deck, progress.settings, NOW);
 	m.ui.screen = "summary";
 	m.draw();
 	const t = $(m.root, ".tr-summary").textContent;
-	assert.match(t, /Right 1 \/ 2/);
-	assert.match(t, /\.\.\.d6 Sicilians \(name\)/);
-	assert.match(t, /in 3 days/);
-	const wait = (rec) => {
-		progress.cards = { [c.id]: rec };
-		m.draw();
-		return $(m.root, ".tr-summary").textContent;
-	};
-	assert.match(wait({ box: 1, seen: NOW, skip: false }), /in 1 dayBack/);
-	assert.match(wait({ box: 2, seen: NOW - 3 * DAY + 3600000, skip: false }), /in 1 hourBack/);
-	assert.match(wait({ box: 2, seen: NOW - 3 * DAY + 7200000, skip: false }), /in 2 hours/);
-	assert.match(wait({ box: 3, seen: NOW - 8 * DAY, skip: false }), /Next review: now/);
-	assert.match(wait({ box: 0, seen: NOW, skip: true }), /nothing scheduled/);
+	assert.match(t, /Right 0 \/ 0/);
+	assert.match(t, /Learned: \.\.\.d6 Sicilians/);
+	assert.match(t, /Mastered: \.\.\.d6 Sicilians/);
+	assert.match(t, /Unlocked: Scheveningen, Najdorf/);
+	assert.match(t, /Still locked: 1 variation(?!s)/);
+	assert.doesNotMatch(t, /Next review|Back to learned/);
+	m.ui.session.before.mastered.add(v("Najdorf").key);
+	m.draw();
+	assert.match($(m.root, ".tr-summary").textContent, /Back to learned: Najdorf/);
 	done();
 });
 

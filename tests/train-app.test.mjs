@@ -23,14 +23,14 @@ test("Save stores the names, and moves unsaved Train progress to the new id", as
   app.reset();
   await app.loadPgn(PGN);
   const p = emptyProgress();
-  p.cards.x = { box: 2, seen: 5, skip: false };
+  p.cards.x = { streak: 2, seen: 5, skip: false };
   saveProgress(null, p);
   assert.ok(ls().getItem("ott-train:unsaved"));
   app.clickText("Save");
   const id = getCurrent().id;
   assert.strictEqual(Object.keys(JSON.parse(ls().getItem("ott:" + id)).names).length, 1);
   assert.strictEqual(ls().getItem("ott-train:unsaved"), null);
-  assert.strictEqual(loadProgress(id).cards.x.box, 2);
+  assert.strictEqual(loadProgress(id).cards.x.streak, 2);
   assert.ok(!("train" in JSON.parse(ls().getItem("ott:" + id))), "localStorage Save omits train");
 });
 
@@ -38,14 +38,14 @@ test("Save to file carries Train progress and opening the file restores it", asy
   app.reset();
   await app.loadPgn(PGN);
   const p = emptyProgress();
-  p.cards.y = { box: 3, seen: 9, skip: false };
+  p.cards.y = { streak: 3, seen: 9, skip: false };
   saveProgress(null, p);
   getCurrent().name = "Book";
   const cap = captureDownloads(app.dom.window.document);
   app.clickText("Save to file");
   cap.restore();
   const text = await cap.blobs[0].text();
-  assert.strictEqual(JSON.parse(text).train.cards.y.box, 3);
+  assert.strictEqual(JSON.parse(text).train.cards.y.streak, 3);
 
   app.reset();
   const input = [...app.view().querySelectorAll("input[type=file]")].find((i) => /json/.test(i.accept));
@@ -54,7 +54,7 @@ test("Save to file carries Train progress and opening the file restores it", asy
   input.onchange();
   await app.settle();
   assert.strictEqual(Object.keys(getCurrent().names).length, 1);
-  assert.strictEqual(loadProgress(null).cards.y.box, 3);
+  assert.strictEqual(loadProgress(null).cards.y.streak, 3);
 });
 
 const NAJ = '1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 {[%name "Najdorf"]} 6. Be3 e5 *';
@@ -176,7 +176,7 @@ test("unsaved Train progress is not inherited by the next workbook", async () =>
   app.reset();
   await app.loadPgn(NAJ);
   const p = emptyProgress();
-  p.cards.z = { box: 4, seen: 1, skip: false };
+  p.cards.z = { streak: 4, seen: 1, skip: false };
   saveProgress(null, p);
   toImport();
   await app.loadPgn(NAJ);
