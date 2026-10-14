@@ -135,7 +135,7 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn, engine = n
 			const depth = Math.max(0, ...[...unlockedKeys(tree, deck, progress, settings)].map((k) => tree.byKey.get(k).level));
 			box.append(el("p", {
 				className: "tr-overview",
-				title: "Learned: its name, order and family questions each answered right in a row often enough. Learning a variation opens the ones below it.",
+				title: "Learned: its name, order and tags questions each answered right often enough. Learning a variation opens the ones below it.",
 				textContent: `Learned ${learnedN} of ${tree.byKey.size} variations · ${masteredN} mastered · open to level ${depth}`,
 			}));
 		}
@@ -263,8 +263,9 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn, engine = n
 				pick("bookRule", "Accept", s.bookRule, ["any", "main"], (x) => set({ bookRule: x }), `Which move counts as right: any book move, or only the mainline's. Default ${D.bookRule === "any" ? "any book move" : "the mainline's only"}.`, { any: "any book move", main: "the mainline's only" }),
 			),
 			group("Progress",
-				num("learnStreak", "Right in a row to learn", s.learnStreak, (n) => set({ learnStreak: n }), 1, 10, `How many right answers in a row learn a question; learning every question of a variation unlocks what is below it. 1 to 10. Default ${D.learnStreak}.`),
-				num("masterStreak", "Right in a row to master", s.masterStreak, (n) => set({ masterStreak: n }), 1, 20, `How many right answers in a row master a question. Never below the learn setting. 1 to 20. Default ${D.masterStreak}.`),
+				num("learnStreak", "Right answers to learn", s.learnStreak, (n) => set({ learnStreak: n }), 1, 10, `How many right answers learn a question, less what misses take away; learning every question of a variation unlocks what is below it. 1 to 10. Default ${D.learnStreak}.`),
+				num("masterStreak", "Right answers to master", s.masterStreak, (n) => set({ masterStreak: n }), 1, 20, `How many right answers master a question, less what misses take away. Never below the learn setting. 1 to 20. Default ${D.masterStreak}.`),
+				num("missCost", "A miss takes away", s.missCost, (n) => set({ missCost: n }), 1, 5, `How many right answers a miss takes off a question, down to none. With the defaults a mastered question drops back to learned. 1 to 5. Default ${D.missCost}.`),
 			),
 			group("Sessions",
 				check("introNew", "Show a new variation first", s.introNew, (on) => set({ introNew: on }), `Before the first question on a variation, show its position, the moves that reach it and the workbook's notes. Default ${onOff(D.introNew)}.`),
@@ -302,7 +303,7 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn, engine = n
 		const opens = card.vkey === "" || isLearned(card.vkey, deck, progress, settings) ? 0 : unlocksIfLearned(card.vkey, tree, deck, progress, settings);
 		const status = el("p", {
 			className: "tr-status",
-			title: `Answer it right ${settings.learnStreak} times in a row to learn it (unlocking what's below), ${settings.masterStreak} times to master it. A miss on a mastered question drops it back to learned; any other miss starts the count again.`,
+			title: `Answer it right ${settings.learnStreak} times to learn it (unlocking what's below), ${settings.masterStreak} times to master it. Each miss takes ${settings.missCost} right answer${settings.missCost === 1 ? "" : "s"} away.`,
 			textContent: `${card.vkey === "" ? "" : `Level ${card.level} · `}${standing}${opens ? ` · learn it to unlock ${opens} variation${opens === 1 ? "" : "s"}` : ""}`,
 		});
 		box.append(el("div", { className: "tr-head" }, [

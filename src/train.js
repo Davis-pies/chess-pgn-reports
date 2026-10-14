@@ -29,6 +29,7 @@ export const DEFAULT_SETTINGS = {
 	bookRule: "any",
 	learnStreak: 3,
 	masterStreak: 5,
+	missCost: 2,
 	learning: 5,
 	recheckEvery: 6,
 	sessionLength: 20,
@@ -146,6 +147,7 @@ const VALID = {
 	bookRule: (x) => x === "any" || x === "main",
 	learnStreak: (x) => isInt(x, 1, 10),
 	masterStreak: (x) => isInt(x, 1, 20),
+	missCost: (x) => isInt(x, 1, 5),
 	learning: (x) => isInt(x, 1, 20),
 	recheckEvery: (x) => isInt(x, 0, 50),
 	introNew: (x) => typeof x === "boolean",
@@ -534,8 +536,12 @@ export function answer(session, progress, card, right, settings, ctx = null) {
 	const shown = session.passed.get(card.vkey);
 	const justShown = right && shown !== undefined && session.results.length - shown < AFTER_INTRO;
 	const tooSoon = spaced || justShown;
-	// a miss takes a card down one stage: a mastered card to learned, any other to the start
-	const to = !right ? (masteredCard(rec, settings) ? settings.learnStreak : 0) : tooSoon ? from : Math.min(from + 1, settings.masterStreak);
+	// A miss takes "A miss takes away" right answers off, down to none, the same
+	// for every card (Davis, 2026-10-14). It replaced two rules: a mastered
+	// card dropped to the learn setting, and any other card started again at
+	// 0, which threw away a nearly learned card's progress for one slip. With
+	// the defaults a mastered card (5) still lands on learned (3).
+	const to = !right ? Math.max(0, from - settings.missCost) : tooSoon ? from : Math.min(from + 1, settings.masterStreak);
 	progress.asked = (progress.asked ?? 0) + 1;
 	const saved = { ...rec, streak: to, seen: progress.asked };
 	if (right && !learnedBefore && learnedCard(saved, settings)) delete saved.tricky;

@@ -36,8 +36,8 @@ test("train asks the questions an answer unlocks in the same session", async ({ 
   for (const label of ["Order", "Book", "Show the moves", "Show a new variation first"]) {
     await page.getByLabel(label, { exact: true }).click();
   }
-  await page.getByLabel("Right in a row to learn").fill("1");
-  await page.getByLabel("Right in a row to learn").blur();
+  await page.getByLabel("Right answers to learn").fill("1");
+  await page.getByLabel("Right answers to learn").blur();
   await page.locator(".tr-settings-done").click();
   await page.locator(".tr-start").click();
   await expect(page.locator(".tr-status")).toHaveText("Level 1 · 0 of 1 right to learn · learn it to unlock 1 variation");
@@ -59,7 +59,7 @@ test("train's session flows on, ends on request and keeps going", async ({ page 
   for (const label of ["Order", "Book", "Show a new variation first"]) {
     await page.getByLabel(label, { exact: true }).click();
   }
-  for (const [label, value] of [["Right in a row to learn", "1"], ["Learning at once", "1"], ["Questions per session", "0"]]) {
+  for (const [label, value] of [["Right answers to learn", "1"], ["Learning at once", "1"], ["Questions per session", "0"]]) {
     await page.getByLabel(label).fill(value);
     await page.getByLabel(label).blur();
   }

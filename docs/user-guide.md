@@ -244,17 +244,17 @@ For a shorter overview see the [README](../README.md).
      keeps the streak where it was and the question comes back.
    - **Streaks** — every question carries one number, its streak: a right
      answer adds one (up to the mastery setting), and nothing about it
-     depends on time. A question is **learned** at 3 right in a row by default
+     depends on time. A question is **learned** at 3 right answers by default
      and **mastered** at 5, so mastery says what you know now. Once a question
      is learned, a right answer adds to its streak only when at least 10 other
      questions have been answered since it was last asked; sooner, it is still
      right but marked "Too soon to count towards mastery: it counts when other
      questions come in between". So mastery takes separate re-checks, spread
      out, rather than the same question asked again and again in one sitting.
-     A miss takes a
-     question down one stage rather than to nothing: a mastered question drops
-     back to learned (two right answers master it again), and any other
-     question starts its count again.
+     A miss takes two right answers off a question (**A miss takes away** in
+     the settings), never below none, so one slip costs some progress
+     without wiping it: a mastered question (5) drops to 3, still learned, and
+     two right answers master it again.
    - **Unlocking** — level-1 variations start unlocked. A variation counts as
      learned when each of its Name, Order and Tags questions is learned;
      learning it unlocks its sub-variations and its Book questions, and what
@@ -336,8 +336,8 @@ For a shorter overview see the [README](../README.md).
      how many choices, showing the moves. **Order questions**: showing the
      target position. **Tags questions**: showing the name, and a group of
      tags to ask within. **Book questions**: the side you play, and whether
-     any book move counts or only the mainline's. **Progress**: right in a row
-     to learn and to master. **Sessions**: showing a new variation first, how many
+     any book move counts or only the mainline's. **Progress**: right answers
+     to learn and to master, and how many a miss takes away. **Sessions**: showing a new variation first, how many
      questions you learn at once, how often a learned one is re-checked, and
      the questions per session (0 for no limit).
    - **Where progress lives** — in this browser, one store for every

@@ -234,7 +234,7 @@ test("newSession: an unnamed workbook is one book variation", () => {
 
 const hand = (queue, extra = {}) => ({ queue, i: 0, results: [], unlockedBefore: new Set(), practice: false, sinceRecheck: 0, pool: [], intros: new Map(), introduced: new Set(), passed: new Map(), tricky: new Set(), ...extra });
 
-test("answer: the streak climbs to the master setting and a miss drops it a stage", () => {
+test("answer: the streak climbs to the master setting and a miss takes two right answers away", () => {
 	const p = emptyProgress();
 	const c = deck[0];
 	let s;
@@ -246,22 +246,28 @@ test("answer: the streak climbs to the master setting and a miss drops it a stag
 	assert.strictEqual(p.cards[c.id].streak, 5);
 	assert.deepStrictEqual(s.results[0], { id: c.id, right: true, from: 5, to: 5, unlocked: [] });
 	assert.strictEqual(p.cards[c.id].seen, p.asked);
-	// mastered: a miss leaves it learned, three right answers master it again
+	// mastered (5): a miss leaves 3, still learned; two right answers master it again
 	answer(hand([c]), p, c, false, S);
-	assert.strictEqual(p.cards[c.id].streak, 2);
+	assert.strictEqual(p.cards[c.id].streak, 3);
 	assert.ok(learnedCard(p.cards[c.id], S) && !masteredCard(p.cards[c.id], S));
-	for (let k = 0; k < 3; k++) {
+	for (let k = 0; k < 2; k++) {
 		p.asked += 10;
 		answer(hand([c]), p, c, true, S);
 	}
 	assert.ok(masteredCard(p.cards[c.id], S));
-	// not mastered: a miss starts again
+	// the same for every card, never below none
+	for (const [from, to] of [[4, 2], [2, 0], [1, 0], [0, 0]]) {
+		p.cards[c.id].streak = from;
+		answer(hand([c]), p, c, false, S);
+		assert.strictEqual(p.cards[c.id].streak, to, `${from} → ${to}`);
+	}
+	// how much a miss costs is a setting
 	p.cards[c.id].streak = 4;
-	answer(hand([c]), p, c, false, S);
-	assert.strictEqual(p.cards[c.id].streak, 0);
-	p.cards[c.id].streak = 1;
-	answer(hand([c]), p, c, false, S);
-	assert.strictEqual(p.cards[c.id].streak, 0);
+	answer(hand([c]), p, c, false, { ...S, missCost: 1 });
+	assert.strictEqual(p.cards[c.id].streak, 3);
+	assert.strictEqual(DEFAULT_SETTINGS.missCost, 2);
+	assert.strictEqual(normalizeSettings({ missCost: 5 }).missCost, 5);
+	for (const bad of [0, 6, 1.5, "2"]) assert.strictEqual(normalizeSettings({ missCost: bad }).missCost, 2, `${bad}`);
 });
 
 test("answer: skip is kept; a miss returns three questions later", () => {
@@ -691,7 +697,7 @@ test("spacing: a learned card's streak grows only after 10 other questions", () 
 	p.cards[c.id] = { streak: 1, seen: p.asked, skip: false };
 	assert.strictEqual(answer(hand([c]), p, c, true, S).to, 2);
 	p.cards[c.id] = { streak: 3, seen: p.asked, skip: false };
-	assert.strictEqual(answer(hand([c]), p, c, false, S).to, 0);
+	assert.strictEqual(answer(hand([c]), p, c, false, S).to, 1, "a miss counts straight away: 3 less 2");
 	// the master cap is not "too soon"
 	p.cards[c.id] = { streak: 5, seen: p.asked, skip: false };
 	assert.ok(!answer(hand([c]), p, c, true, S).tooSoon);

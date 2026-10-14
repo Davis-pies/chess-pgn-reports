@@ -111,17 +111,20 @@ the boxes were hard to follow.
   the session has them to put in between. A right answer given sooner than
   that is "too soon to count": no streak, and like the spacing rule's, it is
   left out of the summary's score.
-- A card is **learned** at a streak of "Right in a row to learn" (default 3,
+- A card is **learned** at a streak of "Right answers to learn" (default 3,
   as successive relearning recommends; it was 2 until 2026-10-14)
-  and **mastered** at "Right in a row to master" (default 5, never below the
+  and **mastered** at "Right answers to master" (default 5, never below the
   learn setting). Both read the current streak, so mastery says what the
   reader knows now.
-- A miss takes a card down one stage, not back to the start (Davis: "We
-  also don't want it to be frustrating. Missing something you've mastered
-  shouldn't fully reset you"): a mastered card drops to learned (its streak
-  to the learn setting, so with the defaults three right answers master it
-  again); a card not yet mastered starts again at 0, as it was not known
-  yet. Nothing unlocked is locked again.
+- A miss takes "A miss takes away" right answers off the streak (default
+  2, 1-5), never below 0, the same for every card (Davis, 2026-10-14: a miss
+  should step progress back, "count against 2 correct (min of 0)"; earlier:
+  "Missing something you've mastered shouldn't fully reset you"). With the
+  defaults a mastered card (5) lands on learned (3). This replaced "a
+  mastered card drops to the learn setting, any other starts again at 0",
+  which wiped a nearly learned card for one slip. The streak is a net count,
+  not "in a row": the settings say "Right answers to learn / to master".
+  Nothing unlocked is locked again.
 - A variation is learned (or mastered) when each of its enabled
   name/order/family cards is. Level-1 variations start unlocked; learning a
   variation unlocks its children and its book cards, and a variation once
@@ -206,7 +209,8 @@ Grouped, each with a tooltip saying what it does and its default:
 - **Tags questions**: show the name; ask only within one group of tags.
 - **Book questions**: the side you play (White, Black, both); accept any
   book move or only the mainline's.
-- **Progress**: right in a row to learn (1-10), to master (learn-20).
+- **Progress**: right answers to learn (1-10, default 3), to master
+  (learn-20, default 5), a miss takes away (1-5, default 2).
 - **Sessions**: show a new variation first (on), learning at once (1-20,
   default 5), re-check every N questions (0-50, default 6; 0: never),
   questions per session (default 20; 0: no limit). Saved settings with the

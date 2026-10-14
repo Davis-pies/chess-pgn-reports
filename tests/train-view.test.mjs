@@ -749,7 +749,7 @@ test("question status: level and streak towards learned, then mastered; never th
 	sessionOf(m, c);
 	assert.strictEqual(status(), "Level 2 · 0 of 2 right to learn · learn it to unlock 1 variation");
 	assert.doesNotMatch(status(), /Najdorf/);
-	assert.match($(m.root, ".tr-status").title, /2 times in a row to learn it.*5 times to master/);
+	assert.match($(m.root, ".tr-status").title, /right 2 times to learn it.*5 times to master it\. Each miss takes 2 right answers away\./);
 	m.progress.cards[c.id] = { streak: 1, seen: NOW, skip: false };
 	m.draw();
 	assert.match(status(), /^Level 2 · 1 of 2 right to learn/);
@@ -814,7 +814,7 @@ test("settings: grouped, every field has a tooltip with its default, streaks cla
 	const legends = [...root.querySelectorAll(".tr-group > legend")].map((l) => l.textContent);
 	assert.deepStrictEqual(legends, ["Questions", "Name questions", "Order questions", "Tags questions", "Book questions", "Progress", "Sessions"]);
 	const labels = [...root.querySelectorAll(".tr-field > span")].map((l) => l.textContent);
-	for (const l of ["Name", "Order", "Tags", "Book", "Answer by", "Choices", "Show the moves", "Show the target position", "Show the name", "You play", "Accept", "Right in a row to learn", "Right in a row to master", "Show a new variation first", "Learning at once", "Re-check every", "Questions per session (0: no limit)"]) {
+	for (const l of ["Name", "Order", "Tags", "Book", "Answer by", "Choices", "Show the moves", "Show the target position", "Show the name", "You play", "Accept", "Right answers to learn", "Right answers to master", "A miss takes away", "Show a new variation first", "Learning at once", "Re-check every", "Questions per session (0: no limit)"]) {
 		assert.ok(labels.includes(l), l);
 	}
 	for (const f of root.querySelectorAll(".tr-field")) assert.ok(f.title, `no tooltip on ${f.textContent}`);
