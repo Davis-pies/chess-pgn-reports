@@ -67,7 +67,7 @@ test("the table's menu opens the study at a move", async ({ page }) => {
   await expect(here(page)).toContainText("The Petroff, then d4.");
 });
 
-test("a real game reads in the study", async ({ page }) => {
+test("a real repertoire reads in the study", async ({ page }) => {
   await loadPgn(page, readFileSync(FIXTURE, "utf8"));
   await openStudy(page);
   await page.keyboard.press("End");
@@ -84,7 +84,7 @@ test("on a phone the board stays put while the notes scroll", async ({ page }) =
   await loadPgn(page, readFileSync(FIXTURE, "utf8"));
   await openStudy(page);
   for (let i = 0; i < 9; i++) await page.locator(".an-fwd").click();
-  await expect(here(page)).toContainText("very solid development");
+  await expect(here(page)).toContainText("keeps the centre closed");
   const board = page.locator(".study .an-board");
   const before = await board.boundingBox();
   await page.locator(".st-window").evaluate((w) => (w.scrollTop = 600));

@@ -299,15 +299,10 @@ test("ends with a single trailing newline", () => {
 });
 
 const FIXTURE = readFileSync(
-	new URL("./fixtures/capablanca.pgn", import.meta.url),
+	new URL("./fixtures/open-games-repertoire.pgn", import.meta.url),
 	"utf8",
 );
 
-// `nullMoves` marks a case chess.js cannot validate: it does not implement the
-// PGN null move ("--"), which the Capablanca fixture uses to show what a side
-// was threatening. Our export reproduces those moves faithfully — dropping them
-// to satisfy the validator would lose annotation the source carried — so that
-// case is checked by the round-trip alone.
 const CASES = [
 	["plain mainline", "1. e4 e5 2. Nf3 Nc6 *"],
 	["one sideline", "1. e4 e5 (1... c5 2. Nf3 d6) 2. Nf3 *"],
@@ -315,16 +310,16 @@ const CASES = [
 	["comments", "1. e4 {best by test} e5 (1... c5 {sharp}) *"],
 	["NAGs", "1. e4 $1 e5 $16 2. Nf3 $13 *"],
 	["a decisive result", "1. e4 e5 1-0"],
-	["the capablanca fixture", FIXTURE, { nullMoves: true }],
+	["the Open Games repertoire fixture", FIXTURE],
 ];
 
-for (const [name, pgn, opts = {}] of CASES) {
+for (const [name, pgn] of CASES) {
 	const exported = () => {
 		const lines = linesOf(pgn);
 		return { lines, out: buildPgn({ name: "T", lines, result: parsePgn(pgn).result }) };
 	};
 
-	test(`chess.js parses our export of ${name}`, { skip: opts.nullMoves && "chess.js has no null-move support" }, () => {
+	test(`chess.js parses our export of ${name}`, () => {
 		const { out } = exported();
 		const c = new Chess();
 		assert.doesNotThrow(() => c.loadPgn(out), out);
@@ -353,9 +348,9 @@ test("marks survive a round-trip", () => {
 });
 
 test("a null move survives the export", () => {
-	// chess.js rejects "--", so this is checked against our own parser: the
-	// fixture uses null moves to show a threat, and losing them would drop
-	// annotation the source carried.
+	// chess.js rejects "--", so this is checked against our own parser: null
+	// moves show a threat, and losing them would drop annotation the source
+	// carried.
 	const lines = linesOf("1. e4 e5 2. -- Bc5 *");
 	const out = buildPgn({ name: "T", lines });
 	assert.match(out, /2\. -- Bc5/);

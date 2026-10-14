@@ -94,11 +94,11 @@ test("a group in the table opens and folds in place", async ({ page }) => {
 
 test("a note's [n] scrolls the table to its move", async ({ page }) => {
   await loadPgn(page, readFileSync(FIXTURE, "utf8"));
-  const note = page.locator(".notes .nt").filter({ hasText: "46.g6" });
+  const note = page.locator(".notes .nt").filter({ hasText: "3...Nf6 — TWO KNIGHTS." });
   await note.scrollIntoViewIfNeeded();
   await note.locator(".note-jump").click();
   const cell = page.locator(".pv-table td.note-hit");
-  await expect(cell).toHaveText(/^g6/);
+  await expect(cell).toHaveText(/^Nf6/);
   await expect(cell).toBeInViewport();
   await expect(cell).toBeFocused();
 });

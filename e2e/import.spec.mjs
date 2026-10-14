@@ -17,7 +17,7 @@ test("a PGN file loads straight into the report", async ({ page }) => {
   await page.locator("input.filein").setInputFiles(FIXTURE);
   await expect(page.locator(".toolbar")).toBeVisible();
   await expect(page.locator(".pv-table td.main").first()).toHaveText("e4");
-  // Capablanca–Burn carries its side variations as lines of their own
+  // The Open Games repertoire carries its side variations as lines of their own
   expect(await page.locator(".pv-table th.var-head").count()).toBeGreaterThan(1);
 });
 
