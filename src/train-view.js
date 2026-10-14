@@ -318,14 +318,17 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 		};
 		if (card.type === "intro") {
 			prompt.textContent = `New: ${node.name}`;
-			body.append(
-				boardSvg(node.fen, BOARD, { flipped: readerFlip }),
-				flip(),
+			body.append(boardSvg(node.fen, BOARD, { flipped: readerFlip }), flip());
+			// the moves and notes go where a question's result goes, beside the
+			// board on a wide window, so the buttons stay in view
+			box.append(el("div", { className: "tr-result tr-intro" }, [
 				el("p", { className: "tr-moves", textContent: node.orders[0].join(" ") }),
 				...card.notes.map((n) => noteLine(n.move, n.text)),
-				chipBtn("tr-learn", "Learn it", "Play through this variation with its notes in Study", () => learn(node)),
-				chipBtn("tr-next", "Got it", "Go on to the questions (Enter)", gotIt),
-			);
+				el("div", { className: "tr-acts" }, [
+					chipBtn("tr-learn", "Learn it", "Play through this variation with its notes in Study", () => learn(node)),
+					chipBtn("tr-next", "Got it", "Go on to the questions (Enter)", gotIt),
+				]),
+			]));
 		} else if (card.type === "name") {
 			prompt.textContent = "What is this position called?";
 			body.append(boardSvg(node.fen, BOARD, { flipped: readerFlip }));

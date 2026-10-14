@@ -1962,6 +1962,17 @@ sup {
 .tr-result.right { border-color: var(--main); }
 .tr-result.wrong { border-color: var(--warn); }
 .tr-result p { margin: .25rem 0; }
+/* On a wide window a question's result, or a new variation's moves and
+   notes, sit beside the board instead of under it: with the notes every
+   answer now shows, a result under a full-height board pushed Next off the
+   bottom of the window. */
+@media (min-width: 900px) {
+	.tr-question { display: grid; grid-template-columns: fit-content(70%) minmax(16rem, 1fr); column-gap: 1.2rem; align-items: start; }
+	.tr-question > * { grid-column: 1 / -1; }
+	.tr-question > .tr-body { grid-column: 1; }
+	.tr-question > .tr-result { grid-column: 2; margin-top: 0; }
+}
+.tr-intro .tr-acts { margin: .5rem 0 0; }
 
 /* ---- keyboard and screen-reader support ---- */
 /* read out, never seen: the live region and the board's piece list */

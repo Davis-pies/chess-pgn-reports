@@ -476,7 +476,8 @@ test("a new variation opens with its intro: position, moves, notes, Learn it and
 	assert.strictEqual($(q, ".tr-prompt").textContent, `New: ${tree.byKey.get(ui.card.key).name}`);
 	assert.ok($(q, ".an-board, svg"), "the board");
 	assert.strictEqual($(q, ".tr-moves").textContent, tree.byKey.get(ui.card.key).orders[0].join(" "));
-	assert.ok(!$(q, ".tr-status") && !$(q, ".tr-choices") && !$(q, ".tr-result"));
+	assert.ok(!$(q, ".tr-status") && !$(q, ".tr-choices") && !$(q, ".tr-result:not(.tr-intro)"), "no status, choices or answer");
+	assert.ok($(q, ".tr-intro .tr-next"), "the moves, notes and buttons sit in the result's place, beside the board on a wide window");
 	assert.match($(q, ".tr-progress").textContent, /^Question 1 of \d+$/);
 	assert.deepStrictEqual([...q.querySelectorAll(".tr-note")].map((n) => n.textContent), ui.card.notes.map((n) => `${n.move} ${n.text}`));
 	learned.length = 0;
