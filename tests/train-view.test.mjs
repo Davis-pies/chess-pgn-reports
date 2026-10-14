@@ -19,7 +19,7 @@ const deck = buildDeck(tree, lines, { ...DEFAULT_SETTINGS, types: ALL });
 const v = (n) => [...tree.byKey.values()].find((x) => x.name === n);
 const NOW = 1e12;
 // a session by hand: one queue, with the fields answer() and refill() touch
-const hand = (queue, extra = {}) => ({ queue, i: 0, results: [], unlockedBefore: new Set(), practice: false, sinceRecheck: 0, pool: [], intros: new Map(), introduced: new Set(), tricky: new Set(), ...extra });
+const hand = (queue, extra = {}) => ({ queue, i: 0, results: [], unlockedBefore: new Set(), practice: false, sinceRecheck: 0, pool: [], intros: new Map(), introduced: new Set(), passed: new Map(), tricky: new Set(), ...extra });
 
 let store;
 let done;
@@ -40,7 +40,7 @@ after(() => delete global.localStorage);
 
 const learned = [];
 function mount({ ui = newTrainUi(), t = tree, d = deck, settings = {}, progress = emptyProgress(), engine = null } = {}) {
-	progress.settings = normalizeSettings({ types: ALL, ...settings });
+	progress.settings = normalizeSettings({ types: ALL, learnStreak: 2, ...settings });
 	const root = document.createElement("div");
 	document.body.append(root); // change events only fire on connected inputs
 	const draw = () => root.replaceChildren(trainPanel(ui, { tree: t, deck: d, progress, engine, learn: (n) => learned.push(n.name) }, draw));
@@ -166,7 +166,8 @@ test("a whole session: right answers, results, Enter for Next, summary", () => {
 	}
 	assert.strictEqual(n, 4, "the session ends at its length, though some cards would have come back");
 	const sum = $(root, ".tr-summary");
-	assert.match(sum.textContent, new RegExp(`Right ${n} / ${n}`));
+	const counted = ui.session.results.filter((r) => !r.tooSoon).length; // an answer right after its intro does not count
+	assert.match(sum.textContent, new RegExp(`Right ${counted} / ${counted}`));
 	assert.doesNotMatch(sum.textContent, /next review/i);
 	click(root, ".tr-back");
 	assert.ok($(root, ".tr-outline"));
@@ -573,8 +574,8 @@ test("a new variation opens with its intro: position, moves, notes, Learn it and
 	// Got it: on to the first question, nothing scored or stored, the count unchanged
 	const before = ui.card;
 	click(root, ".tr-next");
-	assert.notStrictEqual(ui.card.type, "intro");
-	assert.strictEqual(ui.card.vkey, before.vkey);
+	assert.notStrictEqual(ui.card, before);
+	assert.strictEqual(ui.session.i, 1);
 	assert.deepStrictEqual([ui.session.results.length, Object.keys(progress.cards).length, progress.asked], [0, 0, 0]);
 	assert.match($(root, ".tr-progress").textContent, /^Question 1$/);
 	// Enter does the same on the next intro
@@ -716,7 +717,7 @@ test("the question status says how many variations learning it would unlock, unt
 });
 
 const sessionOf = (m, c, extra = {}) => {
-	m.ui.session = { queue: [c], i: 0, results: [], unlockedBefore: new Set(), practice: false, sinceRecheck: 0, pool: [], intros: new Map(), introduced: new Set(), tricky: new Set(), ...extra };
+	m.ui.session = { queue: [c], i: 0, results: [], unlockedBefore: new Set(), practice: false, sinceRecheck: 0, pool: [], intros: new Map(), introduced: new Set(), passed: new Map(), tricky: new Set(), ...extra };
 	m.ui.card = c;
 	m.ui.screen = "question";
 	Object.assign(m.ui, { answered: null, played: [], choices: null });
@@ -801,7 +802,7 @@ test("settings: grouped, every field has a tooltip with its default, streaks cla
 	}
 	for (const f of root.querySelectorAll(".tr-field")) assert.ok(f.title, `no tooltip on ${f.textContent}`);
 	assert.ok($(root, ".tr-subgroup").title);
-	assert.match($(root, '[name="learnStreak"]').closest("label").title, /Default 2\./);
+	assert.match($(root, '[name="learnStreak"]').closest("label").title, /Default 3\./);
 	assert.match($(root, '[name="masterStreak"]').closest("label").title, /Default 5\./);
 	assert.ok(!$(root, '[name="masteryBox"]') && !$(root, '[name="interval-1"]'));
 	const set = (name, val) => {

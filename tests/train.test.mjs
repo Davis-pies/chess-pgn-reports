@@ -13,7 +13,7 @@ const PGN = `1. e4 c5 2. Nf3 d6 {[%name "...d6 Sicilians"]} (2... e6 {[%name "..
 const { nodes } = parsePgn(PGN);
 const lines = collectLines(nodes);
 const tree = variationTree(lines, namesFromNodes(nodes));
-const S = { ...DEFAULT_SETTINGS, types: { name: true, order: true, family: true, book: true }, introNew: false };
+const S = { ...DEFAULT_SETTINGS, learnStreak: 2, types: { name: true, order: true, family: true, book: true }, introNew: false };
 const deck = buildDeck(tree, lines, S);
 const v = (n) => [...tree.byKey.values()].find((x) => x.name === n);
 const ownOf = (vkey) => deck.filter((c) => c.vkey === vkey && c.type !== "book");
@@ -232,7 +232,7 @@ test("newSession: an unnamed workbook is one book variation", () => {
 	assert.strictEqual(newSession(d, t, emptyProgress(), S, {}).queue.length, 1);
 });
 
-const hand = (queue, extra = {}) => ({ queue, i: 0, results: [], unlockedBefore: new Set(), practice: false, sinceRecheck: 0, pool: [], intros: new Map(), introduced: new Set(), tricky: new Set(), ...extra });
+const hand = (queue, extra = {}) => ({ queue, i: 0, results: [], unlockedBefore: new Set(), practice: false, sinceRecheck: 0, pool: [], intros: new Map(), introduced: new Set(), passed: new Map(), tricky: new Set(), ...extra });
 
 test("answer: the streak climbs to the master setting and a miss drops it a stage", () => {
 	const p = emptyProgress();
@@ -404,10 +404,58 @@ test("checkName and nameChoices", () => {
 	const c = nameChoices(card, tree, S, () => 0);
 	assert.strictEqual(c.length, 4);
 	assert.ok(c.includes("Scheveningen"));
-	assert.ok(c.includes("Najdorf")); // same level 2
-	assert.ok(!c.includes("English Attack"));
+	assert.ok(c.includes("Najdorf")); // its one sibling
 	assert.strictEqual(nameChoices(card, tree, { ...S, choices: 9 }, () => 0).length, 5);
 	assert.strictEqual(nameChoices(card, tree, { ...S, choices: 2 }, () => 0).length, 2);
+});
+
+// Roots Sicilian and Open; Sicilian's children S1 (tag x), S2, S3; S1's child
+// S1a; Open's child O1 (tag x). For S1: siblings S2 and S3, then O1 (shared
+// tag), then S1a (not its level), Sicilian and Open elsewhere.
+const CPGN = `1. e4 c5 {[%name "Sicilian"]} (1... e5 {[%name "Open"]} 2. Nf3 Nc6 {[%name "O1"] [%tags "x"]}) 2. Nf3 d6 {[%name "S1"] [%tags "x"]} (2... Nc6 {[%name "S2"]}) (2... e6 {[%name "S3"]}) 3. d4 cxd4 {[%name "S1a"]} *`;
+const cNodes = parsePgn(CPGN).nodes;
+const cLines = collectLines(cNodes);
+const cTree = variationTree(cLines, namesFromNodes(cNodes));
+const cDeck = buildDeck(cTree, cLines, S);
+const cv = (n) => [...cTree.byKey.values()].find((x) => x.name === n);
+const asker = (n) => cDeck.find((c) => c.id === `name|${cv(n).key}`);
+const ask = (n, st, extra) => nameChoices(asker(n), cTree, st, () => 0.5, extra).sort();
+const touch = (p, ...names) => {
+	for (const n of names) p.cards[`name|${cv(n).key}`] = { streak: 0, seen: 1, skip: false };
+	return p;
+};
+
+test("nameChoices: closest first for a learned card, one sibling at most for a new one", () => {
+	const learned = touch(emptyProgress(), "S2", "S3", "O1", "S1a", "Sicilian", "Open");
+	learned.cards[`name|${cv("S1").key}`] = { streak: 3, seen: 1, skip: false };
+	const ctx = { progress: learned, deck: cDeck };
+	assert.deepStrictEqual(ask("S1", { ...S, choices: 3 }, ctx), ["S1", "S2", "S3"]);
+	assert.deepStrictEqual(ask("S1", { ...S, choices: 4 }, ctx), ["O1", "S1", "S2", "S3"]);
+	const five = ask("S1", { ...S, choices: 5 }, ctx);
+	assert.deepStrictEqual(five.filter((n) => ["O1", "S1", "S2", "S3"].includes(n)), ["O1", "S1", "S2", "S3"]);
+	assert.strictEqual(five.length, 5);
+	// not learned: one sibling, then the farther ranks (same level, the rest, tags), the sibling left over last
+	const fresh = touch(emptyProgress(), "S2", "S3", "O1", "S1a", "Sicilian", "Open");
+	for (const choices of [3, 4]) {
+		const c = ask("S1", { ...S, choices }, { progress: fresh, deck: cDeck });
+		assert.strictEqual(c.filter((n) => n === "S2" || n === "S3").length, 1, c.join());
+		assert.ok(!c.includes("O1"), "the shared tag ranks after the rest");
+	}
+	assert.deepStrictEqual(ask("S1", { ...S, choices: 7 }, { progress: fresh, deck: cDeck }), ["O1", "Open", "S1", "S1a", "S2", "S3", "Sicilian"]);
+});
+
+test("nameChoices: met names before unmet ones, the answer always in, never more than there are names", () => {
+	const p = touch(emptyProgress(), "Open", "S2");
+	assert.deepStrictEqual(ask("S1", { ...S, choices: 3 }, { progress: p, deck: cDeck }), ["Open", "S1", "S2"]);
+	// the unmet only fill: after the met ones are used up
+	assert.deepStrictEqual(ask("S1", { ...S, choices: 4 }, { progress: p, deck: cDeck }).filter((n) => ["Open", "S2", "S1"].includes(n)), ["Open", "S1", "S2"]);
+	// callers without progress get "not learned, all unmet"
+	const c = ask("S1", { ...S, choices: 4 });
+	assert.strictEqual(c.length, 4);
+	assert.ok(c.includes("S1") && c.filter((n) => n === "S2" || n === "S3").length === 1);
+	assert.strictEqual(ask("S1", { ...S, choices: 8 }).length, 7, "seven names in all");
+	assert.strictEqual(ask("Sicilian", { ...S, choices: 2 }).length, 2);
+	assert.ok(ask("Sicilian", { ...S, choices: 2 }).includes("Sicilian"));
 });
 
 test("orderStep over two move orders", () => {
@@ -464,14 +512,14 @@ test("progress: round trip, repair and unreadable data", () => {
 	assert.deepStrictEqual(normalizeSettings(null), DEFAULT_SETTINGS);
 	assert.deepStrictEqual(
 		[DEFAULT_SETTINGS.learnStreak, DEFAULT_SETTINGS.masterStreak, DEFAULT_SETTINGS.learning, DEFAULT_SETTINGS.recheckEvery, DEFAULT_SETTINGS.sessionLength],
-		[2, 5, 5, 6, 20],
+		[3, 5, 5, 6, 20],
 	);
 	const range = (k, ok, bad) => {
 		for (const x of ok) assert.strictEqual(normalizeSettings({ [k]: x })[k], x, `${k} ${x}`);
 		for (const x of bad) assert.strictEqual(normalizeSettings({ [k]: x })[k], DEFAULT_SETTINGS[k], `${k} ${x}`);
 	};
 	range("learnStreak", [1, 10], [0, 11, 1.5]);
-	range("masterStreak", [2, 20], [0, 21]);
+	range("masterStreak", [3, 20], [0, 21]); // never below the learn default
 	range("learning", [1, 20], [0, 21]);
 	range("recheckEvery", [0, 50], [-1, 51]);
 	assert.ok(!("newPerSession" in normalizeSettings({ newPerSession: 3, reviews: 2 })) && !("reviews" in normalizeSettings({ reviews: 2 })), "the old batch limits are dropped");
@@ -760,4 +808,74 @@ test("unlocksIfLearned counts the children and also-children that are still clos
 	assert.strictEqual(unlocksIfLearned("", tree, deck, p, S), 0);
 	markKnown(p, root, deck, S);
 	assert.strictEqual(unlocksIfLearned(root, tree, deck, p, S), 0);
+});
+
+const gap = (q, vkey) => {
+	const a = q.findIndex((c) => c.type === "intro" && c.vkey === vkey);
+	const b = q.findIndex((c, k) => k > a && c.vkey === vkey && c.type !== "intro");
+	return q.slice(a + 1, b).filter((c) => c.type !== "intro").length;
+};
+
+test("intros come three other questions before their variation's first one, where the queue has them", () => {
+	const e6 = v("...e6 Sicilians").key;
+	// opening queue: six started cards ahead of the new e6 cards
+	const p = emptyProgress();
+	for (const n of ["...d6 Sicilians", "Najdorf", "Scheveningen"]) for (const c of ownOf(v(n).key)) p.cards[c.id] = { streak: 1, seen: 1, skip: false };
+	const wide = { ...SI, learning: 12, sessionLength: 0, recheckEvery: 0 };
+	const s = newSession(deckI, tree, p, wide, {});
+	assert.strictEqual(gap(s.queue, e6), 3);
+	assert.ok(s.queue.findIndex((c) => c.id === `intro|${e6}`) >= s.i);
+	// refill: a session answering rights keeps every intro as far from its question as the queue allows
+	const q = emptyProgress();
+	const flow = { ...wide, learnStreak: 1, masterStreak: 1, learning: 8 };
+	const t = newSession(deckI, tree, q, flow, {});
+	// (the intros of the opening queue's first cards have nothing to come after)
+	const opening = new Set(t.queue.filter((c) => c.type === "intro").map((c) => c.vkey));
+	let checked = 0;
+	while (current(t)) {
+		for (const k of t.queue.slice(t.i).filter((c) => c.type === "intro" && !opening.has(c.vkey)).map((c) => c.vkey)) {
+			// questions of a variation whose own intro is queued cannot be put between
+			const tail = t.queue.slice(t.i);
+			const others = tail.filter((c) => c.type !== "intro" && c.vkey !== k && !tail.some((x) => x.type === "intro" && x.vkey === c.vkey)).length;
+			assert.ok(gap(t.queue.slice(t.i), k) >= Math.min(3, others), `${k}: ${gap(t.queue.slice(t.i), k)} of ${others}`);
+			checked++;
+		}
+		answer(t, q, current(t), true, flow, { deck: deckI, tree });
+	}
+	assert.ok(checked > 3);
+	// nothing else queued: adjacent
+	const lone = newSession(buildDeck(tree, lines.slice(0, 1), SI), tree, emptyProgress(), { ...SI, types: { name: true, order: false, family: false, book: false }, learning: 1 }, {});
+	assert.deepStrictEqual(lone.queue.map((c) => c.type), ["intro", "name"]);
+});
+
+test("a right answer fewer than three questions after the variation's intro is too soon to count", () => {
+	const p = emptyProgress();
+	const a = deck.find((x) => x.type !== "book");
+	const intro = { id: `intro|${a.vkey}`, type: "intro", vkey: a.vkey };
+	const other = deck.find((x) => x.type !== "book" && x.vkey !== a.vkey);
+	const s = hand([intro, a, other, other, other, a], { passed: new Map() });
+	answer(s, p, intro, true, S);
+	assert.strictEqual(s.passed.get(a.vkey), 0, "no answers yet when it was passed");
+	let r = answer(s, p, a, true, S);
+	assert.deepStrictEqual([r.tooSoon, r.soon, r.to, p.cards[a.id].streak, p.asked], [true, "intro", 0, 0, 1]);
+	assert.ok(s.queue.filter((x) => x === a).length > 1, "not learned, so it comes back");
+	// misses are never too soon; two other questions go by, then the third counts
+	r = answer(s, p, other, false, S);
+	assert.ok(!r.tooSoon);
+	answer(s, p, other, true, S);
+	r = answer(s, p, other, true, S);
+	assert.ok(!("tooSoon" in r), "another variation is not held back");
+	const later = hand([a], { passed: new Map([[a.vkey, 0]]), results: [{}, {}] });
+	assert.strictEqual(answer(later, p, a, true, S).soon, "intro", "two questions in between: still too soon");
+	later.results.push({});
+	assert.ok(!answer(hand([a], later), p, a, true, S).tooSoon, "the third counts");
+});
+
+test("sessionSummary scores only what counted and reports the rest as soon", () => {
+	const p = emptyProgress();
+	const before = { learned: new Set(), mastered: new Set() };
+	const s = hand([], { before, results: [{ right: true }, { right: true, tooSoon: true, soon: "intro" }, { right: false }, { right: true, tooSoon: true, soon: "spacing" }] });
+	const sum = sessionSummary(s, tree, deck, p, S);
+	assert.deepStrictEqual([sum.right, sum.wrong, sum.soon], [1, 1, 2]);
+	assert.strictEqual(sessionSummary(hand([], { before }), tree, deck, p, S).soon, 0);
 });

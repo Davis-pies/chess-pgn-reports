@@ -27,7 +27,7 @@ export const DEFAULT_SETTINGS = {
 	familyGroup: [],
 	bookSide: "black",
 	bookRule: "any",
-	learnStreak: 2,
+	learnStreak: 3,
 	masterStreak: 5,
 	learning: 5,
 	recheckEvery: 6,
@@ -406,6 +406,40 @@ function withIntros(session, progress, cards) {
 	return out;
 }
 
+// How many other questions come between a variation's intro and its first
+// question (Davis, 2026-10-14: a question right after its intro "feels like a
+// free correct answer"). Where the queue cannot supply them, fewer is fine; a
+// right answer given sooner than this after the intro does not count.
+const AFTER_INTRO = 3;
+
+// Make each queued intro come AFTER_INTRO other questions before its
+// variation's first one, run after every change to the queue's tail. The intro
+// moves earlier (never before the card now showing); if the tail is too short
+// for that, questions of other variations are pulled forward from after the
+// first one. A variation with an intro still queued is never pulled from: its
+// questions must not come before it, and moving them would undo its spacing.
+function spaceIntros(session) {
+	const q = session.queue;
+	for (let a = session.i; a < q.length; a++) {
+		if (q[a].type !== "intro") continue;
+		const [intro] = q.splice(a, 1);
+		let b = q.findIndex((c, k) => k >= a && c.vkey === intro.vkey);
+		if (b < 0) {
+			q.splice(a, 0, intro);
+			continue;
+		}
+		let at = b;
+		for (let n = 0; at > session.i && n < AFTER_INTRO; at--) if (q[at - 1].type !== "intro") n++;
+		at = Math.min(at, a); // an intro already further ahead stays there
+		for (let need = AFTER_INTRO - q.slice(at, b).filter((c) => c.type !== "intro").length; need > 0; need--) {
+			const k = q.findIndex((c, j) => j > b && c.vkey !== intro.vkey && c.type !== "intro" && !q.some((x, y) => y >= session.i && x.type === "intro" && x.vkey === c.vkey));
+			if (k < 0) break;
+			q.splice(b++, 0, ...q.splice(k, 1));
+		}
+		q.splice(at, 0, intro);
+	}
+}
+
 // Feed the flow (Davis, 2026-10-14: a session should keep unlocking, not stop
 // at a batch fixed up front). Run after the opening queue and after every
 // answer: new cards join while fewer than `learning` cards are in flight
@@ -441,6 +475,7 @@ function refill(session, progress, settings, ctx) {
 	}
 	const last = session.queue.length ? session.queue[session.queue.length - 1].vkey : null;
 	session.queue.push(...withIntros(session, progress, interleave(more, cards, last)));
+	spaceIntros(session);
 }
 
 export function newSession(deck, tree, progress, settings, { scope = null, practice = false, keys = null }) {
@@ -450,7 +485,7 @@ export function newSession(deck, tree, progress, settings, { scope = null, pract
 	const intros = new Map(deck.filter((c) => c.type === "intro").map((c) => [c.vkey, c]));
 	const base = {
 		i: 0, results: [], unlockedBefore, practice, scope, pool, before: states(tree, cards, progress, settings),
-		intros, introduced: new Set(), tricky: new Set(),
+		intros, introduced: new Set(), passed: new Map(), tricky: new Set(),
 		sinceRecheck: settings.recheckEvery, // the opening queue gets a re-check at once
 	};
 	if (practice) return { ...base, queue: settings.sessionLength > 0 ? pool.slice(0, settings.sessionLength) : pool };
@@ -486,6 +521,7 @@ function holdBack(session, progress) {
 export function answer(session, progress, card, right, settings, ctx = null) {
 	if (card.type === "intro") { // a step, not a question: nothing is scored or stored
 		session.i++;
+		session.passed.set(card.vkey, session.results.length); // answers so far, to space its questions out
 		return { id: card.id, intro: true };
 	}
 	const rec = progress.cards[card.id] || { streak: 0, seen: 0, skip: false };
@@ -493,14 +529,18 @@ export function answer(session, progress, card, right, settings, ctx = null) {
 	const before = ctx && unlockedKeys(ctx.tree, ctx.deck, progress, settings);
 	const learnedBefore = learnedCard(rec, settings);
 	// a right answer on a learned card counts only after enough other questions
-	const tooSoon = right && learnedBefore && from < settings.masterStreak && (progress.asked ?? 0) - rec.seen < SPACING;
+	const spaced = right && learnedBefore && from < settings.masterStreak && (progress.asked ?? 0) - rec.seen < SPACING;
+	// ... and so does one asked fewer than AFTER_INTRO answers after its variation's intro
+	const shown = session.passed.get(card.vkey);
+	const justShown = right && shown !== undefined && session.results.length - shown < AFTER_INTRO;
+	const tooSoon = spaced || justShown;
 	// a miss takes a card down one stage: a mastered card to learned, any other to the start
 	const to = !right ? (masteredCard(rec, settings) ? settings.learnStreak : 0) : tooSoon ? from : Math.min(from + 1, settings.masterStreak);
 	progress.asked = (progress.asked ?? 0) + 1;
 	const saved = { ...rec, streak: to, seen: progress.asked };
 	if (right && !learnedBefore && learnedCard(saved, settings)) delete saved.tricky;
 	const result = { id: card.id, right, from, to, unlocked: [] };
-	if (tooSoon) result.tooSoon = true;
+	if (tooSoon) Object.assign(result, { tooSoon: true, soon: justShown ? "intro" : "spacing" });
 	session.results.push(result);
 	const tricky = !right && session.results.filter((r) => r.id === card.id && !r.right).length >= TRICKY;
 	if (tricky) {
@@ -521,13 +561,15 @@ export function answer(session, progress, card, right, settings, ctx = null) {
 }
 
 export function sessionSummary(session, tree, deck, progress, settings) {
-	const right = session.results.filter((r) => r.right).length;
+	const counted = session.results.filter((r) => !r.tooSoon);
+	const right = counted.filter((r) => r.right).length;
 	const now = states(tree, deck, progress, settings);
 	const names = (keys) => keys.map((k) => tree.byKey.get(k).name);
 	const unlocked = unlockedKeys(tree, deck, progress, settings);
 	return {
 		right,
-		wrong: session.results.length - right,
+		wrong: counted.length - right,
+		soon: session.results.length - counted.length,
 		learned: names([...now.learned].filter((k) => !session.before.learned.has(k))),
 		mastered: names([...now.mastered].filter((k) => !session.before.mastered.has(k))),
 		slipped: names([...session.before.mastered].filter((k) => !now.mastered.has(k))),
@@ -594,13 +636,30 @@ function shuffle(list, rng) {
 	return a;
 }
 
-export function nameChoices(card, tree, settings, rng) {
+// The wrong answers, hardest first (Davis, 2026-10-14: questions should be
+// difficult and ensure understanding; research findings 3 and 6). Ranks of
+// confusability: 1 siblings (same parent; the roots are each other's), 2 a
+// shared tag, 3 the same level, 4 the rest. A variation the reader has met
+// (any card asked) comes before an unmet one, whatever the ranks, so an
+// unmet name only fills. A card not yet learned takes one sibling at most and
+// the farther ranks after it, so that the choice is not a tie-break between
+// near twins; a learned one takes the closest first.
+export function nameChoices(card, tree, settings, rng, { progress, deck } = {}) {
 	const right = tree.byKey.get(card.key);
-	const others = [...tree.byKey.values()].filter((v) => v !== right && v.name !== right.name);
-	const same = shuffle(others.filter((v) => v.level === right.level), rng);
-	const rest = others.filter((v) => v.level !== right.level);
-	const names = [...new Set([right.name, ...same.map((v) => v.name), ...rest.map((v) => v.name)])];
-	return shuffle(names.slice(0, settings.choices), rng);
+	const learned = !!progress && learnedCard(progress.cards[card.id], settings);
+	const met = new Set(deck && progress ? deck.filter((c) => progress.cards[c.id]).map((c) => c.vkey) : []);
+	const rank = (v) => (v.parent === right.parent ? 1 : v.tags.some((t) => right.tags.includes(t)) ? 2 : v.level === right.level ? 3 : 4);
+	const names = new Set([right.name]);
+	const others = [];
+	for (const v of shuffle([...tree.byKey.values()], rng)) if (!names.has(v.name) && names.add(v.name)) others.push(v);
+	const order = (pool) => {
+		const by = (r) => pool.filter((v) => rank(v) === r);
+		const [first, ...more] = by(1);
+		const ranks = learned ? [by(1), by(2), by(3), by(4)] : [first ? [first] : [], by(3), by(4), by(2), more];
+		return ranks.flat();
+	};
+	const picked = [...order(others.filter((v) => met.has(v.key))), ...order(others.filter((v) => !met.has(v.key)))];
+	return shuffle([right.name, ...picked.slice(0, settings.choices - 1).map((v) => v.name)], rng);
 }
 
 export function orderStep(orders, played, san) {
