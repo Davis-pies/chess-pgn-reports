@@ -244,9 +244,9 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 			),
 			group("Sessions",
 				check("introNew", "Show a new variation first", s.introNew, (on) => set({ introNew: on }), `Before the first question on a variation, show its position, the moves that reach it and the workbook's notes. Default ${onOff(D.introNew)}.`),
-				num("newPerSession", "New questions per session", s.newPerSession, (n) => set({ newPerSession: n }), 0, 50, `How many questions never asked before a session adds. 0 to 50. Default ${D.newPerSession}.`),
-				num("reviews", "Re-checks per session", s.reviews, (n) => set({ reviews: n }), 0, 20, `How many mastered questions a session asks again, the ones asked longest ago. 0 to 20. Default ${D.reviews}.`),
-				num("sessionLength", "Questions per session (0: no limit)", s.sessionLength, (n) => set({ sessionLength: n }), 0, undefined, `The most questions in a session; 0 for no limit. Default ${D.sessionLength}.`),
+				num("learning", "Learning at once", s.learning, (n) => set({ learning: n }), 1, 20, `How many new questions you work on at a time: when one is learned, the next joins, including from what it unlocked. 1 to 20. Default ${D.learning}.`),
+				num("recheckEvery", "Re-check every", s.recheckEvery, (n) => set({ recheckEvery: n }), 0, 50, `Bring back one learned question every this many questions, to check it has stuck. 0: never. 0 to 50. Default ${D.recheckEvery}.`),
+				num("sessionLength", "Questions per session (0: no limit)", s.sessionLength, (n) => set({ sessionLength: n }), 0, undefined, `The session ends after this many answers; with 0 it keeps going, unlocking as you learn, until you end it. Default ${D.sessionLength}.`),
 			),
 			chipBtn("tr-settings-done", "Done", "Back to the outline", act(() => (ui.screen = "outline"))),
 		);
@@ -259,10 +259,14 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 		const card = ui.card;
 		const node = tree.byKey.get(card.key);
 		const box = el("div", { className: "tr-question" });
-		// intros are steps, not questions: only the others are counted
+		// intros are steps, not questions: only the others are counted. A flow has
+		// no total (its queue grows), so it counts answers against the length limit,
+		// if any; a practice session still has its whole queue.
 		const asked = (n) => ui.session.queue.slice(0, n).filter((c) => c.type !== "intro").length;
-		const total = asked(Infinity);
-		const place = card.type === "intro" ? asked(ui.session.i) + 1 : ui.answered ? asked(ui.session.i) : asked(ui.session.i + 1);
+		const flow = !ui.session.practice;
+		const place = flow ? ui.session.results.length + (ui.answered ? 0 : 1)
+			: card.type === "intro" ? asked(ui.session.i) + 1 : ui.answered ? asked(ui.session.i) : asked(ui.session.i + 1);
+		const limit = flow ? settings.sessionLength : asked(Infinity);
 		const prompt = el("p", { className: "tr-prompt" });
 		const body = el("div", { className: "tr-body" });
 		// the card's level and streak, never the variation's name: it would give a name question away
@@ -277,7 +281,7 @@ export function trainPanel(ui, { tree, deck, progress, workbookId, rename, learn
 			title: `Answer it right ${settings.learnStreak} times in a row to learn it (unlocking what's below), ${settings.masterStreak} times to master it. A miss on a mastered question drops it back to learned; any other miss starts the count again.`,
 			textContent: `${card.vkey === "" ? "" : `Level ${card.level} · `}${standing}${opens ? ` · learn it to unlock ${opens} variation${opens === 1 ? "" : "s"}` : ""}`,
 		});
-		box.append(el("p", { className: "tr-progress", textContent: `Question ${place} of ${total}` }), prompt, ...(card.type === "intro" ? [] : [status]), body);
+		box.append(el("p", { className: "tr-progress", textContent: `Question ${place}${limit > 0 ? ` of ${limit}` : ""}` }), prompt, ...(card.type === "intro" ? [] : [status]), body);
 
 		const next = () => {
 			setCard();

@@ -17,6 +17,8 @@ const ALL = { name: true, order: true, family: true, book: true };
 const deck = buildDeck(tree, lines, { ...DEFAULT_SETTINGS, types: ALL });
 const v = (n) => [...tree.byKey.values()].find((x) => x.name === n);
 const NOW = 1e12;
+// a session by hand: one queue, with the fields answer() and refill() touch
+const hand = (queue, extra = {}) => ({ queue, i: 0, results: [], unlockedBefore: new Set(), practice: false, sinceRecheck: 0, pool: [], intros: new Map(), introduced: new Set(), tricky: new Set(), ...extra });
 
 let store;
 let done;
@@ -70,7 +72,7 @@ function solve(root, ui) {
 	if (c.type === "book") {
 		const chess = new Chess();
 		c.sans.forEach((s) => chess.move(s));
-		move(root, chess, c.main);
+		move(root, chess, c.main ?? c.moves[0]);
 	}
 }
 
@@ -144,8 +146,7 @@ test("a whole session: right answers, results, Enter for Next, summary", () => {
 	const { root, ui } = mount({ settings: { sessionLength: 4, bookSide: "black" } });
 	click(root, ".tr-start");
 	assert.match($(root, ".tr-progress").textContent, /Question 1 of 4/);
-	// a right answer on a card not yet learned comes back, so the session runs past four answers
-	let n = 0;
+		let n = 0;
 	const enter = () => $(root, ".tr-question").dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 	while ($(root, ".tr-question")) {
 		if (ui.card.type === "intro") { // Got it, or Enter, passes an intro without a question
@@ -158,7 +159,7 @@ test("a whole session: right answers, results, Enter for Next, summary", () => {
 		if (n++ % 2) enter();
 		else click(root, ".tr-next");
 	}
-	assert.ok(n > 4);
+	assert.strictEqual(n, 4, "the session ends at its length, though some cards would have come back");
 	const sum = $(root, ".tr-summary");
 	assert.match(sum.textContent, new RegExp(`Right ${n} / ${n}`));
 	assert.doesNotMatch(sum.textContent, /next review/i);
@@ -172,7 +173,7 @@ test("every question draws its board at one size, asked and answered", () => {
 	for (const type of ["name", "order", "family", "book"]) {
 		const c = deck.find((x) => x.type === type);
 		const m = mount({ settings: { bookSide: "black", orderHint: true } });
-		m.ui.session = { queue: [c], i: 0, results: [], unlockedBefore: new Set() };
+		m.ui.session = hand([c]);
 		m.ui.card = c;
 		m.ui.screen = "question";
 		m.draw();
@@ -188,7 +189,7 @@ test("name question: wrong choice, keys 1-9, typed mode accepts an alias", () =>
 	const c = deck.find((x) => x.id === `name|${key}`);
 	const start = (settings) => {
 		const m = mount({ settings });
-		m.ui.session = { queue: [c], i: 0, results: [], unlockedBefore: new Set() };
+		m.ui.session = hand([c]);
 		m.ui.card = c;
 		m.ui.screen = "question";
 		m.draw();
@@ -217,7 +218,7 @@ test("order question: a wrong first move, then a right run listing other orders"
 	const c = deck.find((x) => x.id === `order|${key}`);
 	const m = mount({ settings: { orderHint: true } });
 	const setup = () => {
-		m.ui.session = { queue: [c], i: 0, results: [], unlockedBefore: new Set() };
+		m.ui.session = hand([c]);
 		m.ui.card = c;
 		m.ui.screen = "question";
 		m.ui.played = [];
@@ -242,7 +243,7 @@ test("family question: tick the tags; a group makes it radio buttons", () => {
 	const c = deck.find((x) => x.id === `family|${key}`);
 	const start = (settings) => {
 		const m = mount({ settings });
-		m.ui.session = { queue: [c], i: 0, results: [], unlockedBefore: new Set() };
+		m.ui.session = hand([c]);
 		m.ui.card = c;
 		m.ui.screen = "question";
 		m.draw();
@@ -270,7 +271,7 @@ test("book question: a wrong move shows the book moves and the note", () => {
 	const base = deck.find((x) => x.type === "book" && x.moves.length === 2);
 	const c = { ...base, notes: { a6: "Najdorf idea." } };
 	const m = mount({ settings: { bookSide: "black" } });
-	m.ui.session = { queue: [c], i: 0, results: [], unlockedBefore: new Set() };
+	m.ui.session = hand([c]);
 	m.ui.card = c;
 	m.ui.screen = "question";
 	m.draw();
@@ -357,7 +358,7 @@ test("digit keys pick a choice even with a choice button focused", () => {
 	const key = v("...d6 Sicilians").key;
 	const c = deck.find((x) => x.id === `name|${key}`);
 	const m = mount();
-	m.ui.session = { queue: [c], i: 0, results: [], unlockedBefore: new Set() };
+	m.ui.session = hand([c]);
 	m.ui.card = c;
 	m.ui.screen = "question";
 	m.draw();
@@ -418,7 +419,10 @@ test("outline: the tag filter lists tagged variations and limits Start", () => {
 test("outline: an empty queue explains Practice and Known", () => {
 	const t = variationTree(lines, namesFromNodes(nodes));
 	const d = buildDeck(t, lines, { ...DEFAULT_SETTINGS, types: ALL });
-	const m = mount({ settings: { newPerSession: 0 }, t, d });
+	// everything is mastered and no book moves are asked: nothing to start, nothing to join
+	const progress = emptyProgress();
+	for (const k of t.byKey.keys()) markKnown(progress, k, d, DEFAULT_SETTINGS);
+	const m = mount({ settings: { types: { ...ALL, book: false } }, t, d, progress });
 	assert.ok($(m.root, ".tr-start").disabled);
 	assert.match($(m.root, ".tr-hint").textContent, /Nothing to train here yet: Practice drills a variation anyway, Known unlocks/);
 	done();
@@ -428,7 +432,7 @@ test("a wrong name says what was answered", () => {
 	const key = v("...e6 Sicilians/Sicilian e6").key;
 	const c = deck.find((x) => x.id === `name|${key}`);
 	const m = mount({ settings: { nameMode: "typed" } });
-	m.ui.session = { queue: [c], i: 0, results: [], unlockedBefore: new Set() };
+	m.ui.session = hand([c]);
 	m.ui.card = c;
 	m.ui.screen = "question";
 	m.draw();
@@ -445,7 +449,7 @@ test("name and family boards: Flip toggles, and Black readers start flipped", ()
 		const c = deck.find((x) => x.id === `${type}|${key}`);
 		const start = (settings) => {
 			const m = mount({ settings });
-			m.ui.session = { queue: [c], i: 0, results: [], unlockedBefore: new Set() };
+			m.ui.session = hand([c]);
 			m.ui.card = c;
 			m.ui.screen = "question";
 			m.draw();
@@ -480,7 +484,7 @@ test("a new variation opens with its intro: position, moves, notes, Learn it and
 	assert.strictEqual($(q, ".tr-moves").textContent, movesText(order.map((san, ply) => ({ san, ply }))).replace(/ +/g, " "));
 	assert.ok(!$(q, ".tr-status") && !$(q, ".tr-choices") && !$(q, ".tr-result:not(.tr-intro)"), "no status, choices or answer");
 	assert.ok($(q, ".tr-intro .tr-next"), "the moves, notes and buttons sit in the result's place, beside the board on a wide window");
-	assert.match($(q, ".tr-progress").textContent, /^Question 1 of \d+$/);
+	assert.match($(q, ".tr-progress").textContent, /^Question 1$/);
 	// one move at a time: from where the variation's own moves begin, only the
 	// notes on the move just played
 	assert.strictEqual(ui.step, ui.card.from);
@@ -508,7 +512,7 @@ test("a new variation opens with its intro: position, moves, notes, Learn it and
 	assert.notStrictEqual(ui.card.type, "intro");
 	assert.strictEqual(ui.card.vkey, before.vkey);
 	assert.deepStrictEqual([ui.session.results.length, Object.keys(progress.cards).length, progress.asked], [0, 0, 0]);
-	assert.match($(root, ".tr-progress").textContent, /^Question 1 of \d+$/);
+	assert.match($(root, ".tr-progress").textContent, /^Question 1$/);
 	// Enter does the same on the next intro
 	while (ui.card.type !== "intro") {
 		solve(root, ui);
@@ -541,12 +545,12 @@ test("question numbers skip the intros", () => {
 		else {
 			seen.push($(m.root, ".tr-progress").textContent);
 			solve(m.root, m.ui);
-			assert.match($(m.root, ".tr-progress").textContent, new RegExp(`^Question ${seen.length} of`), "the same number after answering");
+			assert.match($(m.root, ".tr-progress").textContent, new RegExp(`^Question ${seen.length}$`), "the same number after answering");
 			click(m.root, ".tr-next");
 		}
 		if (m.ui.screen !== "question") break;
 	}
-	assert.strictEqual(seen[0], `Question 1 of ${nonIntro}`);
+	assert.strictEqual(seen[0], "Question 1", "a session with no limit has no total");
 	assert.deepStrictEqual(seen.slice(0, 3).map((x) => +x.match(/\d+/)[0]), [1, 2, 3]);
 	done();
 });
@@ -610,7 +614,7 @@ test("the summary lists tricky questions with Learn it; the outline badges them"
 	const m = mount();
 	learned.length = 0;
 	m.progress.cards[a.id] = { streak: 0, seen: 1, skip: false, tricky: true };
-	m.ui.session = { queue: [], i: 0, results: [], unlockedBefore: new Set(), practice: false, newLeft: 0, pool: [], intros: new Map(), introduced: new Set(), tricky: new Set([a.id, b.id, book.id]), before: { learned: new Set(), mastered: new Set() } };
+	m.ui.session = { queue: [], i: 0, results: [], unlockedBefore: new Set(), practice: false, sinceRecheck: 0, pool: [], intros: new Map(), introduced: new Set(), tricky: new Set([a.id, b.id, book.id]), before: { learned: new Set(), mastered: new Set() } };
 	m.ui.screen = "summary";
 	m.draw();
 	const text = [...m.root.querySelectorAll(".tr-summary p")].find((p) => p.textContent.startsWith("Tricky:"));
@@ -648,7 +652,7 @@ test("the question status says how many variations learning it would unlock, unt
 });
 
 const sessionOf = (m, c, extra = {}) => {
-	m.ui.session = { queue: [c], i: 0, results: [], unlockedBefore: new Set(), practice: false, newLeft: 0, pool: [], intros: new Map(), introduced: new Set(), tricky: new Set(), ...extra };
+	m.ui.session = { queue: [c], i: 0, results: [], unlockedBefore: new Set(), practice: false, sinceRecheck: 0, pool: [], intros: new Map(), introduced: new Set(), tricky: new Set(), ...extra };
 	m.ui.card = c;
 	m.ui.screen = "question";
 	Object.assign(m.ui, { answered: null, played: [], choices: null });
@@ -728,7 +732,7 @@ test("settings: grouped, every field has a tooltip with its default, streaks cla
 	const legends = [...root.querySelectorAll(".tr-group > legend")].map((l) => l.textContent);
 	assert.deepStrictEqual(legends, ["Questions", "Name questions", "Order questions", "Tags questions", "Book questions", "Progress", "Sessions"]);
 	const labels = [...root.querySelectorAll(".tr-field > span")].map((l) => l.textContent);
-	for (const l of ["Name", "Order", "Tags", "Book", "Answer by", "Choices", "Show the moves", "Show the target position", "Show the name", "You play", "Accept", "Right in a row to learn", "Right in a row to master", "Show a new variation first", "New questions per session", "Re-checks per session", "Questions per session (0: no limit)"]) {
+	for (const l of ["Name", "Order", "Tags", "Book", "Answer by", "Choices", "Show the moves", "Show the target position", "Show the name", "You play", "Accept", "Right in a row to learn", "Right in a row to master", "Show a new variation first", "Learning at once", "Re-check every", "Questions per session (0: no limit)"]) {
 		assert.ok(labels.includes(l), l);
 	}
 	for (const f of root.querySelectorAll(".tr-field")) assert.ok(f.title, `no tooltip on ${f.textContent}`);
@@ -745,15 +749,18 @@ test("settings: grouped, every field has a tooltip with its default, streaks cla
 	assert.strictEqual(progress.settings.learnStreak, 7);
 	assert.strictEqual(progress.settings.masterStreak, 7, "master is raised to learn");
 	set("masterStreak", "9");
-	set("reviews", "4");
-	set("newPerSession", "6");
+	set("recheckEvery", "4");
+	set("learning", "6");
 	set("sessionLength", "0");
 	assert.deepStrictEqual(
-		[progress.settings.masterStreak, progress.settings.reviews, progress.settings.newPerSession, progress.settings.sessionLength],
+		[progress.settings.masterStreak, progress.settings.recheckEvery, progress.settings.learning, progress.settings.sessionLength],
 		[9, 4, 6, 0],
 	);
-	set("newPerSession", "99");
-	assert.strictEqual(progress.settings.newPerSession, DEFAULT_SETTINGS.newPerSession, "out of range: the default");
+	set("learning", "99");
+	assert.strictEqual(progress.settings.learning, DEFAULT_SETTINGS.learning, "out of range: the default");
+	assert.match($(root, '[name="learning"]').closest("label").title, /Default 5\./);
+	assert.match($(root, '[name="recheckEvery"]').closest("label").title, /0: never.*Default 6\./);
+	assert.match($(root, '[name="sessionLength"]').closest("label").title, /with 0 it keeps going.*Default 20\./);
 	assert.strictEqual(loadProgress("t1").settings.masterStreak, 9);
 	const intro = $(root, '[name="introNew"]');
 	assert.ok(intro.checked && /Default on\./.test(intro.closest("label").title));

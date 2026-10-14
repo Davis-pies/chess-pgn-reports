@@ -96,57 +96,128 @@ test("unlocking: roots, then children of a learned node, then via also", () => {
 	assert.ok(isLearned("nowhere", deck, emptyProgress(), S) && isMastered("nowhere", deck, emptyProgress(), S));
 });
 
-test("newSession: in progress, then new, then re-checks, with their limits", () => {
+test("newSession: in progress, then new up to learning at once, then a re-check", () => {
 	const p = emptyProgress();
 	const root = v("...d6 Sicilians").key;
 	const e6 = v("...e6 Sicilians").key;
 	const rec = (streak, seen) => ({ streak, seen, skip: false });
-	p.cards[`name|${root}`] = rec(1, NOW - 5);
-	p.cards[`order|${root}`] = rec(0, NOW - 9);
-	p.cards[`name|${e6}`] = rec(5, NOW - 1);
-	p.cards[`family|${e6}`] = rec(5, NOW - 2);
-	const fresh = { ...S, newPerSession: 3, sessionLength: 0 };
-	let s = newSession(deck, tree, p, fresh, {});
-	// in progress (least recently asked first), then new, then re-checks (longest
-	// ago first): the queue is interleaved, so the second root card waits a place
-	assert.deepStrictEqual(s.queue.map((c) => c.id), [`order|${root}`, `order|${e6}`, `name|${root}`, `family|${e6}`, `name|${e6}`]);
-	assert.strictEqual(s.queue.length, 5);
-	assert.strictEqual(s.newLeft, 2);
+	p.asked = 100;
+	p.cards[`name|${root}`] = rec(1, 5);
+	p.cards[`order|${root}`] = rec(0, 1);
+	p.cards[`name|${e6}`] = rec(5, 9);
+	p.cards[`family|${e6}`] = rec(5, 8);
+	const flow = { ...S, sessionLength: 0 };
+	const s = newSession(deck, tree, p, flow, {});
+	// started cards first, least recently asked first; then new ones (order|e6 is
+	// the only unasked card open); then one mastered card for a re-check
+	assert.deepStrictEqual(s.queue.map((c) => c.id), [`order|${root}`, `name|${root}`, `order|${e6}`, `family|${e6}`]);
 	assert.strictEqual(current(s).id, `order|${root}`);
-	assert.strictEqual(newSession(deck, tree, p, { ...fresh, reviews: 1 }, {}).queue.length, 4);
-	assert.strictEqual(newSession(deck, tree, p, { ...fresh, reviews: 0, newPerSession: 0 }, {}).queue.length, 2);
-	s = newSession(deck, tree, p, { ...fresh, sessionLength: 4 }, {});
-	assert.strictEqual(s.queue.length, 4);
-	assert.strictEqual(newSession(deck, tree, p, { ...fresh, newPerSession: 99 }, {}).newLeft, 98);
+	// no re-checks when switched off, or when the card was asked too recently
+	assert.deepStrictEqual(newSession(deck, tree, p, { ...flow, recheckEvery: 0 }, {}).queue.map((c) => c.id), [`order|${root}`, `name|${root}`, `order|${e6}`]);
+	p.cards[`family|${e6}`].seen = 95;
+	p.cards[`name|${e6}`].seen = 98;
+	assert.ok(!newSession(deck, tree, p, flow, {}).queue.some((c) => c.id.endsWith(`|${e6}`) && c.type !== "order"), "spacing: fewer than 10 answers since");
+	// learned but not mastered cards come back as re-checks too
+	p.cards[`name|${e6}`] = rec(2, 3);
+	assert.ok(newSession(deck, tree, p, flow, {}).queue.some((c) => c.id === `name|${e6}`));
+	// "learning at once" bounds the new cards: started ones count towards it
+	const none = emptyProgress();
+	assert.strictEqual(newSession(deck, tree, none, { ...flow, learning: 3 }, {}).queue.length, 3);
+	assert.strictEqual(newSession(deck, tree, none, { ...flow, learning: 1 }, {}).queue.length, 1);
+	assert.strictEqual(newSession(deck, tree, p, { ...flow, learning: 1, recheckEvery: 0 }, {}).queue.length, 2, "two started cards: nothing new joins");
+});
+
+const drive = (s, p, st, right = () => true, max = 500) => {
+	let n = 0;
+	while (current(s) && n++ < max) answer(s, p, current(s), right(current(s)), st, { deck, tree });
+	return s;
+};
+
+test("flow: learning a card brings the next new one in while others are still in flight", () => {
+	const p = emptyProgress();
+	const one = { ...S, learnStreak: 1, learning: 2, sessionLength: 0, recheckEvery: 0 };
+	const s = newSession(deck, tree, p, one, {});
+	const [a, b] = s.queue;
+	assert.strictEqual(s.queue.length, 2);
+	answer(s, p, a, true, one, { deck, tree });
+	assert.strictEqual(s.queue.slice(s.i).length, 2, "b is still in flight and one new card took a's place");
+	assert.ok(s.queue.slice(s.i).includes(b) && !s.queue.slice(s.i).includes(a));
+	// a miss keeps the card in flight: nothing joins for it
+	const n = s.queue.length;
+	answer(s, p, current(s), false, one, { deck, tree });
+	assert.strictEqual(s.queue.length, n + 1, "only the requeued copy");
+});
+
+test("flow: a long session keeps unlocking, down to level 3; without a limit it runs to the end", () => {
+	const p = emptyProgress();
+	const s = drive(newSession(deck, tree, p, { ...S, sessionLength: 30 }, {}), p, { ...S, sessionLength: 30 });
+	assert.strictEqual(s.results.length, 30);
+	const sum = sessionSummary(s, tree, deck, p, S);
+	assert.ok(sum.unlocked.includes("English Attack") && sum.unlocked.includes("Najdorf"), "level 2 and level 3 opened in the session");
+	// no limit: it ends when nothing is left to ask
+	const q = emptyProgress();
+	const t = drive(newSession(deck, tree, q, { ...S, sessionLength: 0 }, {}), q, { ...S, sessionLength: 0 });
+	assert.strictEqual(current(t), null);
+	assert.ok(t.results.length > 30);
+	assert.strictEqual(sessionSummary(t, tree, deck, q, S).locked, 0);
+});
+
+test("flow: the session length ends the queue after that many answers", () => {
+	const p = emptyProgress();
+	const st = { ...S, sessionLength: 3 };
+	const s = newSession(deck, tree, p, st, {});
+	for (let k = 0; k < 3; k++) answer(s, p, current(s), false, st, { deck, tree });
+	assert.strictEqual(current(s), null);
+	assert.strictEqual(s.queue.length, s.i);
+});
+
+test("flow: re-checks join every recheckEvery answers and respect spacing", () => {
+	const p = emptyProgress();
+	for (const k of [v("...d6 Sicilians").key, v("...e6 Sicilians").key]) markKnown(p, k, deck, S);
+	const mastered = new Set(Object.keys(p.cards));
+	p.asked = 200;
+	const st = { ...S, learning: 1, recheckEvery: 3, sessionLength: 0 };
+	const s = newSession(deck, tree, p, st, {});
+	assert.strictEqual(s.queue.filter((c) => mastered.has(c.id)).length, 1, "the opening queue has one");
+	assert.strictEqual(s.queue.length, 2, "and one new card");
+	for (let k = 0; k < 9; k++) answer(s, p, current(s), true, st, { deck, tree });
+	const rechecks = s.results.filter((r) => mastered.has(r.id));
+	assert.ok(rechecks.length >= 3 && rechecks.length <= 5, `about one in three: ${rechecks.length}`);
+	assert.strictEqual(new Set(rechecks.map((r) => r.id)).size, rechecks.length, "none twice within the spacing");
+	const off = emptyProgress();
+	markKnown(off, v("...d6 Sicilians").key, deck, S);
+	off.asked = 200;
+	const known = new Set(Object.keys(off.cards));
+	const t = drive(newSession(deck, tree, off, { ...st, recheckEvery: 0 }, {}), off, { ...st, recheckEvery: 0 }, () => true, 12);
+	assert.ok(t.results.length > 0 && t.results.every((r) => !known.has(r.id)));
 });
 
 test("newSession: scope, practice, book cards, skipped cards", () => {
 	const p = emptyProgress();
 	const root = v("...d6 Sicilians").key;
-	const fresh = { ...S, newPerSession: 3, sessionLength: 0 };
+	const fresh = { ...S, sessionLength: 0 };
 	// scope: Najdorf's subtree only (still locked); practice ignores the lock
 	const naj = v("Najdorf").key;
 	assert.strictEqual(newSession(deck, tree, p, fresh, { scope: naj }).queue.length, 0);
 	const pr = newSession(deck, tree, p, { ...S, sessionLength: 0 }, { scope: naj, practice: true });
 	assert.deepStrictEqual([...new Set(pr.queue.map((c) => c.vkey))].sort(), [naj, v("English Attack").key].sort());
 	assert.ok(pr.queue.length >= 5);
-	assert.strictEqual(pr.newLeft, 0);
 	assert.strictEqual(newSession(deck, tree, p, { ...S, sessionLength: 2 }, { practice: true }).queue.length, 2);
 	// book cards of a learned variation join; of a closed one do not
 	markKnown(p, root, deck, S);
-	const open = newSession(deck, tree, p, { ...S, newPerSession: 99, sessionLength: 0 }, {});
+	const open = newSession(deck, tree, p, { ...S, learning: 20, sessionLength: 0 }, {});
 	assert.ok(open.queue.some((c) => c.type === "book" && c.vkey === root));
 	assert.ok(!open.queue.some((c) => c.type === "book" && c.vkey === naj));
 	// skipped cards stay out
 	skip(p, root, deck, true);
-	assert.ok(!newSession(deck, tree, p, { ...S, newPerSession: 99 }, {}).queue.some((c) => c.vkey === root));
+	assert.ok(!newSession(deck, tree, p, { ...S, learning: 20 }, {}).queue.some((c) => c.vkey === root));
 	assert.ok(!newSession(deck, tree, p, S, { practice: true }).queue.some((c) => c.vkey === root));
 	// a started book card is asked again
 	const bk = deck.find((c) => c.type === "book" && c.vkey === root);
 	const q = emptyProgress();
 	markKnown(q, root, deck, S);
 	q.cards[bk.id] = { streak: 1, seen: NOW - 2, skip: false };
-	assert.strictEqual(newSession(deck, tree, q, { ...S, newPerSession: 0 }, {}).queue[0].id, bk.id);
+	assert.strictEqual(newSession(deck, tree, q, S, {}).queue[0].id, bk.id);
 });
 
 test("newSession: an unnamed workbook is one book variation", () => {
@@ -157,7 +228,7 @@ test("newSession: an unnamed workbook is one book variation", () => {
 	assert.strictEqual(newSession(d, t, emptyProgress(), S, {}).queue.length, 1);
 });
 
-const hand = (queue, extra = {}) => ({ queue, i: 0, results: [], unlockedBefore: new Set(), practice: false, newLeft: 0, pool: [], intros: new Map(), introduced: new Set(), tricky: new Set(), ...extra });
+const hand = (queue, extra = {}) => ({ queue, i: 0, results: [], unlockedBefore: new Set(), practice: false, sinceRecheck: 0, pool: [], intros: new Map(), introduced: new Set(), tricky: new Set(), ...extra });
 
 test("answer: the streak climbs to the master setting and a miss drops it a stage", () => {
 	const p = emptyProgress();
@@ -217,45 +288,43 @@ test("answer: a right answer comes back until the card is learned, then not", ()
 	assert.strictEqual(p.cards[c.id].streak, 2);
 });
 
-test("answer: with a context it names what it unlocked and deepens the session", () => {
+test("answer: with a context it names what it unlocked and refills the session", () => {
 	const p = emptyProgress();
 	const root = v("...d6 Sicilians");
 	const ctx = { deck, tree };
-	const one = { ...S, learnStreak: 1, newPerSession: 2, sessionLength: 0 };
-	const s = newSession(deck, tree, p, { ...one, newPerSession: 0 }, {});
+	const one = { ...S, learnStreak: 1, learning: 2, sessionLength: 0, recheckEvery: 0 };
+	const s = newSession(deck, tree, p, one, {});
 	s.queue = s.pool.filter((c) => c.vkey === root.key && c.type !== "book");
 	s.pool = s.pool.filter((c) => c.vkey !== v("...e6 Sicilians").key); // keep the other root out of it
-	s.newLeft = 2;
 	assert.strictEqual(s.queue.length, 2);
 	// the root's name card is learned at once; its order card is not yet, so nothing unlocks
 	const nameCard = s.queue[0];
 	const orderCard = s.queue[1];
 	let r = answer(s, p, nameCard, true, one, ctx);
 	assert.deepStrictEqual(r.unlocked, []);
+	assert.strictEqual(s.queue.length, 2, "the order card is still in flight and nothing new is open");
 	r = answer(s, p, orderCard, true, one, ctx);
 	assert.deepStrictEqual(r.unlocked.sort(), ["Najdorf", "Scheveningen"]);
 	// two new cards join, questions before book moves even at a shallower level,
 	// (the two taken share a variation, so nothing could be spread)
 	assert.strictEqual(s.queue.length, 4);
 	assert.ok(s.queue.slice(2).every((c) => !p.cards[c.id] && c.type !== "book" && c.vkey !== root.key));
-	assert.strictEqual(s.newLeft, 0);
-	// no more once newLeft is spent
+	// learning one of them makes room for exactly one more
 	const before = s.queue.length;
 	answer(s, p, s.queue[2], true, one, ctx);
-	assert.strictEqual(s.queue.length, before);
+	assert.strictEqual(s.queue.length, before + 1);
 });
 
-test("answer: deepening respects the session length and never runs in practice", () => {
+test("answer: the session length stops the refill, and practice never refills", () => {
 	const root = v("...d6 Sicilians");
-	const one = { ...S, learnStreak: 1, newPerSession: 9, sessionLength: 2 };
+	const one = { ...S, learnStreak: 1, learning: 2, sessionLength: 2, recheckEvery: 0 };
 	const p = emptyProgress();
-	const s = newSession(deck, tree, p, { ...one, newPerSession: 0 }, {});
+	const s = newSession(deck, tree, p, one, {});
 	s.queue = s.pool.filter((c) => c.vkey === root.key && c.type !== "book");
-	s.newLeft = 9;
 	assert.ok(s.pool.length > 2);
 	answer(s, p, s.queue[0], true, one, { deck, tree });
 	answer(s, p, s.queue[1], true, one, { deck, tree });
-	assert.strictEqual(s.queue.length, 2, "the queue was already at the length limit");
+	assert.strictEqual(s.queue.length, 2, "the length is reached: nothing joins");
 	const q = emptyProgress();
 	const pr = newSession(deck, tree, q, { ...one, sessionLength: 0 }, { practice: true });
 	const n = pr.queue.length;
@@ -395,8 +464,8 @@ test("progress: round trip, move, repair and unreadable data", () => {
 	assert.strictEqual(r.asked, 3);
 	assert.deepStrictEqual(normalizeSettings(null), DEFAULT_SETTINGS);
 	assert.deepStrictEqual(
-		[DEFAULT_SETTINGS.learnStreak, DEFAULT_SETTINGS.masterStreak, DEFAULT_SETTINGS.newPerSession, DEFAULT_SETTINGS.reviews],
-		[2, 5, 5, 3],
+		[DEFAULT_SETTINGS.learnStreak, DEFAULT_SETTINGS.masterStreak, DEFAULT_SETTINGS.learning, DEFAULT_SETTINGS.recheckEvery, DEFAULT_SETTINGS.sessionLength],
+		[2, 5, 5, 6, 20],
 	);
 	const range = (k, ok, bad) => {
 		for (const x of ok) assert.strictEqual(normalizeSettings({ [k]: x })[k], x, `${k} ${x}`);
@@ -404,8 +473,9 @@ test("progress: round trip, move, repair and unreadable data", () => {
 	};
 	range("learnStreak", [1, 10], [0, 11, 1.5]);
 	range("masterStreak", [2, 20], [0, 21]);
-	range("reviews", [0, 20], [-1, 21]);
-	range("newPerSession", [0, 50], [-1, 51]);
+	range("learning", [1, 20], [0, 21]);
+	range("recheckEvery", [0, 50], [-1, 51]);
+	assert.ok(!("newPerSession" in normalizeSettings({ newPerSession: 3, reviews: 2 })) && !("reviews" in normalizeSettings({ reviews: 2 })), "the old batch limits are dropped");
 	range("choices", [2, 8], [1, 9]);
 	assert.strictEqual(normalizeSettings({ learnStreak: 6, masterStreak: 4 }).masterStreak, 6);
 	assert.strictEqual(normalizeSettings({ types: { name: false, x: 1 } }).types.name, false);
@@ -546,16 +616,16 @@ test("new cards: questions before book moves, then shallowest level first", () =
 	markKnown(p, v("...d6 Sicilians").key, deck, S);
 	// the eight unlocked questions are taken before any book move, though the
 	// root's book moves are at a shallower level
-	const s = newSession(deck, tree, p, { ...S, newPerSession: 8, sessionLength: 0, reviews: 0 }, {});
+	const s = newSession(deck, tree, p, { ...S, learning: 8, sessionLength: 0, recheckEvery: 0 }, {});
 	assert.strictEqual(s.queue.length, 8);
 	assert.ok(s.queue.every((c) => c.type !== "book"));
-	assert.ok(newSession(deck, tree, p, { ...S, newPerSession: 9, sessionLength: 0, reviews: 0 }, {}).queue.some((c) => c.type === "book"));
+	assert.ok(newSession(deck, tree, p, { ...S, learning: 9, sessionLength: 0, recheckEvery: 0 }, {}).queue.some((c) => c.type === "book"));
 });
 
 test("interleaving: book runs stay together and a variation's cards are kept apart where possible", () => {
 	const p = emptyProgress();
 	markKnown(p, v("...d6 Sicilians").key, deck, S);
-	const s = newSession(deck, tree, p, { ...S, newPerSession: 99, sessionLength: 0, reviews: 0 }, {});
+	const s = newSession(deck, tree, p, { ...S, learning: 20, sessionLength: 0, recheckEvery: 0 }, {});
 	const keys = s.queue.map((c) => c.vkey);
 	for (const k of new Set(keys)) {
 		const run = s.queue.map((c, i) => (c.vkey === k && c.type === "book" ? i : -1)).filter((i) => i >= 0);
@@ -564,7 +634,7 @@ test("interleaving: book runs stay together and a variation's cards are kept apa
 	// with only the order and name cards of two variations, they alternate
 	const q = emptyProgress();
 	const two = deck.filter((c) => ["name", "order"].includes(c.type) && [v("...d6 Sicilians").key, v("...e6 Sicilians").key].includes(c.vkey));
-	const t = newSession(two, tree, q, { ...S, newPerSession: 9, sessionLength: 0 }, {});
+	const t = newSession(two, tree, q, { ...S, learning: 9, sessionLength: 0 }, {});
 	assert.deepStrictEqual(t.queue.map((c) => c.vkey).filter((k, i, a) => i && k === a[i - 1]), []);
 	// requeues skip a spot that holds the same variation
 	const root = v("...d6 Sicilians").key;
@@ -575,29 +645,29 @@ test("interleaving: book runs stay together and a variation's cards are kept apa
 	assert.deepStrictEqual(idsOf(w.queue), ["a", "b", "c", "d", "a", "e", "f"], "moved past d, which has the same variation");
 });
 
-test("difficulty: two misses in the last five hold back unasked cards and their intros", () => {
-	const p = emptyProgress();
-	const s = newSession(deckI, tree, p, { ...SI, sessionLength: 0 }, {});
-	const left0 = s.newLeft;
-	const pass = () => { while (current(s).type === "intro") answer(s, p, current(s), true, SI); };
-	pass();
-	answer(s, p, current(s), false, SI);
-	assert.ok(s.queue.length > 5, "one miss holds nothing back");
-	pass();
-	answer(s, p, current(s), false, SI);
-	assert.ok(s.queue.slice(s.i).every((c) => c.type !== "intro" && p.cards[c.id]), "only asked cards remain");
-	assert.ok(s.newLeft > left0, "they were counted, so they go back to the allowance");
-	// and nothing joins while it lasts
+test("difficulty: two misses in the last five hold back unasked cards and their intros, until they scroll out", () => {
+	const st = { ...SI, sessionLength: 0, learning: 3, recheckEvery: 0 };
 	const ctx = { deck: deckI, tree };
-	const one = { ...SI, learnStreak: 1 };
-	const t = newSession(deckI, tree, emptyProgress(), { ...one, newPerSession: 0 }, {});
-	t.queue = t.pool.filter((c) => c.vkey === v("...d6 Sicilians").key && c.type !== "book");
-	t.newLeft = 5;
-	const q = emptyProgress();
-	answer(t, q, t.queue[0], false, one, ctx);
-	answer(t, q, t.queue[1], false, one, ctx);
-	assert.strictEqual(t.queue.slice(t.i).some((c) => !q.cards[c.id]), false);
-	assert.strictEqual(t.newLeft, 5);
+	const p = emptyProgress();
+	const s = newSession(deckI, tree, p, st, {});
+	const pass = () => { while (current(s).type === "intro") answer(s, p, current(s), true, st, ctx); };
+	const unasked = () => s.queue.slice(s.i).some((c) => !p.cards[c.id] && c.type !== "intro");
+	pass();
+	answer(s, p, current(s), false, st, ctx);
+	assert.ok(unasked(), "one miss holds nothing back");
+	pass();
+	answer(s, p, current(s), false, st, ctx);
+	assert.ok(s.queue.slice(s.i).every((c) => c.type !== "intro" && p.cards[c.id]), "only asked cards remain");
+	// nothing joins while it lasts, and new cards (with their intros) resume after
+	let resumed = false;
+	for (let k = 0; k < 20 && !resumed; k++) {
+		pass();
+		answer(s, p, current(s), true, st, ctx);
+		const held = s.results.slice(-5).filter((r) => !r.right).length >= 2;
+		if (held) assert.ok(!unasked(), "held back");
+		else resumed = unasked();
+	}
+	assert.ok(resumed);
 	// practice is never held back
 	const pr = newSession(deckI, tree, emptyProgress(), { ...SI, sessionLength: 0 }, { practice: true });
 	const n = pr.queue.length;

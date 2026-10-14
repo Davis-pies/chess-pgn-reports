@@ -29,8 +29,8 @@ export const DEFAULT_SETTINGS = {
 	bookRule: "any",
 	learnStreak: 2,
 	masterStreak: 5,
-	newPerSession: 5,
-	reviews: 3,
+	learning: 5,
+	recheckEvery: 6,
 	sessionLength: 20,
 	introNew: true,
 };
@@ -146,8 +146,8 @@ const VALID = {
 	bookRule: (x) => x === "any" || x === "main",
 	learnStreak: (x) => isInt(x, 1, 10),
 	masterStreak: (x) => isInt(x, 1, 20),
-	newPerSession: (x) => isInt(x, 0, 50),
-	reviews: (x) => isInt(x, 0, 20),
+	learning: (x) => isInt(x, 1, 20),
+	recheckEvery: (x) => isInt(x, 0, 50),
 	introNew: (x) => typeof x === "boolean",
 	sessionLength: (x) => isInt(x, 0),
 };
@@ -265,8 +265,8 @@ function inScope(tree, scope) {
 }
 
 // "May be asked now": the variation is unlocked and, for a book card, learned.
-// Shared by the opening queue and by deepening, which asks again after an
-// answer unlocks more.
+// Shared by the opening queue and by refill, which asks again after an answer
+// unlocks more.
 function openTest(deck, progress, settings, unlocked) {
 	const memo = new Map();
 	return (c) => {
@@ -275,6 +275,17 @@ function openTest(deck, progress, settings, unlocked) {
 		const [open, booked] = memo.get(c.vkey);
 		return open && (c.type !== "book" || booked);
 	};
+}
+
+// The cards a session in this scope draws from (`pool`: in scope, not
+// skipped) and those of them that may be asked now (`open`). The outline counts
+// with it, so what it promises is what Start does.
+function scopeCards(deck, tree, progress, settings, { scope = null, keys = null }) {
+	const sc = inScope(tree, scope);
+	const cards = deck.filter((c) => c.type !== "intro");
+	const pool = cards.filter((c) => (!sc || sc.has(c.vkey)) && (!keys || keys.has(c.vkey)) && !progress.cards[c.id]?.skip);
+	const ok = openTest(cards, progress, settings, unlockedKeys(tree, cards, progress, settings));
+	return { pool, open: pool.filter(ok) };
 }
 
 // which variations are learned / mastered, to tell afterwards what changed
@@ -330,32 +341,60 @@ function withIntros(session, progress, cards) {
 	return out;
 }
 
+// Feed the flow (Davis, 2026-10-14: a session should keep unlocking, not stop
+// at a batch fixed up front). Run after the opening queue and after every
+// answer: new cards join while fewer than `learning` cards are in flight
+// (queued and not yet learned, so a card learned just now makes room, and so
+// does the next one it unlocked), and every `recheckEvery` answers one learned
+// card comes back for a spaced check. A card set aside as tricky is not in
+// flight: it would clog the flow for the rest of the session.
+function refill(session, progress, settings, ctx) {
+	if (session.practice) return;
+	if (settings.sessionLength > 0 && session.results.length >= settings.sessionLength) {
+		session.queue = session.queue.slice(0, session.i); // the length is reached: nothing more is asked
+		return;
+	}
+	const cards = ctx.deck.filter((c) => c.type !== "intro");
+	const ok = openTest(cards, progress, settings, unlockedKeys(ctx.tree, cards, progress, settings));
+	const rest = session.queue.slice(session.i).filter((c) => c.type !== "intro");
+	const queued = new Set(rest.map((c) => c.id));
+	const rec = (c) => progress.cards[c.id];
+	const more = [];
+	// while two of the last five answers were misses, nothing new joins
+	if (session.results.slice(-5).filter((r) => !r.right).length < 2) {
+		const inFlight = new Set(rest.filter((c) => !learnedCard(rec(c), settings) && !session.tricky.has(c.id)).map((c) => c.id)).size;
+		more.push(...session.pool.filter((c) => !rec(c) && !queued.has(c.id) && ok(c)).sort(byNewness).slice(0, Math.max(0, settings.learning - inFlight)));
+	}
+	if (settings.recheckEvery > 0 && session.sinceRecheck >= settings.recheckEvery) {
+		const due = session.pool
+			.filter((c) => !queued.has(c.id) && rec(c) && learnedCard(rec(c), settings) && ok(c) && progress.asked - rec(c).seen >= SPACING)
+			.sort((a, b) => rec(a).seen - rec(b).seen)[0];
+		if (due) {
+			more.push(due);
+			session.sinceRecheck = 0;
+		}
+	}
+	const last = session.queue.length ? session.queue[session.queue.length - 1].vkey : null;
+	session.queue.push(...withIntros(session, progress, interleave(more, cards, last)));
+}
+
 export function newSession(deck, tree, progress, settings, { scope = null, practice = false, keys = null }) {
 	const unlockedBefore = unlockedKeys(tree, deck, progress, settings);
-	const sc = inScope(tree, scope);
-	// `keys` is a further limit (the outline's tag filter); it only narrows the
-	// cards, so unlocking still sees the whole deck
 	const cards = deck.filter((c) => c.type !== "intro");
-	const pool = cards.filter((c) => (!sc || sc.has(c.vkey)) && (!keys || keys.has(c.vkey)) && !progress.cards[c.id]?.skip);
-	const cap = (q) => (settings.sessionLength > 0 ? q.slice(0, settings.sessionLength) : q);
+	const { pool, open } = scopeCards(deck, tree, progress, settings, { scope, keys });
 	const intros = new Map(deck.filter((c) => c.type === "intro").map((c) => [c.vkey, c]));
 	const base = {
-		i: 0, results: [], unlockedBefore, practice, pool, before: states(tree, cards, progress, settings),
+		i: 0, results: [], unlockedBefore, practice, scope, pool, before: states(tree, cards, progress, settings),
 		intros, introduced: new Set(), tricky: new Set(),
+		sinceRecheck: settings.recheckEvery, // the opening queue gets a re-check at once
 	};
-	if (practice) return { ...base, queue: cap(pool), newLeft: 0 };
-	const ok = openTest(cards, progress, settings, unlockedBefore);
-	const open = pool.filter(ok);
+	if (practice) return { ...base, queue: settings.sessionLength > 0 ? pool.slice(0, settings.sessionLength) : pool };
 	const rec = (c) => progress.cards[c.id];
-	const bySeen = (a, b) => rec(a).seen - rec(b).seen; // sorts are stable, so deck order breaks ties
-	const started = open.filter((c) => rec(c) && !masteredCard(rec(c), settings)).sort(bySeen);
-	const fresh = open
-		.filter((c) => !rec(c))
-		.sort(byNewness)
-		.slice(0, settings.newPerSession);
-	const recheck = open.filter((c) => rec(c) && masteredCard(rec(c), settings)).sort(bySeen).slice(0, settings.reviews);
-	const queue = withIntros(base, progress, interleave(cap([...started, ...fresh, ...recheck]), cards));
-	return { ...base, queue, newLeft: settings.newPerSession - fresh.length };
+	// sorts are stable, so deck order breaks ties
+	const started = open.filter((c) => rec(c) && !learnedCard(rec(c), settings)).sort((a, b) => rec(a).seen - rec(b).seen);
+	const session = { ...base, queue: withIntros(base, progress, interleave(started, cards)) };
+	refill(session, progress, settings, { deck, tree });
+	return session;
 }
 
 export const current = (s) => s.queue[s.i] || null;
@@ -369,17 +408,16 @@ function requeue(session, card) {
 }
 
 // Finding 3: while two of the last five answers were misses, cards never asked
-// leave the queue (with their intros) and go back to the new-card allowance.
+// leave the queue (with their intros); refill brings them back later.
 function holdBack(session, progress) {
 	const rest = session.queue.slice(session.i);
 	const kept = rest.filter((c) => c.type !== "intro" && progress.cards[c.id]);
 	for (const c of rest) if (c.type === "intro") session.introduced.delete(c.vkey);
-	session.newLeft += rest.filter((c) => c.type !== "intro").length - kept.length;
 	session.queue = [...session.queue.slice(0, session.i), ...kept];
 }
 
-// `ctx` ({ deck, tree }) lets an answer that unlocks variations pull their new
-// cards into the session at once, so a first sitting goes deeper than level 1.
+// `ctx` ({ deck, tree }) lets an answer that learns a card refill the session
+// at once, with the cards it unlocked among them.
 export function answer(session, progress, card, right, settings, ctx = null) {
 	if (card.type === "intro") { // a step, not a question: nothing is scored or stored
 		session.i++;
@@ -408,24 +446,12 @@ export function answer(session, progress, card, right, settings, ctx = null) {
 	if (!tricky && (!right || !learnedCard(saved, settings))) requeue(session, card);
 	session.i++;
 	if (session.practice) return result;
-	const struggling = session.results.slice(-5).filter((r) => !r.right).length >= 2;
-	if (struggling) holdBack(session, progress);
+	session.sinceRecheck++;
+	if (session.results.slice(-5).filter((r) => !r.right).length >= 2) holdBack(session, progress);
 	if (!ctx) return result;
 	const after = unlockedKeys(ctx.tree, ctx.deck, progress, settings);
 	result.unlocked = [...after].filter((k) => !before.has(k)).map((k) => ctx.tree.byKey.get(k).name);
-	if (session.newLeft > 0 && !struggling) {
-		const cards = ctx.deck.filter((c) => c.type !== "intro");
-		const ok = openTest(cards, progress, settings, after);
-		const queued = new Set(session.queue.filter((c) => c.type !== "intro"));
-		const room = settings.sessionLength > 0 ? settings.sessionLength - queued.size : Infinity;
-		const more = session.pool
-			.filter((c) => !progress.cards[c.id] && !queued.has(c) && ok(c))
-			.sort(byNewness)
-			.slice(0, Math.max(0, Math.min(session.newLeft, room)));
-		const last = session.queue.length ? session.queue[session.queue.length - 1].vkey : null;
-		session.queue.push(...withIntros(session, progress, interleave(more, cards, last)));
-		session.newLeft -= more.length;
-	}
+	refill(session, progress, settings, ctx);
 	return result;
 }
 
