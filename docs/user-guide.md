@@ -211,10 +211,28 @@ For a shorter overview see the [README](../README.md).
      board plays one side and you the other along the variation's moves, each
      of your moves its own question; the workbook's note on the move is shown
      after you answer. Name, Order and Book are on by default; Family is off.
+   - **Notes after every answer** — the result of a Name, Order or Family
+     question lists the workbook's notes on the moves that reach the
+     variation (from its parent's position, or the start at level 1), each
+     labelled with its move ("3...Nf6"), as a Book question lists its move's
+     note. A miss is explained, not just marked.
+   - **A new variation first** — the first time a session reaches a variation
+     you have never been asked about, it shows "New: <name>" before any
+     question: its position, the moves that reach it and the notes, with
+     **Learn it** (opens it in Study) and **Got it**; Enter is Got it. It is
+     not a question: nothing is scored or stored, and it is not counted in
+     "Question n of m". Turn it off with "Show a new variation first" in the
+     settings.
    - **Streaks** — every question carries one number, its streak: a right
      answer adds one (up to the mastery setting), and nothing about it
      depends on time. A question is **learned** at 2 right in a row by default
-     and **mastered** at 5, so mastery says what you know now. A miss takes a
+     and **mastered** at 5, so mastery says what you know now. Once a question
+     is learned, a right answer adds to its streak only when at least 10 other
+     questions have been answered since it was last asked; sooner, it is still
+     right but marked "Too soon to count towards mastery: it counts when other
+     questions come in between". So mastery takes separate re-checks, spread
+     out, rather than the same question asked again and again in one sitting.
+     A miss takes a
      question down one stage rather than to nothing: a mastered question drops
      back to learned (three right answers master it again), and any other
      question starts its count again.
@@ -231,10 +249,26 @@ For a shorter overview see the [README](../README.md).
      again that session. When an answer unlocks variations, their new
      questions join the session at once (within the new-question and length
      limits), so a first session goes deeper than level 1.
+   - **Mixed up, not blocked** — the questions of one variation are spread
+     out: two of the same variation are not asked in a row where another
+     order avoids it (a Name question right after its Order question would
+     give it away). A variation's Book questions stay together, in move
+     order. New questions are the Name, Order and Family ones first, then
+     Book questions, shallowest level first.
+   - **When it is going badly** — while two of your last five answers in a
+     session were misses, no new questions are added: those still waiting
+     (and their "New:" steps) leave the session, and answers that unlock
+     variations pull nothing in. They come back in a later session.
+   - **Tricky questions** — a question missed three times in one session is
+     not asked again in it. The summary lists it as tricky with **Learn it**
+     for its variation, and the outline marks the variation "tricky" until
+     the question is next learned: study it before drilling it again.
    - **Seeing progress** — each question shows its level and streak ("Level 2
      · 1 of 2 right to learn", then "learned · 3 of 5 right to master", then
      "mastered"; never the variation's name, which would give a Name question
-     away). After an answer, "Unlocked:" lists what it opened. The outline
+     away). While its variation is not learned and learning it would open
+     others, the line ends "learn it to unlock 3 variations". After an
+     answer, "Unlocked:" lists what it opened. The outline
      says what a session would hold ("3 in progress · 5 new · 2 to
      re-check") and sums up the workbook ("Learned 4 of 12 variations · 1
      mastered · open to level 2"); each row has a bar of progress towards
@@ -253,8 +287,7 @@ For a shorter overview see the [README](../README.md).
      session; when there is nothing to train it says so and points to Practice and Known. **Train from here**, in the table's menu,
      opens Train practising from that position. **Learn** on an outline row
      plays the variation through in Study with the PGN's notes; closing Study
-     returns to Train as you left it. After the first card of a variation you
-     have not seen, the result offers **New to you? Learn it**. In a question, 1–9 pick a
+     returns to Train as you left it. In a question, 1–9 pick a
      choice, Enter goes on and Escape closes.
    - **The board** — Name and Family show the position from your side (Black
      by default, as set by "You play"); **Flip** turns it. After a wrong name
@@ -265,8 +298,8 @@ For a shorter overview see the [README](../README.md).
      target position. **Family questions**: showing the name, and a group of
      tags to ask within. **Book questions**: the side you play, and whether
      any book move counts or only the mainline's. **Progress**: right in a row
-     to learn and to master. **Sessions**: new questions, re-checks and total
-     questions per session (0 for no limit).
+     to learn and to master. **Sessions**: showing a new variation first, new
+     questions, re-checks and total questions per session (0 for no limit).
    - **Where progress lives** — in this browser, separately for each
      workbook, saved after every answer. **Save to file** includes it, and
      opening that file restores it. PGN export and share links do not carry

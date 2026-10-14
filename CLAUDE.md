@@ -23,7 +23,7 @@ npm run test:e2e   # Playwright browser tests in e2e/ (CI's e2e job)
 
 Separately: `npm run lint` (ESLint, zero warnings; `npm run lint:fix`),
 `npm run knip` (unused files, exports or dependencies), `npm test` (the unit
-suite), `npm run coverage:check` (the suite with the 97/87/97 floors, set in
+suite), `npm run coverage:check` (the suite with the 99/95/97 floors, set in
 `package.json`). In Claude Code on the web, `.claude/hooks/session-start.sh`
 installs dependencies at session start.
 
