@@ -224,7 +224,7 @@ For a shorter overview see the [README](../README.md).
      only the notes on the move just played. **Learn it** opens it in Study,
      **Got it** (or Enter) goes on to the questions. It is
      not a question: nothing is scored or stored, and it is not counted in
-     "Question n of m". Turn it off with "Show a new variation first" in the
+     "Question n". Turn it off with "Show a new variation first" in the
      settings.
    - **Streaks** — every question carries one number, its streak: a right
      answer adds one (up to the mastery setting), and nothing about it
@@ -243,15 +243,24 @@ For a shorter overview see the [README](../README.md).
      learned when each of its Name, Order and Tags questions is learned;
      learning it unlocks its sub-variations and its Book questions, and what
      is unlocked stays unlocked.
-   - **A session** — it asks, in this order, the questions you have started
-     but not mastered (the one asked longest ago first), up to 5 questions
-     never asked (the shallowest levels first), and up to 3 mastered ones to
-     re-check, stopping after 20 questions. A miss comes back three questions
-     later, and so does a right answer on a question not yet learned, so a
-     question can be learned in one sitting; once learned it is not asked
-     again that session. When an answer unlocks variations, their new
-     questions join the session at once (within the new-question and length
-     limits), so a first session goes deeper than level 1.
+   - **A session is a flow** — it opens with the questions you have started
+     but not learned (the one asked longest ago first) and brings in new ones
+     as you go: whenever fewer than "Learning at once" (5 by default)
+     questions are being learned, the next new question joins (the Name,
+     Order and Tags ones first, shallowest level first, then Book
+     questions), including the ones a variation you have just learned
+     unlocked. So a long session keeps going deeper. Every "Re-check every"
+     answers (6 by default; 0 for never) one learned question comes back,
+     the one asked longest ago, once at least 10 other questions have been
+     answered since. A miss comes back three questions later, and so does a
+     right answer on a question not yet learned, so a question can be learned
+     in one sitting; once learned it is not asked again that session except
+     as a re-check. The session ends after "Questions per session" answers
+     (20 by default; 0 for no limit, when it runs until nothing is left to
+     ask), or when you press **End session**, which shows the summary of
+     what you answered. **Keep going** on the summary (or Enter) starts a
+     new session with the same variations and tag filter, picking up where
+     you left off.
    - **Mixed up, not blocked** — the questions of one variation are spread
      out: two of the same variation are not asked in a row where another
      order avoids it (a Name question right after its Order question would
@@ -261,7 +270,8 @@ For a shorter overview see the [README](../README.md).
    - **When it is going badly** — while two of your last five answers in a
      session were misses, no new questions are added: those still waiting
      (and their "New:" steps) leave the session, and answers that unlock
-     variations pull nothing in. They come back in a later session.
+     variations pull nothing in. They join again once the misses are no
+     longer among your last five.
    - **Tricky questions** — a question missed three times in one session is
      not asked again in it. The summary lists it as tricky with **Learn it**
      for its variation, and the outline marks the variation "tricky" until
@@ -272,10 +282,9 @@ For a shorter overview see the [README](../README.md).
      away). While its variation is not learned and learning it would open
      others, the line ends "learn it to unlock 3 variations". After an
      answer, "Unlocked:" lists what it opened. The outline
-     says what a session would hold ("3 in progress · 5 new · 2 to
-     re-check") and sums up the workbook ("Learned 4 of 12 variations · 1
+     counts the questions in view ("3 in progress · 5 new · 2 mastered") and sums up the workbook ("Learned 4 of 12 variations · 1
      mastered · open to level 2"); each row has a bar of progress towards
-     mastery and says learned or mastered. The summary shows the score and the
+     mastery and says learned or mastered. The question counter reads "Question 4 of 20", or "Question 4" with no limit. The summary shows the score and the
      variations newly learned, newly mastered, newly unlocked and those that
      slipped back from mastered, and how many are still locked. Every control
      has a tooltip.
@@ -301,8 +310,9 @@ For a shorter overview see the [README](../README.md).
      target position. **Tags questions**: showing the name, and a group of
      tags to ask within. **Book questions**: the side you play, and whether
      any book move counts or only the mainline's. **Progress**: right in a row
-     to learn and to master. **Sessions**: showing a new variation first, new
-     questions, re-checks and total questions per session (0 for no limit).
+     to learn and to master. **Sessions**: showing a new variation first, how many
+     questions you learn at once, how often a learned one is re-checked, and
+     the questions per session (0 for no limit).
    - **Where progress lives** — in this browser, separately for each
      workbook, saved after every answer. **Save to file** includes it, and
      opening that file restores it. PGN export and share links do not carry

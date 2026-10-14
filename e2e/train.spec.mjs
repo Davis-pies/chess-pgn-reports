@@ -49,6 +49,36 @@ test("train asks the questions an answer unlocks in the same session", async ({ 
   await expect(page.locator(".tr-question")).toBeVisible();
 });
 
+// A session is a flow: with no length limit and one question learned at a
+// time, learning a question brings the next one in, and the session carries on
+// until it is ended; Keep going starts the next one from the summary.
+test("train's session flows on, ends on request and keeps going", async ({ page }) => {
+  await loadPgn(page, '1. e4 e5 {[%name "Open"]} 2. Nf3 Nc6 {[%name "Open Knight"]} *');
+  await page.getByRole("button", { name: "Train", exact: true }).click();
+  await page.locator(".tr-settings-open").click();
+  for (const label of ["Order", "Book", "Show a new variation first"]) {
+    await page.getByLabel(label, { exact: true }).click();
+  }
+  for (const [label, value] of [["Right in a row to learn", "1"], ["Learning at once", "1"], ["Questions per session", "0"]]) {
+    await page.getByLabel(label).fill(value);
+    await page.getByLabel(label).blur();
+  }
+  await page.locator(".tr-settings-done").click();
+  await page.locator(".tr-start").click();
+  await expect(page.locator(".tr-progress")).toHaveText("Question 1");
+  await page.locator(".tr-choice", { hasText: /^Open$/ }).click();
+  await expect(page.locator(".tr-result.right")).toBeVisible();
+  await page.locator(".tr-next").click();
+  // learned, so the Open Knight question took its place in the same session
+  await expect(page.locator(".tr-progress")).toHaveText("Question 2");
+  await expect(page.locator(".tr-choice", { hasText: /^Open Knight$/ })).toBeVisible();
+  await page.locator(".tr-end").click();
+  await expect(page.locator(".tr-summary")).toContainText("Right 1 / 1");
+  await page.locator(".tr-again").click();
+  await expect(page.locator(".tr-progress")).toHaveText("Question 1");
+  await expect(page.locator(".tr-choice", { hasText: /^Open Knight$/ })).toBeVisible();
+});
+
 // The board you play on is the analysis board's, which stretches to fill its
 // row; in Train it must keep the size of the pictures the other questions and
 // the answered card show, or it jumps when the answer comes up. That size
