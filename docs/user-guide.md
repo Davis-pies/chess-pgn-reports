@@ -180,7 +180,61 @@ For a shorter overview see the [README](../README.md).
    - **The engine** works as on the analysis board: **E** switches it on,
      Space plays its best move, and clicking a move in one of its lines plays
      the line up to there (off the book, unless the workbook has it).
-5. **Audit** — **Audit** in the toolbar opens the repertoire audit, which
+5. **Train** — **Train** in the toolbar quizzes you on the workbook's
+   openings: the names of the variations, the moves that reach them, and the
+   book moves inside each one. What you learn comes back for review on a
+   schedule.
+   - **Naming positions** — a variation is a position with a name. Right-click
+     a move in the table and choose **Name this position…**, or do the same on
+     the board in Study; give it a name and, optionally, tags separated by `;`
+     (an empty name removes it). Names are stored by position, so a
+     transposition is one variation and a name survives re-importing the PGN.
+     In a PGN a name sits in a comment on the move that reaches the position:
+     `{[%name "Najdorf"] [%tags "...d6; Nc3 committed"]}`. A name set in the
+     app wins over the PGN's, and PGN export writes them back. Study shows the
+     trail of names for the board's position (Sicilian > Najdorf > English
+     Attack).
+   - **Levels** — the first named positions on a line are level 1, the names
+     after them level 2, and so on. A variation reached under another name on
+     a different line is listed under the first and marked "also reached
+     from…".
+   - **The four questions** — **Name**: the board shows a position, you pick
+     (or type; `/` separates accepted aliases, case and punctuation ignored)
+     its name. **Order**: given a name, play the moves from the start; any
+     move some line of the workbook still leads to the position from is
+     accepted. **Family**: tick the tags the position carries. **Book**: the
+     board plays one side and you the other along the variation's moves, each
+     of your moves its own question; the workbook's note on the move is shown
+     after you answer. Name, Order and Book are on by default; Family is off.
+   - **Unlocking** — level-1 variations start unlocked. A variation counts as
+     mastered when each of its Name, Order and Family cards is in the mastery
+     box (box 3 by default) or above; mastering it unlocks its sub-variations
+     and its Book questions.
+   - **The review schedule** — each card sits in a box from 0 to 5. A right
+     answer moves it up a box, a wrong one sends it to box 1. Box 0 is asked
+     again this session; boxes 1 to 5 wait 1, 3, 7, 16 and 35 days. A session
+     takes what is due first, most overdue first, then up to 10 new cards,
+     and stops after 20 questions. A miss comes back later in the same
+     session. The summary shows the score, cards that moved, newly unlocked
+     variations and when the next review is due.
+   - **Controls** — in the outline, per variation: **Known** (its cards
+     count as mastered, unlocking what is below), **Skip** / **Unskip**,
+     **Reset**, **Box…** to set a box by hand, and **Practice** to drill that
+     variation and below now, due or not (the results still count). **Start**
+     runs the scheduled session. **Train from here**, in the table's menu,
+     opens Train practising from that position. In a question, 1–9 pick a
+     choice, Enter goes on and Escape closes.
+   - **Settings** — which question types are on; choice or typed names and
+     how many choices; showing the moves, the order target and the family
+     name; a group of tags for Family questions; which side you play in Book
+     questions and whether any book move counts or only the mainline's; the
+     mastery box; the days in each box; new cards per session; session
+     length (0 for no limit).
+   - **Where progress lives** — in this browser, separately for each
+     workbook, saved after every answer. **Save to file** includes it, and
+     opening that file restores it. PGN export and share links do not carry
+     it (names do travel in PGN export). Names are part of the workbook.
+6. **Audit** — **Audit** in the toolbar opens the repertoire audit, which
    runs the engine over every position in the workbook and reports the moves
    that lose ground. Press **Run audit** and keep working: it runs in the
    background, on engines of its own, so the analysis board and the study
@@ -236,7 +290,7 @@ For a shorter overview see the [README](../README.md).
      while it runs join the run. **Stop** halts it; **✕** hides the panel and
      leaves a run going. A changed depth starts the report over at that
      depth.
-6. **Render** — a table (plies down, lines across), or a linear
+7. **Render** — a table (plies down, lines across), or a linear
    **card** view (each table row with a board diagram of its end position) for
    print — footnotes don't get their own card, since they're not a table row.
    Boards use the open-source **cburnett** piece set (white + black) with
@@ -350,21 +404,21 @@ For a shorter overview see the [README](../README.md).
    opening, variation, ECO, players, event, site, date, round — and the
    edits are saved with the workbook, laid over the PGN's own tags so they
    survive **Update PGN**. A blank field is left out of the report.
-7. **Export** — **Export PGN** (editable chess notation for any chess app),
+8. **Export** — **Export PGN** (editable chess notation for any chess app),
    **Export Markdown** (paste into Google Docs/Word), or **Print → Save as
    PDF** (always the linear card view). Saved workbooks (`localStorage`) are
    listed under **My saved workbooks** on the import screen to reopen/delete.
    Export PGN keeps the header: the players, event, date and tags like ECO
    and Opening go back out with the lines (Event is the notebook's name when
    it has one, unless Game info sets one).
-8. **Save and reload as a file** — **Save to file** asks for a name (prefilled
+9. **Save and reload as a file** — **Save to file** asks for a name (prefilled
    with the workbook's current one) and writes the whole workbook, PGN and all
    annotations together, to one `.json` you can back up, share or keep in
    version control; the import screen reopens one. It's the same format
    `localStorage` holds, so nothing is lost either way. A file opens with no
    `localStorage` id of its own — pressing **Save** files it as a new entry
    rather than overwriting one.
-9. **Update the PGN under your annotations** — **Update PGN…** replaces the
+10. **Update the PGN under your annotations** — **Update PGN…** replaces the
    moves without throwing the markup away. Notes and symbols are re-attached by
    **move path**, so a note on a move several lines share reaches all of them,
    however the new PGN re-cuts the lines around it; a line's own name, tag,
@@ -380,7 +434,7 @@ For a shorter overview see the [README](../README.md).
    nothing can be lost. The pasted text then no longer describes the line set,
    so the workbook's stored PGN is rebuilt from its lines (the same way Export
    PGN builds one) rather than being the file that was pasted.
-10. **Settings** — the **Settings** menu beside the theme button, and what the
+11. **Settings** — the **Settings** menu beside the theme button, and what the
    app remembers in this browser between visits: the theme, which way up new
    analysis boards start (the way the last one was left, or White/Black picked
    here), the table panel's dragged width, whether the analysis board's
@@ -389,7 +443,7 @@ For a shorter overview see the [README](../README.md).
    last workbook on start** turns that off; **Forget settings** clears it all
    (saved workbooks are kept). A workbook never carries these: a file you send
    someone does not bring your panel width with it.
-11. **Phones and tablets** — on a narrow screen the report stacks with the
+12. **Phones and tablets** — on a narrow screen the report stacks with the
    toolbar first, and the table scrolls sideways in its own box rather than
    widening the page. The analysis window becomes a full-screen sheet; in
    landscape the board is sized to the height so it and its step buttons fit.

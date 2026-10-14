@@ -116,6 +116,9 @@ way in (see `migrate()`).
 | `src/engine-view.js` | the engine box, eval bar and arrows, shared by the analysis board and the study |
 | `src/study.js` | the study view's state: the workbook's lines to step through, moves off the book, the notes along a line |
 | `src/study-view.js` | the read-only study window: board, the line with its notes, other lines, engine |
+| `src/names.js` | named positions: keys, the hierarchy and stretches, names and tags read from and written to PGN comments |
+| `src/train.js` | Train's cards, answer checking, spaced-review scheduling, unlocking and sessions, with progress load/save; no DOM |
+| `src/train-view.js` | the Train window: outline, settings, questions and summary |
 | `src/analysis-commit.js` | the only write from the board into the workbook (line plus regenerated PGN) |
 | `src/share-tools.js` | the analysis panel's copy/save row: FEN, PGN, board PNG and SVG |
 | `src/share.js` | standalone board SVG (pieces inlined), SVG to PNG, file names for saved positions |

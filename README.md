@@ -26,6 +26,10 @@ a `.json` file you keep.
 - **Study** the workbook on a board, read-only: step through each line with
   its notes shown large beside the moves, flip between lines with ◀ ▶ or
   jump to any of them, try your own moves, and run the engine.
+- **Train** on the openings you have named: quizzes on the names of
+  variations, the moves that reach them and the book moves inside them,
+  unlocked level by level and brought back on a spaced-review schedule.
+  Progress stays in your browser and goes into Save to file.
 - **Audit** the whole repertoire: the engine searches every position once, in
   the background while you keep working, and lists the moves that lose
   ground (blunders, mistakes, inaccuracies) with its preferred move and the

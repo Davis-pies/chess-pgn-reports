@@ -898,7 +898,9 @@ function trainOverlay() {
   };
   const ov = el("div", { className: "modal-overlay an-overlay tr-overlay" });
   trainBox = ov;
-  ov.onclick = (e) => e.target === ov && close();
+  ov.onclick = (e) => {
+    if (e.target === ov) close(); // not `&&`: an onclick returning false cancels the click, and a checkbox in Settings would not toggle
+  };
   ov.onkeydown = (e) => {
     if (e.key === "Escape") close();
     else trapTab(ov, e);
