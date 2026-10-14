@@ -82,7 +82,7 @@ test("outline: roots listed, children behind a toggle, locked badge", () => {
 	assert.doesNotMatch(row(root, "...d6 Sicilians").textContent, /locked/);
 	click(row(root, "...d6 Sicilians"), ".tr-open");
 	assert.ok(!row(root, "Najdorf"));
-	assert.match($(root, ".tr-count").textContent, /\d+ due · \d+ new/);
+	assert.match($(root, ".tr-count").textContent, /\d+ in progress · \d+ new · \d+ to re-check/);
 	done();
 });
 
@@ -91,7 +91,9 @@ test("outline: Known, Skip, Reset update progress and save", () => {
 	const key = v("...d6 Sicilians").key;
 	click(row(root, "...d6 Sicilians"), ".tr-known");
 	assert.strictEqual(progress.cards[`name|${key}`].streak, 5);
-	assert.match(row(root, "...d6 Sicilians").querySelector(".tr-bar span").style.width, /^[1-9]/);
+	assert.match(row(root, "...d6 Sicilians").querySelector(".tr-bar span").style.width, /^100%/);
+	assert.strictEqual($(row(root, "...d6 Sicilians"), ".tr-state").textContent, "mastered");
+	assert.ok(!$(root, ".tr-box") && !$(root, ".tr-due"));
 	assert.ok(store.get("ott-train:t1").includes(`name|${key}`));
 	click(row(root, "...d6 Sicilians"), ".tr-skip");
 	assert.ok(progress.cards[`name|${key}`].skip);
@@ -129,11 +131,11 @@ test("outline: Practice starts a scoped question screen, scope shows the subtree
 	done();
 });
 
-test("empty tree: hint, and Nothing due when there is nothing to drill", () => {
+test("empty tree: hint, and Nothing to train when there is nothing to drill", () => {
 	const { root } = mount({ t: variationTree([], {}), d: [] });
 	assert.match($(root, ".tr-empty").textContent, /Name this position/);
 	assert.ok($(root, ".tr-start").disabled);
-	assert.match($(root, ".tr-start").textContent, /Nothing due/);
+	assert.match($(root, ".tr-start").textContent, /Nothing to train/);
 	done();
 });
 
@@ -406,12 +408,12 @@ test("outline: the tag filter lists tagged variations and limits Start", () => {
 	done();
 });
 
-test("outline: Nothing due explains Practice and Known", () => {
+test("outline: an empty queue explains Practice and Known", () => {
 	const t = variationTree(lines, namesFromNodes(nodes));
 	const d = buildDeck(t, lines, { ...DEFAULT_SETTINGS, types: ALL });
 	const m = mount({ settings: { newPerSession: 0 }, t, d });
 	assert.ok($(m.root, ".tr-start").disabled);
-	assert.match($(m.root, ".tr-hint").textContent, /Nothing due now\. Use Practice/);
+	assert.match($(m.root, ".tr-hint").textContent, /Nothing to train here yet: Practice drills a variation anyway, Known unlocks/);
 	done();
 });
 
@@ -477,5 +479,115 @@ test("a first card of a variation offers to learn it after answering, never befo
 		solve(root, ui);
 		assert.ok(!$(root, ".tr-result .tr-learn"));
 	}
+	done();
+});
+
+const sessionOf = (m, c, extra = {}) => {
+	m.ui.session = { queue: [c], i: 0, results: [], unlockedBefore: new Set(), practice: false, newLeft: 0, pool: [], ...extra };
+	m.ui.card = c;
+	m.ui.screen = "question";
+	Object.assign(m.ui, { answered: null, played: [], choices: null });
+	m.draw();
+};
+
+test("question status: level and streak towards learned, then mastered; never the name", () => {
+	const key = v("Najdorf").key;
+	const c = deck.find((x) => x.id === `name|${key}`);
+	const m = mount();
+	const status = () => $(m.root, ".tr-status").textContent;
+	sessionOf(m, c);
+	assert.strictEqual(status(), "Level 2 · 0 of 2 right to learn");
+	assert.doesNotMatch(status(), /Najdorf/);
+	assert.match($(m.root, ".tr-status").title, /2 times in a row to learn it.*5 times to master/);
+	m.progress.cards[c.id] = { streak: 1, seen: NOW, skip: false };
+	m.draw();
+	assert.strictEqual(status(), "Level 2 · 1 of 2 right to learn");
+	m.progress.cards[c.id].streak = 2;
+	m.draw();
+	assert.strictEqual(status(), "Level 2 · learned · 2 of 5 right to master");
+	m.progress.cards[c.id].streak = 5;
+	m.draw();
+	assert.strictEqual(status(), "Level 2 · mastered");
+	// a book card outside any named variation has no level
+	const b = { ...deck.find((x) => x.type === "book"), vkey: "", level: 0 };
+	sessionOf(m, b);
+	assert.strictEqual(status(), "0 of 2 right to learn");
+	done();
+});
+
+test("an answer that unlocks variations says so and the new questions join the session", () => {
+	const root = v("...d6 Sicilians").key;
+	const name = deck.find((x) => x.id === `name|${root}`);
+	const m = mount({ settings: { learnStreak: 1, types: { name: true, order: true, family: false, book: false } } });
+	m.progress.cards[`order|${root}`] = { streak: 1, seen: NOW, skip: false };
+	sessionOf(m, name, { pool: deck.filter((c) => c.type === "name" || c.type === "order"), newLeft: 6 });
+	assert.ok(!$(m.root, ".tr-unlocked"));
+	solve(m.root, m.ui);
+	assert.match($(m.root, ".tr-result .tr-unlocked").textContent, /^Unlocked: .*Najdorf/);
+	assert.ok(m.ui.session.queue.some((c) => c.id === `name|${v("Najdorf").key}`));
+	// a right answer that unlocks nothing says nothing
+	const e6 = deck.find((x) => x.id === `order|${v("...e6 Sicilians/Sicilian e6").key}`);
+	sessionOf(m, e6);
+	solve(m.root, m.ui);
+	assert.ok(!$(m.root, ".tr-unlocked"));
+	done();
+});
+
+test("outline: overview, state, bar and tooltips", () => {
+	const m = mount();
+	const root = v("...d6 Sicilians").key;
+	assert.strictEqual($(m.root, ".tr-overview").textContent, "Learned 0 of 5 variations · 0 mastered · open to level 1");
+	for (const c of deck.filter((x) => x.vkey === root && x.type !== "book")) m.progress.cards[c.id] = { streak: 2, seen: NOW, skip: false };
+	m.draw();
+	const r = row(m.root, "...d6 Sicilians");
+	assert.strictEqual($(r, ".tr-state").textContent, "learned");
+	assert.strictEqual($(r, ".tr-bar span").style.width, "40%");
+	assert.strictEqual($(r, ".tr-bar").title, "0 of 2 questions mastered");
+	assert.match($(m.root, ".tr-overview").textContent, /^Learned 1 of 5 variations · 0 mastered · open to level 2$/);
+	click(r, ".tr-known");
+	assert.strictEqual($(row(m.root, "...d6 Sicilians"), ".tr-state").textContent, "mastered");
+	assert.match($(m.root, ".tr-overview").textContent, /1 mastered/);
+	assert.ok($(row(m.root, "...d6 Sicilians"), ".tr-known").title.includes("unlocks what's below"));
+	// every control in the outline explains itself
+	click(row(m.root, "...d6 Sicilians"), ".tr-open");
+	for (const n of m.root.querySelectorAll("button, select, .tr-count, .tr-overview, .tr-level, .tr-bar, .tr-state, .tr-badge")) {
+		assert.ok(n.title, `no tooltip on ${n.className} ${n.textContent}`);
+	}
+	done();
+});
+
+test("settings: grouped, every field has a tooltip with its default, streaks clamp", () => {
+	const { root, progress } = mount();
+	click(root, ".tr-settings-open");
+	const legends = [...root.querySelectorAll(".tr-group > legend")].map((l) => l.textContent);
+	assert.deepStrictEqual(legends, ["Questions", "Name questions", "Order questions", "Family questions", "Book questions", "Progress", "Sessions"]);
+	const labels = [...root.querySelectorAll(".tr-field > span")].map((l) => l.textContent);
+	for (const l of ["Name", "Order", "Family", "Book", "Answer by", "Choices", "Show the moves", "Show the target position", "Show the name", "You play", "Accept", "Right in a row to learn", "Right in a row to master", "New questions per session", "Re-checks per session", "Questions per session (0: no limit)"]) {
+		assert.ok(labels.includes(l), l);
+	}
+	for (const f of root.querySelectorAll(".tr-field")) assert.ok(f.title, `no tooltip on ${f.textContent}`);
+	assert.ok($(root, ".tr-subgroup").title);
+	assert.match($(root, '[name="learnStreak"]').closest("label").title, /Default 2\./);
+	assert.match($(root, '[name="masterStreak"]').closest("label").title, /Default 5\./);
+	assert.ok(!$(root, '[name="masteryBox"]') && !$(root, '[name="interval-1"]'));
+	const set = (name, val) => {
+		const n = $(root, `[name="${name}"]`);
+		n.value = val;
+		n.dispatchEvent(new window.Event("change"));
+	};
+	set("learnStreak", "7");
+	assert.strictEqual(progress.settings.learnStreak, 7);
+	assert.strictEqual(progress.settings.masterStreak, 7, "master is raised to learn");
+	set("masterStreak", "9");
+	set("reviews", "4");
+	set("newPerSession", "6");
+	set("sessionLength", "0");
+	assert.deepStrictEqual(
+		[progress.settings.masterStreak, progress.settings.reviews, progress.settings.newPerSession, progress.settings.sessionLength],
+		[9, 4, 6, 0],
+	);
+	set("newPerSession", "99");
+	assert.strictEqual(progress.settings.newPerSession, DEFAULT_SETTINGS.newPerSession, "out of range: the default");
+	assert.strictEqual(loadProgress("t1").settings.masterStreak, 9);
 	done();
 });

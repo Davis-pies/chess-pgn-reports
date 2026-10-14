@@ -1932,7 +1932,7 @@ sup {
 /* the actions share the name's line when they fit, else wrap as one block under it */
 .tr-acts { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-left: 1.6rem; }
 .tr-also, .tr-hint { font-size: .8rem; color: var(--muted); }
-.tr-level, .tr-due { font-size: .78rem; color: var(--muted); }
+.tr-level, .tr-state { font-size: .78rem; color: var(--muted); }
 .tr-toggle-gap { display: inline-block; width: 1.6rem; }
 .tr-bar { display: inline-block; width: 5rem; height: .5rem; border-radius: var(--radius-sm); background: var(--line); overflow: hidden; }
 .tr-bar span { display: block; height: 100%; background: var(--main); }
@@ -1940,8 +1940,12 @@ sup {
 .tr-settings { display: flex; flex-direction: column; gap: .4rem; max-width: 26rem; }
 .tr-field { display: flex; justify-content: space-between; align-items: center; gap: .6rem; }
 .tr-field input[type=number] { width: 5rem; }
+.tr-group, .tr-subgroup { margin: 0; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: .5rem .7rem; display: flex; flex-direction: column; gap: .4rem; }
+.tr-group legend, .tr-subgroup legend { font-size: .8rem; color: var(--muted); }
+.tr-subgroup { border-style: dashed; }
+.tr-unlocked { color: var(--main); }
 .tr-prompt { font-weight: 600; font-size: 1.05rem; }
-.tr-progress { font-size: .8rem; color: var(--muted); }
+.tr-progress, .tr-status, .tr-overview { font-size: .8rem; color: var(--muted); }
 /* Train shows one screen at a time, so it takes the whole window rather than
    the analysis board's 480px board column (which also capped its board). */
 .analysis.train { grid-template-columns: minmax(0, 1fr); }
