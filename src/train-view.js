@@ -20,6 +20,7 @@ import {
 
 // Every question draws its board at one size, asked or answered, so the board
 // does not jump between cards (Name questions used to be smaller than Order).
+// The size on screen is style.css's (.tr-body), which scales the drawing.
 const BOARD = 320;
 
 export function newTrainUi(scope = null) {

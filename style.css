@@ -1942,13 +1942,17 @@ sup {
 .tr-field input[type=number] { width: 5rem; }
 .tr-prompt { font-weight: 600; font-size: 1.05rem; }
 .tr-progress { font-size: .8rem; color: var(--muted); }
+/* Train shows one screen at a time, so it takes the whole window rather than
+   the analysis board's 480px board column (which also capped its board). */
+.analysis.train { grid-template-columns: minmax(0, 1fr); }
 .tr-body { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .8rem; }
-/* The board you play on is the analysis board, which stretches to fill its
-   row. Here it keeps the size it is drawn at, like the pictures on the other
-   questions and the answered card, so the board does not jump when the answer
-   comes up. Both shrink to fit a narrow window. */
-.tr-body .an-board { flex: none; max-width: 100%; }
-.tr-body .an-board svg, .tr-body > svg { width: auto; max-width: 100%; height: auto; }
+/* Every question's board, the one you play on and the pictures alike, gets
+   this one size, so the board does not jump between questions or when the
+   answer comes up. It follows the window's height, leaving room for the
+   prompt and the result below it, up to 640px, and shrinks to fit a narrow
+   window. */
+.tr-body > svg, .tr-body > .an-board { flex: none; width: clamp(240px, 55vh, 640px); max-width: 100%; }
+.tr-body > svg { height: auto; }
 .tr-choice { text-align: left; }
 .tr-result { margin-top: .6rem; padding: .5rem .8rem; border-radius: var(--radius-sm); border: 1px solid var(--line); }
 .tr-result.right { border-color: var(--main); }

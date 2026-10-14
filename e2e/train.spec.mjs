@@ -29,12 +29,17 @@ test("train quizzes the named variations and scores a right answer", async ({ pa
 
 // The board you play on is the analysis board's, which stretches to fill its
 // row; in Train it must keep the size of the pictures the other questions and
-// the answered card show, or it jumps when the answer comes up.
+// the answered card show, or it jumps when the answer comes up. That size
+// follows the window, so a big screen gets a big board.
 test("train's board keeps one size across questions and answers", async ({ page }) => {
   await loadPgn(page, readFileSync(FIXTURE, "utf8"));
   await page.getByRole("button", { name: "Train", exact: true }).click();
   await page.locator(".tr-start").click();
-  const width = async () => (await page.locator(".tr-body svg").first().boundingBox()).width;
+  const width = async () => Math.round((await page.locator(".tr-body svg").first().boundingBox()).width);
+  const small = await width();
+  await page.setViewportSize({ width: 2560, height: 1440 });
+  expect(await width()).toBe(640); // its full size: nothing else in the window caps it
+  expect(small).toBeLessThan(640); // and a smaller window got a smaller board
   const seen = new Map(); // prompt kind -> widths
   for (let i = 0; i < 6 && (await page.locator(".tr-question").count()); i++) {
     const prompt = await page.locator(".tr-prompt").innerText();
@@ -48,5 +53,5 @@ test("train's board keeps one size across questions and answers", async ({ page 
     await page.locator(".tr-next").click();
   }
   expect([...seen.keys()]).toEqual(expect.arrayContaining(["What", "Play"]));
-  expect(new Set([...seen.values()].flat())).toEqual(new Set([320]));
+  expect(new Set([...seen.values()].flat()).size).toBe(1);
 });
