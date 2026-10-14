@@ -1,7 +1,7 @@
 import { test, after } from "node:test";
 import assert from "node:assert";
 import { bootApp, captureDownloads } from "./helpers.mjs";
-import { getCurrent } from "../src/state.js";
+import { getCurrent, getMode, getRenderHooks } from "../src/state.js";
 import { emptyProgress, loadProgress, saveProgress } from "../src/train.js";
 
 const app = await bootApp();
@@ -55,4 +55,52 @@ test("Save to file carries Train progress and opening the file restores it", asy
   await app.settle();
   assert.strictEqual(Object.keys(getCurrent().names).length, 1);
   assert.strictEqual(loadProgress(null).cards.y.box, 3);
+});
+
+const NAJ = '1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6 {[%name "Najdorf"]} 6. Be3 e5 *';
+const trWin = () => app.view().querySelector(".tr-window");
+const esc = (n) => n.dispatchEvent(new app.dom.window.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+
+test("the toolbar's Train opens the window; Escape and the close button shut it", async () => {
+  app.reset();
+  await app.loadPgn(NAJ);
+  app.button("Train").click();
+  assert.strictEqual(getMode(), "train");
+  assert.ok(trWin());
+  assert.strictEqual(trWin().querySelector("#tr-title").textContent, "Train");
+  esc(trWin());
+  assert.strictEqual(trWin(), null);
+  assert.strictEqual(getMode(), "report");
+  app.button("Train").click();
+  trWin().querySelector(".an-close").click();
+  assert.strictEqual(trWin(), null);
+});
+
+test("a full redraw keeps Train open", async () => {
+  app.reset();
+  await app.loadPgn(NAJ);
+  app.button("Train").click();
+  getRenderHooks().renderApp();
+  assert.ok(trWin());
+});
+
+test("Train from here scopes the outline to the last named position", async () => {
+  app.reset();
+  await app.loadPgn(NAJ);
+  const cell = [...app.view().querySelectorAll(".pv-table td")].find((c) => /Be3/.test(c.textContent));
+  cell.dispatchEvent(new app.dom.window.MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+  [...app.dom.window.document.querySelectorAll("button")].find((b) => b.textContent === "Train from here").click();
+  assert.ok(trWin());
+  assert.match(trWin().textContent, /Najdorf/);
+  assert.strictEqual(getMode(), "train");
+});
+
+test("acting in Train persists progress for a saved workbook", async () => {
+  app.reset();
+  await app.loadPgn(NAJ);
+  app.clickText("Save");
+  const id = getCurrent().id;
+  app.button("Train").click();
+  trWin().querySelector(".tr-known").click();
+  assert.ok(ls().getItem("ott-train:" + id));
 });

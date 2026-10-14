@@ -104,7 +104,7 @@ export function getMode() {
 	return mode;
 }
 export function setMode(m) {
-	mode = m === "analysis" || m === "study" ? m : "report";
+	mode = m === "analysis" || m === "study" || m === "train" ? m : "report";
 	return mode;
 }
 let scratch = null;

@@ -214,6 +214,12 @@ function buildInto(box, target) {
 					getRenderHooks().nameAt(movesUpTo(target.lines[0], target.ply)),
 				),
 			);
+		if (target.ply != null)
+			box.appendChild(
+				item("Train from here", () =>
+					getRenderHooks().openTrain(movesUpTo(target.lines[0], target.ply)),
+				),
+			);
 		box.appendChild(section(target.lines.length + " lines"));
 		// Still no Make mainline: a group is not one line.
 		lineActions(box, target.lines);
@@ -236,6 +242,12 @@ function buildInto(box, target) {
 			box.appendChild(
 				item("Name this position…", () =>
 					getRenderHooks().nameAt(movesUpTo(line, ply)),
+				),
+			);
+		if (ply != null)
+			box.appendChild(
+				item("Train from here", () =>
+					getRenderHooks().openTrain(movesUpTo(line, ply)),
 				),
 			);
 		box.appendChild(section(line.name || "this line"));

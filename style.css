@@ -2482,3 +2482,6 @@ kbd {
     display: none !important;
   }
 }
+
+/* Train: the same two-pane window as the analysis board and the study */
+.tr-window { max-height: calc(100vh - 2rem); overflow: auto; }

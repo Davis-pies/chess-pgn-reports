@@ -20,10 +20,11 @@ import {
   applyNotebook,
   parseWorkbook,
 } from "./store.js";
-import { namesFromNodes, setName } from "./names.js";
+import { namesFromNodes, setName, trailOf, variationTree } from "./names.js";
+import { trainPanel, newTrainUi } from "./train-view.js";
 import { Chess } from "chess.js";
 import { posKey } from "./audit.js";
-import { loadProgress, saveProgress, moveProgress } from "./train.js";
+import { loadProgress, saveProgress, moveProgress, buildDeck } from "./train.js";
 import { mergeAnnotations } from "./merge.js";
 import { buildPgn } from "./pgn-out.js";
 import { el } from "./dom.js";
@@ -133,6 +134,7 @@ setRenderHooks({
   renderApp,
   openAnalysis,
   openStudy,
+  openTrain,
   nameAt,
   rerenderTable,
   rerenderMarkup,
@@ -475,6 +477,38 @@ export function openStudy(moves = []) {
 	else renderApp();
 }
 
+// Open the Train window. The tree is built once from the workbook as it
+// stands; the deck is rebuilt on every draw (settings change which cards exist).
+// From a move it opens scoped to the last named position on the way there.
+let train = null;
+let trainBox = null;
+export function openTrain(moves = []) {
+	if (getMode() !== "train") opener = focusKey($("view"), document.activeElement);
+	const all = getCurrent().lines;
+	const lines = editorOrder(all).filter((l) => visibleLines(all).includes(l));
+	const names = getCurrent().names;
+	const trail = trailOf(moves.map((m) => m.san), names);
+	const id = getCurrent().id;
+	train = {
+		ui: newTrainUi(trail.length ? trail[trail.length - 1].key : null),
+		tree: variationTree(lines, names),
+		lines,
+		progress: loadProgress(id),
+		workbookId: id,
+	};
+	setMode("train");
+	const wrap = $("view").firstElementChild;
+	if (wrap && !trainBox?.isConnected) wrap.appendChild(trainOverlay());
+	else renderApp();
+}
+
+function rerenderTrain() {
+	if (getMode() !== "train" || !trainBox?.isConnected) return renderApp();
+	const win = trainBox.querySelector(".an-window");
+	keepFocus = win ? focusKey(win, document.activeElement) : null;
+	trainBox.replaceWith(trainOverlay());
+}
+
 // The study window alone, as rerenderAnalysis does for the board: stepping
 // through the workbook touches nothing behind the window.
 let studyBox = null;
@@ -565,6 +599,14 @@ function viewRoot() {
       textContent: "Study",
       title: "Read the workbook's lines and notes on a board, with the engine",
       onclick: () => openStudy(),
+    }),
+  );
+  top.appendChild(
+    el("button", {
+      className: "chip tr-toggle",
+      textContent: "Train",
+      title: "Drill the workbook's named variations with cards",
+      onclick: () => openTrain(),
     }),
   );
   top.appendChild(auditChip());
@@ -717,6 +759,7 @@ function viewRoot() {
   );
   if (getMode() === "analysis") wrap.appendChild(analysisOverlay());
   if (getMode() === "study" && study) wrap.appendChild(studyOverlay());
+  if (getMode() === "train" && train) wrap.appendChild(trainOverlay());
   return wrap;
 }
 
@@ -838,6 +881,50 @@ function studyOverlay() {
     const help = win.querySelector(".an-help-close");
     if (help) help.focus({ preventScroll: true });
     else if (!restoreFocus(win, keep)) panel.focus({ preventScroll: true });
+  });
+  return ov;
+}
+
+// The Train window over the report, closed like the study. Escape always
+// closes it, so the view itself does not handle Escape.
+function trainOverlay() {
+  const close = () => {
+    setMode("report");
+    const back = opener;
+    opener = null;
+    if (!ov.isConnected) renderApp();
+    else ov.remove();
+    restoreFocus($("view"), back);
+  };
+  const ov = el("div", { className: "modal-overlay an-overlay tr-overlay" });
+  trainBox = ov;
+  ov.onclick = (e) => e.target === ov && close();
+  ov.onkeydown = (e) => {
+    if (e.key === "Escape") close();
+    else trapTab(ov, e);
+  };
+  // settings change which cards exist, so the deck is rebuilt for every draw
+  const deck = buildDeck(train.tree, train.lines, train.progress.settings);
+  const panel = trainPanel(train.ui, { tree: train.tree, deck, progress: train.progress, workbookId: train.workbookId }, rerenderTrain);
+  const head = el("div", { className: "an-head" }, [
+    el("h3", { id: "tr-title", textContent: "Train" }),
+    el("button", {
+      className: "chip mini an-close",
+      textContent: "✕",
+      title: "Close (Esc)",
+      onclick: () => close(),
+    }),
+  ]);
+  head.lastChild.setAttribute("aria-label", "Close Train");
+  const win = el("div", { className: "modal an-window tr-window" }, [head, panel]);
+  win.setAttribute("role", "dialog");
+  win.setAttribute("aria-modal", "true");
+  win.setAttribute("aria-labelledby", "tr-title");
+  ov.appendChild(win);
+  const keep = keepFocus;
+  keepFocus = null;
+  queueMicrotask(() => {
+    if (!restoreFocus(win, keep)) panel.focus({ preventScroll: true });
   });
   return ov;
 }
