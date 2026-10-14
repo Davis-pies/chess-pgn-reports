@@ -182,8 +182,9 @@ For a shorter overview see the [README](../README.md).
      the line up to there (off the book, unless the workbook has it).
 5. **Train** — **Train** in the toolbar quizzes you on the workbook's
    openings: the names of the variations, the moves that reach them, and the
-   book moves inside each one. What you learn comes back for review on a
-   schedule.
+   book moves inside each one. Nothing is scheduled by the clock: every
+   question keeps a streak, and what you have learned comes back a few at a
+   time to be re-checked.
    - **Naming positions** — a variation is a position with a name. Right-click
      a move in the table and choose **Name this position…**, or do the same on
      the board in Study; give it a name and, optionally, tags separated by `;`
@@ -210,40 +211,62 @@ For a shorter overview see the [README](../README.md).
      board plays one side and you the other along the variation's moves, each
      of your moves its own question; the workbook's note on the move is shown
      after you answer. Name, Order and Book are on by default; Family is off.
+   - **Streaks** — every question carries one number, its streak: a right
+     answer adds one (up to the mastery setting), and nothing about it
+     depends on time. A question is **learned** at 2 right in a row by default
+     and **mastered** at 5, so mastery says what you know now. A miss takes a
+     question down one stage rather than to nothing: a mastered question drops
+     back to learned (three right answers master it again), and any other
+     question starts its count again.
    - **Unlocking** — level-1 variations start unlocked. A variation counts as
-     mastered when each of its Name, Order and Family cards is in the mastery
-     box (box 3 by default) or above; mastering it unlocks its sub-variations
-     and its Book questions.
-   - **The review schedule** — each card sits in a box from 0 to 5. A right
-     answer moves it up a box, a wrong one sends it to box 1. Box 0 is asked
-     again this session; boxes 1 to 5 wait 1, 3, 7, 16 and 35 days. A session
-     takes what is due first, most overdue first, then up to 10 new cards,
-     and stops after 20 questions. A miss comes back later in the same
-     session, and a right answer then does not move it up again. The summary shows the score, cards that moved, newly unlocked
-     variations and when the next review is due.
+     learned when each of its Name, Order and Family questions is learned;
+     learning it unlocks its sub-variations and its Book questions, and what
+     is unlocked stays unlocked.
+   - **A session** — it asks, in this order, the questions you have started
+     but not mastered (the one asked longest ago first), up to 5 questions
+     never asked (the shallowest levels first), and up to 3 mastered ones to
+     re-check, stopping after 20 questions. A miss comes back three questions
+     later, and so does a right answer on a question not yet learned, so a
+     question can be learned in one sitting; once learned it is not asked
+     again that session. When an answer unlocks variations, their new
+     questions join the session at once (within the new-question and length
+     limits), so a first session goes deeper than level 1.
+   - **Seeing progress** — each question shows its level and streak ("Level 2
+     · 1 of 2 right to learn", then "learned · 3 of 5 right to master", then
+     "mastered"; never the variation's name, which would give a Name question
+     away). After an answer, "Unlocked:" lists what it opened. The outline
+     says what a session would hold ("3 in progress · 5 new · 2 to
+     re-check") and sums up the workbook ("Learned 4 of 12 variations · 1
+     mastered · open to level 2"); each row has a bar of progress towards
+     mastery and says learned or mastered. The summary shows the score and the
+     variations newly learned, newly mastered, newly unlocked and those that
+     slipped back from mastered, and how many are still locked. Every control
+     has a tooltip.
    - **Controls** — in the outline, per variation: **Known** (its cards
      count as mastered, unlocking what is below), **Skip** / **Unskip**,
-     **Reset**, **Box…** to set a box by hand, **Rename…** to rename or retag
+     **Reset**, **Rename…** to rename or retag
      it (the same prompts as in the table), and **Practice** to drill that
-     variation and below now, due or not (the results still count). A
+     variation and below now, whatever its state (the results still count). A
      variation reachable under several names shows "also reached from…". The
      tag menu at the top narrows the outline, and **Start**, to the variations
-     carrying a tag and those below them. **Start** runs the scheduled
-     session; when nothing is due it says so and points to Practice and Known. **Train from here**, in the table's menu,
+     carrying a tag and those below them. **Start** runs a
+     session; when there is nothing to train it says so and points to Practice and Known. **Train from here**, in the table's menu,
      opens Train practising from that position. **Learn** on an outline row
      plays the variation through in Study with the PGN's notes; closing Study
      returns to Train as you left it. After the first card of a variation you
      have not seen, the result offers **New to you? Learn it**. In a question, 1–9 pick a
      choice, Enter goes on and Escape closes.
    - **The board** — Name and Family show the position from your side (Black
-     by default, as set by "Book side"); **Flip** turns it. After a wrong name
+     by default, as set by "You play"); **Flip** turns it. After a wrong name
      the answer also shows what you gave.
-   - **Settings** — which question types are on; choice or typed names and
-     how many choices; showing the moves, the order target and the family
-     name; a group of tags for Family questions; which side you play in Book
-     questions and whether any book move counts or only the mainline's; the
-     mastery box; the days in each box; new cards per session; session
-     length (0 for no limit).
+   - **Settings** — in groups, each field with a tooltip giving its default.
+     **Questions**: which types are on. **Name questions**: choose or type,
+     how many choices, showing the moves. **Order questions**: showing the
+     target position. **Family questions**: showing the name, and a group of
+     tags to ask within. **Book questions**: the side you play, and whether
+     any book move counts or only the mainline's. **Progress**: right in a row
+     to learn and to master. **Sessions**: new questions, re-checks and total
+     questions per session (0 for no limit).
    - **Where progress lives** — in this browser, separately for each
      workbook, saved after every answer. **Save to file** includes it, and
      opening that file restores it. PGN export and share links do not carry

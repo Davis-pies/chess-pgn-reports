@@ -10,7 +10,7 @@ test("train quizzes the named variations and scores a right answer", async ({ pa
   await expect(page.locator(".tr-name")).toHaveText(["...d6 Sicilians", "...e6 Sicilians"]);
   // only name questions, with their moves shown, so the right choice is known
   await page.locator(".tr-settings-open").click();
-  for (const label of ["Order questions", "Book questions", "Show the moves"]) {
+  for (const label of ["Order", "Book", "Show the moves"]) {
     await page.getByLabel(label, { exact: true }).click();
   }
   await page.locator(".tr-settings-done").click();
@@ -25,6 +25,28 @@ test("train quizzes the named variations and scores a right answer", async ({ pa
 
   await page.keyboard.press("Escape");
   await expect(page.locator(".tr-outline, .tr-question")).toHaveCount(0);
+});
+
+// Learning a variation opens the ones below it, and their questions join the
+// session at once instead of waiting for another day.
+test("train asks the questions an answer unlocks in the same session", async ({ page }) => {
+  await loadPgn(page, '1. e4 e5 {[%name "Open"]} 2. Nf3 Nc6 {[%name "Open Knight"]} *');
+  await page.getByRole("button", { name: "Train", exact: true }).click();
+  await page.locator(".tr-settings-open").click();
+  for (const label of ["Order", "Book", "Show the moves"]) {
+    await page.getByLabel(label, { exact: true }).click();
+  }
+  await page.getByLabel("Right in a row to learn").fill("1");
+  await page.getByLabel("Right in a row to learn").blur();
+  await page.locator(".tr-settings-done").click();
+  await page.locator(".tr-start").click();
+  await expect(page.locator(".tr-status")).toHaveText("Level 1 · 0 of 1 right to learn");
+  await page.locator(".tr-choice", { hasText: /^Open$/ }).click();
+  await expect(page.locator(".tr-result.right")).toBeVisible();
+  await expect(page.locator(".tr-unlocked")).toHaveText("Unlocked: Open Knight");
+  await page.locator(".tr-next").click();
+  await expect(page.locator(".tr-status")).toHaveText(/^Level 2 · /);
+  await expect(page.locator(".tr-question")).toBeVisible();
 });
 
 // The board you play on is the analysis board's, which stretches to fill its

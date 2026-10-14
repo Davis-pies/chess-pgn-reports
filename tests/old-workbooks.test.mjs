@@ -19,6 +19,8 @@ import { sharedAudit } from "../src/audit.js";
 //                        dropped `view.printSummary`
 //   2026-10-03-current   a354b13, analysis lines with names
 //   2026-10-05-audit     this build, the audit's evals in `audit`
+//   2026-10-14-train     this build: named positions in `names`, Train
+//                        progress (streaks) in `train`
 //
 // legacy-glyphs predates the history the repository keeps, so it was
 // rebuilt from what store.js and nags.js say such workbooks held: no format
@@ -34,6 +36,7 @@ const FIXTURES = [
   "2026-09-27-header",
   "2026-10-03-current",
   "2026-10-05-audit",
+  "2026-10-14-train",
 ];
 const read = (name) =>
   fs.readFileSync(
@@ -172,6 +175,20 @@ function checkFormat(name, nb) {
       score: { cp: 15 },
       best: "e2e4",
     });
+  }
+
+  if (nb.names) {
+    assert.deepStrictEqual(c.names, nb.names, `${name}: named positions come back`);
+  }
+
+  if (nb.train) {
+    // the progress lands where the app keeps it: under the workbook's id when
+    // it was opened from this browser's list, in the shared slot from a file
+    const store = app.dom.window.localStorage;
+    const saved = JSON.parse(store.getItem("ott-train:old") ?? store.getItem("ott-train:unsaved"));
+    assert.deepStrictEqual(saved.cards, nb.train.cards, `${name}: streaks come back`);
+    assert.deepStrictEqual(saved.settings, nb.train.settings);
+    assert.ok(Object.values(saved.cards).every((r) => Number.isInteger(r.streak)));
   }
 
   if (nb.header) {
