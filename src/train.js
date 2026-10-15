@@ -465,6 +465,7 @@ function refill(session, progress, settings, ctx) {
 	const queued = new Set(rest.map((c) => c.id));
 	const rec = (c) => progress.cards[c.id];
 	const more = [];
+	let starved = false;
 	// while two of the last five answers were misses, nothing new joins
 	if (session.results.slice(-5).filter((r) => !r.right).length < 2) {
 		const inFlight = new Set(rest.filter((c) => !learnedCard(rec(c), settings) && !session.tricky.has(c.id)).map((c) => c.vkey));
@@ -473,11 +474,21 @@ function refill(session, progress, settings, ctx) {
 			inFlight.add(c.vkey);
 			more.push(c);
 		}
+		starved = inFlight.size < settings.newVariations;
 	}
-	if (settings.recheckEvery > 0 && session.sinceRecheck >= settings.recheckEvery) {
+	// Starved (fewer variations left to learn than may be learned at once), a
+	// re-check comes after every answer: otherwise the last line's book moves
+	// were asked over and over, and once everything was learned a session held
+	// one re-check and ended (Davis, 2026-10-14). Questions not yet mastered
+	// come before mastered ones, so finishing mastery does not wait behind
+	// what is known cold. A question asked in this session is not re-checked in
+	// it (one recall per session is the relearning pattern), which also ends a
+	// session with no length limit.
+	if (settings.recheckEvery > 0 && (starved || session.sinceRecheck >= settings.recheckEvery)) {
+		const asked = new Set(session.results.map((r) => r.id));
 		const due = session.pool
-			.filter((c) => !queued.has(c.id) && rec(c) && learnedCard(rec(c), settings) && ok(c) && progress.asked - rec(c).seen >= SPACING)
-			.sort((a, b) => rec(a).seen - rec(b).seen)[0];
+			.filter((c) => !queued.has(c.id) && !asked.has(c.id) && rec(c) && learnedCard(rec(c), settings) && ok(c) && progress.asked - rec(c).seen >= SPACING)
+			.sort((a, b) => masteredCard(rec(a), settings) - masteredCard(rec(b), settings) || rec(a).seen - rec(b).seen)[0];
 		// asked next, not behind the new questions already queued, which would
 		// leave whole stretches with nothing older in them; but not beside a
 		// question of its own variation, which would give one away

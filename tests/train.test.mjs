@@ -221,6 +221,33 @@ test("flow: a due re-check is asked next, but not beside a question of its own v
 	assert.strictEqual(run([name, book, order]), 3);
 });
 
+test("flow: with nothing new left, every question is a re-check, the unmastered first, each once", () => {
+	const p = emptyProgress();
+	const all = deck.filter((c) => c.type !== "intro");
+	// all learned; the older half also mastered
+	all.forEach((c, k) => (p.cards[c.id] = { streak: k < all.length / 2 ? S.masterStreak : S.learnStreak, seen: k + 1, skip: false }));
+	p.asked = 1000;
+	const st = { ...S, sessionLength: 0 };
+	const s = drive(newSession(deck, tree, p, st, {}), p, st);
+	assert.strictEqual(s.results.length, all.length, "a full session, not one re-check and the end");
+	assert.strictEqual(new Set(s.results.map((r) => r.id)).size, all.length, "each once");
+	const firstHalf = s.results.slice(0, all.length - Math.ceil(all.length / 2));
+	assert.ok(firstHalf.every((r) => r.from < S.masterStreak), "not yet mastered ones first");
+});
+
+test("flow: the last variation left to learn alternates with re-checks", () => {
+	const p = emptyProgress();
+	const naj = v("Najdorf").key;
+	const all = deck.filter((c) => c.type !== "intro" && c.vkey !== naj && c.vkey !== v("English Attack").key);
+	all.forEach((c, k) => (p.cards[c.id] = { streak: S.learnStreak, seen: k + 1, skip: false }));
+	p.asked = 1000;
+	const st = { ...S, sessionLength: 10 };
+	const s = drive(newSession(deck, tree, p, st, {}), p, st);
+	const najs = s.results.map((r) => deck.find((c) => c.id === r.id).vkey === naj);
+	assert.ok(najs.some((x) => x) && najs.some((x) => !x));
+	assert.ok(najs.every((x, i) => !x || !najs[i - 1]), `never two Najdorf questions running: ${najs}`);
+});
+
 test("newSession: scope, practice, book cards, skipped cards", () => {
 	const p = emptyProgress();
 	const root = v("...d6 Sicilians").key;

@@ -149,7 +149,12 @@ the boxes were hard to follow.
   3. a mastered card joins every "Re-check every" questions (default 3, 0:
      never), the one asked longest ago that the spacing rule would count. It
      is asked next, not behind the queued new questions, but never beside a
-     question of its own variation;
+     question of its own variation. When fewer variations are left to learn
+     than may be learned at once, one comes after every answer instead (the
+     last line's book moves were asked over and over, and once everything
+     was learned a session held one re-check). Not-mastered cards are picked
+     before mastered ones, and a card asked in the session is not re-checked
+     in it;
      learned-not-mastered cards from earlier sessions are in step 1's
      "started" only until learned, so they come back the same way.
   The session ends after "Questions per session" answers (default 20; 0: no
