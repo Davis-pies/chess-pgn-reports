@@ -231,8 +231,17 @@ test("flow: with nothing new left, every question is a re-check, the unmastered 
 	const s = drive(newSession(deck, tree, p, st, {}), p, st);
 	assert.strictEqual(s.results.length, all.length, "a full session, not one re-check and the end");
 	assert.strictEqual(new Set(s.results.map((r) => r.id)).size, all.length, "each once");
-	const firstHalf = s.results.slice(0, all.length - Math.ceil(all.length / 2));
-	assert.ok(firstHalf.every((r) => r.from < S.masterStreak), "not yet mastered ones first");
+	// not yet mastered ones first, unless one's line was just played or shown:
+	// a mastered one goes before it only while it is on the line of one of the
+	// last ten questions
+	const byId = new Map(deck.map((c) => [c.id, c]));
+	s.results.forEach((r, k) => {
+		if (r.from < S.masterStreak) return;
+		const near = new Set(s.results.slice(Math.max(0, k - 10), k).flatMap((x) => byId.get(x.id).on));
+		const later = s.results.slice(k + 1).filter((x) => x.from < S.masterStreak);
+		assert.ok(later.every((x) => near.has(byId.get(x.id).vkey)), `mastered ${r.id} before an unmastered one off the recent lines`);
+	});
+	assert.ok(s.results.slice(0, 3).every((r) => r.from < S.masterStreak), "the session opens on unmastered ones");
 });
 
 test("flow: the last variation left to learn alternates with re-checks", () => {
@@ -797,13 +806,13 @@ test("interleaving: book runs stay together and a variation's cards are kept apa
 	const two = deck.filter((c) => ["name", "order"].includes(c.type) && [v("...d6 Sicilians").key, v("...e6 Sicilians").key].includes(c.vkey));
 	const t = newSession(two, tree, q, { ...S, newVariations: 9, sessionLength: 0 }, {});
 	assert.deepStrictEqual(t.queue.map((c) => c.vkey).filter((k, i, a) => i && k === a[i - 1]), []);
-	// requeues skip a spot that holds the same variation
+	// requeues keep off both sides of a card of the same variation
 	const root = v("...d6 Sicilians").key;
 	const mk = (id, vkey) => ({ id, type: "name", vkey });
 	const [a, b, c, d, e, f] = [mk("a", root), mk("b", "x"), mk("c", "y"), mk("d", root), mk("e", "z"), mk("f", "w")];
 	const w = hand([a, b, c, d, e, f]);
 	answer(w, emptyProgress(), a, false, S);
-	assert.deepStrictEqual(idsOf(w.queue), ["a", "b", "c", "d", "a", "e", "f"], "moved past d, which has the same variation");
+	assert.deepStrictEqual(idsOf(w.queue), ["a", "b", "c", "d", "e", "a", "f"], "moved past d, which has the same variation, and not just after it");
 });
 
 test("difficulty: two misses in the last five hold back unasked cards and their intros, until they scroll out", () => {
@@ -963,4 +972,84 @@ test("leadsTo names the shortest variation starting with the moves, or null", ()
 	assert.strictEqual(leadsTo(tree, ["e4", "c5", "Nf3", "e6"]), "...e6 Sicilians");
 	assert.strictEqual(leadsTo(tree, ["e4", "c5", "Nf3", "e6", "d4", "cxd4", "Nxd4", "Nf6", "Nc3", "d6"]), "Scheveningen");
 	assert.strictEqual(leadsTo(tree, ["d4"]), null);
+});
+
+test("order credit: playing a line counts for each variation it passes through, all the way up; a miss is never passed up", () => {
+	const [d6, naj, ea] = ["...d6 Sicilians", "Najdorf", "English Attack"].map((n) => v(n).key);
+	const card = deck.find((c) => c.id === `order|${ea}`);
+	const line = v("English Attack").orders[0];
+	const play = (p, right, played, extra) => answer(hand([card], extra), p, card, right, S, { deck, tree, played });
+	const streak = (p, k) => p.cards[`order|${k}`]?.streak;
+	let p = emptyProgress();
+	assert.deepStrictEqual(play(p, true, line).also, ["...d6 Sicilians", "Najdorf"]);
+	assert.deepStrictEqual([d6, naj, ea].map((k) => streak(p, k)), [1, 1, 1], "its own card once");
+	assert.strictEqual(p.cards[`name|${naj}`], undefined, "playing the moves is not naming them");
+	// a learned one credited too soon is left alone, so its spacing is not restarted
+	p = emptyProgress();
+	p.cards[`order|${naj}`] = { streak: 2, seen: 5, skip: false };
+	p.asked = 6;
+	assert.deepStrictEqual(play(p, true, line).also, ["...d6 Sicilians"]);
+	assert.deepStrictEqual(p.cards[`order|${naj}`], { streak: 2, seen: 5, skip: false });
+	p.asked = 20;
+	assert.deepStrictEqual(play(p, true, line).also, ["...d6 Sicilians", "Najdorf"]);
+	assert.deepStrictEqual(p.cards[`order|${naj}`], { streak: 3, seen: 21, skip: false });
+	// a miss: the variations reached before it were played right; the others keep their streak
+	p = emptyProgress();
+	p.cards[`order|${naj}`] = { streak: 1, seen: 1, skip: false };
+	assert.deepStrictEqual(play(p, false, line.slice(0, 3)).also, []);
+	assert.strictEqual(streak(p, naj), 1, "a miss before the Najdorf is not a Najdorf miss");
+	assert.deepStrictEqual(play(p, false, line.slice(0, -1)).also, ["...d6 Sicilians", "Najdorf"]);
+	assert.deepStrictEqual([naj, ea].map((k) => streak(p, k)), [2, 0]);
+	// nothing right after the intro, which showed those moves; a skipped card stays skipped
+	p = emptyProgress();
+	assert.strictEqual(play(p, true, line, { passed: new Map([[ea, 0]]) }).also, undefined);
+	assert.strictEqual(streak(p, naj), undefined);
+	p.cards[`order|${naj}`] = { streak: 0, seen: 0, skip: true };
+	assert.deepStrictEqual(play(p, true, line).also, ["...d6 Sicilians"]);
+	assert.strictEqual(streak(p, naj), 0);
+});
+
+test("flow: a re-check skips a variation whose line was just played or shown, unless nothing else is left", () => {
+	const [d6, e6, naj, ea] = ["...d6 Sicilians", "...e6 Sicilians", "Najdorf", "English Attack"].map((n) => v(n).key);
+	const card = deck.find((c) => c.id === `order|${ea}`);
+	const other = deck.find((c) => c.id === `order|${v("Scheveningen").key}`);
+	const run = (known, asked, st, extra = {}) => {
+		const p = emptyProgress();
+		for (const k of known) markKnown(p, k, deck, S);
+		p.asked = 200;
+		const s = hand([asked], { pool: deck.filter((c) => known.includes(c.vkey) && c.type !== "book"), sinceRecheck: 1, ...extra });
+		answer(s, p, asked, true, st, { deck, tree });
+		return s.queue.slice(s.i).filter((c) => c !== asked).map((c) => c.vkey);
+	};
+	const st = { ...S, recheckEvery: 1, sessionLength: 0 };
+	assert.deepStrictEqual(run([d6, naj, e6], card, st), [e6], "not the Najdorf or the ...d6 Sicilians straight after the English Attack");
+	assert.deepStrictEqual(run([d6, naj], card, st), [], "they wait while something else is queued");
+	assert.deepStrictEqual(run([naj], card, { ...st, learnStreak: 1 }), [naj], "but the session does not end for them");
+	// an intro shown shows its line too
+	const intro = { ...card, id: `intro|${ea}`, type: "intro" };
+	assert.deepStrictEqual(run([naj, e6], other, st, { intros: new Map([[ea, intro]]), passed: new Map([[ea, 0]]) }), [e6]);
+});
+
+test("families: new variations and the queue mix them, and a requeue keeps off its own family", () => {
+	const pgn = `1. e4 e5 {[%name "A"]} (1... c5 {[%name "B"]} 2. Nf3 d6 {[%name "B0"]} 3. d4 {[%name "B1"]}) 2. Nf3 Nc6 {[%name "A1"]} (2... d6 {[%name "A2"]}) *`;
+	const { nodes: n2 } = parsePgn(pgn);
+	const l2 = collectLines(n2);
+	const t2 = variationTree(l2, namesFromNodes(n2));
+	const st = { ...S, types: { name: true, order: true, family: false, book: false }, newVariations: 2, recheckEvery: 0, sessionLength: 0 };
+	const d2 = buildDeck(t2, l2, st);
+	const key = (n) => [...t2.byKey.values()].find((x) => x.name === n).key;
+	const p = emptyProgress();
+	markKnown(p, key("A"), d2, st);
+	markKnown(p, key("B"), d2, st);
+	markKnown(p, key("B0"), d2, st);
+	const s = newSession(d2, t2, p, st, {});
+	const name = (c) => t2.byKey.get(c.vkey).name;
+	assert.deepStrictEqual([...new Set(s.queue.map(name))].sort(), ["A1", "B1"], "B1 before A2, though A2 is shallower");
+	assert.deepStrictEqual(s.queue.map((c) => c.family).filter((f, i, a) => i && f === a[i - 1]), [], "the families alternate");
+	// a requeue three on, moved past spots beside a card of its family
+	const mk = (id, family) => ({ id, type: "name", vkey: id, family });
+	const q = [mk("a", "X"), mk("b", "Y"), mk("c", "X"), mk("d", "Y"), mk("e", "Y"), mk("f", "X")];
+	const w = hand([...q]);
+	answer(w, emptyProgress(), q[0], false, S);
+	assert.deepStrictEqual(idsOf(w.queue), ["a", "b", "c", "d", "a", "e", "f"]);
 });

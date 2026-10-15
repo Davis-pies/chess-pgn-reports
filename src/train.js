@@ -67,19 +67,36 @@ function commentsByPath(lines) {
 // question's result shows only the `own` notes; the intro steps through the
 // moves from `from` and shows one move's notes at a time (2026-10-14: every
 // note at once was a wall of text at level 1).
+// `on` lists the named positions that order passes through before the
+// variation: its parent, the parent's parent and so on, and an `also` parent
+// the order goes by.
 function notesOf(v, tree, comments) {
 	const order = v.orders[0];
 	const chess = new Chess();
 	let from = 0;
 	let path = "";
 	const notes = [];
+	const on = [];
 	order.forEach((san, at) => {
 		chess.move(san);
 		path += ` ${san}`;
-		if (at < order.length - 1 && tree.byKey.has(posKey(chess.fen()))) from = at + 1;
+		const key = posKey(chess.fen());
+		if (at < order.length - 1 && tree.byKey.has(key)) {
+			from = at + 1;
+			on.push(key);
+		}
 		for (const text of comments.get(path) || []) notes.push({ at, move: fullmoveLabel(at) + san, text, own: at === order.length - 1 });
 	});
-	return { from, notes };
+	return { from, notes, on };
+}
+
+// A variation's family: the top-level variation it sits under (Davis,
+// 2026-10-15: a run of ...d6 lines trained "I'm doing d6 Sicilians right now"
+// instead of recognising the position). Before any named position, "".
+function familyOf(tree, vkey) {
+	let v = tree.byKey.get(vkey);
+	while (v?.parent) v = v.parent;
+	return v ? v.key : "";
 }
 
 export function buildDeck(tree, lines, settings) {
@@ -87,8 +104,8 @@ export function buildDeck(tree, lines, settings) {
 	const on = settings.types;
 	const comments = commentsByPath(lines);
 	for (const v of tree.byKey.values()) {
-		const { from, notes } = notesOf(v, tree, comments);
-		const base = { key: v.key, vkey: v.key, level: v.level };
+		const { from, notes, on: path } = notesOf(v, tree, comments);
+		const base = { key: v.key, vkey: v.key, level: v.level, family: familyOf(tree, v.key), on: path };
 		// an intro is a step, not a question: it is never stored and never counts
 		if (settings.introNew) deck.push({ id: `intro|${v.key}`, type: "intro", ...base, notes, from });
 		if (on.name) deck.push({ id: `name|${v.key}`, type: "name", ...base, notes });
@@ -119,7 +136,8 @@ function bookCards(tree, lines, settings) {
 			let c = cards.get(key);
 			if (!c) {
 				const v = tree.byKey.get(vkey);
-				c = { id: `book|${key}`, type: "book", key, vkey, level: v ? v.level : 0, sans, moves: [], main: null, notes: {} };
+				const on = sans.map((_, k) => posKey(fens.get(line.moves[k].ply))).filter((x) => tree.byKey.has(x));
+				c = { id: `book|${key}`, type: "book", key, vkey, level: v ? v.level : 0, family: familyOf(tree, vkey), on, sans, moves: [], main: null, notes: {} };
 				cards.set(key, c);
 			}
 			if (!c.moves.includes(m.san)) c.moves.push(m.san);
@@ -371,8 +389,9 @@ const byNewness = (a, b) => (a.type === "book") - (b.type === "book") || a.level
 // Spread the cards of one variation apart (finding 6): a name question right
 // after its order question gives it away. A block is one non-book card, or all
 // of a variation's book cards as one run in deck order. Blocks go in priority
-// order, but never right after a block of the same variation while a later
-// block of another can go there; `last` is the variation of what comes before.
+// order, but never right after a block of the same family while a later block
+// of another can go there, nor of the same variation while another can; `last`
+// is the card that comes before.
 function interleave(cards, deck, last = null) {
 	const rank = new Map(deck.map((c, i) => [c.id, i]));
 	const runs = new Map();
@@ -385,10 +404,11 @@ function interleave(cards, deck, last = null) {
 	for (const run of runs.values()) run.sort((a, b) => rank.get(a.id) - rank.get(b.id));
 	const out = [];
 	while (blocks.length) {
-		const k = Math.max(0, blocks.findIndex((b) => b[0].vkey !== last));
+		let k = blocks.findIndex((b) => b[0].family !== last?.family);
+		if (k < 0) k = Math.max(0, blocks.findIndex((b) => b[0].vkey !== last?.vkey));
 		const [block] = blocks.splice(k, 1);
 		out.push(...block);
-		last = block[0].vkey;
+		last = block[block.length - 1];
 	}
 	return out;
 }
@@ -472,11 +492,19 @@ function refill(session, progress, settings, ctx) {
 	let starved = false;
 	// while two of the last five answers were misses, nothing new joins
 	if (session.results.slice(-5).filter((r) => !r.right).length < 2) {
-		const inFlight = new Set(rest.filter((c) => !learnedCard(rec(c), settings) && !session.tricky.has(c.id)).map((c) => c.vkey));
-		for (const c of session.pool.filter((x) => !rec(x) && !queued.has(x.id) && ok(x)).sort(byNewness)) {
-			if (!inFlight.has(c.vkey) && inFlight.size >= settings.newVariations) continue;
-			inFlight.add(c.vkey);
-			more.push(c);
+		const flying = rest.filter((c) => !learnedCard(rec(c), settings) && !session.tricky.has(c.id));
+		const inFlight = new Set(flying.map((c) => c.vkey));
+		const families = new Set(flying.map((c) => c.family));
+		// a new variation from a family with nothing in flight goes first, so
+		// that the families are mixed rather than learned one after another
+		const fresh = session.pool.filter((x) => !rec(x) && !queued.has(x.id) && ok(x)).sort(byNewness);
+		for (const mixed of [true, false]) {
+			for (const c of fresh) {
+				if (more.includes(c) || (!inFlight.has(c.vkey) && (inFlight.size >= settings.newVariations || (mixed && families.has(c.family))))) continue;
+				inFlight.add(c.vkey);
+				families.add(c.family);
+				more.push(c);
+			}
 		}
 		starved = inFlight.size < settings.newVariations;
 	}
@@ -490,21 +518,28 @@ function refill(session, progress, settings, ctx) {
 	// session with no length limit.
 	if (settings.recheckEvery > 0 && (starved || session.sinceRecheck >= settings.recheckEvery)) {
 		const asked = new Set(session.results.map((r) => r.id));
-		const due = session.pool
+		// A variation whose line was just played or shown, by a question or an
+		// intro of one below it, is practised already (Davis, 2026-10-15: the
+		// Najdorf straight after the Najdorf with 6.Be3): not re-checked until
+		// SPACING answers have passed, unless nothing else is left to ask.
+		const byId = new Map(ctx.deck.map((c) => [c.id, c]));
+		const recent = session.results.slice(-SPACING).map((r) => byId.get(r.id));
+		for (const [vkey, at] of session.passed) if (session.results.length - at < SPACING) recent.push(session.intros.get(vkey));
+		const near = new Set(recent.flatMap((c) => c?.on ?? []));
+		const dues = session.pool
 			.filter((c) => !queued.has(c.id) && !asked.has(c.id) && rec(c) && learnedCard(rec(c), settings) && ok(c) && progress.asked - rec(c).seen >= SPACING)
-			.sort((a, b) => masteredCard(rec(a), settings) - masteredCard(rec(b), settings) || rec(a).seen - rec(b).seen)[0];
+			.sort((a, b) => masteredCard(rec(a), settings) - masteredCard(rec(b), settings) || rec(a).seen - rec(b).seen);
+		const due = dues.find((c) => !near.has(c.vkey)) ?? (rest.length || more.length ? undefined : dues[0]);
 		// asked next, not behind the new questions already queued, which would
 		// leave whole stretches with nothing older in them; but not beside a
-		// question of its own variation, which would give one away
+		// question of its own family, nor of its own variation, which would give
+		// one away
 		if (due) {
-			const q = session.queue;
-			let at = session.i;
-			while (at < q.length && (q[at].vkey === due.vkey || q[at - 1]?.vkey === due.vkey)) at++;
-			q.splice(at, 0, due);
+			session.queue.splice(spot(session.queue, session.i, due), 0, due);
 			session.sinceRecheck = 0;
 		}
 	}
-	const last = session.queue.length ? session.queue[session.queue.length - 1].vkey : null;
+	const last = session.queue[session.queue.length - 1] ?? null;
 	session.queue.push(...withIntros(session, progress, interleave(more, cards, last)));
 	spaceIntros(session);
 }
@@ -530,12 +565,22 @@ export function newSession(deck, tree, progress, settings, { scope = null, pract
 
 export const current = (s) => s.queue[s.i] || null;
 
+// Where to put `card` from `from` on: the first place with no card of its
+// family on either side; failing that (a session within one family), none of
+// its variation; failing that, the end.
+function spot(q, from, card) {
+	const free = (key) => {
+		for (let at = from; at < q.length; at++) if (q[at][key] !== card[key] && q[at - 1]?.[key] !== card[key]) return at;
+		return -1;
+	};
+	const at = free("family");
+	return at >= 0 ? at : free("vkey") >= 0 ? free("vkey") : q.length;
+}
+
 // A miss, or a right answer on a card not yet learned, comes back three
-// questions later, a little further if that spot holds the same variation.
+// questions later, a little further to keep it away from its family.
 function requeue(session, card) {
-	let at = Math.min(session.i + 3, session.queue.length);
-	while (at < session.queue.length && session.queue[at].vkey === card.vkey) at++;
-	session.queue.splice(at, 0, card);
+	session.queue.splice(spot(session.queue, Math.min(session.i + 3, session.queue.length), card), 0, card);
 }
 
 // Finding 3: while two of the last five answers were misses, cards never asked
@@ -547,8 +592,33 @@ function holdBack(session, progress) {
 	session.queue = [...session.queue.slice(0, session.i), ...kept];
 }
 
+// Playing a variation's moves plays those of every named position they pass
+// through (Davis, 2026-10-15): each of those variations' order card is
+// answered right too, under the same spacing rule, all the way up. A credit
+// that would come too soon leaves the record alone, or practising a line below
+// would keep restarting its spacing and it would never be re-checked. A miss
+// is not passed up (Davis: "failures shouldn't count towards parent
+// failures"): `played` holds only the moves before it, and those were right.
+// Nothing is credited for an answer right after its intro, which showed
+// those moves too. Returns the names of the variations credited.
+function credit(progress, { deck, tree, played }, settings, own) {
+	const chess = new Chess();
+	const out = [];
+	for (const san of played) {
+		chess.move(san);
+		const c = deck.find((x) => x.id === `order|${posKey(chess.fen())}`);
+		if (!c || c.id === own || progress.cards[c.id]?.skip) continue;
+		const r = progress.cards[c.id] || { streak: 0, seen: 0, skip: false };
+		if (learnedCard(r, settings) && r.streak < settings.masterStreak && progress.asked - r.seen < SPACING) continue;
+		progress.cards[c.id] = { ...r, streak: Math.min(r.streak + 1, settings.masterStreak), seen: progress.asked };
+		out.push(tree.byKey.get(c.vkey).name);
+	}
+	return out;
+}
+
 // `ctx` ({ deck, tree }) lets an answer that learns a card refill the session
-// at once, with the cards it unlocked among them.
+// at once, with the cards it unlocked among them; an order answer adds
+// `played`, the moves played right, to credit the variations they pass through.
 export function answer(session, progress, card, right, settings, ctx = null) {
 	if (card.type === "intro") { // a step, not a question: nothing is scored or stored
 		session.i++;
@@ -583,6 +653,7 @@ export function answer(session, progress, card, right, settings, ctx = null) {
 		session.tricky.add(card.id);
 	}
 	progress.cards[card.id] = saved;
+	if (card.type === "order" && ctx?.played && !justShown) result.also = credit(progress, ctx, settings, card.id);
 	if (!tricky && (!right || !learnedCard(saved, settings))) requeue(session, card);
 	session.i++;
 	if (session.practice) return result;

@@ -315,11 +315,13 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn, engine = n
 			setCard();
 			onChange();
 		};
-		// a wrong move passes `miss`: the moves before it, the move itself and the right moves there
+		// a wrong move passes `miss`: the moves before it, the move itself and the right moves there.
+		// An order answer passes the moves played right, which count for the variations they pass through.
 		const finish = (right, detail, miss = null) => {
-			const { unlocked, tooSoon, soon } = answer(ui.session, progress, card, right, settings, { deck: live, tree });
+			const played = card.type === "order" ? (miss ? miss.played : ui.played) : null;
+			const { unlocked, tooSoon, soon, also = [] } = answer(ui.session, progress, card, right, settings, { deck: live, tree, played });
 			save();
-			ui.answered = { right, detail, tooSoon: !!tooSoon, soon, unlocked, miss };
+			ui.answered = { right, detail, tooSoon: !!tooSoon, soon, unlocked, miss, also };
 			onChange();
 		};
 		// an intro is passed, not answered: nothing is scored or stored
@@ -473,7 +475,7 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn, engine = n
 		}
 
 		if (ui.answered) {
-			const { right, detail, tooSoon, soon, unlocked, miss } = ui.answered;
+			const { right, detail, tooSoon, soon, unlocked, miss, also } = ui.answered;
 			const res = el("div", { className: `tr-result ${right ? "right" : "wrong"}` }, [el("strong", { textContent: right ? "Right" : "Not quite" })]);
 			if (tooSoon) {
 				// two rules make an answer too soon: a learned card asked again within SPACING answers, and a card asked straight after its variation's intro
@@ -527,6 +529,7 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn, engine = n
 			// a book card keeps its notes by move; the others show the variation's own note only (the intro steps through the rest)
 			const notes = Array.isArray(card.notes) ? card.notes.filter((n) => n.own && !(miss && n.at === miss.played.length)).map((n) => [n.move, n.text]) : Object.entries(card.notes);
 			for (const [move, text] of notes) res.append(noteLine(Array.isArray(card.notes) ? move : `${move}:`, text));
+			if (also.length) res.append(el("p", { className: "tr-also-counts", title: "Its moves play these variations' moves too, so their order questions count as answered right", textContent: `Also counts for: ${also.join(", ")}` }));
 			if (unlocked.length) res.append(el("p", { className: "tr-unlocked", textContent: `Unlocked: ${unlocked.join(", ")}` }));
 			res.append(chipBtn("tr-next", "Next", "Next question (Enter)", next));
 			box.append(res);

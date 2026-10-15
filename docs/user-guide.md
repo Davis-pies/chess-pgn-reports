@@ -265,6 +265,15 @@ For a shorter overview see the [README](../README.md).
      the settings), never below none, so one slip costs some progress
      without wiping it: a mastered question (5) drops to 3, still learned, and
      two right answers master it again.
+   - **A line plays the lines it goes on from** — an Order question makes you
+     play every move from the start, so playing the English Attack right
+     also plays the Najdorf and the ...d6 Sicilians: each of those Order
+     questions counts as answered right too ("Also counts for: ..."), under
+     the same 10-question spacing rule, all the way up. When the credit would
+     come too soon it is simply not given, and the question's record is left
+     as it was. A miss is never passed up: the variations you reached before
+     the wrong move still count as played right, and the others are left
+     alone.
    - **Unlocking** — level-1 variations start unlocked. A variation counts as
      learned when each of its Name, Order and Tags questions is learned;
      learning it unlocks its sub-variations and its Book questions, and what
@@ -280,7 +289,11 @@ For a shorter overview see the [README](../README.md).
      answers (3 by default; 0 for never) one learned question comes back
      next, the one asked longest ago, once at least 10 other questions have
      been answered since, so older lines keep being recalled between the new
-     ones. When fewer new variations are left than that, a re-check comes
+     ones. A variation whose line was just played or shown (by a question or
+     a "New:" step on a line that goes on from it) is not re-checked until 10
+     more questions have been answered, so the Najdorf does not come straight
+     after the English Attack; only when nothing else is left to ask does it
+     come anyway. When fewer new variations are left than that, a re-check comes
      after every answer, so the last line left alternates with older ones and,
      once everything is learned, a session is all re-checks, those not yet
      mastered first. A question is re-checked at most once a session. A miss comes back three questions later, and so does a
@@ -295,9 +308,14 @@ For a shorter overview see the [README](../README.md).
    - **Mixed up, not blocked** — the questions of one variation are spread
      out: two of the same variation are not asked in a row where another
      order avoids it (a Name question right after its Order question would
-     give it away). A variation's Book questions stay together, in move
-     order. New questions are the Name, Order and Tags ones first, then
-     Book questions, shallowest level first.
+     give it away). Families are mixed too: a family is everything under one
+     level-1 variation (the ...d6, ...e6 or ...Nc6 Sicilians), and two
+     questions of one family are not asked in a row where another order
+     avoids it, so you can't settle into "I'm doing ...d6 Sicilians now". New
+     variations come from a family with nothing new in play before one with
+     something, even if it is deeper. A variation's Book questions stay
+     together, in move order. New questions are the Name, Order and Tags ones
+     first, then Book questions, shallowest level first.
    - **When it is going badly** — while two of your last five answers in a
      session were misses, no new questions are added: those still waiting
      (and their "New:" steps) leave the session, and answers that unlock

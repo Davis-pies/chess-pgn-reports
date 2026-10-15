@@ -1948,7 +1948,7 @@ sup {
 .tr-group, .tr-subgroup { margin: 0; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: .5rem .7rem; display: flex; flex-direction: column; gap: .4rem; }
 .tr-group legend, .tr-subgroup legend { font-size: .8rem; color: var(--muted); }
 .tr-subgroup { border-style: dashed; }
-.tr-unlocked { color: var(--main); }
+.tr-unlocked, .tr-also-counts { color: var(--main); }
 .tr-prompt { font-weight: 600; font-size: 1.05rem; }
 .tr-progress, .tr-status, .tr-overview, .tr-soon { font-size: .8rem; color: var(--muted); }
 /* Train shows one screen at a time, so it takes the whole window rather than

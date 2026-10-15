@@ -300,6 +300,11 @@ test("order question: a wrong first move, then a right run listing other orders"
 	for (const san of tree.byKey.get(key).orders[0]) move(m.root, chess, san);
 	assert.ok($(m.root, ".tr-result.right"));
 	assert.match($(m.root, ".tr-result").textContent, /Also reached by/);
+	// its moves played the variation it goes on from: that order question counts too
+	const up = c.on.map((k) => tree.byKey.get(k));
+	assert.ok(up.length > 0);
+	assert.strictEqual($(m.root, ".tr-also-counts").textContent, `Also counts for: ${up.map((x) => x.name).join(", ")}`);
+	assert.ok(m.progress.cards[`order|${up[0].key}`].streak > 0);
 	done();
 });
 

@@ -125,6 +125,18 @@ the boxes were hard to follow.
   which wiped a nearly learned card for one slip. The streak is a net count,
   not "in a row": the settings say "Right answers to learn / to master".
   Nothing unlocked is locked again.
+- **A line plays its ancestors** (Davis, 2026-10-15: "playing the moves
+  for a derivative line counts as practice and progress"). An order card is
+  answered by playing every move from the start, so each named position
+  those moves pass through (parent, its parent and so on, and an `also`
+  parent the order goes by) has its order card answered right too, under
+  the spacing rule. A credit that would be too soon is not given and leaves
+  the record alone: restarting its spacing on every practice of a child would
+  keep the parent from ever being re-checked. A miss is not passed up
+  (Davis: "failures shouldn't count towards parent failures"): only the
+  moves before it count, and those were right. An answer straight after its
+  intro credits nothing, as the intro showed those moves. Name and tags
+  cards get no credit: playing moves is not naming them.
 - A variation is learned (or mastered) when each of its enabled
   name/order/family cards is. Level-1 variations start unlocked; learning a
   variation unlocks its children and its book cards, and a variation once
@@ -141,6 +153,9 @@ the boxes were hard to follow.
      a free place (Davis, 2026-10-14: counting questions filled a session
      with the sibling variations one parent had just unlocked, look-alike
      new lines drilled against each other instead of older ones recalled):
+     a variation from a family with nothing in flight before one from a
+     family already in flight (Davis, 2026-10-15: not getting into "the
+     habit of thinking I'm doing d6 Sicilians right now"), then
      name/order/tags cards first, shallowest level first, then
      book cards, in reading order (names and move orders, then deeper
      variations, then the book moves inside each one, as the Goal says). So
@@ -154,17 +169,24 @@ the boxes were hard to follow.
      last line's book moves were asked over and over, and once everything
      was learned a session held one re-check). Not-mastered cards are picked
      before mastered ones, and a card asked in the session is not re-checked
-     in it;
+     in it. A card whose variation lies on the line of any of the last 10
+     questions or intros (the card's `on`: the named positions before it) is
+     skipped while another is due (Davis, 2026-10-15: "we don't get the
+     Najdorf after the Najdorf with Be6"), and taken only when the queue
+     would otherwise run dry;
      learned-not-mastered cards from earlier sessions are in step 1's
      "started" only until learned, so they come back the same way.
   The session ends after "Questions per session" answers (default 20; 0: no
   limit), when nothing is left to ask, or with **End session**. The queue is
   **interleaved** as it grows (research, finding 6): no two cards of one
-  variation back to back where another order avoids it, a variation's book
+  family (everything under one level-1 variation) back to back where another
+  order avoids it, failing that no two of one variation, a variation's book
   cards kept together in move order as one run, each intro just before its
   variation's first card.
 - In a session, a miss comes back three questions later, and so does a right
-  answer on a card not yet learned, so a card can be learned in one sitting.
+  answer on a card not yet learned, so a card can be learned in one sitting;
+  a little further where needed so that no card of its family (failing
+  that, its variation) sits on either side.
   (Mastery builds across the flow: once learned, a card is not repeated in
   the same session except as a re-check.)
 - **The right difficulty** (research, findings 3 and 8): while two of the
