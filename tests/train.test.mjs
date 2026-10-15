@@ -5,7 +5,7 @@ import { collectLines } from "../src/tree.js";
 import { namesFromNodes, variationTree } from "../src/names.js";
 import {
 	DEFAULT_SETTINGS, buildDeck, normalizeSettings, emptyProgress, loadProgress, saveProgress, mergeProgress, parseProgress, progressFor, hasProgress,
-	learnedCard, masteredCard, isLearned, isMastered, unlockedKeys, bookOpen, newSession, current, answer, sessionSummary,
+	learnedCard, masteredCard, isLearned, isMastered, isRetired, unlockedKeys, bookOpen, newSession, current, answer, sessionSummary,
 	markKnown, skip, resetVar, isTricky, unlocksIfLearned, checkName, nameChoices, orderStep, checkFamily, checkBook, allTags, positionDiff, divergence, leadsTo,
 } from "../src/train.js";
 
@@ -15,6 +15,9 @@ const lines = collectLines(nodes);
 const tree = variationTree(lines, namesFromNodes(nodes));
 const S = { ...DEFAULT_SETTINGS, learnStreak: 2, types: { name: true, order: true, family: true, book: true }, introNew: false };
 const deck = buildDeck(tree, lines, S);
+// the deck with nothing retired, for tests of the re-check mechanics that use
+// mastered cards of variations with others below them (retirement has its own)
+const flat = deck.map((c) => ({ ...c, under: false }));
 const v = (n) => [...tree.byKey.values()].find((x) => x.name === n);
 const ownOf = (vkey) => deck.filter((c) => c.vkey === vkey && c.type !== "book");
 const ids = (d, t) => d.filter((c) => c.type === t).map((c) => c.id);
@@ -101,6 +104,7 @@ test("unlocking: roots, then children of a learned node, then via also", () => {
 });
 
 test("newSession: in progress, then new up to new variations at once, then a re-check", () => {
+	const deck = flat;
 	const p = emptyProgress();
 	const root = v("...d6 Sicilians").key;
 	const e6 = v("...e6 Sicilians").key;
@@ -182,6 +186,7 @@ test("flow: the session length ends the queue after that many answers", () => {
 });
 
 test("flow: re-checks join every recheckEvery answers and respect spacing", () => {
+	const deck = flat;
 	const p = emptyProgress();
 	for (const k of [v("...d6 Sicilians").key, v("...e6 Sicilians").key]) markKnown(p, k, deck, S);
 	const mastered = new Set(Object.keys(p.cards));
@@ -203,6 +208,7 @@ test("flow: re-checks join every recheckEvery answers and respect spacing", () =
 });
 
 test("flow: a due re-check is asked next, but not beside a question of its own variation", () => {
+	const deck = flat;
 	const d6 = v("...d6 Sicilians").key;
 	const e6 = v("...e6 Sicilians").key;
 	const st = { ...S, recheckEvery: 1, sessionLength: 0 };
@@ -1010,6 +1016,7 @@ test("order credit: playing a line counts for each variation it passes through, 
 });
 
 test("flow: a re-check skips a variation whose line was just played or shown, unless nothing else is left", () => {
+	const deck = flat;
 	const [d6, e6, naj, ea] = ["...d6 Sicilians", "...e6 Sicilians", "Najdorf", "English Attack"].map((n) => v(n).key);
 	const card = deck.find((c) => c.id === `order|${ea}`);
 	const other = deck.find((c) => c.id === `order|${v("Scheveningen").key}`);
@@ -1052,4 +1059,56 @@ test("families: new variations and the queue mix them, and a requeue keeps off i
 	const w = hand([...q]);
 	answer(w, emptyProgress(), q[0], false, S);
 	assert.deepStrictEqual(idsOf(w.queue), ["a", "b", "c", "d", "a", "e", "f"]);
+});
+
+test("retirement: a mastered card a deeper line replays is re-checked only when nothing else is left", () => {
+	const [d6, naj, ea, sch] = ["...d6 Sicilians", "Najdorf", "English Attack", "Scheveningen"].map((n) => v(n).key);
+	const card = (id) => deck.find((c) => c.id === id);
+	// replayed: a variation with one below it, a book move on a named line's way; not a leaf
+	assert.ok(card(`name|${naj}`).under && card(`order|${d6}`).under);
+	assert.ok(!card(`name|${ea}`).under && !card(`name|${sch}`).under);
+	assert.ok(deck.filter((c) => c.type === "book").every((c) => c.under), "each book move here is on a named line's way");
+	// a book move off every named line (2.c3) is not
+	const { nodes: n2 } = parsePgn(`1. e4 c5 {[%name "S"]} 2. Nf3 (2. c3 d5) 2... d6 {[%name "D"]} *`);
+	const l2 = collectLines(n2);
+	const books = buildDeck(variationTree(l2, namesFromNodes(n2)), l2, S).filter((c) => c.type === "book");
+	assert.deepStrictEqual(books.map((c) => [c.sans.at(-1), c.under]), [["Nf3", true], ["c3", false]]);
+	const p = emptyProgress();
+	for (const k of [d6, naj, ea, sch]) markKnown(p, k, deck, S);
+	assert.ok(isRetired(naj, deck, p, S) && !isRetired(ea, deck, p, S) && !isRetired(sch, deck, p, S));
+	p.asked = 200;
+	const st = { ...S, recheckEvery: 1, sessionLength: 0 };
+	const pool = deck.filter((c) => [d6, naj, ea, sch].includes(c.vkey) && c.type !== "book");
+	const s = hand([card(`name|${sch}`)], { pool, sinceRecheck: 1 });
+	answer(s, p, current(s), true, st, { deck, tree });
+	const next = s.queue.slice(s.i);
+	assert.ok(next.length === 1 && [ea, sch].includes(next[0].vkey), "a leaf, not the retired Najdorf or ...d6 Sicilians");
+	// with the leaves asked, the session ends on the retired ones rather than early
+	const r = drive(hand([card(`name|${sch}`)], { pool, sinceRecheck: 1 }), p, st);
+	const later = r.results.slice(r.results.findIndex((x) => x.id.endsWith(d6) || x.id.endsWith(naj)));
+	assert.ok(later.length > 0 && later.every((x) => !x.id.endsWith(ea) && !x.id.endsWith(sch)), "retired ones only once nothing else is left");
+	// a miss on a retired card brings it back
+	const id = `name|${naj}`;
+	answer(hand([card(id)]), p, card(id), false, S);
+	assert.ok(!isRetired(naj, deck, p, S));
+});
+
+test("order credit: the book moves played on the way count too, once they have been asked", () => {
+	const card = deck.find((c) => c.id === `order|${v("English Attack").key}`);
+	// Black's moves on the way: 3...cxd4, 4...Nf6, 5...a6
+	const black = deck.filter((c) => c.type === "book" && c.vkey === v("...d6 Sicilians").key);
+	assert.deepStrictEqual(black.map((c) => c.sans.length), [5, 7, 9]);
+	const p = emptyProgress();
+	p.cards[black[0].id] = { streak: 1, seen: 1, skip: false };
+	answer(hand([card]), p, card, true, S, { deck, tree, played: v("English Attack").orders[0] });
+	assert.strictEqual(p.cards[black[0].id].streak, 2);
+	assert.ok(black.slice(1).every((c) => !p.cards[c.id]), "never asked: not brought in");
+	// a move that is not the main one, under "main moves only", is not a book answer
+	const a6 = black[2];
+	assert.strictEqual(a6.main, "e6");
+	p.cards[a6.id] = { streak: 1, seen: 1, skip: false };
+	answer(hand([card]), p, card, true, { ...S, bookRule: "main" }, { deck, tree, played: v("English Attack").orders[0] });
+	assert.strictEqual(p.cards[a6.id].streak, 1);
+	answer(hand([card]), p, card, true, S, { deck, tree, played: v("English Attack").orders[0] });
+	assert.strictEqual(p.cards[a6.id].streak, 2, "any book move, by default");
 });

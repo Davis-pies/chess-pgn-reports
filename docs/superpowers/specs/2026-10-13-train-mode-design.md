@@ -136,7 +136,22 @@ the boxes were hard to follow.
   (Davis: "failures shouldn't count towards parent failures"): only the
   moves before it count, and those were right. An answer straight after its
   intro credits nothing, as the intro showed those moves. Name and tags
-  cards get no credit: playing moves is not naming them.
+  cards get no credit: playing moves is not naming them. Book cards for
+  the moves played count the same way when the move is a book answer there
+  and the card has a record (a credit never brings a book card in unasked).
+- **Retired** (Davis, 2026-10-15: "a hidden true mastery where a line stops
+  being displayed altogether and only derivative lines will get quizzed
+  on", back "VERY rarely if at all"). A card is `under` when a deeper named
+  line replays it: a variation's name/order/tags cards when another
+  variation has it as parent or `also`, a book card whose position a named
+  variation's order passes through. Mastered and under, it is retired:
+  re-checks pass it over and take it only when the queue would otherwise
+  run dry. Nothing is stored for it: a miss drops it below mastered, and it
+  is back. Leaves and unnamed sidelines are never under, so they never
+  retire. The outline shows "retired" in place of "mastered" when all of a
+  variation's name/order/tags cards are. Considered and set aside: a recall
+  probability per card, opaque and close to the time-based scheduling
+  ruled out above.
 - A variation is learned (or mastered) when each of its enabled
   name/order/family cards is. Level-1 variations start unlocked; learning a
   variation unlocks its children and its book cards, and a variation once

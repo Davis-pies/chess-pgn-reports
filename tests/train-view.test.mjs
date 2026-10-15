@@ -100,7 +100,7 @@ test("outline: Known, Skip, Reset update progress and save", () => {
 	click(row(root, "...d6 Sicilians"), ".tr-known");
 	assert.strictEqual(progress.cards[`name|${key}`].streak, 5);
 	assert.match(row(root, "...d6 Sicilians").querySelector(".tr-bar span").style.width, /^100%/);
-	assert.strictEqual($(row(root, "...d6 Sicilians"), ".tr-state").textContent, "mastered");
+	assert.strictEqual($(row(root, "...d6 Sicilians"), ".tr-state").textContent, "retired", "mastered, with lines below it");
 	assert.ok(!$(root, ".tr-box") && !$(root, ".tr-due"));
 	assert.ok(store.get("ott-train").includes(`name|${key}`));
 	click(row(root, "...d6 Sicilians"), ".tr-skip");
@@ -934,11 +934,14 @@ test("outline: overview, state, bar and tooltips", () => {
 	assert.strictEqual($(r, ".tr-bar").title, "0 of 2 questions mastered");
 	assert.match($(m.root, ".tr-overview").textContent, /^Learned 1 of 5 variations · 0 mastered · open to level 2$/);
 	click(r, ".tr-known");
-	assert.strictEqual($(row(m.root, "...d6 Sicilians"), ".tr-state").textContent, "mastered");
+	assert.strictEqual($(row(m.root, "...d6 Sicilians"), ".tr-state").textContent, "retired", "mastered, and every line below plays it");
 	assert.match($(m.root, ".tr-overview").textContent, /1 mastered/);
 	assert.ok($(row(m.root, "...d6 Sicilians"), ".tr-known").title.includes("unlocks what's below"));
-	// every control in the outline explains itself
+	// a leaf is played by nothing below it: mastered, never retired
 	click(row(m.root, "...d6 Sicilians"), ".tr-open");
+	click(row(m.root, "Scheveningen"), ".tr-known");
+	assert.strictEqual($(row(m.root, "Scheveningen"), ".tr-state").textContent, "mastered");
+	// every control in the outline explains itself
 	for (const n of m.root.querySelectorAll("button, select, .tr-count, .tr-overview, .tr-level, .tr-bar, .tr-state, .tr-badge")) {
 		assert.ok(n.title, `no tooltip on ${n.className} ${n.textContent}`);
 	}

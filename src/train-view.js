@@ -16,7 +16,7 @@ import { boardSvg, fullmoveLabel, movesText } from "./render.js";
 import { drawArrows, interactiveBoard } from "./board-input.js";
 import {
 	DEFAULT_SETTINGS, allTags, answer, checkBook, checkFamily, checkName, current, divergence, isLearned, isMastered, learnedCard,
-	isTricky, leadsTo, markKnown, masteredCard, nameChoices, newSession, normalizeSettings, orderStep, positionDiff, resetVar, saveProgress, scopeCards, sessionSummary, skip,
+	isRetired, isTricky, leadsTo, markKnown, masteredCard, nameChoices, newSession, normalizeSettings, orderStep, positionDiff, resetVar, saveProgress, scopeCards, sessionSummary, skip,
 	unlockedKeys, unlocksIfLearned,
 } from "./train.js";
 
@@ -169,8 +169,13 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn, engine = n
 				el("span", { className: "tr-level", title: `Level ${n.level}: how deep this is among named positions`, textContent: `L${n.level}` }),
 			);
 			if (solid.length) {
-				const state = isMastered(n.key, deck, progress, settings) ? "mastered" : isLearned(n.key, deck, progress, settings) ? "learned" : "";
-				if (state) r.append(el("span", { className: "tr-state", title: state === "mastered" ? "Every question answered right often enough to master" : "Every question learned: what is below it is open", textContent: state }));
+				const state = isMastered(n.key, deck, progress, settings) ? (isRetired(n.key, deck, progress, settings) ? "retired" : "mastered") : isLearned(n.key, deck, progress, settings) ? "learned" : "";
+				const tip = {
+					retired: "Mastered, and played in every line below it: only asked again when nothing else is left",
+					mastered: "Every question answered right often enough to master",
+					learned: "Every question learned: what is below it is open",
+				};
+				if (state) r.append(el("span", { className: "tr-state", title: tip[state], textContent: state }));
 			}
 			if (n.also.length) r.append(el("span", { className: "tr-also", title: "Another line reaches this position too", textContent: `also reached from ${n.also.map((a) => a.name).join(", ")}` }));
 			const bar = el("span", { className: "tr-bar", title: `${mastered} of ${solid.length} questions mastered` }, el("span"));

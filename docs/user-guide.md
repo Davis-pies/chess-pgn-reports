@@ -273,7 +273,18 @@ For a shorter overview see the [README](../README.md).
      come too soon it is simply not given, and the question's record is left
      as it was. A miss is never passed up: the variations you reached before
      the wrong move still count as played right, and the others are left
-     alone.
+     alone. The Book questions for your moves along the way count the same
+     way, once they have been asked at least once.
+   - **Retired** — a mastered question that a deeper named line plays
+     through is retired: a variation's Name, Order and Tags questions once a
+     line goes on from it, and a Book question whose position lies on the
+     way to a named variation. Every Order question below it replays those
+     moves (and counts for them), so it is no longer re-checked on its own:
+     it comes back only when a session has nothing else left to ask. A miss
+     on it takes it below mastered, which brings it back. The outline shows
+     a variation whose questions have all retired as "retired". The
+     variations at the end of a line, and unnamed sidelines, are played by
+     nothing below them, so they never retire.
    - **Unlocking** — level-1 variations start unlocked. A variation counts as
      learned when each of its Name, Order and Tags questions is learned;
      learning it unlocks its sub-variations and its Book questions, and what

@@ -99,20 +99,36 @@ function familyOf(tree, vkey) {
 	return v ? v.key : "";
 }
 
+// `under` marks a card that a deeper named line replays: a variation's own
+// cards when one goes on from it, a book card whose position a named
+// variation's moves pass through. Mastered, such a card is retired (see
+// retiredCard).
 export function buildDeck(tree, lines, settings) {
 	const deck = [];
 	const on = settings.types;
 	const comments = commentsByPath(lines);
+	const below = new Set();
+	const replayed = new Set();
+	for (const v of tree.byKey.values()) {
+		for (const a of [v.parent, ...v.also]) if (a) below.add(a.key);
+		for (const o of v.orders) {
+			const chess = new Chess();
+			for (const san of o) {
+				replayed.add(posKey(chess.fen()));
+				chess.move(san);
+			}
+		}
+	}
 	for (const v of tree.byKey.values()) {
 		const { from, notes, on: path } = notesOf(v, tree, comments);
-		const base = { key: v.key, vkey: v.key, level: v.level, family: familyOf(tree, v.key), on: path };
+		const base = { key: v.key, vkey: v.key, level: v.level, family: familyOf(tree, v.key), on: path, under: below.has(v.key) };
 		// an intro is a step, not a question: it is never stored and never counts
 		if (settings.introNew) deck.push({ id: `intro|${v.key}`, type: "intro", ...base, notes, from });
 		if (on.name) deck.push({ id: `name|${v.key}`, type: "name", ...base, notes });
 		if (on.order) deck.push({ id: `order|${v.key}`, type: "order", ...base, notes });
 		if (on.family && v.tags.length) deck.push({ id: `family|${v.key}`, type: "family", ...base, notes });
 	}
-	if (on.book) deck.push(...bookCards(tree, lines, settings));
+	if (on.book) deck.push(...bookCards(tree, lines, settings).map((c) => ({ ...c, under: replayed.has(c.key) })));
 	return deck;
 }
 
@@ -313,6 +329,16 @@ const solid = (c) => c.type !== "book" && c.type !== "intro";
 const ownCards = (vkey, deck) => deck.filter((c) => c.vkey === vkey && solid(c));
 
 export const isLearned = (vkey, deck, progress, settings) => learnedBy(ownCards(vkey, deck), progress, settings);
+
+// "True mastery" (Davis, 2026-10-15: "a line stops being displayed altogether
+// and only derivative lines will get quizzed on", coming back "VERY rarely if
+// at all"). A mastered card that a deeper named line replays is retired: it is
+// re-checked only when nothing else is left to ask, as its moves are played
+// in every order question below it, and credited there. A miss on it drops it
+// below mastered, which brings it back. Leaves and unnamed sidelines are
+// replayed by nothing, so they never retire.
+const retiredCard = (card, rec, s) => !!card.under && masteredCard(rec, s);
+export const isRetired = (vkey, deck, progress, settings) => ownCards(vkey, deck).every((c) => retiredCard(c, progress.cards[c.id], settings));
 export const isMastered = (vkey, deck, progress, settings) => masteredBy(ownCards(vkey, deck), progress, settings);
 
 export function unlockedKeys(tree, deck, progress, settings) {
@@ -529,7 +555,8 @@ function refill(session, progress, settings, ctx) {
 		const dues = session.pool
 			.filter((c) => !queued.has(c.id) && !asked.has(c.id) && rec(c) && learnedCard(rec(c), settings) && ok(c) && progress.asked - rec(c).seen >= SPACING)
 			.sort((a, b) => masteredCard(rec(a), settings) - masteredCard(rec(b), settings) || rec(a).seen - rec(b).seen);
-		const due = dues.find((c) => !near.has(c.vkey)) ?? (rest.length || more.length ? undefined : dues[0]);
+		const retired = (c) => retiredCard(c, rec(c), settings);
+		const due = dues.find((c) => !near.has(c.vkey) && !retired(c)) ?? (rest.length || more.length ? undefined : dues.find((c) => !retired(c)) ?? dues[0]);
 		// asked next, not behind the new questions already queued, which would
 		// leave whole stretches with nothing older in them; but not beside a
 		// question of its own family, nor of its own variation, which would give
@@ -600,18 +627,25 @@ function holdBack(session, progress) {
 // is not passed up (Davis: "failures shouldn't count towards parent
 // failures"): `played` holds only the moves before it, and those were right.
 // Nothing is credited for an answer right after its intro, which showed
-// those moves too. Returns the names of the variations credited.
+// those moves too. The book moves played on the way count as well, which
+// keeps a retired book card practised; only one already asked, so that an
+// order answer never brings book moves into a session by the back door.
+// Returns the names of the variations credited.
 function credit(progress, { deck, tree, played }, settings, own) {
 	const chess = new Chess();
 	const out = [];
+	const bump = (c) => {
+		const r = progress.cards[c.id] || { streak: 0, seen: 0, skip: false };
+		if (r.skip || (learnedCard(r, settings) && r.streak < settings.masterStreak && progress.asked - r.seen < SPACING)) return false;
+		progress.cards[c.id] = { ...r, streak: Math.min(r.streak + 1, settings.masterStreak), seen: progress.asked };
+		return true;
+	};
 	for (const san of played) {
+		const book = deck.find((x) => x.id === `book|${posKey(chess.fen())}`);
+		if (book && progress.cards[book.id] && checkBook(book, san, settings)) bump(book);
 		chess.move(san);
 		const c = deck.find((x) => x.id === `order|${posKey(chess.fen())}`);
-		if (!c || c.id === own || progress.cards[c.id]?.skip) continue;
-		const r = progress.cards[c.id] || { streak: 0, seen: 0, skip: false };
-		if (learnedCard(r, settings) && r.streak < settings.masterStreak && progress.asked - r.seen < SPACING) continue;
-		progress.cards[c.id] = { ...r, streak: Math.min(r.streak + 1, settings.masterStreak), seen: progress.asked };
-		out.push(tree.byKey.get(c.vkey).name);
+		if (c && c.id !== own && bump(c)) out.push(tree.byKey.get(c.vkey).name);
 	}
 	return out;
 }
