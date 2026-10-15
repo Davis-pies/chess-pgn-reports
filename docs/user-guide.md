@@ -271,14 +271,16 @@ For a shorter overview see the [README](../README.md).
      is unlocked stays unlocked.
    - **A session is a flow** — it opens with the questions you have started
      but not learned (the one asked longest ago first) and brings in new ones
-     as you go: whenever fewer than "Learning at once" (5 by default)
-     questions are being learned, the next new question joins (the Name,
-     Order and Tags ones first, shallowest level first, then Book
+     as you go: whenever fewer than "New variations at once" (3 by default)
+     variations are being learned, the next new variation's questions join
+     (the Name, Order and Tags ones first, shallowest level first, then Book
      questions), including the ones a variation you have just learned
-     unlocked. So a long session keeps going deeper. Every "Re-check every"
-     answers (6 by default; 0 for never) one learned question comes back,
-     the one asked longest ago, once at least 10 other questions have been
-     answered since. A miss comes back three questions later, and so does a
+     unlocked. So a long session keeps going deeper, a few variations at a
+     time rather than a crowd of look-alike siblings. Every "Re-check every"
+     answers (3 by default; 0 for never) one learned question comes back
+     next, the one asked longest ago, once at least 10 other questions have
+     been answered since, so older lines keep being recalled between the new
+     ones. A miss comes back three questions later, and so does a
      right answer on a question not yet learned, so a question can be learned
      in one sitting; once learned it is not asked again that session except
      as a re-check. The session ends after "Questions per session" answers
@@ -348,7 +350,7 @@ For a shorter overview see the [README](../README.md).
      tags to ask within. **Book questions**: the side you play, and whether
      any book move counts or only the mainline's. **Progress**: right answers
      to learn and to master, and how many a miss takes away. **Sessions**: showing a new variation first, how many
-     questions you learn at once, how often a learned one is re-checked, and
+     variations you learn at once, how often a learned one is re-checked, and
      the questions per session (0 for no limit).
    - **Where progress lives** — in this browser, one store for every
      workbook, by position, saved after every answer. Loading another PGN,

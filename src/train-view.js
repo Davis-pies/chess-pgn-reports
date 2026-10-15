@@ -269,7 +269,7 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn, engine = n
 			),
 			group("Sessions",
 				check("introNew", "Show a new variation first", s.introNew, (on) => set({ introNew: on }), `Before the first question on a variation, show its position, the moves that reach it and the workbook's notes. Default ${onOff(D.introNew)}.`),
-				num("learning", "Learning at once", s.learning, (n) => set({ learning: n }), 1, 20, `How many new questions you work on at a time: when one is learned, the next joins, including from what it unlocked. 1 to 20. Default ${D.learning}.`),
+				num("newVariations", "New variations at once", s.newVariations, (n) => set({ newVariations: n }), 1, 20, `How many new variations you work on at a time: when one is learned, the next joins, including from what it unlocked. Fewer keeps look-alike lines apart. 1 to 20. Default ${D.newVariations}.`),
 				num("recheckEvery", "Re-check every", s.recheckEvery, (n) => set({ recheckEvery: n }), 0, 50, `Bring back one learned question every this many questions, to check it has stuck. 0: never. 0 to 50. Default ${D.recheckEvery}.`),
 				num("sessionLength", "Questions per session (0: no limit)", s.sessionLength, (n) => set({ sessionLength: n }), 0, undefined, `The session ends after this many answers; with 0 it keeps going, unlocking as you learn, until you end it. Default ${D.sessionLength}.`),
 			),

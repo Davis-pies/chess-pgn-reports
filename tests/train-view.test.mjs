@@ -946,7 +946,7 @@ test("settings: grouped, every field has a tooltip with its default, streaks cla
 	const legends = [...root.querySelectorAll(".tr-group > legend")].map((l) => l.textContent);
 	assert.deepStrictEqual(legends, ["Questions", "Name questions", "Order questions", "Tags questions", "Book questions", "Progress", "Sessions"]);
 	const labels = [...root.querySelectorAll(".tr-field > span")].map((l) => l.textContent);
-	for (const l of ["Name", "Order", "Tags", "Book", "Answer by", "Choices", "Show the moves", "Show the target position", "Show the name", "You play", "Accept", "Right answers to learn", "Right answers to master", "A miss takes away", "Show a new variation first", "Learning at once", "Re-check every", "Questions per session (0: no limit)"]) {
+	for (const l of ["Name", "Order", "Tags", "Book", "Answer by", "Choices", "Show the moves", "Show the target position", "Show the name", "You play", "Accept", "Right answers to learn", "Right answers to master", "A miss takes away", "Show a new variation first", "New variations at once", "Re-check every", "Questions per session (0: no limit)"]) {
 		assert.ok(labels.includes(l), l);
 	}
 	for (const f of root.querySelectorAll(".tr-field")) assert.ok(f.title, `no tooltip on ${f.textContent}`);
@@ -964,16 +964,16 @@ test("settings: grouped, every field has a tooltip with its default, streaks cla
 	assert.strictEqual(progress.settings.masterStreak, 7, "master is raised to learn");
 	set("masterStreak", "9");
 	set("recheckEvery", "4");
-	set("learning", "6");
+	set("newVariations", "6");
 	set("sessionLength", "0");
 	assert.deepStrictEqual(
-		[progress.settings.masterStreak, progress.settings.recheckEvery, progress.settings.learning, progress.settings.sessionLength],
+		[progress.settings.masterStreak, progress.settings.recheckEvery, progress.settings.newVariations, progress.settings.sessionLength],
 		[9, 4, 6, 0],
 	);
-	set("learning", "99");
-	assert.strictEqual(progress.settings.learning, DEFAULT_SETTINGS.learning, "out of range: the default");
-	assert.match($(root, '[name="learning"]').closest("label").title, /Default 5\./);
-	assert.match($(root, '[name="recheckEvery"]').closest("label").title, /0: never.*Default 6\./);
+	set("newVariations", "99");
+	assert.strictEqual(progress.settings.newVariations, DEFAULT_SETTINGS.newVariations, "out of range: the default");
+	assert.match($(root, '[name="newVariations"]').closest("label").title, /Default 3\./);
+	assert.match($(root, '[name="recheckEvery"]').closest("label").title, /0: never.*Default 3\./);
 	assert.match($(root, '[name="sessionLength"]').closest("label").title, /with 0 it keeps going.*Default 20\./);
 	assert.strictEqual(loadProgress().settings.masterStreak, 9);
 	const intro = $(root, '[name="introNew"]');

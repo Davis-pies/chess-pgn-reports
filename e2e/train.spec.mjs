@@ -49,7 +49,7 @@ test("train asks the questions an answer unlocks in the same session", async ({ 
   await expect(page.locator(".tr-question")).toBeVisible();
 });
 
-// A session is a flow: with no length limit and one question learned at a
+// A session is a flow: with no length limit and one variation learned at a
 // time, learning a question brings the next one in, and the session carries on
 // until it is ended; Keep going starts the next one from the summary.
 test("train's session flows on, ends on request and keeps going", async ({ page }) => {
@@ -59,7 +59,7 @@ test("train's session flows on, ends on request and keeps going", async ({ page 
   for (const label of ["Order", "Book", "Show a new variation first"]) {
     await page.getByLabel(label, { exact: true }).click();
   }
-  for (const [label, value] of [["Right answers to learn", "1"], ["Learning at once", "1"], ["Questions per session", "0"]]) {
+  for (const [label, value] of [["Right answers to learn", "1"], ["New variations at once", "1"], ["Questions per session", "0"]]) {
     await page.getByLabel(label).fill(value);
     await page.getByLabel(label).blur();
   }

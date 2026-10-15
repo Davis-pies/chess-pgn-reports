@@ -30,8 +30,8 @@ export const DEFAULT_SETTINGS = {
 	learnStreak: 3,
 	masterStreak: 5,
 	missCost: 2,
-	learning: 5,
-	recheckEvery: 6,
+	newVariations: 3,
+	recheckEvery: 3,
 	sessionLength: 20,
 	introNew: true,
 };
@@ -148,7 +148,7 @@ const VALID = {
 	learnStreak: (x) => isInt(x, 1, 10),
 	masterStreak: (x) => isInt(x, 1, 20),
 	missCost: (x) => isInt(x, 1, 5),
-	learning: (x) => isInt(x, 1, 20),
+	newVariations: (x) => isInt(x, 1, 20),
 	recheckEvery: (x) => isInt(x, 0, 50),
 	introNew: (x) => typeof x === "boolean",
 	sessionLength: (x) => isInt(x, 0),
@@ -444,11 +444,15 @@ function spaceIntros(session) {
 
 // Feed the flow (Davis, 2026-10-14: a session should keep unlocking, not stop
 // at a batch fixed up front). Run after the opening queue and after every
-// answer: new cards join while fewer than `learning` cards are in flight
-// (queued and not yet learned, so a card learned just now makes room, and so
-// does the next one it unlocked), and every `recheckEvery` answers one learned
-// card comes back for a spaced check. A card set aside as tricky is not in
-// flight: it would clog the flow for the rest of the session.
+// answer: new cards join while fewer than `newVariations` variations are in
+// flight (with a card queued and not yet learned, so a variation learned just
+// now makes room, and so does the next one it unlocked), and every
+// `recheckEvery` answers one learned card comes back for a spaced check. A card
+// set aside as tricky is not in flight: it would clog the flow for the rest of
+// the session. The cap counts variations, not questions (Davis, 2026-10-14:
+// five new questions were nearly always the sibling variations one parent had
+// just unlocked, so a session was drilling look-alike new lines against each
+// other instead of recalling older ones).
 function refill(session, progress, settings, ctx) {
 	if (session.practice) return;
 	if (settings.sessionLength > 0 && session.results.length >= settings.sessionLength) {
@@ -463,15 +467,25 @@ function refill(session, progress, settings, ctx) {
 	const more = [];
 	// while two of the last five answers were misses, nothing new joins
 	if (session.results.slice(-5).filter((r) => !r.right).length < 2) {
-		const inFlight = new Set(rest.filter((c) => !learnedCard(rec(c), settings) && !session.tricky.has(c.id)).map((c) => c.id)).size;
-		more.push(...session.pool.filter((c) => !rec(c) && !queued.has(c.id) && ok(c)).sort(byNewness).slice(0, Math.max(0, settings.learning - inFlight)));
+		const inFlight = new Set(rest.filter((c) => !learnedCard(rec(c), settings) && !session.tricky.has(c.id)).map((c) => c.vkey));
+		for (const c of session.pool.filter((x) => !rec(x) && !queued.has(x.id) && ok(x)).sort(byNewness)) {
+			if (!inFlight.has(c.vkey) && inFlight.size >= settings.newVariations) continue;
+			inFlight.add(c.vkey);
+			more.push(c);
+		}
 	}
 	if (settings.recheckEvery > 0 && session.sinceRecheck >= settings.recheckEvery) {
 		const due = session.pool
 			.filter((c) => !queued.has(c.id) && rec(c) && learnedCard(rec(c), settings) && ok(c) && progress.asked - rec(c).seen >= SPACING)
 			.sort((a, b) => rec(a).seen - rec(b).seen)[0];
+		// asked next, not behind the new questions already queued, which would
+		// leave whole stretches with nothing older in them; but not beside a
+		// question of its own variation, which would give one away
 		if (due) {
-			more.push(due);
+			const q = session.queue;
+			let at = session.i;
+			while (at < q.length && (q[at].vkey === due.vkey || q[at - 1]?.vkey === due.vkey)) at++;
+			q.splice(at, 0, due);
 			session.sinceRecheck = 0;
 		}
 	}

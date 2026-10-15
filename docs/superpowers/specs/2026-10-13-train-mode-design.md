@@ -135,15 +135,21 @@ the boxes were hard to follow.
   cards in scope, not skipped:
   1. it opens with the cards started but not learned, least-recently asked
      first;
-  2. new cards join whenever fewer than "Learning at once" (default 5, 1-20)
-     cards in the session are started but not yet learned, one for each
-     free place: name/order/tags cards first, shallowest level first, then
+  2. new cards join whenever fewer than "New variations at once" (default 3,
+     1-20) variations have a card in the session started but not yet
+     learned; a card joins if its variation is already in flight or there is
+     a free place (Davis, 2026-10-14: counting questions filled a session
+     with the sibling variations one parent had just unlocked, look-alike
+     new lines drilled against each other instead of older ones recalled):
+     name/order/tags cards first, shallowest level first, then
      book cards, in reading order (names and move orders, then deeper
      variations, then the book moves inside each one, as the Goal says). So
      as cards are learned, new ones take their place, including from the
      variations they unlocked;
-  3. a mastered card joins every "Re-check every" questions (default 6, 0:
-     never), the one asked longest ago that the spacing rule would count;
+  3. a mastered card joins every "Re-check every" questions (default 3, 0:
+     never), the one asked longest ago that the spacing rule would count. It
+     is asked next, not behind the queued new questions, but never beside a
+     question of its own variation;
      learned-not-mastered cards from earlier sessions are in step 1's
      "started" only until learned, so they come back the same way.
   The session ends after "Questions per session" answers (default 20; 0: no
@@ -211,10 +217,11 @@ Grouped, each with a tooltip saying what it does and its default:
   book move or only the mainline's.
 - **Progress**: right answers to learn (1-10, default 3), to master
   (learn-20, default 5), a miss takes away (1-5, default 2).
-- **Sessions**: show a new variation first (on), learning at once (1-20,
-  default 5), re-check every N questions (0-50, default 6; 0: never),
+- **Sessions**: show a new variation first (on), new variations at once
+  (1-20, default 3), re-check every N questions (0-50, default 3; 0: never),
   questions per session (default 20; 0: no limit). Saved settings with the
-  old `newPerSession` / `reviews` keys drop them.
+  old `newPerSession` / `reviews` keys drop them, and so do those with
+  `learning`, which counted questions rather than variations.
 
 ## The Train window
 
