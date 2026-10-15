@@ -240,8 +240,8 @@ For a shorter overview see the [README](../README.md).
      Order question lists the whole order with the moves from your slip on
      marked, and the note on the right move.
    - **A new variation first** — the first time a session reaches a variation
-     you have never been asked about, it shows "New: <name>" before any
-     question. The board starts where the variation's own moves begin (after
+     you have not yet answered a question on right, it shows "New: <name>"
+     before any question. The board starts where the variation's own moves begin (after
      the named position before it; the moves before are dimmed) and steps
      through them with ◀ ▶ or the arrow keys, or a click on a move, showing
      only the notes on the move just played. **Learn it** opens it in Study,

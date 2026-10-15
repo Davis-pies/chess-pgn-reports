@@ -82,7 +82,7 @@ explained feedback beats right/wrong). The rest are for the intro: all of
 them at once were a wall of text (Davis, 2026-10-14).
 
 - **intro** - not a question: the first time a session reaches a variation
-  never asked, a "New: <name>" step plays its moves on the board one at a
+  with no question answered right yet, a "New: <name>" step plays its moves on the board one at a
   time (◀ ▶, arrow keys, or a click on a move), starting where its own moves
   begin after its parent's position, and shows only the notes on the move
   just played; **Learn it** (Study) and **Got it**. Unscored, never

@@ -393,13 +393,17 @@ function interleave(cards, deck, last = null) {
 	return out;
 }
 
-// Put each variation's intro (when it has one, hasn't been shown and none of
-// its cards has been asked) just before its first card.
+// Put each variation's intro (when it has one, hasn't been shown this session
+// and none of its cards has been answered right yet) just before its first
+// card. "Answered right", not "asked": progress from before intros existed
+// holds variations asked but never shown, which were then quizzed cold
+// (Davis, 2026-10-14, on the Fischer Attack); and one only ever missed is
+// worth seeing again.
 function withIntros(session, progress, cards) {
 	const out = [];
 	for (const c of cards) {
 		const intro = session.intros.get(c.vkey);
-		if (intro && !session.introduced.has(c.vkey) && !session.pool.some((x) => x.vkey === c.vkey && progress.cards[x.id])) {
+		if (intro && !session.introduced.has(c.vkey) && !session.pool.some((x) => x.vkey === c.vkey && progress.cards[x.id]?.streak > 0)) {
 			session.introduced.add(c.vkey);
 			out.push(intro);
 		}

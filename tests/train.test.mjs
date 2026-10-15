@@ -722,12 +722,18 @@ test("intro cards: one per variation when on, never in progress, never counted",
 	assert.deepStrictEqual(r, { id: s.queue[0].id, intro: true });
 	assert.deepStrictEqual([s.i, s.results, pr.cards, pr.asked], [1, [], {}, 0]);
 	assert.strictEqual(sessionSummary(s, tree, deckI, pr, SI).right, 0);
-	// none in practice, none for a variation already asked, none with the setting off
+	// none in practice, none for a variation already answered right, none with the setting off
 	assert.ok(!newSession(deckI, tree, emptyProgress(), SI, { practice: true }).queue.some((c) => c.type === "intro"));
 	const q = emptyProgress();
 	q.cards[`name|${root}`] = { streak: 1, seen: 1, skip: false };
 	const started = newSession(deckI, tree, q, SI, {}).queue;
 	assert.ok(!started.some((c) => c.id === `intro|${root}`) && started.some((c) => c.id === `intro|${v("...e6 Sicilians").key}`));
+	// asked but never right (or saved before intros existed): still introduced, before its first card
+	q.cards[`name|${root}`] = { streak: 0, seen: 1, skip: false };
+	const cold = newSession(deckI, tree, q, SI, {}).queue;
+	assert.ok(cold.findIndex((c) => c.id === `intro|${root}`) >= 0);
+	assert.ok(cold.findIndex((c) => c.id === `intro|${root}`) < cold.findIndex((c) => c.vkey === root && c.type !== "intro"));
+	assert.strictEqual(cold.filter((c) => c.id === `intro|${root}`).length, 1);
 	assert.ok(!newSession(deck, tree, emptyProgress(), S, {}).queue.some((c) => c.type === "intro"));
 });
 
