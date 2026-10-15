@@ -499,37 +499,42 @@ const touch = (p, ...names) => {
 	return p;
 };
 
-test("nameChoices: closest first for a learned card, one sibling at most for a new one", () => {
-	const learned = touch(emptyProgress(), "S2", "S3", "O1", "S1a", "Sicilian", "Open");
-	learned.cards[`name|${cv("S1").key}`] = { streak: 3, seen: 1, skip: false };
-	const ctx = { progress: learned, deck: cDeck };
-	assert.deepStrictEqual(ask("S1", { ...S, choices: 3 }, ctx), ["S1", "S2", "S3"]);
-	assert.deepStrictEqual(ask("S1", { ...S, choices: 4 }, ctx), ["O1", "S1", "S2", "S3"]);
-	const five = ask("S1", { ...S, choices: 5 }, ctx);
-	assert.deepStrictEqual(five.filter((n) => ["O1", "S1", "S2", "S3"].includes(n)), ["O1", "S1", "S2", "S3"]);
-	assert.strictEqual(five.length, 5);
-	// not learned: one sibling, then the farther ranks (same level, the rest, tags), the sibling left over last
-	const fresh = touch(emptyProgress(), "S2", "S3", "O1", "S1a", "Sicilian", "Open");
-	for (const choices of [3, 4]) {
-		const c = ask("S1", { ...S, choices }, { progress: fresh, deck: cDeck });
-		assert.strictEqual(c.filter((n) => n === "S2" || n === "S3").length, 1, c.join());
-		assert.ok(!c.includes("O1"), "the shared tag ranks after the rest");
+test("nameChoices: the closest look-alike positions first; a line's own continuations after them", () => {
+	// Four Knights and Classical differ by ...e6 for ...d6, pawns only; the
+	// Richter-Rauzer is the Classical a move on, and the Najdorf a knight off
+	const pgn = `1. e4 c5 2. Nf3 d6 {[%name "D"]} (2... e6 {[%name "E"]} 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 Nc6 {[%name "Four Knights"]}) 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 Nc6 {[%name "Classical"]} (5... a6 {[%name "Najdorf"]}) 6. Bg5 {[%name "Richter-Rauzer"]} *`;
+	const { nodes: n2 } = parsePgn(pgn);
+	const l2 = collectLines(n2);
+	const t2 = variationTree(l2, namesFromNodes(n2));
+	const d2 = buildDeck(t2, l2, S);
+	const name = (n) => d2.find((c) => c.id === `name|${[...t2.byKey.values()].find((x) => x.name === n).key}`);
+	const all = emptyProgress();
+	for (const c of d2.filter((x) => x.type === "name")) all.cards[c.id] = { streak: 0, seen: 1, skip: false };
+	const ask = (n, choices, progress = all) => nameChoices(name(n), t2, { ...S, choices }, Math.random, { progress, deck: d2 }).sort();
+	for (let k = 0; k < 20; k++) { // whatever the shuffle
+		assert.deepStrictEqual(ask("Classical", 2), ["Classical", "Four Knights"]);
+		assert.deepStrictEqual(ask("Four Knights", 2), ["Classical", "Four Knights"]);
+		assert.deepStrictEqual(ask("Classical", 3), ["Classical", "Four Knights", "Najdorf"], "the Richter-Rauzer, a move on, counts two further: it ties with the Najdorf, a sibling, which wins");
 	}
-	assert.deepStrictEqual(ask("S1", { ...S, choices: 7 }, { progress: fresh, deck: cDeck }), ["O1", "Open", "S1", "S1a", "S2", "S3", "Sicilian"]);
+	// only met names: with the Four Knights unmet, the next closest; with too few met, fewer choices
+	const some = emptyProgress();
+	for (const n of ["Classical", "Najdorf", "Richter-Rauzer"]) some.cards[name(n).id] = { streak: 0, seen: 1, skip: false };
+	assert.deepStrictEqual(ask("Classical", 2, some), ["Classical", "Najdorf"]);
+	assert.deepStrictEqual(ask("Classical", 4, some), ["Classical", "Najdorf", "Richter-Rauzer"]);
+	// never fewer than two: with nothing else met, the closest unmet one
+	assert.deepStrictEqual(ask("Four Knights", 4, emptyProgress()), ["Classical", "Four Knights"]);
 });
 
-test("nameChoices: met names before unmet ones, the answer always in, never more than there are names", () => {
-	const p = touch(emptyProgress(), "Open", "S2");
-	assert.deepStrictEqual(ask("S1", { ...S, choices: 3 }, { progress: p, deck: cDeck }), ["Open", "S1", "S2"]);
-	// the unmet only fill: after the met ones are used up
-	assert.deepStrictEqual(ask("S1", { ...S, choices: 4 }, { progress: p, deck: cDeck }).filter((n) => ["Open", "S2", "S1"].includes(n)), ["Open", "S1", "S2"]);
-	// callers without progress get "not learned, all unmet"
-	const c = ask("S1", { ...S, choices: 4 });
-	assert.strictEqual(c.length, 4);
-	assert.ok(c.includes("S1") && c.filter((n) => n === "S2" || n === "S3").length === 1);
+test("nameChoices: the answer always in, met names only, never more than there are names", () => {
+	// S3 (...e6) and S2 (...Nc6) are the closest to S1 (...d6)
+	const c4 = ask("S1", { ...S, choices: 3 });
+	assert.deepStrictEqual(c4, ["S1", "S2", "S3"]);
 	assert.strictEqual(ask("S1", { ...S, choices: 8 }).length, 7, "seven names in all");
 	assert.strictEqual(ask("Sicilian", { ...S, choices: 2 }).length, 2);
 	assert.ok(ask("Sicilian", { ...S, choices: 2 }).includes("Sicilian"));
+	// met only, with progress
+	const p = touch(emptyProgress(), "Open", "S2");
+	assert.deepStrictEqual(ask("S1", { ...S, choices: 4 }, { progress: p, deck: cDeck }), ["Open", "S1", "S2"]);
 });
 
 test("orderStep over two move orders", () => {

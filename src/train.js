@@ -776,30 +776,45 @@ function shuffle(list, rng) {
 	return a;
 }
 
-// The wrong answers, hardest first (Davis, 2026-10-14: questions should be
-// difficult and ensure understanding; research findings 3 and 6). Ranks of
-// confusability: 1 siblings (same parent; the roots are each other's), 2 a
-// shared tag, 3 the same level, 4 the rest. A variation the reader has met
-// (any card asked) comes before an unmet one, whatever the ranks, so an
-// unmet name only fills. A card not yet learned takes one sibling at most and
-// the farther ranks after it, so that the choice is not a tie-break between
-// near twins; a learned one takes the closest first.
+// The variations above `v`: its parent, its `also` parents and theirs.
+function above(v, out = new Set()) {
+	for (const a of [v.parent, ...v.also]) if (a && !out.has(a)) above(a, out.add(a));
+	return out;
+}
+
+// How unlike two variations' positions look, lower for a closer look-alike:
+// the squares whose piece differs, one less when only pawns differ (the same
+// pieces on another pawn structure, ...e6 for ...d6), two more for one on the
+// other's own line, above or below it, which the board and the move in its
+// name tell apart.
+function unlikeness(a, b) {
+	const diff = positionDiff(a.fen, b.fen);
+	const [x, y] = [new Chess(a.fen), new Chess(b.fen)];
+	const pawns = diff.every((sq) => [x.get(sq), y.get(sq)].every((p) => !p || p.type === "p"));
+	return diff.length - (pawns ? 1 : 0) + (above(a).has(b) || above(b).has(a) ? 2 : 0);
+}
+
+// The wrong answers, the closest look-alikes first (Davis, 2026-10-15: "four
+// knights and classical should always be options when the answer is the
+// other"). Ties go to the older ranks: siblings, a shared tag, the same level,
+// the rest. Only variations the reader has met (any card asked) are offered
+// (Davis: "we should still only see what we've seen before as options"): an
+// unmet look-alike can't deceive, as its position is unknown. With too few
+// met, the question has fewer choices, but never fewer than two. Without
+// progress, every variation counts as met.
+// This replaced "a card not yet learned takes one sibling at most" (2026-10-14),
+// which kept the look-alikes out while a variation was being learned.
 export function nameChoices(card, tree, settings, rng, { progress, deck } = {}) {
 	const right = tree.byKey.get(card.key);
-	const learned = !!progress && learnedCard(progress.cards[card.id], settings);
-	const met = new Set(deck && progress ? deck.filter((c) => progress.cards[c.id]).map((c) => c.vkey) : []);
+	const met = (v) => !progress || deck.some((c) => c.vkey === v.key && progress.cards[c.id]);
 	const rank = (v) => (v.parent === right.parent ? 1 : v.tags.some((t) => right.tags.includes(t)) ? 2 : v.level === right.level ? 3 : 4);
 	const names = new Set([right.name]);
 	const others = [];
-	for (const v of shuffle([...tree.byKey.values()], rng)) if (!names.has(v.name) && names.add(v.name)) others.push(v);
-	const order = (pool) => {
-		const by = (r) => pool.filter((v) => rank(v) === r);
-		const [first, ...more] = by(1);
-		const ranks = learned ? [by(1), by(2), by(3), by(4)] : [first ? [first] : [], by(3), by(4), by(2), more];
-		return ranks.flat();
-	};
-	const picked = [...order(others.filter((v) => met.has(v.key))), ...order(others.filter((v) => !met.has(v.key)))];
-	return shuffle([right.name, ...picked.slice(0, settings.choices - 1).map((v) => v.name)], rng);
+	for (const v of shuffle([...tree.byKey.values()], rng)) if (!names.has(v.name) && names.add(v.name)) others.push({ v, d: unlikeness(right, v), r: rank(v) });
+	others.sort((a, b) => a.d - b.d || a.r - b.r);
+	let picked = others.filter((o) => met(o.v)).slice(0, settings.choices - 1);
+	if (!picked.length) picked = others.slice(0, 1);
+	return shuffle([right.name, ...picked.map((o) => o.v.name)], rng);
 }
 
 export function orderStep(orders, played, san) {

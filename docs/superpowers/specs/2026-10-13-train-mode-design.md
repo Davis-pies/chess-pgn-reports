@@ -51,13 +51,19 @@ Each named position gives cards; each card type can be switched off.
   show the moves that led there, board orientation.
   **Choices** (Davis, 2026-10-14: make it difficult, ensure understanding;
   research, findings 3 and 6: discrimination between similar items, at the
-  right difficulty). The wrong answers are ranked by how confusable they
-  are: (1) siblings (same parent; the other roots at level 1), (2) variations
-  sharing a tag with it, (3) the same level elsewhere, (4) the rest. Names
-  the reader has met (any card of that variation asked) come before unmet
-  ones within each rank; an unmet name is used only to fill. A card not yet
-  learned takes at most one sibling and the rest from the farther ranks; a
-  learned card takes the closest ranks first. Shuffled every time.
+  right difficulty). 2026-10-15 (Davis: "Four Knights and Classical should
+  always be options when the answer is the other"): the wrong answers are
+  ranked by how alike the positions look: the squares whose piece differs,
+  one less when only pawns differ, two more for a variation on the answer's
+  own line (above or below it, told apart by the board and the move in its
+  name). Ties go to the older ranks: (1) siblings (same parent; the other
+  roots at level 1), (2) a shared tag, (3) the same level, (4) the rest.
+  Only variations the reader has met (any card asked) are offered (Davis:
+  "we should still only see what we've seen before as options"); with too
+  few, fewer choices, but never fewer than two (the closest unmet one
+  fills). Replaced: met names first with unmet filling, and "a card not
+  yet learned takes at most one sibling", which kept the look-alikes out
+  while a variation was being learned. Shuffled every time.
 - **order** - given the name, play the moves from the start. A move is
   accepted while some workbook path still leads to the position; a move off
   all of them is wrong and the accepted moves are shown. Arriving lists the

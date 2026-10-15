@@ -216,14 +216,17 @@ For a shorter overview see the [README](../README.md).
      board plays one side and you the other along the variation's moves, each
      of your moves its own question; the workbook's note on the move is shown
      after you answer. Name, Order and Book are on by default; Tags is off.
-   - **Name choices** — the wrong names are the ones easiest to confuse with
-     the right one: first its siblings (the same parent; the other level-1
-     variations for a level-1 one), then variations sharing a tag with it,
-     then others at its level, then the rest. Names you have already been
-     asked about come before ones you have never met, which only fill the
-     list. A question you have not learned yet takes at most one sibling, so
-     it is not a toss-up between near twins; once learned it takes the
-     closest ones first, which makes it harder. They change every time.
+   - **Name choices** — the wrong names are the positions that look most
+     like the right one: the fewest squares different, counting a
+     difference in pawns alone (the same pieces with ...e6 for ...d6) as
+     closer still, so the Four Knights and the Classical are always offered
+     for each other. A line one or two moves on from the answer, or the one
+     it came from, counts as further away, because the board and the move in
+     its name tell them apart. Ties go to siblings, then a shared tag, then
+     the same level. Only variations you have already been asked about are
+     offered: a look-alike you have never studied can't fool you. With too
+     few of those met, the question has fewer choices, never fewer than two.
+     The order of the choices changes every time.
    - **Notes after every answer** — the result of a Name, Order or Tags
      question shows the workbook's note on the move that reaches the
      variation, labelled with its move ("3...Nf6"), as a Book question shows

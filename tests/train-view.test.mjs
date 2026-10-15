@@ -252,8 +252,14 @@ test("every question draws its board at one size, asked and answered", () => {
 test("name question: wrong choice, keys 1-9, typed mode accepts an alias", () => {
 	const key = v("...e6 Sicilians/Sicilian e6").key;
 	const c = deck.find((x) => x.id === `name|${key}`);
+	// every variation met, so all four choices are there to pick from
+	const met = () => {
+		const p = emptyProgress();
+		for (const x of deck.filter((y) => y.type === "name")) p.cards[x.id] = { streak: 0, seen: 1, skip: false };
+		return p;
+	};
 	const start = (settings) => {
-		const m = mount({ settings });
+		const m = mount({ settings, progress: met() });
 		m.ui.session = hand([c]);
 		m.ui.card = c;
 		m.ui.screen = "question";
