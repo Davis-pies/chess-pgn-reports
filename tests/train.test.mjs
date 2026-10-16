@@ -6,7 +6,7 @@ import { namesFromNodes, variationTree } from "../src/names.js";
 import {
 	DEFAULT_SETTINGS, buildDeck, normalizeSettings, emptyProgress, loadProgress, saveProgress, mergeProgress, parseProgress, progressFor, hasProgress,
 	learnedCard, masteredCard, isLearned, isMastered, isRetired, unlockedKeys, bookOpen, newSession, current, answer, sessionSummary,
-	markKnown, skip, resetVar, isTricky, unlocksIfLearned, checkName, nameChoices, orderStep, checkFamily, checkBook, allTags, positionDiff, divergence, leadsTo,
+	answerRun, runHere, runOn, runPlay, runShow, startRun, markKnown, skip, resetVar, isTricky, unlocksIfLearned, checkName, nameChoices, orderStep, checkFamily, allTags, positionDiff, divergence, leadsTo,
 } from "../src/train.js";
 
 const PGN = `1. e4 c5 2. Nf3 d6 {[%name "...d6 Sicilians"]} (2... e6 {[%name "...e6 Sicilians"] [%tags "e6"]} 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 d6 {[%name "Scheveningen"] Small centre.}) 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 e6 {[%name "Scheveningen"]} (5... a6 {[%name "Najdorf"] [%tags "d6; Nc3 committed"]} 6. Be3 {[%name "English Attack"]}) *`;
@@ -48,21 +48,25 @@ test("deck: name/order per node, family for tagged, black-to-move book cards fro
 	assert.ok(book.length > 0);
 	for (const c of book) assert.strictEqual(c.sans.length % 2, 1); // black to move
 	assert.ok(book.every((c) => tree.byKey.has(c.vkey)));
-	// after 4...Nf6 5.Nc3 the mainline plays e6, the variation a6/d6 ... shared key merges
-	const c5 = book.find((c) => c.sans.join(" ") === "e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3".replace("Nf3 d6", "Nf3 d6"));
-	assert.deepStrictEqual(c5.moves, ["e6", "a6"]);
-	assert.strictEqual(c5.main, "e6");
-	assert.strictEqual(c5.vkey, v("...d6 Sicilians").key);
-	assert.strictEqual(c5.level, 1);
+	// after 4...Nf6 5.Nc3 the mainline plays e6, the variation a6: a card per move, sharing the position's book moves
+	const at5 = book.filter((c) => c.sans.join(" ") === "e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3");
+	assert.deepStrictEqual(at5.map((c) => c.san), ["e6", "a6"]);
+	assert.ok(at5.every((c) => c.id === `book|${c.key}|${c.san}` && c.moves === at5[0].moves));
+	assert.deepStrictEqual(at5[0].moves, ["e6", "a6"]);
+	assert.strictEqual(at5[0].vkey, v("...d6 Sicilians").key);
+	assert.strictEqual(at5[0].level, 1);
+	// the lines through a move: both lines play 5...e6's way up to it, only one goes on with a6
+	assert.strictEqual(at5[1].lines.length, 1);
+	assert.deepStrictEqual(at5[1].lines[0].marks.map((m) => tree.byKey.get(m.key).name), ["...d6 Sicilians", "Najdorf", "English Attack"]);
 	// bookSide both / white
 	assert.ok(buildDeck(tree, lines, { ...S, bookSide: "both" }).filter((c) => c.type === "book").length > book.length);
 	assert.ok(buildDeck(tree, lines, { ...S, bookSide: "white" }).filter((c) => c.type === "book").every((c) => c.sans.length % 2 === 0));
-	// notes: the comment on a move is kept under its SAN
+	// notes: the comment on a move is the card's note, and the line's
 	const withNote = [{ moves: [{ san: "e4", ply: 1 }, { san: "e5", ply: 2 }], comments: [{ ply: 2, text: "Open game." }], isMain: true }];
 	const t0 = variationTree(withNote, {});
 	const d0 = buildDeck(t0, withNote, { ...S, bookSide: "both" });
-	assert.deepStrictEqual(d0.map((c) => [c.vkey, c.moves, c.notes]), [["", ["e4"], {}], ["", ["e5"], { e5: "Open game." }]]);
-	assert.strictEqual(d0[0].main, "e4");
+	assert.deepStrictEqual(d0.map((c) => [c.vkey, c.moves, c.note]), [["", ["e4"], ""], ["", ["e5"], "Open game."]]);
+	assert.deepStrictEqual(d0[0].lines[0].notes, ["", "Open game."]);
 });
 
 test("learned and mastered read the streak against the two settings", () => {
@@ -138,9 +142,24 @@ test("newSession: in progress, then new up to new variations at once, then a re-
 	assert.deepStrictEqual([...vars(p, { ...flow, newVariations: 1, recheckEvery: 0 })], [root], "the started variation fills it: order|e6 waits");
 });
 
+// a book card is answered as the view does, by a run: every line move played,
+// or, when `right` says no, shown (a miss) instead
+const playRun = (s, p, c, st, right = true, d = deck, t = tree) => {
+	const run = startRun(c, d, p, st);
+	while (!run.done) {
+		if (right) runPlay(run, runHere(run).want, t);
+		else runShow(run);
+		runOn(run);
+	}
+	return answerRun(s, p, c, run, st, { deck: d, tree: t });
+};
 const drive = (s, p, st, right = () => true, max = 500) => {
 	let n = 0;
-	while (current(s) && n++ < max) answer(s, p, current(s), right(current(s)), st, { deck, tree });
+	while (current(s) && n++ < max) {
+		const c = current(s);
+		if (c.type === "book") playRun(s, p, c, st, right(c));
+		else answer(s, p, c, right(c), st, { deck, tree });
+	}
 	return s;
 };
 
@@ -235,8 +254,10 @@ test("flow: with nothing new left, every question is a re-check, the unmastered 
 	p.asked = 1000;
 	const st = { ...S, sessionLength: 0 };
 	const s = drive(newSession(deck, tree, p, st, {}), p, st);
-	assert.strictEqual(s.results.length, all.length, "a full session, not one re-check and the end");
-	assert.strictEqual(new Set(s.results.map((r) => r.id)).size, all.length, "each once");
+	// a run scores every book move on its line, so those leave the queue with it
+	assert.ok(all.every((c) => p.cards[c.id].seen > 1000), "a full session, not one re-check and the end");
+	assert.ok(s.results.length < all.length, "fewer questions than cards: runs");
+	assert.strictEqual(new Set(s.results.map((r) => r.id)).size, s.results.length, "each once");
 	// not yet mastered ones first, unless one's line was just played or shown:
 	// a mastered one goes before it only while it is on the line of one of the
 	// last ten questions
@@ -382,15 +403,14 @@ test("answer: with a context it names what it unlocked and refills the session",
 	assert.strictEqual(s.queue.length, 2, "the order card is still in flight and nothing new is open");
 	r = answer(s, p, orderCard, true, one, ctx);
 	assert.deepStrictEqual(r.unlocked.sort(), ["Najdorf", "Scheveningen"]);
-	// one new variation's questions join, before the root's book moves though
-	// those are at a shallower level
+	// the root's book moves open with its order question and join first, at
+	// their level, before the questions of the level below
 	const joined = s.queue.slice(2);
-	assert.ok(joined.length > 1 && new Set(joined.map((c) => c.vkey)).size === 1);
-	assert.ok(joined.every((c) => !p.cards[c.id] && c.type !== "book" && c.vkey !== root.key));
-	// learning it makes room for the next variation
-	for (const c of joined) answer(s, p, c, true, one, ctx);
+	assert.ok(joined.length > 1 && joined.every((c) => c.type === "book" && c.vkey === root.key && !p.cards[c.id]));
+	// learning them makes room for the next variation
+	while (current(s)?.type === "book") playRun(s, p, current(s), one);
 	const next = s.queue.slice(s.i);
-	assert.ok(next.length && new Set(next.map((c) => c.vkey)).size === 1 && next[0].vkey !== joined[0].vkey);
+	assert.ok(next.length && new Set(next.map((c) => c.vkey)).size === 1 && next[0].vkey !== root.key);
 });
 
 test("answer: the session length stops the refill, and practice never refills", () => {
@@ -552,15 +572,10 @@ test("orderStep over two move orders", () => {
 	assert.deepStrictEqual(orderStep(orders, ["x"], "y"), { ok: false, done: false, accepted: [] });
 });
 
-test("checkFamily, checkBook, allTags", () => {
+test("checkFamily, allTags", () => {
 	assert.ok(checkFamily(["b", "a"], ["a", "b"]));
 	assert.ok(!checkFamily(["a"], ["a", "b"]));
 	assert.ok(!checkFamily(["a", "c"], ["a", "b"]));
-	const card = { moves: ["e6", "a6"], main: "e6" };
-	assert.ok(checkBook(card, "a6", { bookRule: "any" }));
-	assert.ok(!checkBook(card, "a6", { bookRule: "main" }));
-	assert.ok(checkBook(card, "e6", { bookRule: "main" }));
-	assert.ok(checkBook({ moves: ["a6"], main: null }, "a6", { bookRule: "main" }));
 	assert.deepStrictEqual(allTags(tree), ["Nc3 committed", "d6", "e6"]);
 });
 
@@ -692,7 +707,7 @@ test("notes: every comment on the way, by move, the variation's own marked, and 
 	assert.strictEqual(intro(open).from, 0);
 	assert.strictEqual(intro(naj).from, 3);
 	assert.deepStrictEqual(intro(naj).notes, notes("name", naj));
-	assert.ok(d.filter((c) => c.type === "book").every((c) => typeof c.notes === "object" && !Array.isArray(c.notes)));
+	assert.ok(d.filter((c) => c.type === "book").every((c) => typeof c.note === "string" && !c.notes));
 });
 
 test("notes come from whichever line holds them, not the first line through the variation", () => {
@@ -792,15 +807,16 @@ test("loadProgress: asked is kept when saved, else the timestamps are renumbered
 	assert.deepStrictEqual([b.cards.z.seen, b.cards.x.seen, b.cards.y.seen, b.asked], [1, 2, 0, 2]);
 });
 
-test("new cards: questions before book moves, then shallowest level first", () => {
+test("new cards: shallowest level first, a variation's book moves after its questions", () => {
 	const p = emptyProgress();
 	markKnown(p, v("...d6 Sicilians").key, deck, S);
-	// the three unlocked variations' questions are taken before any book move,
-	// though the root's book moves are at a shallower level
-	const s = newSession(deck, tree, p, { ...S, newVariations: 3, sessionLength: 0, recheckEvery: 0 }, {});
-	assert.strictEqual(s.queue.length, 8);
-	assert.ok(s.queue.every((c) => c.type !== "book"));
-	assert.ok(newSession(deck, tree, p, { ...S, newVariations: 4, sessionLength: 0, recheckEvery: 0 }, {}).queue.some((c) => c.type === "book"));
+	// the root's book moves (level 1) are taken before the questions of the
+	// level-2 variations it unlocked (Davis, 2026-10-16: they "came in late"),
+	// though the other root's questions, also level 1, come first in deck order
+	const s = newSession(deck, tree, p, { ...S, newVariations: 2, sessionLength: 0, recheckEvery: 0 }, {});
+	const levels = new Set(s.queue.map((c) => c.level));
+	assert.deepStrictEqual([...levels], [1]);
+	assert.ok(s.queue.some((c) => c.type === "book" && c.vkey === v("...d6 Sicilians").key));
 });
 
 test("interleaving: book runs stay together and a variation's cards are kept apart where possible", () => {
@@ -1098,22 +1114,133 @@ test("retirement: a mastered card a deeper line replays is re-checked only when 
 	assert.ok(!isRetired(naj, deck, p, S));
 });
 
-test("order credit: the book moves played on the way count too, once they have been asked", () => {
+test("order credit: every book move played on the way counts, asked before or not", () => {
 	const card = deck.find((c) => c.id === `order|${v("English Attack").key}`);
-	// Black's moves on the way: 3...cxd4, 4...Nf6, 5...a6
-	const black = deck.filter((c) => c.type === "book" && c.vkey === v("...d6 Sicilians").key);
-	assert.deepStrictEqual(black.map((c) => c.sans.length), [5, 7, 9]);
+	// Black's moves on the way: 3...cxd4, 4...Nf6, 5...a6 (not 5...e6, the other book move there)
+	const all = deck.filter((c) => c.type === "book" && c.vkey === v("...d6 Sicilians").key);
+	const played = all.filter((c) => c.san !== "e6");
+	assert.deepStrictEqual(played.map((c) => c.san), ["cxd4", "Nf6", "a6"]);
 	const p = emptyProgress();
-	p.cards[black[0].id] = { streak: 1, seen: 1, skip: false };
+	p.cards[played[0].id] = { streak: 1, seen: 1, skip: false };
 	answer(hand([card]), p, card, true, S, { deck, tree, played: v("English Attack").orders[0] });
-	assert.strictEqual(p.cards[black[0].id].streak, 2);
-	assert.ok(black.slice(1).every((c) => !p.cards[c.id]), "never asked: not brought in");
-	// a move that is not the main one, under "main moves only", is not a book answer
-	const a6 = black[2];
-	assert.strictEqual(a6.main, "e6");
-	p.cards[a6.id] = { streak: 1, seen: 1, skip: false };
-	answer(hand([card]), p, card, true, { ...S, bookRule: "main" }, { deck, tree, played: v("English Attack").orders[0] });
-	assert.strictEqual(p.cards[a6.id].streak, 1);
-	answer(hand([card]), p, card, true, S, { deck, tree, played: v("English Attack").orders[0] });
-	assert.strictEqual(p.cards[a6.id].streak, 2, "any book move, by default");
+	assert.deepStrictEqual(played.map((c) => p.cards[c.id].streak), [2, 1, 1]);
+	assert.ok(!p.cards[all.find((c) => c.san === "e6").id], "a book move not played is not credited");
+});
+
+// --- runs ---------------------------------------------------------------------
+
+// the Kan reached by two orders, then one line on: Black's only book move is 5...Nf6
+const KAN = `1. e4 c5 2. Nf3 e6 (2... a6 3. d4 cxd4 4. Nxd4 e6 {[%name "Kan"]}) 3. d4 cxd4 4. Nxd4 a6 {[%name "Kan"]} 5. Bd3 {Solid.} Nf6 {Develops.} (5... Bc5 6. Nb3 Ba7) 6. O-O Qc7 *`;
+const kan = (() => {
+	const { nodes: n } = parsePgn(KAN);
+	const l = collectLines(n);
+	const t = variationTree(l, namesFromNodes(n));
+	return { tree: t, deck: buildDeck(t, l, S), k: [...t.byKey.keys()][0] };
+})();
+const kanCard = (san) => kan.deck.find((c) => c.type === "book" && c.san === san);
+const kanOpen = () => {
+	const p = emptyProgress();
+	p.cards[`order|${kan.k}`] = { streak: S.learnStreak, seen: 1, skip: false };
+	p.asked = 50;
+	return p;
+};
+
+test("bookOpen: a variation's book moves open with its order question", () => {
+	const p = emptyProgress();
+	assert.ok(!bookOpen(kan.k, kan.deck, p, S));
+	p.cards[`order|${kan.k}`] = { streak: S.learnStreak, seen: 1, skip: false };
+	assert.ok(bookOpen(kan.k, kan.deck, p, S), "the name question not learned yet");
+	assert.ok(bookOpen("", kan.deck, p, S));
+	// with order questions off, the whole variation
+	const noOrder = kan.deck.filter((c) => c.type !== "order");
+	assert.ok(!bookOpen(kan.k, noOrder, p, S));
+	p.cards[`name|${kan.k}`] = { streak: S.learnStreak, seen: 1, skip: false };
+	assert.ok(bookOpen(kan.k, noOrder, p, S));
+});
+
+test("run: from move 1 along the line with the most unlearned book moves, the board playing White", () => {
+	const p = kanOpen();
+	const run = startRun(kanCard("Nf6"), kan.deck, p, S);
+	assert.strictEqual(run.at, 1, "1.e4 played for you");
+	assert.strictEqual(run.last, 8);
+	assert.strictEqual(run.order.id, `order|${kan.k}`);
+	assert.deepStrictEqual(run.sans.slice(8), ["Bd3", "Nf6", "O-O", "Qc7"], "on to the line's end");
+	// with ...Nf6 and ...Qc7 learned, a run from 5...Nf6's position steers down the ...Bc5 line instead
+	for (const san of ["Nf6", "Qc7"]) p.cards[kanCard(san).id] = { streak: S.learnStreak, seen: 1, skip: false };
+	assert.deepStrictEqual(startRun(kanCard("Bc5"), kan.deck, p, S).sans.slice(9), ["Bc5", "Nb3", "Ba7"]);
+	// a line through a named position not open yet stops there, and is that position's order question only up to the last open one
+	const closed = startRun(kanCard("Nf6"), kan.deck, emptyProgress(), S);
+	assert.strictEqual(closed.last, 0);
+	assert.strictEqual(closed.order, null);
+});
+
+test("run: another order is not scored, any book move is right, the rest optional, a miss shows and goes on", () => {
+	const p = kanOpen();
+	const run = startRun(kanCard("Nf6"), kan.deck, p, S);
+	const play = (san) => runPlay(run, san, kan.tree);
+	assert.strictEqual(play("c5"), "right");
+	assert.strictEqual(run.at, 3, "2.Nf3 played for you");
+	assert.strictEqual(play("a6"), "order", "the Kan's other order: not this line's");
+	assert.strictEqual(run.scored.size, 0);
+	assert.strictEqual(play("e6"), "right");
+	play("cxd4");
+	play("a6");
+	assert.strictEqual(run.at, 9, "at 5...: two book moves");
+	assert.deepStrictEqual(runHere(run).moves, ["Nf6", "Bc5"]);
+	// another book move: credited, the line's move still asked for
+	assert.strictEqual(play("Bc5"), "book");
+	assert.strictEqual(run.msg, "book");
+	assert.strictEqual(run.scored.get(kanCard("Bc5").id).right, true);
+	assert.strictEqual(play("Nf6"), "right");
+	assert.strictEqual(run.at, 11, "every book move found: on, 6.O-O played");
+	// a miss: scored wrong, waits, then Go on plays the line's move and the run ends
+	assert.strictEqual(play("Qb6"), "miss");
+	assert.strictEqual(run.wait, "miss");
+	assert.strictEqual(play("Qc7"), "none", "waiting for Go on");
+	runOn(run);
+	assert.ok(run.done);
+	assert.strictEqual(run.scored.get(kanCard("Qc7").id).right, false);
+	assert.strictEqual(run.orderMiss, null, "the miss came after the Kan");
+	// the optional extra: after the line's move, the others may be played or left
+	const r2 = startRun(kanCard("Nf6"), kan.deck, p, S);
+	for (const san of ["c5", "e6", "cxd4", "a6", "Nf6"]) runPlay(r2, san, kan.tree);
+	assert.strictEqual(r2.wait, "more");
+	assert.strictEqual(runPlay(r2, "Qb6", kan.tree), "none", "not a miss while waiting");
+	runOn(r2);
+	assert.strictEqual(r2.at, 11);
+	assert.ok(!r2.scored.has(kanCard("Bc5").id), "never required");
+	// Show me before the Kan is a miss of its order
+	const r3 = startRun(kanCard("Nf6"), kan.deck, p, S);
+	runShow(r3);
+	assert.strictEqual(r3.orderMiss, 1);
+	assert.deepStrictEqual(r3.misses, [{ at: 1, san: null }]);
+});
+
+test("answerRun: one answer scoring every move, the order question and what it leaves queued", () => {
+	const p = kanOpen();
+	const nf6 = kanCard("Nf6");
+	const qc7 = kanCard("Qc7");
+	const s = hand([nf6, qc7, kanCard("Bc5")]);
+	const run = startRun(nf6, kan.deck, p, S);
+	for (const san of ["c5", "e6", "cxd4", "a6", "Nf6"]) runPlay(run, san, kan.tree);
+	runOn(run); // 5...Bc5 left
+	runShow(run); // 6...Qc7 missed
+	runOn(run);
+	const asked = p.asked;
+	const r = answerRun(s, p, nf6, run, S, { deck: kan.deck, tree: kan.tree });
+	assert.strictEqual(p.asked, asked + 1, "one answer");
+	assert.deepStrictEqual([r.right, r.moves, r.missed, r.from, r.to], [false, 2, 1, 0, 1]);
+	assert.strictEqual(p.cards[nf6.id].streak, 1);
+	assert.strictEqual(p.cards[qc7.id].streak, 0);
+	assert.strictEqual(p.cards[`order|${kan.k}`].streak, S.learnStreak + 1, "the Kan's order, played right");
+	// the moves it scored left the queue; 5...Bc5 was not scored and stays; the miss and the unlearned card come back
+	const rest = s.queue.slice(s.i).map((c) => c.san);
+	assert.deepStrictEqual(rest.filter((x) => x === "Bc5").length, 1);
+	assert.ok(rest.includes("Qc7") && rest.includes("Nf6"));
+	assert.strictEqual(s.results.length, 1);
+	// a clean run is right
+	const p2 = kanOpen();
+	const s2 = hand([nf6]);
+	const clean = playRun(s2, p2, nf6, S, true, kan.deck, kan.tree);
+	assert.deepStrictEqual([clean.right, clean.moves, clean.missed], [true, 2, 0]);
 });

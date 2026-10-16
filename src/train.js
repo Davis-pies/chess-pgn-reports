@@ -1,7 +1,6 @@
 import { Chess } from "chess.js";
 import { fenMap } from "./pgn.js";
 import { posKey } from "./audit.js";
-import { isMainLine } from "./tree.js";
 import { fullmoveLabel } from "./render.js";
 
 // Train mode's logic, no DOM: cards from the variation tree, answer checks,
@@ -26,7 +25,6 @@ export const DEFAULT_SETTINGS = {
 	familyShowName: true,
 	familyGroup: [],
 	bookSide: "black",
-	bookRule: "any",
 	learnStreak: 3,
 	masterStreak: 5,
 	missCost: 2,
@@ -100,9 +98,8 @@ function familyOf(tree, vkey) {
 }
 
 // `under` marks a card that a deeper named line replays: a variation's own
-// cards when one goes on from it, a book card whose position a named
-// variation's moves pass through. Mastered, such a card is retired (see
-// retiredCard).
+// cards when one goes on from it, a book move that a named variation's order
+// plays. Mastered, such a card is retired (see retiredCard).
 export function buildDeck(tree, lines, settings) {
 	const deck = [];
 	const on = settings.types;
@@ -114,7 +111,7 @@ export function buildDeck(tree, lines, settings) {
 		for (const o of v.orders) {
 			const chess = new Chess();
 			for (const san of o) {
-				replayed.add(posKey(chess.fen()));
+				replayed.add(`${posKey(chess.fen())}|${san}`);
 				chess.move(san);
 			}
 		}
@@ -128,38 +125,49 @@ export function buildDeck(tree, lines, settings) {
 		if (on.order) deck.push({ id: `order|${v.key}`, type: "order", ...base, notes });
 		if (on.family && v.tags.length) deck.push({ id: `family|${v.key}`, type: "family", ...base, notes });
 	}
-	if (on.book) deck.push(...bookCards(tree, lines, settings).map((c) => ({ ...c, under: replayed.has(c.key) })));
+	if (on.book) deck.push(...bookCards(tree, lines, settings, comments).map((c) => ({ ...c, under: replayed.has(`${c.key}|${c.san}`) })));
 	return deck;
 }
 
-// One card per position where the reader is to move, merged across lines.
-function bookCards(tree, lines, settings) {
+// One card per move the reader plays, merged across lines (Davis, 2026-10-16:
+// one card per position, right with any book move, let the familiar branch be
+// played every time). `moves` are all the book moves at its position, shared
+// by its cards there; `lines` are the workbook lines through it, which a book
+// question plays as a run (see startRun): the moves, the notes on each, and
+// `marks`, the named positions each reaches (`at`: moves played to get there).
+function bookCards(tree, lines, settings, comments) {
 	const want = settings.bookSide === "white" ? "w" : settings.bookSide === "black" ? "b" : null;
 	const cards = new Map();
+	const movesAt = new Map();
 	for (const line of lines) {
 		const fens = fenMap(line.moves);
+		const sans = line.moves.map((m) => m.san);
+		const keys = line.moves.map((m) => posKey(fens.get(m.ply))); // the position after each move
+		let path = "";
+		const run = {
+			sans,
+			before: [posKey(START), ...keys.slice(0, -1)],
+			notes: sans.map((san) => [...(comments.get((path += ` ${san}`)) || [])].join(" ")),
+			marks: keys.flatMap((k, i) => (tree.byKey.has(k) ? [{ at: i + 1, key: k }] : [])),
+		};
 		let vkey = ""; // nearest named position at or before this one
 		let started = tree.roots.length === 0; // with names, no cards before the first
 		line.moves.forEach((m, i) => {
 			const fen = i ? fens.get(line.moves[i - 1].ply) : START;
-			const sans = line.moves.slice(0, i).map((x) => x.san);
-			if (i) {
-				const key = posKey(fen);
-				if (tree.byKey.has(key)) { vkey = key; started = true; }
-			}
+			if (i && tree.byKey.has(keys[i - 1])) { vkey = keys[i - 1]; started = true; }
 			if (!started || (want && fen.split(" ")[1] !== want)) return;
 			const key = posKey(fen);
-			let c = cards.get(key);
+			const moves = movesAt.get(key) || movesAt.set(key, []).get(key);
+			if (!moves.includes(m.san)) moves.push(m.san);
+			const id = `book|${key}|${m.san}`;
+			let c = cards.get(id);
 			if (!c) {
 				const v = tree.byKey.get(vkey);
-				const on = sans.map((_, k) => posKey(fens.get(line.moves[k].ply))).filter((x) => tree.byKey.has(x));
-				c = { id: `book|${key}`, type: "book", key, vkey, level: v ? v.level : 0, family: familyOf(tree, vkey), on, sans, moves: [], main: null, notes: {} };
-				cards.set(key, c);
+				const on = keys.slice(0, i).filter((x) => tree.byKey.has(x));
+				c = { id, type: "book", key, san: m.san, vkey, level: v ? v.level : 0, family: familyOf(tree, vkey), on, sans: sans.slice(0, i), moves, note: run.notes[i], lines: [] };
+				cards.set(id, c);
 			}
-			if (!c.moves.includes(m.san)) c.moves.push(m.san);
-			if (isMainLine(line) && !c.main) c.main = m.san;
-			const note = (line.comments || []).find((x) => x.ply === m.ply);
-			if (note && !(m.san in c.notes)) c.notes[m.san] = note.text;
+			c.lines.push(run);
 		});
 	}
 	return [...cards.values()];
@@ -178,7 +186,6 @@ const VALID = {
 	familyShowName: (x) => typeof x === "boolean",
 	familyGroup: isStrs,
 	bookSide: (x) => ["white", "black", "both"].includes(x),
-	bookRule: (x) => x === "any" || x === "main",
 	learnStreak: (x) => isInt(x, 1, 10),
 	masterStreak: (x) => isInt(x, 1, 20),
 	missCost: (x) => isInt(x, 1, 5),
@@ -360,10 +367,16 @@ export function unlockedKeys(tree, deck, progress, settings) {
 	return out;
 }
 
-// Only learning is checked here, not unlocking: the callers check both. (A
-// learned variation has records, and a record unlocks it, so the tree isn't
-// needed.)
-export const bookOpen = (vkey, deck, progress, settings) => vkey === "" || isLearned(vkey, deck, progress, settings);
+// A variation's book moves open once its order question is learned (Davis,
+// 2026-10-16: waiting for the whole variation brought them in late); with
+// order questions off, once the variation is. Only learning is checked here,
+// not unlocking: the callers check both. (A learned card has a record, and a
+// record unlocks its variation, so the tree isn't needed.)
+export function bookOpen(vkey, deck, progress, settings) {
+	if (vkey === "") return true;
+	const order = deck.find((c) => c.id === `order|${vkey}`);
+	return order ? learnedCard(progress.cards[order.id], settings) : isLearned(vkey, deck, progress, settings);
+}
 
 // --- sessions ------------------------------------------------------------
 
@@ -408,9 +421,11 @@ const states = (tree, deck, progress, settings) => {
 	};
 };
 
-// New cards: names, orders and families before book moves, then shallowest
-// level first; the sorts are stable, so deck order breaks ties.
-const byNewness = (a, b) => (a.type === "book") - (b.type === "book") || a.level - b.level;
+// New cards: shallowest level first; the sorts are stable, so deck order
+// breaks ties, which puts a variation's book moves after its other questions.
+// Book moves used to wait behind every question of every level (Davis,
+// 2026-10-16: they "came in late").
+const byNewness = (a, b) => a.level - b.level;
 
 // Spread the cards of one variation apart (finding 6): a name question right
 // after its order question gives it away. A block is one non-book card, or all
@@ -627,11 +642,12 @@ function holdBack(session, progress) {
 // is not passed up (Davis: "failures shouldn't count towards parent
 // failures"): `played` holds only the moves before it, and those were right.
 // Nothing is credited for an answer right after its intro, which showed
-// those moves too. The book moves played on the way count as well, which
-// keeps a retired book card practised; only one already asked, so that an
-// order answer never brings book moves into a session by the back door.
-// Returns the names of the variations credited.
-function credit(progress, { deck, tree, played }, settings, own) {
+// those moves too. Every book move played on the way counts as well, asked
+// before or not (Davis, 2026-10-16: "the move playback for named position
+// should also contribute to the book move progress"); a run scores its own
+// (`books` false). Returns the names of the variations credited.
+function credit(progress, { deck, tree, played }, settings, own, books = true) {
+	const byId = new Map(deck.map((c) => [c.id, c]));
 	const chess = new Chess();
 	const out = [];
 	const bump = (c) => {
@@ -641,27 +657,20 @@ function credit(progress, { deck, tree, played }, settings, own) {
 		return true;
 	};
 	for (const san of played) {
-		const book = deck.find((x) => x.id === `book|${posKey(chess.fen())}`);
-		if (book && progress.cards[book.id] && checkBook(book, san, settings)) bump(book);
+		const book = books && byId.get(`book|${posKey(chess.fen())}|${san}`);
+		if (book) bump(book);
 		chess.move(san);
-		const c = deck.find((x) => x.id === `order|${posKey(chess.fen())}`);
+		const c = byId.get(`order|${posKey(chess.fen())}`);
 		if (c && c.id !== own && bump(c)) out.push(tree.byKey.get(c.vkey).name);
 	}
 	return out;
 }
 
-// `ctx` ({ deck, tree }) lets an answer that learns a card refill the session
-// at once, with the cards it unlocked among them; an order answer adds
-// `played`, the moves played right, to credit the variations they pass through.
-export function answer(session, progress, card, right, settings, ctx = null) {
-	if (card.type === "intro") { // a step, not a question: nothing is scored or stored
-		session.i++;
-		session.passed.set(card.vkey, session.results.length); // answers so far, to space its questions out
-		return { id: card.id, intro: true };
-	}
+// A card's new record after one answer, shared by questions and runs: the
+// answer count is not yet raised, so `seen` is the one this answer takes.
+function score(session, progress, card, right, settings) {
 	const rec = progress.cards[card.id] || { streak: 0, seen: 0, skip: false };
 	const from = rec.streak;
-	const before = ctx && unlockedKeys(ctx.tree, ctx.deck, progress, settings);
 	const learnedBefore = learnedCard(rec, settings);
 	// a right answer on a learned card counts only after enough other questions
 	const spaced = right && learnedBefore && from < settings.masterStreak && (progress.asked ?? 0) - rec.seen < SPACING;
@@ -675,20 +684,41 @@ export function answer(session, progress, card, right, settings, ctx = null) {
 	// 0, which threw away a nearly learned card's progress for one slip. With
 	// the defaults a mastered card (5) still lands on learned (3).
 	const to = !right ? Math.max(0, from - settings.missCost) : tooSoon ? from : Math.min(from + 1, settings.masterStreak);
-	progress.asked = (progress.asked ?? 0) + 1;
-	const saved = { ...rec, streak: to, seen: progress.asked };
+	const saved = { ...rec, streak: to, seen: (progress.asked ?? 0) + 1 };
 	if (right && !learnedBefore && learnedCard(saved, settings)) delete saved.tricky;
+	progress.cards[card.id] = saved;
+	return { from, to, tooSoon, justShown };
+}
+
+// `ctx` ({ deck, tree }) lets an answer that learns a card refill the session
+// at once, with the cards it unlocked among them; an order answer adds
+// `played`, the moves played right, to credit the variations they pass through.
+export function answer(session, progress, card, right, settings, ctx = null) {
+	if (card.type === "intro") { // a step, not a question: nothing is scored or stored
+		session.i++;
+		session.passed.set(card.vkey, session.results.length); // answers so far, to space its questions out
+		return { id: card.id, intro: true };
+	}
+	const before = ctx && unlockedKeys(ctx.tree, ctx.deck, progress, settings);
+	const { from, to, tooSoon, justShown } = score(session, progress, card, right, settings);
+	progress.asked = (progress.asked ?? 0) + 1;
 	const result = { id: card.id, right, from, to, unlocked: [] };
 	if (tooSoon) Object.assign(result, { tooSoon: true, soon: justShown ? "intro" : "spacing" });
+	if (card.type === "order" && ctx?.played && !justShown) result.also = credit(progress, ctx, settings, card.id);
+	return settle(session, progress, card, result, settings, ctx, before, !right || !learnedCard(progress.cards[card.id], settings));
+}
+
+// What follows every answer: the result recorded, a card missed three times
+// set aside as tricky, the card queued again (`again`), and the session
+// refilled with what the answer unlocked.
+function settle(session, progress, card, result, settings, ctx, before, again) {
 	session.results.push(result);
-	const tricky = !right && session.results.filter((r) => r.id === card.id && !r.right).length >= TRICKY;
+	const tricky = !result.right && session.results.filter((r) => r.id === card.id && !r.right).length >= TRICKY;
 	if (tricky) {
-		saved.tricky = true;
+		progress.cards[card.id].tricky = true;
 		session.tricky.add(card.id);
 	}
-	progress.cards[card.id] = saved;
-	if (card.type === "order" && ctx?.played && !justShown) result.also = credit(progress, ctx, settings, card.id);
-	if (!tricky && (!right || !learnedCard(saved, settings))) requeue(session, card);
+	if (!tricky && again) requeue(session, card);
 	session.i++;
 	if (session.practice) return result;
 	session.sinceRecheck++;
@@ -698,6 +728,148 @@ export function answer(session, progress, card, right, settings, ctx = null) {
 	result.unlocked = [...after].filter((k) => !before.has(k)).map((k) => ctx.tree.byKey.get(k).name);
 	refill(session, progress, settings, ctx);
 	return result;
+}
+
+// --- runs --------------------------------------------------------------------
+
+// A book question is a run (Davis, 2026-10-16: book moves should "progress
+// from replaying entire lines"): a workbook line through the card's move,
+// played from the start, the board playing the other side. Of the lines
+// through it, the one with the most of the reader's book moves not yet
+// learned, so runs steer to what is not known yet. It ends at the line's end,
+// or on reaching a named position whose book moves are not open yet. Up to
+// the last open named position it reaches (`last` moves in) it is that
+// position's order question, `order`.
+export function startRun(card, deck, progress, settings) {
+	const byId = new Map(deck.map((c) => [c.id, c]));
+	const side = settings.bookSide === "white" ? 0 : settings.bookSide === "black" ? 1 : null;
+	const open = (key) => bookOpen(key, deck, progress, settings);
+	let best = null;
+	for (const line of card.lines) {
+		const at = line.before.findIndex((x, i) => x === card.key && line.sans[i] === card.san);
+		const end = line.marks.find((m) => m.at > at && !open(m.key))?.at ?? line.sans.length;
+		const unlearned = line.sans.slice(0, end).filter((san, i) => {
+			const c = byId.get(`book|${line.before[i]}|${san}`);
+			return c && !learnedCard(progress.cards[c.id], settings);
+		}).length;
+		if (!best || unlearned > best.unlearned) best = { line, end, unlearned };
+	}
+	const { line, end } = best;
+	const mark = line.marks.filter((m) => m.at <= end && open(m.key)).at(-1);
+	const run = {
+		byId, side, sans: line.sans.slice(0, end), before: line.before, notes: line.notes,
+		last: mark?.at ?? 0, vkey: mark?.key ?? "", order: (mark && byId.get(`order|${mark.key}`)) || null,
+		at: 0, found: [], wait: null, msg: "", miss: null, misses: [], orderMiss: null, scored: new Map(), done: false,
+	};
+	seek(run);
+	return run;
+}
+
+const mine = (run, i) => run.side === null || i % 2 === run.side;
+// on to the reader's next move, the board playing the other side's
+function seek(run) {
+	while (run.at < run.sans.length && !mine(run, run.at)) run.at++;
+	run.done = run.at >= run.sans.length;
+}
+function step(run) {
+	Object.assign(run, { at: run.at + 1, found: [], wait: null, msg: "", miss: null });
+	seek(run);
+}
+
+// The move the line plays here, the book moves there are (just that one
+// before the first named position, where there are no book cards) and the
+// line's move's card.
+export function runHere(run) {
+	const want = run.sans[run.at];
+	const card = run.byId.get(`book|${run.before[run.at]}|${want}`) ?? null;
+	return { want, card, moves: card ? card.moves : [want] };
+}
+
+// a book move played here scores its card, once a run
+function take(run, san, right) {
+	const c = run.byId.get(`book|${run.before[run.at]}|${san}`);
+	if (c && !run.scored.has(c.id)) run.scored.set(c.id, { card: c, right });
+}
+
+function missHere(run, san) {
+	take(run, run.sans[run.at], false);
+	if (run.at < run.last && run.orderMiss === null) run.orderMiss = run.at;
+	run.misses.push({ at: run.at, san });
+	Object.assign(run, { miss: { at: run.at, san }, wait: "miss", msg: "" });
+}
+
+// The reader plays `san`. Any book move is right, and scores its card; one
+// this line does not take asks for the line's move ("book"). After the line's
+// move, the run waits ("more") while book moves remain unplayed there: they
+// may be played for credit, never required (Davis, 2026-10-16: "allow it but
+// not enforce finding all the book moves"). Before the named position, a move
+// of another of its orders is "order": not this line's, not scored. Anything
+// else is a miss: the run waits for runOn, which plays the line's move.
+export function runPlay(run, san, tree) {
+	if (run.done || run.wait === "miss") return "none";
+	const { want, moves } = runHere(run);
+	if (run.wait === "more") {
+		if (san === want || !moves.includes(san) || run.found.includes(san)) return "none";
+		take(run, san, true);
+		run.found.push(san);
+		if (moves.every((m) => run.found.includes(m))) step(run);
+		return "book";
+	}
+	if (san === want) {
+		take(run, san, true);
+		run.found.push(san);
+		if (moves.every((m) => run.found.includes(m))) step(run);
+		else Object.assign(run, { wait: "more", msg: "" });
+		return "right";
+	}
+	const v = run.at < run.last && tree.byKey.get(run.vkey);
+	if (v && orderStep(v.orders, run.sans.slice(0, run.at), san).ok) {
+		run.msg = "order";
+		return "order";
+	}
+	if (moves.includes(san)) {
+		if (!run.found.includes(san)) {
+			take(run, san, true);
+			run.found.push(san);
+		}
+		run.msg = "book";
+		return "book";
+	}
+	missHere(run, san);
+	return "miss";
+}
+
+// "Show me": a miss with no move played
+export function runShow(run) {
+	if (!run.done && run.wait === null) missHere(run, null);
+}
+
+// "Go on": past a miss or the optional book moves, playing the line's move
+export function runOn(run) {
+	if (run.wait) step(run);
+}
+
+// A finished run's answers: every book move it scored, the order question of
+// the named position it played up to, and the order questions above that,
+// credited as an order answer credits them. It is one answer in the count, as
+// the spacing rule counts questions, and right only with no miss. The book
+// moves it scored leave the queue; the card asked, if not learned, and every
+// one missed come back.
+export function answerRun(session, progress, card, run, settings, ctx = null) {
+	const before = ctx && unlockedKeys(ctx.tree, ctx.deck, progress, settings);
+	const items = [...run.scored.values()].map(({ card: c, right }) => ({ card: c, right, ...score(session, progress, c, right, settings) }));
+	const orderRight = run.orderMiss === null;
+	const order = run.order && score(session, progress, run.order, orderRight, settings);
+	progress.asked = (progress.asked ?? 0) + 1;
+	const right = orderRight && items.every((x) => x.right);
+	const own = items.find((x) => x.card.id === card.id);
+	const result = { id: card.id, right, from: own?.from, to: own?.to, run: true, moves: items.length, missed: items.filter((x) => !x.right).length, unlocked: [] };
+	if (order && ctx && !order.justShown) result.also = credit(progress, { ...ctx, played: run.sans.slice(0, run.orderMiss ?? run.last) }, settings, run.order.id, false);
+	const rest = session.queue.slice(session.i + 1).filter((c) => !run.scored.has(c.id));
+	session.queue = [...session.queue.slice(0, session.i + 1), ...rest];
+	for (const x of items) if (!x.right && x.card.id !== card.id) requeue(session, x.card);
+	const again = !learnedCard(progress.cards[card.id], settings) || run.scored.get(card.id)?.right === false;
+	return settle(session, progress, card, result, settings, ctx, before, again);
 }
 
 export function sessionSummary(session, tree, deck, progress, settings) {
@@ -828,9 +1000,6 @@ export function orderStep(orders, played, san) {
 }
 
 export const checkFamily = (selected, tags) => selected.length === tags.length && tags.every((t) => selected.includes(t));
-
-export const checkBook = (card, san, settings) =>
-	settings.bookRule === "main" && card.main ? san === card.main : card.moves.includes(san);
 
 // Squares whose piece (type and colour, or none) differs between two FENs, so
 // a wrong answer's feedback can highlight where the two positions part.

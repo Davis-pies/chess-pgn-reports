@@ -212,10 +212,30 @@ For a shorter overview see the [README](../README.md).
      (or type; `/` separates accepted aliases, case and punctuation ignored)
      its name. **Order**: given a name, play the moves from the start; any
      move some line of the workbook still leads to the position from is
-     accepted. **Tags**: tick the tags the position carries. **Book**: the
-     board plays one side and you the other along the variation's moves, each
-     of your moves its own question; the workbook's note on the move is shown
-     after you answer. Name, Order and Book are on by default; Tags is off.
+     accepted. **Tags**: tick the tags the position carries. **Book**: play a
+     whole line of the workbook from move 1 to its end, the board playing the
+     other side (below). Name, Order and Book are on by default; Tags is off.
+   - **Book runs** — progress is kept for each of your book moves, and every
+     time you play one counts for it: in a Book run, and in an Order
+     question, whose moves are book moves too. A Book question plays a line
+     through the move it asks about, the one with the most book moves you
+     have not learned yet. Up to the line's last named position it is that
+     position's Order question ("Play the Najdorf, then on to the end of the
+     line"); when the position has more than one move order the prompt names
+     the line's, and a move from another order only says "Another order:
+     play this line's". Where you have several book moves, any of them is
+     right: one this line does not take counts, and you are asked for the
+     line's ("Book, but this line goes another way"). The hint says how many
+     there are, and when this line's is one you haven't learned yet. After
+     the line's move, the others can be played for credit too, or **Go on**
+     (Enter) skips them: finding them all is never required. A move outside
+     the book, or **Show me**, is a miss for the line's move: the board shows
+     it in green beside yours in red, with its note and, before the named
+     position, the position you were heading for; **Go on** plays it and the
+     run carries on to the end. Each move's note shows as it is played. A run
+     is one question in the session, right only with no miss, and the result
+     lists what you missed. The book moves it played leave the session's
+     queue; the ones you missed come back.
    - **Name choices** — the wrong names are the positions that look most
      like the right one: the fewest squares different, counting a
      difference in pawns alone (the same pieces with ...e6 for ...d6) as
@@ -241,7 +261,8 @@ For a shorter overview see the [README](../README.md).
      as a red arrow and the right move or moves green, says where your move
      leads ("That leads to the Dragon", or "Not in this workbook"), and in an
      Order question lists the whole order with the moves from your slip on
-     marked, and the note on the right move.
+     marked, the note on the right move, and the position you were heading
+     for.
    - **A new variation first** — the first time a session reaches a variation
      you have not yet answered a question on right, it shows "New: <name>"
      before any question. The board starts where the variation's own moves begin (after
@@ -276,8 +297,7 @@ For a shorter overview see the [README](../README.md).
      come too soon it is simply not given, and the question's record is left
      as it was. A miss is never passed up: the variations you reached before
      the wrong move still count as played right, and the others are left
-     alone. The Book questions for your moves along the way count the same
-     way, once they have been asked at least once.
+     alone. Your book moves along the way count the same way.
    - **Retired** — a mastered question that a deeper named line plays
      through is retired: a variation's Name, Order and Tags questions once a
      line goes on from it, and a Book question whose position lies on the
@@ -290,14 +310,15 @@ For a shorter overview see the [README](../README.md).
      nothing below them, so they never retire.
    - **Unlocking** — level-1 variations start unlocked. A variation counts as
      learned when each of its Name, Order and Tags questions is learned;
-     learning it unlocks its sub-variations and its Book questions, and what
-     is unlocked stays unlocked.
+     learning it unlocks its sub-variations, and what is unlocked stays
+     unlocked. Its Book questions open as soon as its Order question is
+     learned.
    - **A session is a flow** — it opens with the questions you have started
      but not learned (the one asked longest ago first) and brings in new ones
      as you go: whenever fewer than "New variations at once" (3 by default)
      variations are being learned, the next new variation's questions join
-     (the Name, Order and Tags ones first, shallowest level first, then Book
-     questions), including the ones a variation you have just learned
+     (shallowest level first, a variation's Book questions after its Name,
+     Order and Tags ones), including the ones a variation you have just learned
      unlocked. So a long session keeps going deeper, a few variations at a
      time rather than a crowd of look-alike siblings. Every "Re-check every"
      answers (3 by default; 0 for never) one learned question comes back
@@ -328,8 +349,9 @@ For a shorter overview see the [README](../README.md).
      avoids it, so you can't settle into "I'm doing ...d6 Sicilians now". New
      variations come from a family with nothing new in play before one with
      something, even if it is deeper. A variation's Book questions stay
-     together, in move order. New questions are the Name, Order and Tags ones
-     first, then Book questions, shallowest level first.
+     together, in move order. New questions come shallowest level first, a
+     variation's Book questions after its others, so they come before the
+     questions of the variations below it.
    - **When it is going badly** — while two of your last five answers in a
      session were misses, no new questions are added: those still waiting
      (and their "New:" steps) leave the session, and answers that unlock
@@ -382,8 +404,7 @@ For a shorter overview see the [README](../README.md).
      **Questions**: which types are on. **Name questions**: choose or type,
      how many choices, showing the moves. **Order questions**: showing the
      target position. **Tags questions**: showing the name, and a group of
-     tags to ask within. **Book questions**: the side you play, and whether
-     any book move counts or only the mainline's. **Progress**: right answers
+     tags to ask within. **Book questions**: the side you play. **Progress**: right answers
      to learn and to master, and how many a miss takes away. **Sessions**: showing a new variation first, how many
      variations you learn at once, how often a learned one is re-checked, and
      the questions per session (0 for no limit).

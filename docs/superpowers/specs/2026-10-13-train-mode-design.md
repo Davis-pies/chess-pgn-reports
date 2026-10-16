@@ -71,12 +71,12 @@ Each named position gives cards; each card type can be switched off.
 - **tags** (stored as `family`, so saved progress keeps its keys) - tick the tags the position carries, out of all the workbook's
   tags; exact set to score. Off by default. Options: show the name; pick-one
   mode restricted to one chosen group of tags.
-- **book** - a run through the variation's stretch: the board plays the
-  other side, the reader plays theirs, each of the reader's moves its own
-  card (keyed by position). Any book move counts (option: the mainline's
-  only). A wrong move shows the book moves and play continues along one.
-  The workbook's note on the move is shown after answering. Option: which
-  side the reader plays (White, Black, both).
+- **book** - 2026-10-16: replaced by line runs, one card per book move; see
+  [Train: book questions as line runs](2026-10-16-train-book-runs-design.md).
+  (Before: a card per position in the variation's stretch, right with any
+  book move, opened once the variation was learned and asked after every
+  other new question.) Option: which side the reader plays (White, Black,
+  both).
 
 Answers score right or wrong; there is no partial credit.
 
@@ -142,15 +142,15 @@ the boxes were hard to follow.
   (Davis: "failures shouldn't count towards parent failures"): only the
   moves before it count, and those were right. An answer straight after its
   intro credits nothing, as the intro showed those moves. Name and tags
-  cards get no credit: playing moves is not naming them. Book cards for
-  the moves played count the same way when the move is a book answer there
-  and the card has a record (a credit never brings a book card in unasked).
+  cards get no credit: playing moves is not naming them. The book move
+  of every move played counts the same way, asked before or not
+  (2026-10-16, book runs).
 - **Retired** (Davis, 2026-10-15: "a hidden true mastery where a line stops
   being displayed altogether and only derivative lines will get quizzed
   on", back "VERY rarely if at all"). A card is `under` when a deeper named
   line replays it: a variation's name/order/tags cards when another
-  variation has it as parent or `also`, a book card whose position a named
-  variation's order passes through. Mastered and under, it is retired:
+  variation has it as parent or `also`, a book move a named variation's
+  order plays. Mastered and under, it is retired:
   re-checks pass it over and take it only when the queue would otherwise
   run dry. Nothing is stored for it: a miss drops it below mastered, and it
   is back. Leaves and unnamed sidelines are never under, so they never
@@ -160,8 +160,8 @@ the boxes were hard to follow.
   ruled out above.
 - A variation is learned (or mastered) when each of its enabled
   name/order/family cards is. Level-1 variations start unlocked; learning a
-  variation unlocks its children and its book cards, and a variation once
-  unlocked stays unlocked.
+  variation unlocks its children, and a variation once unlocked stays
+  unlocked. Its book cards open once its order card is learned (2026-10-16).
 - A session is a **flow**, not a batch fixed at the start (Davis,
   2026-10-14: "if you set 30 questions, there's actual progression within the
   session"; with 0, "constantly unlock and be integrated"). From the unlocked
@@ -177,9 +177,9 @@ the boxes were hard to follow.
      a variation from a family with nothing in flight before one from a
      family already in flight (Davis, 2026-10-15: not getting into "the
      habit of thinking I'm doing d6 Sicilians right now"), then
-     name/order/tags cards first, shallowest level first, then
-     book cards, in reading order (names and move orders, then deeper
-     variations, then the book moves inside each one, as the Goal says). So
+     shallowest level first, a variation's book cards after its
+     name/order/tags cards, in reading order (2026-10-16: book cards
+     waited behind every level's questions and came in late). So
      as cards are learned, new ones take their place, including from the
      variations they unlocked;
   3. a mastered card joins every "Re-check every" questions (default 3, 0:
@@ -261,8 +261,8 @@ Grouped, each with a tooltip saying what it does and its default:
   show the moves that lead there.
 - **Order questions**: show the target position as a hint.
 - **Tags questions**: show the name; ask only within one group of tags.
-- **Book questions**: the side you play (White, Black, both); accept any
-  book move or only the mainline's.
+- **Book questions**: the side you play (White, Black, both). ("Accept any
+  book move or only the mainline's" went with book runs, 2026-10-16.)
 - **Progress**: right answers to learn (1-10, default 3), to master
   (learn-20, default 5), a miss takes away (1-5, default 2).
 - **Sessions**: show a new variation first (on), new variations at once

@@ -74,10 +74,16 @@ function solve(root, ui) {
 		for (const t of tree.byKey.get(c.key).tags) click(root, `.tr-tag input[value="${t}"]`);
 		click(root, ".tr-check");
 	}
+	// a run: every line move, Go on past the optional book moves
 	if (c.type === "book") {
-		const chess = new Chess();
-		c.sans.forEach((s) => chess.move(s));
-		move(root, chess, c.main ?? c.moves[0]);
+		while (!ui.answered) {
+			if (ui.run?.wait) click(root, ".tr-next");
+			else {
+				const chess = new Chess();
+				ui.run.sans.slice(0, ui.run.at).forEach((s) => chess.move(s));
+				move(root, chess, ui.run.sans[ui.run.at]);
+			}
+		}
 	}
 }
 
@@ -341,6 +347,7 @@ test("wrong order move: the right and wrong moves drawn, what it leads to, the o
 	assert.ok($(m.root, ".tr-order mark").textContent.includes("d6"));
 	assert.doesNotMatch($(m.root, ".tr-order mark").textContent, /e4/);
 	assert.match($(m.root, ".tr-result").textContent, /The Scheveningen move\./);
+	assert.strictEqual($(m.root, ".tr-result .tr-compare figcaption").textContent, "Heading for: Scheveningen", "the position it was heading for");
 	// after 5.Nc3 the Scheveningen wants e6; a6 starts the Najdorf
 	ask(["e4", "c5", "Nf3", "d6", "d4", "cxd4", "Nxd4", "Nf6", "Nc3"]);
 	const chess2 = new Chess();
@@ -381,50 +388,70 @@ test("family question: tick the tags; a group makes it radio buttons", () => {
 	done();
 });
 
-test("book question: a wrong move shows the book moves and the note", () => {
-	const base = deck.find((x) => x.type === "book" && x.moves.length === 2);
-	const c = { ...base, notes: { a6: "Najdorf idea." } };
-	const m = mount({ settings: { bookSide: "black" } });
+// a book question on 3...cxd4, with the ...d6 Sicilians' order learned: a run to the Scheveningen or the Najdorf
+function bookRun() {
+	const progress = emptyProgress();
+	progress.cards[`order|${v("...d6 Sicilians").key}`] = { streak: 2, seen: 1, skip: false };
+	const c = deck.find((x) => x.type === "book" && x.san === "cxd4");
+	const m = mount({ settings: { bookSide: "black" }, progress });
 	m.ui.session = hand([c]);
 	m.ui.card = c;
 	m.ui.screen = "question";
 	m.draw();
-	assert.match($(m.root, ".tr-prompt").textContent, /find the move/);
-	const chess = new Chess();
-	c.sans.forEach((s) => chess.move(s));
-	move(m.root, chess, "g6");
+	const play = (san) => {
+		const chess = new Chess();
+		m.ui.run.sans.slice(0, m.ui.run.at).forEach((x) => chess.move(x));
+		move(m.root, chess, san);
+	};
+	return { m, play };
+}
+
+test("book question: a run from move 1, a miss shown and gone on from, any book move right", () => {
+	const { m, play } = bookRun();
+	assert.strictEqual($(m.root, ".tr-prompt").textContent, "Play the ...d6 Sicilians, then on to the end of the line");
+	assert.strictEqual($(m.root, ".tr-moves").textContent, "1.e4", "the board plays White");
+	play("c5");
+	play("d6");
+	assert.strictEqual($(m.root, ".tr-moves").textContent, "1.e4 c5  2.Nf3 d6  3.d4");
+	// a move off the book: red and green arrows, where it leads, Go on plays the line's
+	play("Nc6");
+	assert.strictEqual(m.root.querySelectorAll(".tr-feedback .an-arrow.bad").length, 1);
+	assert.strictEqual(m.root.querySelectorAll(".tr-feedback .an-arrow:not(.bad)").length, 1);
+	assert.match($(m.root, ".tr-leads").textContent, /^Not quite: this line plays 3\.\.\.cxd4 \(yours is not in this workbook\)$/);
+	assert.ok(!$(m.root, ".tr-compare"), "past the named position: no target");
+	assert.ok(!$(m.root, ".tr-show"));
+	click(m.root, ".tr-next");
+	play("Nf6");
+	// two book moves at 5...: the hint, then the one this line doesn't take is right but asks for the line's
+	assert.match($(m.root, ".tr-hint").textContent, /^2 book moves here · this line takes one you haven't learned yet$/);
+	const want = m.ui.run.sans[m.ui.run.at];
+	const other = want === "e6" ? "a6" : "e6";
+	play(other);
+	assert.match($(m.root, ".tr-hint").textContent, /this line goes another way/);
+	play(want);
 	const r = $(m.root, ".tr-result.wrong");
-	assert.match(r.textContent, /e6/);
-	assert.match(r.textContent, /a6: Najdorf idea\./);
+	assert.ok(r, "one miss: not right");
+	assert.match(r.textContent, /3 of 4 book moves right/);
+	assert.match(r.textContent, /3\.\.\.cxd4: you played Nc6/);
 	click(m.root, ".tr-flip");
 	assert.strictEqual(m.ui.flipped, true);
 	done();
 });
 
-test("wrong book move: the book moves drawn green, the one played red, and where it leads", () => {
-	const c = deck.find((x) => x.type === "book" && x.moves.length === 2);
-	const m = mount({ settings: { bookSide: "black" } });
-	m.ui.session = hand([c]);
-	m.ui.card = c;
-	m.ui.screen = "question";
-	m.draw();
-	const chess = new Chess();
-	c.sans.forEach((s) => chess.move(s));
-	move(m.root, chess, "g6");
-	assert.strictEqual(m.root.querySelectorAll(".tr-feedback .an-arrow.bad").length, 1);
-	assert.strictEqual(m.root.querySelectorAll(".tr-feedback .an-arrow:not(.bad)").length, c.moves.length);
-	assert.match($(m.root, ".tr-leads").textContent, /^(That leads to the .+|Not in this workbook)$/);
-	// the right move draws nothing
-	const m2 = mount({ settings: { bookSide: "black" } });
-	m2.ui.session = hand([c]);
-	m2.ui.card = c;
-	m2.ui.screen = "question";
-	m2.draw();
-	const chess2 = new Chess();
-	c.sans.forEach((s) => chess2.move(s));
-	move(m2.root, chess2, c.moves[0]);
-	assert.ok($(m2.root, ".tr-result.right"));
-	assert.strictEqual($(m2.root, ".tr-feedback"), null);
+test("book question: Show me before the named position shows its position; the optional book moves wait for Go on", () => {
+	const { m, play } = bookRun();
+	click(m.root, ".tr-show");
+	assert.match($(m.root, ".tr-leads").textContent, /^Here: this line plays 1\.\.\.c5$/);
+	assert.strictEqual($(m.root, ".tr-compare figcaption").textContent, "Heading for: ...d6 Sicilians");
+	assert.strictEqual(m.root.querySelectorAll(".tr-feedback .an-arrow").length, 1);
+	m.root.querySelector(".analysis").dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+	assert.strictEqual(m.ui.run.at, 3, "Enter goes on");
+	for (const san of ["d6", "cxd4", "Nf6"]) play(san);
+	play(m.ui.run.sans[m.ui.run.at]);
+	assert.match($(m.root, ".tr-hint").textContent, /^Right\. 1 more book move here/);
+	assert.ok(!m.ui.answered);
+	click(m.root, ".tr-next");
+	assert.ok($(m.root, ".tr-result.wrong"));
 	done();
 });
 
@@ -960,7 +987,7 @@ test("settings: grouped, every field has a tooltip with its default, streaks cla
 	const legends = [...root.querySelectorAll(".tr-group > legend")].map((l) => l.textContent);
 	assert.deepStrictEqual(legends, ["Questions", "Name questions", "Order questions", "Tags questions", "Book questions", "Progress", "Sessions"]);
 	const labels = [...root.querySelectorAll(".tr-field > span")].map((l) => l.textContent);
-	for (const l of ["Name", "Order", "Tags", "Book", "Answer by", "Choices", "Show the moves", "Show the target position", "Show the name", "You play", "Accept", "Right answers to learn", "Right answers to master", "A miss takes away", "Show a new variation first", "New variations at once", "Re-check every", "Questions per session (0: no limit)"]) {
+	for (const l of ["Name", "Order", "Tags", "Book", "Answer by", "Choices", "Show the moves", "Show the target position", "Show the name", "You play", "Right answers to learn", "Right answers to master", "A miss takes away", "Show a new variation first", "New variations at once", "Re-check every", "Questions per session (0: no limit)"]) {
 		assert.ok(labels.includes(l), l);
 	}
 	for (const f of root.querySelectorAll(".tr-field")) assert.ok(f.title, `no tooltip on ${f.textContent}`);
