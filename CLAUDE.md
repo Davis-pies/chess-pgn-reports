@@ -97,4 +97,8 @@ intercept `https://esm.sh/**` and serve `node_modules/chess.js/dist/esm/chess.js
 
 - Commit subjects are short imperative sentences describing the behaviour
   ("List a printed table's notes in number order"), not the code.
-- Work on a branch and open a PR against `master`; CI must be green to merge.
+- Work on a branch, never on `master`. When the work is done and the checks
+  pass, stop: summarise what changed and how to try it (`npm run dev` on the
+  branch), and wait for Davis to review it by hand. Merge into `master` and
+  push only after he says so. Pushing `master` deploys to GitHub Pages, so it
+  is the release, not a test step. No pull requests: merge locally, then push.
