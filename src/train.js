@@ -15,6 +15,11 @@ import { fullmoveLabel } from "./render.js";
 const SPACING = 10;
 // misses of one card in a session before it is set aside as tricky (finding 7)
 const TRICKY = 3;
+// Mastered questions' share of a flow session: light review only (Davis,
+// 2026-10-17: a 50-question set kept serving mastered positions). They come
+// back only while the queue so far is under this share, unless there is no
+// unmastered material left to ask.
+const MASTERED_SHARE = 0.1;
 
 export const DEFAULT_SETTINGS = {
 	types: { name: true, order: true, family: false, book: true },
@@ -570,8 +575,13 @@ function refill(session, progress, settings, ctx) {
 		const dues = session.pool
 			.filter((c) => !queued.has(c.id) && !asked.has(c.id) && rec(c) && learnedCard(rec(c), settings) && ok(c) && progress.asked - rec(c).seen >= SPACING)
 			.sort((a, b) => masteredCard(rec(a), settings) - masteredCard(rec(b), settings) || rec(a).seen - rec(b).seen);
+		// the mastered share is counted over the whole queue, so it holds at
+		// every point of the session, not only at its end
+		const queuedQs = session.queue.filter((c) => c.type !== "intro");
+		const mayMaster = queuedQs.filter((c) => masteredCard(rec(c), settings)).length < MASTERED_SHARE * (queuedQs.length + 1);
+		const eligible = mayMaster ? dues : dues.filter((c) => !masteredCard(rec(c), settings));
 		const retired = (c) => retiredCard(c, rec(c), settings);
-		const due = dues.find((c) => !near.has(c.vkey) && !retired(c)) ?? (rest.length || more.length ? undefined : dues.find((c) => !retired(c)) ?? dues[0]);
+		const due = eligible.find((c) => !near.has(c.vkey) && !retired(c)) ?? (rest.length || more.length ? undefined : eligible.find((c) => !retired(c)) ?? dues.find((c) => !retired(c)) ?? dues[0]);
 		// asked next, not behind the new questions already queued, which would
 		// leave whole stretches with nothing older in them; but not beside a
 		// question of its own family, nor of its own variation, which would give

@@ -331,7 +331,10 @@ For a shorter overview see the [README](../README.md).
      come anyway. When fewer new variations are left than that, a re-check comes
      after every answer, so the last line left alternates with older ones and,
      once everything is learned, a session is all re-checks, those not yet
-     mastered first. A question is re-checked at most once a session. A miss comes back three questions later, and so does a
+     mastered first. Mastered questions are light review: they make up at most
+     a tenth of the questions so far (so about 5 of a 50-question session),
+     and only when nothing unmastered is left to ask do they fill more.
+     A question is re-checked at most once a session. A miss comes back three questions later, and so does a
      right answer on a question not yet learned, so a question can be learned
      in one sitting; once learned it is not asked again that session except
      as a re-check. The session ends after "Questions per session" answers

@@ -216,7 +216,8 @@ test("flow: re-checks join every recheckEvery answers and respect spacing", () =
 	assert.strictEqual(new Set(s.queue.filter((c) => !mastered.has(c.id)).map((c) => c.vkey)).size, 1, "and one new variation");
 	for (let k = 0; k < 9; k++) answer(s, p, current(s), true, st, { deck, tree });
 	const rechecks = s.results.filter((r) => mastered.has(r.id));
-	assert.ok(rechecks.length >= 3 && rechecks.length <= 5, `about one in three: ${rechecks.length}`);
+	// mastered questions are light review: at most a tenth of the queue so far
+	assert.strictEqual(rechecks.length, 1, "a tenth of the first 10 answers");
 	assert.strictEqual(new Set(rechecks.map((r) => r.id)).size, rechecks.length, "none twice within the spacing");
 	const off = emptyProgress();
 	markKnown(off, v("...d6 Sicilians").key, deck, S);
