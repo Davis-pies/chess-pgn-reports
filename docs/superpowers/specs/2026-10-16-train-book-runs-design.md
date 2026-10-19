@@ -8,6 +8,20 @@ should show the position it was meant to reach.
 
 Replaces the **book** card of the [Train design](2026-10-13-train-mode-design.md).
 
+> **Superseded in part, 2026-10-19.** The runs were a misreading. Davis: "the
+> book moves should take progression from when you play a line which would
+> require you to know that book move"; "we already had the line playback
+> thing" (the order question). A run made a book question replay everything
+> its line held, all at once, to the line's end. Kept: a card per (position,
+> move), order questions crediting every book move they play, book moves
+> opening with the order question and joining by level, and the target
+> position on a wrong order. Changed: a book question is one position and
+> one move again. The asked move is right; another book move there counts
+> for its own card and the question waits for the asked one; anything else
+> is a miss. A book move an order answer has just played and learned leaves
+> the session's queue. The **A book question is a run** and **Which line**
+> sections below no longer apply.
+
 ## What was wrong
 
 - New book cards sorted behind every name/order card in the workbook, and

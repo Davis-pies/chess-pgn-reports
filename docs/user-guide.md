@@ -212,30 +212,19 @@ For a shorter overview see the [README](../README.md).
      (or type; `/` separates accepted aliases, case and punctuation ignored)
      its name. **Order**: given a name, play the moves from the start; any
      move some line of the workbook still leads to the position from is
-     accepted. **Tags**: tick the tags the position carries. **Book**: play a
-     whole line of the workbook from move 1 to its end, the board playing the
-     other side (below). Name, Order and Book are on by default; Tags is off.
-   - **Book runs** — progress is kept for each of your book moves, and every
-     time you play one counts for it: in a Book run, and in an Order
-     question, whose moves are book moves too. A Book question plays a line
-     through the move it asks about, the one with the most book moves you
-     have not learned yet. Up to the line's last named position it is that
-     position's Order question ("Play the Najdorf, then on to the end of the
-     line"). The prompt never gives the moves: when the position has more
-     than one move order, any of them is right, and the board follows the
-     one you play. Where you have several book moves, any of them is
-     right: one this line does not take counts, and you are asked for the
-     line's ("Book, but this line goes another way"). The hint says how many
-     there are, and when this line's is one you haven't learned yet. After
-     the line's move, the others can be played for credit too, or **Go on**
-     (Enter) skips them: finding them all is never required. A move outside
-     the book, or **Show me**, is a miss for the line's move: the board shows
-     it in green beside yours in red, with its note and, before the named
-     position, the position you were heading for; **Go on** plays it and the
-     run carries on to the end. Each move's note shows as it is played. A run
-     is one question in the session, right only with no miss, and the result
-     lists what you missed. The book moves it played leave the session's
-     queue; the ones you missed come back.
+     accepted. **Tags**: tick the tags the position carries. **Book**: the
+     board shows a position, with the moves that reach it, and you play the
+     book move there. Name, Order and Book are on by default; Tags is off.
+   - **Book moves** — progress is kept for each of your book moves, and it
+     is shared with the lines that play them: every book move an Order
+     question has you play counts for it, so replaying a line is what
+     teaches its book moves. One you have just learned that way leaves the
+     session's queue rather than being asked straight after. A Book question
+     asks for one move; where there are several book moves, another of them
+     is not wrong: it counts for itself, and you are asked for the one this
+     question is about. A move outside the book is a miss: the board shows
+     the book move in green beside yours in red, says where yours leads, and
+     the result shows the move's note.
    - **Name choices** — the wrong names are the positions that look most
      like the right one: the fewest squares different, counting a
      difference in pawns alone (the same pieces with ...e6 for ...d6) as
@@ -337,8 +326,8 @@ For a shorter overview see the [README](../README.md).
      A question is re-checked at most once a session. A miss comes back three questions later, and so does a
      right answer on a question not yet learned, so a question can be learned
      in one sitting; once learned it is not asked again that session except
-     as a re-check. The same question, or a Book run along the same line, is
-     never asked twice in a row: when nothing else is queued, a learned or
+     as a re-check. The same question is never asked twice in a
+     row: when nothing else is queued, a learned or
      mastered question comes in between. The session ends after "Questions per session" answers
      (20 by default; 0 for no limit, when it runs until nothing is left to
      ask), or when you press **End session**, which shows the summary of

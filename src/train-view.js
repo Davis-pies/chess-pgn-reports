@@ -15,9 +15,9 @@ import { engineBox } from "./engine-view.js";
 import { boardSvg, fullmoveLabel, movesText } from "./render.js";
 import { drawArrows, interactiveBoard } from "./board-input.js";
 import {
-	DEFAULT_SETTINGS, allTags, answer, answerRun, checkFamily, checkName, current, divergence, isLearned, isMastered, learnedCard,
+	DEFAULT_SETTINGS, allTags, answer, checkFamily, checkName, current, divergence, isLearned, isMastered, learnedCard,
 	isRetired, isTricky, leadsTo, markKnown, masteredCard, nameChoices, newSession, normalizeSettings, orderStep, positionDiff, resetVar, saveProgress, scopeCards, sessionSummary, skip,
-	runHere, runOn, runPlay, runShow, startRun, unlockedKeys, unlocksIfLearned,
+	bookTry, unlockedKeys, unlocksIfLearned,
 } from "./train.js";
 
 // Every question draws its board at one size, asked or answered, so the board
@@ -28,8 +28,7 @@ const BOARD = 320;
 export function newTrainUi(scope = null) {
 	return {
 		screen: "outline", session: null, card: null,
-		picked: null, typed: "", played: [], answered: null, step: null, // step: how far an intro has played its moves
-		run: null, // a book question's run, as it is played
+		picked: null, typed: "", played: [], answered: null, step: null, // step: how far an intro has played its moves; played: an order's moves, a book question's other book moves
 		ticked: [], choices: null, // the family ticks and the name choices, kept so a redraw doesn't reshuffle
 		scope, open: new Set(), flipped: false, tag: "",
 	};
@@ -84,7 +83,7 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn, engine = n
 	};
 	const setCard = () => {
 		ui.card = current(ui.session);
-		Object.assign(ui, { picked: null, typed: "", played: [], answered: null, step: null, run: null, ticked: [], choices: null });
+		Object.assign(ui, { picked: null, typed: "", played: [], answered: null, step: null, ticked: [], choices: null });
 		if (!ui.card) ui.screen = "summary";
 	};
 
@@ -240,7 +239,7 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn, engine = n
 			name: "Show a named position's board and ask what it is called.",
 			order: "Name a position and ask for the moves that reach it, played on the board.",
 			family: "Ask which tags a position carries.",
-			book: "Play a whole line from the start: the board plays the other side and you play yours, every move counting for its book move.",
+			book: "Show a position and ask for a book move there. Playing a line in an Order question counts for every book move it plays, too.",
 		};
 		box.append(
 			group("Questions", ...TYPES.map((t) => check(`type-${t}`, TYPE_LABEL[t], s.types[t], (on) => set({ types: { ...s.types, [t]: on } }), `${typeTips[t]} Default ${onOff(D.types[t])}.`))),
@@ -339,7 +338,6 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn, engine = n
 				if (e.target.closest?.("button")) return; // a focused button handles Enter itself
 				if (card.type === "intro") gotIt();
 				else if (ui.answered) next();
-				else if (ui.run?.wait) goOn();
 				else if (typedInput && e.target === typedInput) pickName(typedInput.value);
 				return;
 			}
@@ -371,25 +369,6 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn, engine = n
 			ui.picked = ui.typed = text;
 			const right = checkName(text, node.name);
 			finish(right, right ? [`Answer: ${node.name}`] : [`Answer: ${node.name}`, `You answered: ${text}`]);
-		};
-		// a run's move, Go on past a miss or the extra book moves, and its end
-		const endRun = () => {
-			if (!ui.run.done || ui.answered) return;
-			const r = answerRun(ui.session, progress, card, ui.run, settings, { deck: live, tree });
-			const detail = [`${r.moves - r.missed} of ${r.moves} book moves right`, ...ui.run.misses.map((m) => `${fullmoveLabel(m.at)}${ui.run.sans[m.at]}${m.san ? `: you played ${m.san}` : ": shown"}`)];
-			ui.answered = { right: r.right, detail, tooSoon: false, unlocked: r.unlocked, miss: null, also: r.also ?? [] };
-		};
-		const playRun = (san) => {
-			runPlay(ui.run, san, tree);
-			endRun();
-			save();
-			onChange();
-		};
-		const goOn = () => {
-			runOn(ui.run);
-			endRun();
-			save();
-			onChange();
 		};
 		// the position a move order was heading for, at half size
 		const targetBoard = (n) => el("div", { className: "tr-compare" }, [el("figure", {}, [boardSvg(n.fen, BOARD / 2, { flipped: readerFlip }), el("figcaption", { textContent: `Heading for: ${n.name}` })])]);
@@ -486,44 +465,25 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn, engine = n
 			body.append(list);
 			if (!ui.answered) body.append(chipBtn("tr-check", "Check", "Check the tags", () => finish(checkFamily(ui.ticked, tags), [`Answer: ${tags.join(", ") || "none"}`])));
 		} else {
-			// A book question is a run along a whole line (spec 2026-10-16-train-book-runs-design.md)
-			ui.run ??= startRun(card, live, progress, settings);
-			const run = ui.run;
-			const v = tree.byKey.get(run.vkey);
-			// never the moves: any of the variation's orders is right (runPlay follows it)
-			prompt.textContent = v ? `Play the ${v.name}, then on to the end of the line` : "Play the line from the start";
+			// One position, one move (bookTry): playing the line is the order question's
 			const chess = new Chess();
-			run.sans.slice(0, run.at).forEach((s) => chess.move(s));
-			const waiting = !run.done && run.wait !== "miss";
-			body.append(stage(chess.fen(), { flipped: readerFlip, play: waiting && !ui.answered ? playRun : null, box: !!ui.answered }), flip());
-			if (!run.done) {
-				// beside the board, as an intro's moves and notes are
-				const side = el("div", { className: "tr-result tr-intro" }, [el("p", { className: "tr-moves" }, run.at ? numbered(run.sans.slice(0, run.at)) : "(start position)")]);
-				box.append(side);
-				// the notes on the last two moves: the reader's and the reply
-				for (let i = Math.max(0, run.at - 2); i < run.at; i++) if (run.notes[i]) side.append(noteLine(fullmoveLabel(i) + run.sans[i], run.notes[i]));
-				const { want, card: here, moves } = runHere(run);
-				const left = moves.filter((m) => !run.found.includes(m)).length; // read only once the line's move is found
-				const say = (text, className = "tr-hint") => side.append(el("p", { className, textContent: text }));
-				if (run.wait === "miss") {
-					const { san } = run.miss;
-					const arrow = (m) => {
-						const mv = new Chess(chess.fen()).move(m);
-						return { from: mv.from, to: mv.to };
-					};
-					drawArrows(body.querySelector(".an-board"), [...(san ? [{ ...arrow(san), tone: "bad" }] : []), arrow(want)], "tr-feedback");
-					const lead = san && leadsTo(tree, [...run.sans.slice(0, run.at), san]);
-					say(`${san ? "Not quite" : "Here"}: this line plays ${fullmoveLabel(run.at)}${want}${san ? (lead ? ` (yours leads to the ${lead})` : " (yours is not in this workbook)") : ""}`, "tr-leads");
-					if (run.notes[run.at]) side.append(noteLine(fullmoveLabel(run.at) + want, run.notes[run.at]));
-					if (run.at < run.last) side.append(targetBoard(v));
-				} else if (run.wait === "more") say(`Right. ${left} more book move${left === 1 ? "" : "s"} here: play ${left === 1 ? "it" : "them"} if you know ${left === 1 ? "it" : "them"}, or go on`);
-				else if (run.msg === "book") say("Book, but this line goes another way: find its move");
-				else if (run.at >= run.last && moves.length > 1) {
-					say(`${moves.length} book moves here${here && !learnedCard(progress.cards[here.id], settings) ? " · this line takes one you haven't learned yet" : ""}`);
+			card.sans.forEach((s) => chess.move(s));
+			prompt.textContent = `${card.vkey === "" ? "Book" : tree.byKey.get(card.vkey).name}: find the move`;
+			body.append(el("p", { className: "tr-moves", textContent: numbered(card.sans) || "(start position)" }));
+			const blackToPlay = settings.bookSide === "both" ? chess.turn() === "b" : settings.bookSide === "black";
+			const play = (san) => {
+				const got = ui.played.includes(san) ? "other" : bookTry(progress, live, card, san, settings);
+				if (got === "other") {
+					if (!ui.played.includes(san)) ui.played.push(san);
+					save();
+					return onChange();
 				}
-				side.append(el("div", { className: "tr-acts" }, run.wait
-					? [chipBtn("tr-next", "Go on", "Play this line's move and carry on (Enter)", goOn)]
-					: [chipBtn("tr-show", "Show me", "Show this line's move: it counts as a miss", act(() => runShow(run)))]));
+				finish(got === "right", [`Book here: ${card.moves.map((m) => fullmoveLabel(card.sans.length) + m).join(", ")}`], got === "right" ? null : { played: [...card.sans], san, rightMoves: [card.san] });
+			};
+			body.append(stage(chess.fen(), { flipped: blackToPlay !== ui.flipped, play: ui.answered ? null : play, box: !!ui.answered }), flip());
+			if (ui.played.length && !ui.answered) {
+				const n = card.moves.length - ui.played.length;
+				body.append(el("p", { className: "tr-hint", textContent: `${ui.played.join(", ")}: book too, and counted. This question asks for ${n === 1 ? "the other one" : `one of the other ${n}`}` }));
 			}
 		}
 
@@ -580,7 +540,8 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn, engine = n
 					res.append(targetBoard(node));
 				}
 			}
-			// the variation's own note only (the intro steps through the rest; a run showed its notes as it went)
+			// a book move's note, or the variation's own note only (the intro steps through the rest)
+			if (card.type === "book" && card.note) res.append(noteLine(fullmoveLabel(card.sans.length) + card.san, card.note));
 			for (const n of card.notes?.filter((x) => x.own && !(miss && x.at === miss.played.length)) ?? []) res.append(noteLine(n.move, n.text));
 			if (also.length) res.append(el("p", { className: "tr-also-counts", title: "Its moves play these variations' moves too, so their order questions count as answered right", textContent: `Also counts for: ${also.join(", ")}` }));
 			if (unlocked.length) res.append(el("p", { className: "tr-unlocked", textContent: `Unlocked: ${unlocked.join(", ")}` }));

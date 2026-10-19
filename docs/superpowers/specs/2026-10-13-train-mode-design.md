@@ -71,8 +71,10 @@ Each named position gives cards; each card type can be switched off.
 - **tags** (stored as `family`, so saved progress keeps its keys) - tick the tags the position carries, out of all the workbook's
   tags; exact set to score. Off by default. Options: show the name; pick-one
   mode restricted to one chosen group of tags.
-- **book** - 2026-10-16: replaced by line runs, one card per book move; see
-  [Train: book questions as line runs](2026-10-16-train-book-runs-design.md).
+- **book** - 2026-10-16: one card per book move, credited by order answers;
+  see [Train: book questions as line runs](2026-10-16-train-book-runs-design.md).
+  The runs themselves were reverted on 2026-10-19: a book question is one
+  position and one move.
   (Before: a card per position in the variation's stretch, right with any
   book move, opened once the variation was learned and asked after every
   other new question.) Option: which side the reader plays (White, Black,

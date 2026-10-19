@@ -74,16 +74,10 @@ function solve(root, ui) {
 		for (const t of tree.byKey.get(c.key).tags) click(root, `.tr-tag input[value="${t}"]`);
 		click(root, ".tr-check");
 	}
-	// a run: every line move, Go on past the optional book moves
 	if (c.type === "book") {
-		while (!ui.answered) {
-			if (ui.run?.wait) click(root, ".tr-next");
-			else {
-				const chess = new Chess();
-				ui.run.sans.slice(0, ui.run.at).forEach((s) => chess.move(s));
-				move(root, chess, ui.run.sans[ui.run.at]);
-			}
-		}
+		const chess = new Chess();
+		c.sans.forEach((s) => chess.move(s));
+		move(root, chess, c.san);
 	}
 }
 
@@ -389,99 +383,76 @@ test("family question: tick the tags; a group makes it radio buttons", () => {
 });
 
 // a book question on 3...cxd4, with the ...d6 Sicilians' order learned: a run to the Scheveningen or the Najdorf
-function bookRun() {
-	const progress = emptyProgress();
-	progress.cards[`order|${v("...d6 Sicilians").key}`] = { streak: 2, seen: 1, skip: false };
-	const c = deck.find((x) => x.type === "book" && x.san === "cxd4");
-	const m = mount({ settings: { bookSide: "black" }, progress });
+// Davis, 2026-10-19: playing a line is the order question's; a book question is one position and one move
+function bookAt(san) {
+	const c = deck.find((x) => x.type === "book" && x.san === san && x.moves.length === 2);
+	const m = mount({ settings: { bookSide: "black" } });
 	m.ui.session = hand([c]);
 	m.ui.card = c;
 	m.ui.screen = "question";
 	m.draw();
-	const play = (san) => {
+	const play = (x) => {
 		const chess = new Chess();
-		m.ui.run.sans.slice(0, m.ui.run.at).forEach((x) => chess.move(x));
-		move(m.root, chess, san);
+		c.sans.forEach((y) => chess.move(y));
+		move(m.root, chess, x);
 	};
-	return { m, play };
+	return { c, m, play };
 }
 
-test("book question: a run from move 1, a miss shown and gone on from, any book move right", () => {
-	const { m, play } = bookRun();
-	assert.strictEqual($(m.root, ".tr-prompt").textContent, "Play the ...d6 Sicilians, then on to the end of the line");
-	assert.strictEqual($(m.root, ".tr-moves").textContent, "1.e4", "the board plays White");
-	play("c5");
-	play("d6");
-	assert.strictEqual($(m.root, ".tr-moves").textContent, "1.e4 c5  2.Nf3 d6  3.d4");
-	// a move off the book: red and green arrows, where it leads, Go on plays the line's
-	play("Nc6");
-	assert.strictEqual(m.root.querySelectorAll(".tr-feedback .an-arrow.bad").length, 1);
-	assert.strictEqual(m.root.querySelectorAll(".tr-feedback .an-arrow:not(.bad)").length, 1);
-	assert.match($(m.root, ".tr-leads").textContent, /^Not quite: this line plays 3\.\.\.cxd4 \(yours is not in this workbook\)$/);
-	assert.ok(!$(m.root, ".tr-compare"), "past the named position: no target");
-	assert.ok(!$(m.root, ".tr-show"));
-	click(m.root, ".tr-next");
-	play("Nf6");
-	// two book moves at 5...: the hint, then the one this line doesn't take is right but asks for the line's
-	assert.match($(m.root, ".tr-hint").textContent, /^2 book moves here · this line takes one you haven't learned yet$/);
-	const want = m.ui.run.sans[m.ui.run.at];
-	const other = want === "e6" ? "a6" : "e6";
-	play(other);
-	assert.match($(m.root, ".tr-hint").textContent, /this line goes another way/);
-	play(want);
-	const r = $(m.root, ".tr-result.wrong");
-	assert.ok(r, "one miss: not right");
-	assert.match(r.textContent, /3 of 4 book moves right/);
-	assert.match(r.textContent, /3\.\.\.cxd4: you played Nc6/);
+test("book question: the position and the moves to it, the asked move right", () => {
+	const { c, m, play } = bookAt("a6");
+	assert.strictEqual($(m.root, ".tr-prompt").textContent, "...d6 Sicilians: find the move");
+	assert.strictEqual($(m.root, ".tr-moves").textContent, "1.e4 c5  2.Nf3 d6  3.d4 cxd4  4.Nxd4 Nf6  5.Nc3");
+	play("a6");
+	const r = $(m.root, ".tr-result.right");
+	assert.ok(r);
+	assert.match(r.textContent, /Book here: 5\.\.\.e6, 5\.\.\.a6/);
+	assert.strictEqual(m.progress.cards[c.id].streak, 1);
 	click(m.root, ".tr-flip");
 	assert.strictEqual(m.ui.flipped, true);
 	done();
 });
 
-// Davis, 2026-10-19: the prompt named the line's move order, giving its moves away
-test("book question: the prompt never gives the moves; any of the position's orders is played on", () => {
-	const kan = parsePgn(`1. e4 c5 2. Nf3 e6 (2... a6 {Flexible.} 3. d4 cxd4 4. Nxd4 e6 {[%name "Kan"]}) 3. d4 cxd4 4. Nxd4 a6 {[%name "Kan"]} 5. Bd3 Nf6 *`).nodes;
-	const kl = collectLines(kan);
-	const t = variationTree(kl, namesFromNodes(kan));
-	const d = buildDeck(t, kl, { ...DEFAULT_SETTINGS, types: ALL });
-	const progress = emptyProgress();
-	progress.cards[`order|${[...t.byKey.keys()][0]}`] = { streak: 2, seen: 1, skip: false };
-	const c = d.find((x) => x.type === "book" && x.san === "Nf6");
-	const m = mount({ t, d, settings: { bookSide: "black" }, progress });
+test("book question: the answer shows the workbook's note on the move", () => {
+	const n = parsePgn(`1. e4 c5 {[%name "Sicilian"]} 2. Nf3 d6 {Flexible.} *`).nodes;
+	const l = collectLines(n);
+	const t = variationTree(l, namesFromNodes(n));
+	const d = buildDeck(t, l, { ...DEFAULT_SETTINGS, types: ALL });
+	const c = d.find((x) => x.type === "book" && x.san === "d6");
+	const m = mount({ t, d, settings: { bookSide: "black" } });
 	m.ui.session = hand([c]);
 	m.ui.card = c;
 	m.ui.screen = "question";
 	m.draw();
-	assert.strictEqual($(m.root, ".tr-prompt").textContent, "Play the Kan, then on to the end of the line");
-	const play = (san) => {
-		const chess = new Chess();
-		m.ui.run.sans.slice(0, m.ui.run.at).forEach((x) => chess.move(x));
-		move(m.root, chess, san);
-	};
-	play("c5");
+	const chess = new Chess();
+	c.sans.forEach((x) => chess.move(x));
+	move(m.root, chess, "d6");
+	assert.strictEqual($(m.root, ".tr-result .tr-note").textContent, "2...d6 Flexible.");
+	done();
+});
+
+test("book question: another book move counts for itself and waits for the asked one", () => {
+	const { c, m, play } = bookAt("a6");
+	play("e6");
+	assert.ok(!m.ui.answered);
+	assert.strictEqual($(m.root, ".tr-hint").textContent, "e6: book too, and counted. This question asks for the other one");
+	assert.strictEqual(m.progress.cards[`book|${c.key}|e6`].streak, 1);
+	play("e6");
+	assert.strictEqual(m.progress.cards[`book|${c.key}|e6`].streak, 1, "once");
 	play("a6");
-	assert.ok(!$(m.root, ".tr-leads"), "the other order is no miss");
-	assert.strictEqual($(m.root, ".tr-moves").textContent, "1.e4 c5  2.Nf3 a6  3.d4");
-	assert.match($(m.root, ".tr-result").textContent, /2\.\.\.a6 Flexible\./, "its notes come along");
-	for (const san of ["cxd4", "e6", "Nf6"]) play(san);
 	assert.ok($(m.root, ".tr-result.right"));
 	done();
 });
 
-test("book question: Show me before the named position shows its position; the optional book moves wait for Go on", () => {
-	const { m, play } = bookRun();
-	click(m.root, ".tr-show");
-	assert.match($(m.root, ".tr-leads").textContent, /^Here: this line plays 1\.\.\.c5$/);
-	assert.strictEqual($(m.root, ".tr-compare figcaption").textContent, "Heading for: ...d6 Sicilians");
-	assert.strictEqual(m.root.querySelectorAll(".tr-feedback .an-arrow").length, 1);
-	m.root.querySelector(".analysis").dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-	assert.strictEqual(m.ui.run.at, 3, "Enter goes on");
-	for (const san of ["d6", "cxd4", "Nf6"]) play(san);
-	play(m.ui.run.sans[m.ui.run.at]);
-	assert.match($(m.root, ".tr-hint").textContent, /^Right\. 1 more book move here/);
-	assert.ok(!m.ui.answered);
-	click(m.root, ".tr-next");
-	assert.ok($(m.root, ".tr-result.wrong"));
+test("book question: a wrong move shows the asked move green, the one played red, and where it leads", () => {
+	const { m, play } = bookAt("a6");
+	play("g6");
+	const r = $(m.root, ".tr-result.wrong");
+	assert.ok(r);
+	assert.strictEqual(m.root.querySelectorAll(".tr-feedback .an-arrow.bad").length, 1);
+	assert.strictEqual(m.root.querySelectorAll(".tr-feedback .an-arrow:not(.bad)").length, 1);
+	assert.match($(r, ".tr-leads").textContent, /Not in this workbook/);
+	assert.ok(!$(m.root, ".tr-compare"), "no target position: it is not an order question");
 	done();
 });
 
