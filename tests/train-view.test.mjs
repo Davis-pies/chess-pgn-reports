@@ -438,6 +438,36 @@ test("book question: a run from move 1, a miss shown and gone on from, any book 
 	done();
 });
 
+// Davis, 2026-10-19: the prompt named the line's move order, giving its moves away
+test("book question: the prompt never gives the moves; any of the position's orders is played on", () => {
+	const kan = parsePgn(`1. e4 c5 2. Nf3 e6 (2... a6 {Flexible.} 3. d4 cxd4 4. Nxd4 e6 {[%name "Kan"]}) 3. d4 cxd4 4. Nxd4 a6 {[%name "Kan"]} 5. Bd3 Nf6 *`).nodes;
+	const kl = collectLines(kan);
+	const t = variationTree(kl, namesFromNodes(kan));
+	const d = buildDeck(t, kl, { ...DEFAULT_SETTINGS, types: ALL });
+	const progress = emptyProgress();
+	progress.cards[`order|${[...t.byKey.keys()][0]}`] = { streak: 2, seen: 1, skip: false };
+	const c = d.find((x) => x.type === "book" && x.san === "Nf6");
+	const m = mount({ t, d, settings: { bookSide: "black" }, progress });
+	m.ui.session = hand([c]);
+	m.ui.card = c;
+	m.ui.screen = "question";
+	m.draw();
+	assert.strictEqual($(m.root, ".tr-prompt").textContent, "Play the Kan, then on to the end of the line");
+	const play = (san) => {
+		const chess = new Chess();
+		m.ui.run.sans.slice(0, m.ui.run.at).forEach((x) => chess.move(x));
+		move(m.root, chess, san);
+	};
+	play("c5");
+	play("a6");
+	assert.ok(!$(m.root, ".tr-leads"), "the other order is no miss");
+	assert.strictEqual($(m.root, ".tr-moves").textContent, "1.e4 c5  2.Nf3 a6  3.d4");
+	assert.match($(m.root, ".tr-result").textContent, /2\.\.\.a6 Flexible\./, "its notes come along");
+	for (const san of ["cxd4", "e6", "Nf6"]) play(san);
+	assert.ok($(m.root, ".tr-result.right"));
+	done();
+});
+
 test("book question: Show me before the named position shows its position; the optional book moves wait for Go on", () => {
 	const { m, play } = bookRun();
 	click(m.root, ".tr-show");

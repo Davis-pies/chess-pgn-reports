@@ -35,9 +35,9 @@ Replaces the **book** card of the [Train design](2026-10-13-train-mode-design.md
     order questions above it as now. A line that goes on into a variation
     not yet open stops there.
   - Each of the reader's moves is scored for its book move.
-  - When the named position has several move orders, the prompt names this
-    line's; a move of another of its orders is "Another order: play this
-    line's", not scored.
+  - When the named position has several move orders, any of them is right
+    and the run follows the one played. (It first named this line's order
+    in the prompt, which gave the moves away: Davis, 2026-10-19.)
   - At a position with several book moves, any of them is right. Playing
     one this line does not take credits it and asks for this line's move
     ("Book, but this line goes another way"). After this line's move, the

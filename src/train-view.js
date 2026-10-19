@@ -490,8 +490,8 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn, engine = n
 			ui.run ??= startRun(card, live, progress, settings);
 			const run = ui.run;
 			const v = tree.byKey.get(run.vkey);
-			const by = v && v.orders.length > 1 ? ` by ${numbered(run.sans.slice(0, run.last))}` : "";
-			prompt.textContent = v ? `Play the ${v.name}${by}, then on to the end of the line` : "Play the line from the start";
+			// never the moves: any of the variation's orders is right (runPlay follows it)
+			prompt.textContent = v ? `Play the ${v.name}, then on to the end of the line` : "Play the line from the start";
 			const chess = new Chess();
 			run.sans.slice(0, run.at).forEach((s) => chess.move(s));
 			const waiting = !run.done && run.wait !== "miss";
@@ -517,7 +517,6 @@ export function trainPanel(ui, { tree, deck, progress, rename, learn, engine = n
 					if (run.notes[run.at]) side.append(noteLine(fullmoveLabel(run.at) + want, run.notes[run.at]));
 					if (run.at < run.last) side.append(targetBoard(v));
 				} else if (run.wait === "more") say(`Right. ${left} more book move${left === 1 ? "" : "s"} here: play ${left === 1 ? "it" : "them"} if you know ${left === 1 ? "it" : "them"}, or go on`);
-				else if (run.msg === "order") say("Another order: play this line's");
 				else if (run.msg === "book") say("Book, but this line goes another way: find its move");
 				else if (run.at >= run.last && moves.length > 1) {
 					say(`${moves.length} book moves here${here && !learnedCard(progress.cards[here.id], settings) ? " · this line takes one you haven't learned yet" : ""}`);

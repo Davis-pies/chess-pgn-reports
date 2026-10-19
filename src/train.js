@@ -140,10 +140,13 @@ export function buildDeck(tree, lines, settings) {
 // by its cards there; `lines` are the workbook lines through it, which a book
 // question plays as a run (see startRun): the moves, the notes on each, and
 // `marks`, the named positions each reaches (`at`: moves played to get there).
+// `all` holds every workbook line, shared by all the cards, for a run that
+// goes on by another move order (see reorder).
 function bookCards(tree, lines, settings, comments) {
 	const want = settings.bookSide === "white" ? "w" : settings.bookSide === "black" ? "b" : null;
 	const cards = new Map();
 	const movesAt = new Map();
+	const all = [];
 	for (const line of lines) {
 		const fens = fenMap(line.moves);
 		const sans = line.moves.map((m) => m.san);
@@ -155,6 +158,7 @@ function bookCards(tree, lines, settings, comments) {
 			notes: sans.map((san) => [...(comments.get((path += ` ${san}`)) || [])].join(" ")),
 			marks: keys.flatMap((k, i) => (tree.byKey.has(k) ? [{ at: i + 1, key: k }] : [])),
 		};
+		all.push(run);
 		let vkey = ""; // nearest named position at or before this one
 		let started = tree.roots.length === 0; // with names, no cards before the first
 		line.moves.forEach((m, i) => {
@@ -169,7 +173,7 @@ function bookCards(tree, lines, settings, comments) {
 			if (!c) {
 				const v = tree.byKey.get(vkey);
 				const on = keys.slice(0, i).filter((x) => tree.byKey.has(x));
-				c = { id, type: "book", key, san: m.san, vkey, level: v ? v.level : 0, family: familyOf(tree, vkey), on, sans: sans.slice(0, i), moves, note: run.notes[i], lines: [] };
+				c = { id, type: "book", key, san: m.san, vkey, level: v ? v.level : 0, family: familyOf(tree, vkey), on, sans: sans.slice(0, i), moves, note: run.notes[i], lines: [], all };
 				cards.set(id, c);
 			}
 			c.lines.push(run);
@@ -730,14 +734,54 @@ function settle(session, progress, card, result, settings, ctx, before, again) {
 	}
 	if (!tricky && again) requeue(session, card);
 	session.i++;
-	if (session.practice) return result;
+	if (session.practice) {
+		noRepeat(session, progress, settings, ctx, card, result.line);
+		return result;
+	}
 	session.sinceRecheck++;
 	if (session.results.slice(-5).filter((r) => !r.right).length >= 2) holdBack(session, progress);
-	if (!ctx) return result;
-	const after = unlockedKeys(ctx.tree, ctx.deck, progress, settings);
-	result.unlocked = [...after].filter((k) => !before.has(k)).map((k) => ctx.tree.byKey.get(k).name);
-	refill(session, progress, settings, ctx);
+	if (ctx) {
+		const after = unlockedKeys(ctx.tree, ctx.deck, progress, settings);
+		result.unlocked = [...after].filter((k) => !before.has(k)).map((k) => ctx.tree.byKey.get(k).name);
+		refill(session, progress, settings, ctx);
+	}
+	noRepeat(session, progress, settings, ctx, card, result.line);
 	return result;
+}
+
+// The question just answered is never the next one (Davis, 2026-10-19: "even
+// if it means giving more mastered or learned content than desired"). A short
+// queue put a requeued card straight after itself, and two book cards could
+// play the same line one after the other. The next question is the same when
+// it is the same card, or a book card whose run would play `line`, the line
+// just played. A later queued intro or question goes first instead (not a
+// question whose intro is still to come, which moving an intro earlier keeps
+// spaced); failing that, a learned one from the pool, the longest unasked
+// first; failing that, the repeat is dropped.
+function noRepeat(session, progress, settings, ctx, card, line) {
+	const q = session.queue;
+	const deck = ctx?.deck ?? session.pool;
+	const same = (c) => c.id === card.id || (line !== undefined && c.type === "book" && startRun(c, deck, progress, settings).sans.join(" ") === line);
+	while (session.i < q.length && q[session.i].type !== "intro" && same(q[session.i])) {
+		const introAhead = (c) => q.some((x, y) => y >= session.i && x.type === "intro" && x.vkey === c.vkey);
+		const k = q.findIndex((c, j) => j > session.i && (c.type === "intro" || (!introAhead(c) && !same(c))));
+		if (k >= 0) {
+			q.splice(session.i, 0, ...q.splice(k, 1));
+			return;
+		}
+		const queued = new Set(q.slice(session.i).map((c) => c.id));
+		const cards = deck.filter((c) => c.type !== "intro");
+		const ok = ctx ? openTest(cards, progress, settings, unlockedKeys(ctx.tree, cards, progress, settings)) : () => true;
+		const rec = (c) => progress.cards[c.id];
+		const other = session.pool
+			.filter((c) => !queued.has(c.id) && rec(c) && learnedCard(rec(c), settings) && ok(c) && !same(c))
+			.sort((a, b) => rec(a).seen - rec(b).seen)[0];
+		if (other) {
+			q.splice(session.i, 0, other);
+			return;
+		}
+		q.splice(session.i, 1);
+	}
 }
 
 // --- runs --------------------------------------------------------------------
@@ -767,7 +811,7 @@ export function startRun(card, deck, progress, settings) {
 	const { line, end } = best;
 	const mark = line.marks.filter((m) => m.at <= end && open(m.key)).at(-1);
 	const run = {
-		byId, side, sans: line.sans.slice(0, end), before: line.before, notes: line.notes,
+		byId, side, sans: line.sans.slice(0, end), before: line.before, notes: line.notes, all: card.all,
 		last: mark?.at ?? 0, vkey: mark?.key ?? "", order: (mark && byId.get(`order|${mark.key}`)) || null,
 		at: 0, found: [], wait: null, msg: "", miss: null, misses: [], orderMiss: null, scored: new Map(), done: false,
 	};
@@ -833,8 +877,11 @@ export function runPlay(run, san, tree) {
 		return "right";
 	}
 	const v = run.at < run.last && tree.byKey.get(run.vkey);
-	if (v && orderStep(v.orders, run.sans.slice(0, run.at), san).ok) {
-		run.msg = "order";
+	const order = v && v.orders.find((o) => o.length > run.at && o[run.at] === san && run.sans.slice(0, run.at).every((s, i) => o[i] === s));
+	if (order) {
+		reorder(run, order);
+		take(run, san, true);
+		step(run);
 		return "order";
 	}
 	if (moves.includes(san)) {
@@ -847,6 +894,23 @@ export function runPlay(run, san, tree) {
 	}
 	missHere(run, san);
 	return "miss";
+}
+
+// The run goes on by another of the named position's orders, the one the
+// reader is playing. Naming the line's order in the prompt gave its moves
+// away (Davis, 2026-10-19), so any order is right and the run follows it:
+// every order reaches the same position, so the line after it is unchanged.
+// The notes on the new order's moves come from a workbook line that plays it.
+function reorder(run, order) {
+	const rest = run.sans.slice(run.last);
+	const chess = new Chess();
+	const before = [...order, ...rest].map((san) => {
+		const key = posKey(chess.fen());
+		chess.move(san);
+		return key;
+	});
+	const line = run.all.find((l) => order.every((s, i) => l.sans[i] === s));
+	Object.assign(run, { sans: [...order, ...rest], before, notes: [...line.notes.slice(0, order.length), ...run.notes.slice(run.last)], last: order.length });
 }
 
 // "Show me": a miss with no move played
@@ -873,7 +937,7 @@ export function answerRun(session, progress, card, run, settings, ctx = null) {
 	progress.asked = (progress.asked ?? 0) + 1;
 	const right = orderRight && items.every((x) => x.right);
 	const own = items.find((x) => x.card.id === card.id);
-	const result = { id: card.id, right, from: own?.from, to: own?.to, run: true, moves: items.length, missed: items.filter((x) => !x.right).length, unlocked: [] };
+	const result = { id: card.id, right, from: own?.from, to: own?.to, run: true, line: run.sans.join(" "), moves: items.length, missed: items.filter((x) => !x.right).length, unlocked: [] };
 	if (order && ctx && !order.justShown) result.also = credit(progress, { ...ctx, played: run.sans.slice(0, run.orderMiss ?? run.last) }, settings, run.order.id, false);
 	const rest = session.queue.slice(session.i + 1).filter((c) => !run.scored.has(c.id));
 	session.queue = [...session.queue.slice(0, session.i + 1), ...rest];

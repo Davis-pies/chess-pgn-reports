@@ -175,8 +175,11 @@ test("flow: learning a variation brings the next new one in, not before", () => 
 	assert.ok(tail().length && tail().every((c) => c.vkey === first), "a learned question is not room: its variation is still in flight");
 	// a miss keeps the card in flight: nothing joins for it
 	const n = s.queue.length;
-	answer(s, p, current(s), false, one, ctx);
-	assert.strictEqual(s.queue.length, n + 1, "only the requeued copy");
+	const missed = current(s);
+	answer(s, p, missed, false, one, ctx);
+	assert.strictEqual(s.queue.length, n + 2, "the requeued copy, and the learned question put between it and itself");
+	assert.notStrictEqual(current(s), missed);
+	assert.strictEqual(current(s).vkey, first, "nothing new joined");
 	while (current(s).vkey === first) answer(s, p, current(s), true, one, ctx);
 	assert.strictEqual(new Set(tail().map((c) => c.vkey)).size, 1, "learned: exactly one new variation joins");
 });
@@ -224,7 +227,8 @@ test("flow: re-checks join every recheckEvery answers and respect spacing", () =
 	off.asked = 200;
 	const known = new Set(Object.keys(off.cards));
 	const t = drive(newSession(deck, tree, off, { ...st, recheckEvery: 0 }, {}), off, { ...st, recheckEvery: 0 }, () => true, 12);
-	assert.ok(t.results.length > 0 && t.results.every((r) => !known.has(r.id)));
+	// a known question comes only between two of the same question, which would otherwise be asked back to back
+	assert.ok(t.results.length > 0 && t.results.every((r, k) => !known.has(r.id) || (k > 0 && (t.results[k - 1].line ?? t.results[k - 1].id) === (t.results[k + 1]?.line ?? t.results[k + 1]?.id))));
 });
 
 test("flow: a due re-check is asked next, but not beside a question of its own variation", () => {
@@ -368,9 +372,15 @@ test("answer: skip is kept; a miss returns three questions later", () => {
 	assert.strictEqual(p.cards[c.id].skip, true);
 	assert.strictEqual(w.i, 1);
 	assert.strictEqual(w.queue[3], c);
+	// never straight back: with nothing else to ask the session ends, and a learned question comes between where there is one
 	const end = hand([c]);
 	answer(end, p, c, false, S);
-	assert.deepStrictEqual(end.queue, [c, c]);
+	assert.strictEqual(current(end), null);
+	const known = deck[1];
+	p.cards[known.id] = { streak: S.learnStreak, seen: 1, skip: false };
+	const between = hand([c], { pool: [c, known] });
+	answer(between, p, c, false, S);
+	assert.deepStrictEqual(between.queue.slice(between.i), [known, c]);
 	assert.strictEqual(current({ queue: [c], i: 1 }), null);
 });
 
@@ -878,6 +888,8 @@ test("tricky: the third miss sets the card aside, learning clears it, the summar
 	const c = deck[0];
 	const p = emptyProgress();
 	const s = hand([c, deck[1], deck[2], deck[3], deck[4], deck[5], deck[6]], { before: { learned: new Set(), mastered: new Set() } });
+	// asked before, so that holding back after two misses keeps them between c's copies
+	for (const x of s.queue.slice(1)) p.cards[x.id] = { streak: 0, seen: 1, skip: false };
 	answer(s, p, c, false, S);
 	answer(s, p, c, false, S);
 	assert.strictEqual(s.queue.filter((x) => x === c).length, 3, "requeued after the second miss");
@@ -1052,7 +1064,8 @@ test("flow: a re-check skips a variation whose line was just played or shown, un
 	};
 	const st = { ...S, recheckEvery: 1, sessionLength: 0 };
 	assert.deepStrictEqual(run([d6, naj, e6], card, st), [e6], "not the Najdorf or the ...d6 Sicilians straight after the English Attack");
-	assert.deepStrictEqual(run([d6, naj], card, st), [], "they wait while something else is queued");
+	// they wait while something else is queued; the requeued English Attack question is, but it may not come straight back, so one of them comes between
+	assert.deepStrictEqual(run([d6, naj], card, st), [d6], "they wait while something else is queued, but come between a question and itself");
 	assert.deepStrictEqual(run([naj], card, { ...st, learnStreak: 1 }), [naj], "but the session does not end for them");
 	// an intro shown shows its line too
 	const intro = { ...card, id: `intro|${ea}`, type: "intro" };
@@ -1146,6 +1159,30 @@ const kanOpen = () => {
 	return p;
 };
 
+// Davis, 2026-10-19: "it still occasionally repeats the same exact question back-to-back"
+test("run: the same line is never played twice in a row; a learned question comes between, or the session ends", () => {
+	const missQc7 = (s, p, c) => {
+		const run = startRun(c, kan.deck, p, S);
+		while (!run.done) {
+			if (run.sans[run.at] === "Qc7") runShow(run);
+			else runPlay(run, runHere(run).want, kan.tree);
+			runOn(run);
+		}
+		return answerRun(s, p, c, run, S, { deck: kan.deck, tree: kan.tree });
+	};
+	const order = kan.deck.find((c) => c.type === "order");
+	const p = kanOpen();
+	const s = hand([kanCard("Nf6")], { pool: [order, kanCard("Nf6"), kanCard("Qc7")] });
+	const r = missQc7(s, p, kanCard("Nf6"));
+	assert.strictEqual(r.line, "e4 c5 Nf3 e6 d4 cxd4 Nxd4 a6 Bd3 Nf6 O-O Qc7");
+	assert.deepStrictEqual(s.queue.slice(s.i).map((c) => c.id), [order.id, kanCard("Qc7").id, kanCard("Nf6").id], "the Kan's order question, then the two book moves the line missed or did not learn");
+	// with nothing else to ask, the session ends rather than play the line again
+	const q = kanOpen();
+	const t = hand([kanCard("Nf6")]);
+	missQc7(t, q, kanCard("Nf6"));
+	assert.strictEqual(current(t), null);
+});
+
 test("bookOpen: a variation's book moves open with its order question", () => {
 	const p = emptyProgress();
 	assert.ok(!bookOpen(kan.k, kan.deck, p, S));
@@ -1175,17 +1212,20 @@ test("run: from move 1 along the line with the most unlearned book moves, the bo
 	assert.strictEqual(closed.order, null);
 });
 
-test("run: another order is not scored, any book move is right, the rest optional, a miss shows and goes on", () => {
+test("run: another order is followed, any book move is right, the rest optional, a miss shows and goes on", () => {
 	const p = kanOpen();
 	const run = startRun(kanCard("Nf6"), kan.deck, p, S);
 	const play = (san) => runPlay(run, san, kan.tree);
 	assert.strictEqual(play("c5"), "right");
 	assert.strictEqual(run.at, 3, "2.Nf3 played for you");
-	assert.strictEqual(play("a6"), "order", "the Kan's other order: not this line's");
-	assert.strictEqual(run.scored.size, 0);
+	// the prompt does not give the order away, so the Kan's other one is right too: the run follows it
+	assert.strictEqual(play("a6"), "order");
+	assert.strictEqual(run.at, 5, "3.d4 played for you");
+	assert.deepStrictEqual(run.sans.slice(0, 8), ["e4", "c5", "Nf3", "a6", "d4", "cxd4", "Nxd4", "e6"]);
+	assert.deepStrictEqual(run.sans.slice(8), ["Bd3", "Nf6", "O-O", "Qc7"], "the same line after the Kan");
+	assert.strictEqual(run.scored.size, 0, "before the first named position: no book cards");
+	assert.strictEqual(play("cxd4"), "right");
 	assert.strictEqual(play("e6"), "right");
-	play("cxd4");
-	play("a6");
 	assert.strictEqual(run.at, 9, "at 5...: two book moves");
 	assert.deepStrictEqual(runHere(run).moves, ["Nf6", "Bc5"]);
 	// another book move: credited, the line's move still asked for

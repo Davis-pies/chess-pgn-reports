@@ -221,9 +221,9 @@ For a shorter overview see the [README](../README.md).
      through the move it asks about, the one with the most book moves you
      have not learned yet. Up to the line's last named position it is that
      position's Order question ("Play the Najdorf, then on to the end of the
-     line"); when the position has more than one move order the prompt names
-     the line's, and a move from another order only says "Another order:
-     play this line's". Where you have several book moves, any of them is
+     line"). The prompt never gives the moves: when the position has more
+     than one move order, any of them is right, and the board follows the
+     one you play. Where you have several book moves, any of them is
      right: one this line does not take counts, and you are asked for the
      line's ("Book, but this line goes another way"). The hint says how many
      there are, and when this line's is one you haven't learned yet. After
@@ -337,7 +337,9 @@ For a shorter overview see the [README](../README.md).
      A question is re-checked at most once a session. A miss comes back three questions later, and so does a
      right answer on a question not yet learned, so a question can be learned
      in one sitting; once learned it is not asked again that session except
-     as a re-check. The session ends after "Questions per session" answers
+     as a re-check. The same question, or a Book run along the same line, is
+     never asked twice in a row: when nothing else is queued, a learned or
+     mastered question comes in between. The session ends after "Questions per session" answers
      (20 by default; 0 for no limit, when it runs until nothing is left to
      ask), or when you press **End session**, which shows the summary of
      what you answered. **Keep going** on the summary (or Enter) starts a
